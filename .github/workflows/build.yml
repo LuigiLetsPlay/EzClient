@@ -1,0 +1,40 @@
+name: Build EzClient
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build EzClient.exe
+        run: |
+          pyinstaller --onefile --noconsole --name EzClient launcher/main.py
+
+      - name: Build EzClientSetup.exe
+        run: |
+          pyinstaller --onefile --noconsole --name EzClientSetup setup/setup_main.py
+
+      - name: Upload releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/EzClient.exe
+            dist/EzClientSetup.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
