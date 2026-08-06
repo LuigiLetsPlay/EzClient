@@ -1,59 +1,52 @@
-"""Microsoft-Login via Device-Code-Flow."""
+"""Microsoft-Login - Offline Dummy fuer Entwicklung."""
 
 import json
-import os
-import time
-import requests
 from pathlib import Path
 
-
-# Oeffentliche Client-ID von Prism Launcher, austauschbar via EZCLIENT_CLIENT_ID
-CLIENT_ID = os.getenv("EZCLIENT_CLIENT_ID", "96c8c72f-50b0-466d-88f2-878950c47655")
 
 AUTH_CACHE_DIR = Path.home() / "AppData" / "Roaming" / "EzClient"
 AUTH_CACHE_FILE = AUTH_CACHE_DIR / "auth.json"
 
 
-def _get_device_code():
-    """Hole Device-Code vom Microsoft-Endpoint."""
-    url = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode"
-    data = {
-        "client_id": CLIENT_ID,
-        "scope": "XboxLive.signin offline_access",
-    }
-    resp = requests.post(url, data=data)
-    resp.raise_for_status()
-    return resp.json()
+def login(on_code_callback):
+    """
+    DEVELOPMENT: Dummy-Login, speichert einen Test-Spieler.
 
-
-def _get_token(device_code):
-    """Hole den Zugriff-Token, indem wir den Device-Code pollen."""
-    url = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
-    data = {
-        "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
-        "client_id": CLIENT_ID,
-        "device_code": device_code,
+    Fuer Production: Nutze Microsoft-Auth hier.
+    """
+    profile = {
+        "name": "TestSpieler",
+        "uuid": "00000000-0000-0000-0000-000000000000",
+        "access_token": "test_token_12345",
+        "refresh_token": "test_refresh_token",
     }
 
-    # Pollet alle 5 Sekunden, Timeout nach 15 Min
-    for _ in range(180):
-        try:
-            resp = requests.post(url, data=data, timeout=5)
-            if resp.status_code == 200:
-                return resp.json()
-            elif resp.status_code == 400:
-                err = resp.json()
-                if err.get("error") == "authorization_pending":
-                    time.sleep(5)
-                    continue
-                else:
-                    raise ValueError(f"Device-Code-Fehler: {err.get('error_description')}")
-            else:
-                resp.raise_for_status()
-        except requests.exceptions.Timeout:
-            time.sleep(5)
+    _save_cache(profile)
+    return profile
 
-    raise TimeoutError("Device-Code-Bestaetigung hat zu lange gedauert.")
+
+def load_cached_profile():
+    """Lade gecachtes Profil."""
+    if not AUTH_CACHE_FILE.exists():
+        return None
+    try:
+        with open(AUTH_CACHE_FILE) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return None
+
+
+def _save_cache(profile):
+    """Speichere Profil im Cache."""
+    AUTH_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    with open(AUTH_CACHE_FILE, "w") as f:
+        json.dump(profile, f)
+
+
+def logout():
+    """Loesche Profil-Cache."""
+    if AUTH_CACHE_FILE.exists():
+        AUTH_CACHE_FILE.unlink()
 
 
 def _xbox_authenticate(access_token):
@@ -142,7 +135,7 @@ def login(on_code_callback):
     Starte Device-Code-Login-Flow.
 
     on_code_callback(user_code, verification_uri) wird aufgerufen mit dem Code,
-    den der Spieler eingeben muss, und der URL, wo der Login durchgefuehrt wird.
+    den der Spieler eingeben muss, und der URL zum Bestaetigen.
 
     Gibt {name, uuid, access_token, refresh_token} zurueck.
     """

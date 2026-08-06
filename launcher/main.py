@@ -95,11 +95,12 @@ class EzClientLauncher:
     def _do_login(self):
         def login_thread():
             try:
-                self._update_login_status("Verbinde mit Microsoft...")
-
                 def on_code(user_code, uri):
-                    self._update_login_status(f"Code: {user_code}\nKlick hier: {uri}")
+                    self._update_login_status(
+                        f"Code: {user_code}\n\nGehe zu:\n{uri}\nund gib den Code ein."
+                    )
 
+                self._update_login_status("Bekomme Device-Code...")
                 self.profile = auth.login(on_code)
                 self.root.after(0, self._show_version_screen)
             except Exception as e:
