@@ -1,0 +1,13 @@
+singleton EzTheme 1.0 EzTheme.qml
+singleton EzI18n 1.0 EzI18n.qml
+TitleBar 1.0 TitleBar.qml
+TopBar 1.0 TopBar.qml
+Sidebar 1.0 Sidebar.qml
+StatusBar 1.0 StatusBar.qml
+ProfileDetailPage 1.0 ProfileDetailPage.qml
+ProfilesPage 1.0 ProfilesPage.qml
+ModsPage 1.0 ModsPage.qml
+HomePage 1.0 HomePage.qml
+SettingsPage 1.0 SettingsPage.qml
+ModrinthPage 1.0 ModrinthPage.qml
+OnboardingPage 1.0 OnboardingPage.qml

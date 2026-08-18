@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "ezclient",
+  "version": "1.0.0",
+  "name": "EzClient",
+  "description": "EzClient Core Client Mod - Performance Optimizer & Window Customizer",
+  "authors": [
+    "EzClient Team"
+  ],
+  "contact": {
+    "homepage": "https://ezclient.app"
+  },
+  "license": "MIT",
+  "icon": "assets/ezclient/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "app.ezclient.EzClientMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.14.0"
+  }
+}

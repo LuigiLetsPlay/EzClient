@@ -1,0 +1,48 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# PyInstaller / Build Artifacts
+build/
+dist/
+*.spec
+*.manifest
+
+# Caches & Logs
+*.log
+.cache/
+.pytest_cache/
+scratch/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# OS specific files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+.DS_Store
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# Java build temp (keep src and backend/assets/EzClient.jar)
+client_mod/bin/
+client_mod/*.class
+client_mod/**/*.class
