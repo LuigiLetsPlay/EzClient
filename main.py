@@ -116,13 +116,18 @@ def main() -> None:
         splash.close()
         sys.exit(-1)
 
-    window = engine.rootObjects()[0]
     from PySide6.QtCore import QSize
-    window.setMinimumSize(QSize(1040, 680))
+    try:
+        window.setMinimumSize(QSize(1040, 680))
+    except Exception:
+        pass
 
     splash.setMessage("Bereit!", 100)
     app.processEvents()
-    splash.finish(window)
+    splash.close()
+    window.show()
+    window.raise_()
+    window.requestActivate()
 
     # ── System Tray Icon Setup ──
     tray_icon = QSystemTrayIcon(app_icon, app)
