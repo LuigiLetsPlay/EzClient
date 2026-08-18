@@ -235,11 +235,35 @@ class AccountController(QObject):
 
     skinFetched = Signal(str, str)  # local_path, preview_url
     skinHistoryChanged = Signal()
+    savedSkinsChanged = Signal()
 
     @Property("QVariantList", notify=skinHistoryChanged)
     def skinHistory(self) -> list[dict]:
         from backend.services.skin_service import get_skin_history
         return get_skin_history()
+
+    @Property("QVariantList", notify=savedSkinsChanged)
+    def savedSkins(self) -> list[dict]:
+        from backend.services.skin_service import get_saved_skins
+        return get_saved_skins()
+
+    @Slot(str, str)
+    def saveCurrentSkin(self, name: str, path: str = "") -> None:
+        """Saves a custom skin with a custom name to the persistent library."""
+        target_path = path or self._active_custom_path
+        target_name = (name or "").strip() or self._active_custom_name or "Mein Skin"
+        from backend.services.skin_service import save_skin_to_library
+        save_skin_to_library(target_name, target_path, self._active_custom_avatar)
+        self.savedSkinsChanged.emit()
+        self.skinUploadStatusChanged.emit(f"Skin '{target_name}' in Bibliothek gespeichert!", False)
+
+    @Slot(str)
+    def deleteSavedSkin(self, skin_id_or_name: str) -> None:
+        """Removes a skin from the persistent library."""
+        from backend.services.skin_service import delete_saved_skin_from_library
+        delete_saved_skin_from_library(skin_id_or_name)
+        self.savedSkinsChanged.emit()
+        self.skinUploadStatusChanged.emit("Skin aus Bibliothek gelöscht.", False)
 
     @Slot(str)
     def fetchSkinByUsername(self, username: str) -> None:

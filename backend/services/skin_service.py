@@ -209,6 +209,66 @@ def generate_skin_renders(skin_path: str | Path) -> tuple[str, str]:
         return "", ""
 
 
+def get_saved_skins() -> list[dict]:
+    saved_file = get_skins_dir() / "saved_skins.json"
+    if saved_file.exists():
+        try:
+            return json.loads(saved_file.read_text("utf-8"))
+        except Exception:
+            return []
+    return []
+
+
+def save_skin_to_library(name: str, path: str, preview_url: str = "") -> list[dict]:
+    skins = get_saved_skins()
+    clean_name = (name or "").strip()
+    if not clean_name:
+        clean_name = "Mein Skin"
+
+    # If preview_url is not set and path is a local file, generate rendered preview
+    if not preview_url and path and Path(path).exists():
+        body_p, av_p = generate_skin_renders(path)
+        if av_p:
+            preview_url = "file:///" + str(Path(av_p)).replace("\\", "/")
+
+    skin_id = f"skin_{int(time.time())}_{len(skins)}"
+    # Deduplicate by name
+    skins = [s for s in skins if s.get("name", "").lower() != clean_name.lower()]
+    skins.insert(0, {
+        "id": skin_id,
+        "name": clean_name,
+        "path": path or "",
+        "previewUrl": preview_url or f"https://mc-heads.net/avatar/{clean_name}/64",
+        "savedAt": int(time.time())
+    })
+    try:
+        (get_skins_dir() / "saved_skins.json").write_text(json.dumps(skins, indent=2), "utf-8")
+    except Exception:
+        pass
+    return skins
+
+
+def delete_saved_skin_from_library(skin_id_or_name: str) -> list[dict]:
+    skins = get_saved_skins()
+    target = (skin_id_or_name or "").strip().lower()
+    skins = [s for s in skins if s.get("id", "").lower() != target and s.get("name", "").lower() != target]
+    try:
+        (get_skins_dir() / "saved_skins.json").write_text(json.dumps(skins, indent=2), "utf-8")
+    except Exception:
+        pass
+    return skins
+
+
+def get_skin_history() -> list[dict]:
+    hist_file = get_skins_dir() / "history.json"
+    if hist_file.exists():
+        try:
+            return json.loads(hist_file.read_text("utf-8"))
+        except Exception:
+            return []
+    return []
+
+
 def add_skin_to_history(username: str, path: str, preview_url: str = "") -> list[dict]:
     history = get_skin_history()
     u_clean = (username or "").strip().lower()
@@ -253,6 +313,31 @@ def fetch_skin_by_username(username: str) -> tuple[bool, str, str]:
         return False, "", "Kein Spielername angegeben."
 
     target_png = get_skins_dir() / f"{name}.png"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    }
+
+    # 1. Primary: playerdb.co API (High-speed official texture lookup)
+    try:
+        req = urllib.request.Request(f"https://playerdb.co/api/player/minecraft/{name}", headers=headers)
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            if resp.getcode() == 200:
+                data = json.loads(resp.read().decode("utf-8", errors="replace"))
+                skin_tex_url = data.get("data", {}).get("player", {}).get("skin_texture")
+                if skin_tex_url:
+                    req_tex = urllib.request.Request(skin_tex_url, headers=headers)
+                    with urllib.request.urlopen(req_tex, timeout=6) as r_tex:
+                        content = r_tex.read()
+                        if len(content) > 300:
+                            target_png.write_bytes(content)
+                            body_p, av_p = generate_skin_renders(target_png)
+                            preview_url = ("file:///" + str(Path(body_p)).replace("\\", "/")) if body_p else f"https://mc-heads.net/body/{name}/360"
+                            add_skin_to_history(name, str(target_png), preview_url)
+                            return True, str(target_png), preview_url
+    except Exception:
+        pass
+
+    # 2. Fallbacks: Minotar, mc-heads, Crafatar
     urls = [
         f"https://minotar.net/skin/{name}",
         f"https://mc-heads.net/download/{name}",
@@ -261,13 +346,14 @@ def fetch_skin_by_username(username: str) -> tuple[bool, str, str]:
 
     for url in urls:
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "EzClient/1.0.8"})
-            with urllib.request.urlopen(req, timeout=8) as resp:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=6) as resp:
                 if resp.getcode() == 200:
                     content = resp.read()
-                    if len(content) > 500:
+                    if len(content) > 300:
                         target_png.write_bytes(content)
-                        preview_url = f"https://mc-heads.net/body/{name}/360"
+                        body_p, av_p = generate_skin_renders(target_png)
+                        preview_url = ("file:///" + str(Path(body_p)).replace("\\", "/")) if body_p else f"https://mc-heads.net/body/{name}/360"
                         add_skin_to_history(name, str(target_png), preview_url)
                         return True, str(target_png), preview_url
         except Exception:
