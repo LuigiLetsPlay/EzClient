@@ -73,6 +73,22 @@ class AccountController(QObject):
         self._is_logging_in = False
         self._login_status = ""
         self._login_dialog = None
+        self._active_custom_name = ""
+        self._active_custom_path = ""
+        self._active_custom_body = ""
+        self._active_custom_avatar = ""
+
+        try:
+            from backend.services.skin_service import get_active_skin
+            act = get_active_skin()
+            if act:
+                self._active_custom_name = act.get("name", "")
+                self._active_custom_path = act.get("path", "")
+                self._active_custom_body = act.get("bodyUrl", "")
+                self._active_custom_avatar = act.get("avatarUrl", "")
+        except Exception:
+            pass
+
         self._load_account()
 
     def _load_account(self, force_refresh: bool = False) -> None:
@@ -123,18 +139,24 @@ class AccountController(QObject):
 
     @Property(str, notify=accountChanged)
     def avatarUrl(self) -> str:
+        if self._active_custom_avatar:
+            return self._active_custom_avatar
         if self._username:
             return f"https://mc-heads.net/avatar/{self._username}/64?t={self._skin_version}"
         return ""
 
     @Property(str, notify=accountChanged)
     def bustUrl(self) -> str:
+        if self._active_custom_body:
+            return self._active_custom_body
         if self._username:
             return f"https://mc-heads.net/bust/{self._username}/160?t={self._skin_version}"
         return ""
 
     @Property(str, notify=accountChanged)
     def bodyUrl(self) -> str:
+        if self._active_custom_body:
+            return self._active_custom_body
         if self._username:
             return f"https://mc-heads.net/body/{self._username}/360?t={self._skin_version}"
         return ""
@@ -229,12 +251,22 @@ class AccountController(QObject):
         self.skinUploadStatusChanged.emit(f"Lade Skin für '{username.strip()}'…", False)
 
         def worker():
-            from backend.services.skin_service import fetch_skin_by_username
+            from backend.services.skin_service import fetch_skin_by_username, generate_skin_renders, set_active_skin
             ok, path, preview = fetch_skin_by_username(username.strip())
             if ok:
-                self.skinFetched.emit(path, preview)
+                body_p, av_p = generate_skin_renders(path)
+                body_url = ("file:///" + str(Path(body_p)).replace("\\", "/")) if body_p else preview
+                av_url = ("file:///" + str(Path(av_p)).replace("\\", "/")) if av_p else f"https://mc-heads.net/avatar/{username.strip()}/64"
+                self._active_custom_body = body_url
+                self._active_custom_avatar = av_url
+                self._active_custom_name = username.strip()
+                self._active_custom_path = path
+                set_active_skin(username.strip(), path, body_url, av_url)
+                self._skin_version = int(time.time())
+                self.skinFetched.emit(path, body_url)
+                self.accountChanged.emit()
                 self.skinHistoryChanged.emit()
-                self.skinUploadStatusChanged.emit(f"Skin von {username.strip()} geladen!", False)
+                self.skinUploadStatusChanged.emit(f"Skin von {username.strip()} geladen & synchronisiert!", False)
             else:
                 self.skinUploadStatusChanged.emit(preview, True)
 
@@ -254,15 +286,22 @@ class AccountController(QObject):
             "Minecraft Skin (*.png);;Alle Dateien (*.*)"
         )
         if file_path:
-            from backend.services.skin_service import generate_skin_renders, add_skin_to_history
+            from backend.services.skin_service import generate_skin_renders, add_skin_to_history, set_active_skin
             body_p, av_p = generate_skin_renders(file_path)
             clean_name = Path(file_path).stem.replace("_", " ").replace("-", " ").title()
             av_url = ("file:///" + str(Path(av_p)).replace("\\", "/")) if av_p else ""
             body_url = ("file:///" + str(Path(body_p)).replace("\\", "/")) if body_p else ""
             
             add_skin_to_history(clean_name, file_path, av_url)
+            self._active_custom_body = body_url
+            self._active_custom_avatar = av_url
+            self._active_custom_name = clean_name
+            self._active_custom_path = file_path
+            set_active_skin(clean_name, file_path, body_url, av_url)
+            self._skin_version = int(time.time())
             self.skinHistoryChanged.emit()
             self.skinFetched.emit(file_path, body_url)
+            self.accountChanged.emit()
         return file_path or ""
 
     @Slot(str, str)
@@ -272,37 +311,36 @@ class AccountController(QObject):
             self.skinUploadStatusChanged.emit("Keine Skin-Datei ausgewählt.", True)
             return
 
-        self.skinUploadStatusChanged.emit("Skin wird zu Mojang übertragen…", False)
-
-        # 1. Save current active skin to history before overwriting
-        if self._username and self._username != "Player":
-            try:
-                from backend.services.skin_service import add_skin_to_history
-                add_skin_to_history(self._username, "", f"https://mc-heads.net/avatar/{self._username}/64?t={self._skin_version}")
-                self.skinHistoryChanged.emit()
-            except Exception:
-                pass
+        # 1. Immediately apply skin locally across all 3 UI views
+        from backend.services.skin_service import generate_skin_renders, add_skin_to_history, set_active_skin
+        body_p, av_p = generate_skin_renders(file_path)
+        clean_name = Path(file_path).stem.replace("_", " ").replace("-", " ").title()
+        av_url = ("file:///" + str(Path(av_p)).replace("\\", "/")) if av_p else ""
+        body_url = ("file:///" + str(Path(body_p)).replace("\\", "/")) if body_p else ""
+        
+        self._active_custom_body = body_url
+        self._active_custom_avatar = av_url
+        self._active_custom_name = clean_name
+        self._active_custom_path = file_path
+        set_active_skin(clean_name, file_path, body_url, av_url)
+        add_skin_to_history(clean_name, file_path, av_url)
+        self._skin_version = int(time.time())
+        self.accountChanged.emit()
+        self.skinHistoryChanged.emit()
+        self.skinUploadStatusChanged.emit("Skin aktiv & wird zu Mojang übertragen…", False)
 
         def worker():
             try:
                 session = get_minecraft_session()
                 token = session.access_token if session else ""
                 if not token:
-                    self.skinUploadStatusChanged.emit("Nicht mit Microsoft eingeloggt.", True)
+                    self.skinUploadStatusChanged.emit("Skin lokal angewendet (Offline/Lokaler Modus).", False)
                     return
 
                 ok, msg = upload_skin_file(token, file_path, variant)
                 self.skinUploadStatusChanged.emit(msg, not ok)
                 if ok:
-                    self._skin_version = int(time.time())
-                    from backend.services.skin_service import generate_skin_renders, add_skin_to_history
-                    body_p, av_p = generate_skin_renders(file_path)
-                    clean_name = Path(file_path).stem.replace("_", " ").replace("-", " ").title()
-                    av_url = ("file:///" + str(Path(av_p)).replace("\\", "/")) if av_p else ""
-                    add_skin_to_history(clean_name, file_path, av_url)
                     self._load_account(force_refresh=True)
-                    self.skinHistoryChanged.emit()
-                    self.accountChanged.emit()
             except Exception as e:
                 self.skinUploadStatusChanged.emit(f"Fehler: {e}", True)
 
@@ -311,6 +349,14 @@ class AccountController(QObject):
     @Slot()
     def resetSkin(self) -> None:
         """Resets active skin to default."""
+        self._active_custom_body = ""
+        self._active_custom_avatar = ""
+        self._active_custom_name = ""
+        self._active_custom_path = ""
+        from backend.services.skin_service import set_active_skin
+        set_active_skin("", "", "", "")
+        self._skin_version = int(time.time())
+        self.accountChanged.emit()
         self.skinUploadStatusChanged.emit("Skin wird zurückgesetzt…", False)
 
         def worker():
@@ -318,7 +364,7 @@ class AccountController(QObject):
                 session = get_minecraft_session()
                 token = session.access_token if session else ""
                 if not token:
-                    self.skinUploadStatusChanged.emit("Nicht mit Microsoft eingeloggt.", True)
+                    self.skinUploadStatusChanged.emit("Standard-Skin aktiv.", False)
                     return
 
                 ok, msg = reset_skin_to_default(token)

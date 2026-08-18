@@ -98,14 +98,28 @@ def get_skins_dir() -> Path:
     return p
 
 
-def get_skin_history() -> list[dict]:
-    hist_file = get_skins_dir() / "history.json"
-    if hist_file.exists():
+def get_active_skin() -> dict:
+    f = get_skins_dir() / "active_skin.json"
+    if f.exists():
         try:
-            return json.loads(hist_file.read_text("utf-8"))
+            return json.loads(f.read_text("utf-8"))
         except Exception:
-            return []
-    return []
+            return {}
+    return {}
+
+
+def set_active_skin(name: str, path: str, body_url: str, avatar_url: str) -> dict:
+    data = {
+        "name": name,
+        "path": path,
+        "bodyUrl": body_url,
+        "avatarUrl": avatar_url
+    }
+    try:
+        (get_skins_dir() / "active_skin.json").write_text(json.dumps(data, indent=2), "utf-8")
+    except Exception:
+        pass
+    return data
 
 
 def generate_skin_renders(skin_path: str | Path) -> tuple[str, str]:

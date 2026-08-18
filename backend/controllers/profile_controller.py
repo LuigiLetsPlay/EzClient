@@ -663,8 +663,8 @@ class ProfileController(QObject):
                     was_intentional_stop = self._live_log_service.intentional_stop
                     self._live_log_service.detach_process()
 
-                    if self.minimizeToTray:
-                        self.restoreFromTrayRequested.emit()
+                    # Always bring the launcher window back to front when game exits
+                    self.restoreFromTrayRequested.emit()
 
                     # Check for fresh crash reports generated during this specific run
                     crash_reports_dir = self._active_profile.path / "crash-reports"
@@ -735,8 +735,7 @@ class ProfileController(QObject):
 
                 def on_game_exited():
                     self._is_launching = False
-                    if self.minimizeToTray:
-                        self.restoreFromTrayRequested.emit()
+                    self.restoreFromTrayRequested.emit()
                     self.launchStatusChanged.emit(f"Spiel beendet ({self._active_profile.name})", False)
 
                 # Watch for game start, autokill official launcher window, restore on exit

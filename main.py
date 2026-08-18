@@ -9,13 +9,6 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtCore import QUrl, Qt
 
 from backend.models.types import APP_VERSION
-from backend.services.store import ProfileStore
-from backend.models.profile_model import ProfileModel
-from backend.models.mod_model import ModModel
-from backend.controllers.profile_controller import ProfileController
-from backend.controllers.modrinth_controller import ModrinthController
-from backend.controllers.account_controller import AccountController
-from backend.controllers.update_controller import UpdateController
 from backend.ui_splash import EzSplashScreen
 
 
@@ -47,6 +40,34 @@ def create_app_icon() -> QIcon:
     return QIcon(pix)
 
 
+def force_window_to_front(hwnd: int) -> None:
+    """Bypasses Windows foreground lock policy and brings window to absolute top."""
+    if sys.platform != "win32" or not hwnd:
+        return
+    try:
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        
+        user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+        
+        fg_hwnd = user32.GetForegroundWindow()
+        fg_thread = user32.GetWindowThreadProcessId(fg_hwnd, None)
+        curr_thread = kernel32.GetCurrentThreadId()
+        
+        if fg_thread != curr_thread and fg_thread != 0:
+            user32.AttachThreadInput(curr_thread, fg_thread, True)
+            user32.BringWindowToTop(hwnd)
+            user32.SetForegroundWindow(hwnd)
+            user32.SetFocus(hwnd)
+            user32.AttachThreadInput(curr_thread, fg_thread, False)
+        else:
+            user32.BringWindowToTop(hwnd)
+            user32.SetForegroundWindow(hwnd)
+            user32.SetFocus(hwnd)
+    except Exception as e:
+        print(f"[FocusHelper] {e}")
+
+
 def main() -> None:
     # Ensure Windows single-instance check
     if sys.platform == "win32":
@@ -56,8 +77,7 @@ def main() -> None:
             if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
                 hwnd = ctypes.windll.user32.FindWindowW(None, "EzClient")
                 if hwnd:
-                    ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-                    ctypes.windll.user32.SetForegroundWindow(hwnd)
+                    force_window_to_front(hwnd)
                 sys.exit(0)
         except Exception:
             pass
@@ -71,7 +91,7 @@ def main() -> None:
     app_icon = create_app_icon()
     app.setWindowIcon(app_icon)
 
-    # ── Instant Splash Screen (Shows within 50ms) ──
+    # ── Instant Splash Screen (Shows immediately in <20ms) ──
     splash = EzSplashScreen(APP_VERSION)
     splash.show()
     app.processEvents()
@@ -93,6 +113,14 @@ def main() -> None:
     # Backend initialization
     splash.setMessage("Lade Profile & Einstellungen…", 50)
     app.processEvents()
+
+    from backend.services.store import ProfileStore
+    from backend.models.profile_model import ProfileModel
+    from backend.models.mod_model import ModModel
+    from backend.controllers.profile_controller import ProfileController
+    from backend.controllers.modrinth_controller import ModrinthController
+    from backend.controllers.account_controller import AccountController
+    from backend.controllers.update_controller import UpdateController
 
     store = ProfileStore()
     profile_model = ProfileModel()
@@ -148,9 +176,16 @@ def main() -> None:
     act_quit = tray_menu.addAction("Beenden")
 
     def restore_window():
+        window.show()
         window.showNormal()
         window.raise_()
         window.requestActivate()
+        if sys.platform == "win32":
+            try:
+                hwnd = int(window.winId())
+                force_window_to_front(hwnd)
+            except Exception:
+                pass
 
     def hide_window_to_tray():
         window.hide()

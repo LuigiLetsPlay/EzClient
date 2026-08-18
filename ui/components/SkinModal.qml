@@ -410,7 +410,14 @@ Rectangle {
                                     onClicked: {
                                         if (modelData.path) {
                                             skinModal.selectedFilePath = modelData.path
-                                            skinModal.previewBodyUrl = modelData.previewUrl || ("https://mc-heads.net/body/" + (modelData.username || "Steve") + "/360")
+                                            if (accountController) {
+                                                accountController.uploadSkin(modelData.path, skinModal.skinVariant)
+                                            }
+                                        } else if (modelData.username) {
+                                            skinNameInput.text = modelData.username
+                                            if (accountController) {
+                                                accountController.fetchSkinByUsername(modelData.username)
+                                            }
                                         }
                                     }
                                 }
