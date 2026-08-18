@@ -17,6 +17,14 @@ Item {
     readonly property string accountUser: typeof accountController !== "undefined" && accountController ? accountController.username : "Player"
     readonly property string bodyUrl: typeof accountController !== "undefined" && accountController ? accountController.bodyUrl : ""
 
+    function formatImageUrl(path) {
+        if (!path) return "assets/hero_bg.jpg";
+        if (path.startsWith("file:///") || path.startsWith("http://") || path.startsWith("https://") || path.startsWith("qrc:/")) return path;
+        var clean = path.replace(/\\/g, "/");
+        if (clean.startsWith("/")) return "file://" + clean;
+        return "file:///" + clean;
+    }
+
     // ─────────────────────────────────────────────────────────
     // 1. FULL-BLEED CINEMATIC MINECRAFT BACKGROUND
     // ─────────────────────────────────────────────────────────
@@ -24,10 +32,14 @@ Item {
         id: bgHero
         anchors.fill: parent
         source: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage) 
-                ? (profileController.customBackgroundImage.indexOf(":") >= 0 ? profileController.customBackgroundImage : ("file:///" + profileController.customBackgroundImage.replace(/\\/g, "/"))) 
+                ? root.formatImageUrl(profileController.customBackgroundImage) 
                 : "assets/hero_bg.jpg"
-        fillMode: Image.PreserveAspectCrop
-        opacity: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage) ? 0.55 : 0.35
+        fillMode: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundFillMode === "PreserveAspectFit") 
+                  ? Image.PreserveAspectFit 
+                  : (profileController && profileController.customBackgroundFillMode === "Stretch" ? Image.Stretch : Image.PreserveAspectCrop)
+        opacity: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage) 
+                 ? profileController.customBackgroundOpacity 
+                 : 0.35
         Behavior on opacity { NumberAnimation { duration: 300 } }
     }
 

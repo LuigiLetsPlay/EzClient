@@ -1,7 +1,9 @@
 import re
+import time
 import threading
 import urllib.parse
 import webbrowser
+from pathlib import Path
 from PySide6.QtCore import QObject, Signal, Slot, Property, QUrl, Qt
 from PySide6.QtWidgets import QDialog, QVBoxLayout
 
@@ -66,6 +68,7 @@ class AccountController(QObject):
         self._account_type = "Microsoft Account"
         self._uuid = ""
         self._skin_url = ""
+        self._skin_version = int(time.time())
         self._is_online = False
         self._is_logging_in = False
         self._login_status = ""
@@ -81,6 +84,7 @@ class AccountController(QObject):
                 self._uuid = session.uuid
                 self._skin_url = session.skin_url
                 self._is_online = session.is_online
+                self._skin_version = int(time.time())
                 self._account_type = "Microsoft Account (Online Verifiziert)" if session.is_online else "Microsoft Account (Lokal)"
             except Exception as e:
                 print(f"[AccountController] Error loading account: {e}")
@@ -120,19 +124,19 @@ class AccountController(QObject):
     @Property(str, notify=accountChanged)
     def avatarUrl(self) -> str:
         if self._username:
-            return f"https://mc-heads.net/avatar/{self._username}/32"
+            return f"https://mc-heads.net/avatar/{self._username}/64?t={self._skin_version}"
         return ""
 
     @Property(str, notify=accountChanged)
     def bustUrl(self) -> str:
         if self._username:
-            return f"https://mc-heads.net/bust/{self._username}/160"
+            return f"https://mc-heads.net/bust/{self._username}/160?t={self._skin_version}"
         return ""
 
     @Property(str, notify=accountChanged)
     def bodyUrl(self) -> str:
         if self._username:
-            return f"https://mc-heads.net/body/{self._username}/360"
+            return f"https://mc-heads.net/body/{self._username}/360?t={self._skin_version}"
         return ""
 
     @Slot()
@@ -264,6 +268,15 @@ class AccountController(QObject):
 
         self.skinUploadStatusChanged.emit("Skin wird zu Mojang übertragen…", False)
 
+        # 1. Save current active skin to history before overwriting
+        if self._username and self._username != "Player":
+            try:
+                from backend.services.skin_service import add_skin_to_history
+                add_skin_to_history(self._username, "", f"https://mc-heads.net/avatar/{self._username}/64?t={self._skin_version}")
+                self.skinHistoryChanged.emit()
+            except Exception:
+                pass
+
         def worker():
             try:
                 session = get_minecraft_session()
@@ -275,7 +288,11 @@ class AccountController(QObject):
                 ok, msg = upload_skin_file(token, file_path, variant)
                 self.skinUploadStatusChanged.emit(msg, not ok)
                 if ok:
+                    self._skin_version = int(time.time())
+                    from backend.services.skin_service import add_skin_to_history
+                    add_skin_to_history(Path(file_path).stem, file_path, f"https://mc-heads.net/avatar/{self._username}/64?t={self._skin_version}")
                     self._load_account(force_refresh=True)
+                    self.skinHistoryChanged.emit()
             except Exception as e:
                 self.skinUploadStatusChanged.emit(f"Fehler: {e}", True)
 

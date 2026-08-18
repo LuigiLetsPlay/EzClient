@@ -12,7 +12,7 @@ Item {
 
     // Form state
     property string newName: ""
-    property string newVersion: "1.21.4"
+    property string newVersion: "26.2"
     property string newLoader: "Fabric"
     property string selectedPreset: "performance" // "raw" | "performance" | "essentials"
 

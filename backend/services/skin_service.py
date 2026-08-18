@@ -110,14 +110,25 @@ def get_skin_history() -> list[dict]:
 
 def add_skin_to_history(username: str, path: str, preview_url: str = "") -> list[dict]:
     history = get_skin_history()
-    # Filter duplicate
-    history = [h for h in history if h.get("username", "").lower() != username.lower() and h.get("path") != path]
+    u_clean = (username or "").strip().lower()
+    p_clean = str(path or "").strip().lower()
+
+    def is_dup(item: dict) -> bool:
+        item_u = str(item.get("username", "")).strip().lower()
+        item_p = str(item.get("path", "")).strip().lower()
+        if u_clean and item_u and item_u == u_clean:
+            return True
+        if p_clean and item_p and item_p == p_clean:
+            return True
+        return False
+
+    history = [h for h in history if not is_dup(h)]
     history.insert(0, {
-        "username": username,
-        "path": path,
+        "username": (username or "Skin").strip(),
+        "path": path or "",
         "previewUrl": preview_url or f"https://mc-heads.net/avatar/{username}/64"
     })
-    history = history[:12]  # keep up to 12 recent skins
+    history = history[:16]  # keep up to 16 recent skins
     try:
         (get_skins_dir() / "history.json").write_text(json.dumps(history, indent=2), "utf-8")
     except Exception:

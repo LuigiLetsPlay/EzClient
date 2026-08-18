@@ -160,12 +160,32 @@ class ProfileController(QObject):
     def customBackgroundImage(self) -> str:
         return self._store.settings.get("custom_background_image", "")
 
+    @Property(float, notify=settingsChanged)
+    def customBackgroundOpacity(self) -> float:
+        return float(self._store.settings.get("custom_background_opacity", 0.60))
+
+    @Property(str, notify=settingsChanged)
+    def customBackgroundFillMode(self) -> str:
+        return str(self._store.settings.get("custom_background_fill_mode", "PreserveAspectCrop"))
+
     @Slot(str)
     def setCustomBackgroundImage(self, path_or_url: str) -> None:
         self._store.settings["custom_background_image"] = str(path_or_url).strip()
         self._store.save()
         self.settingsChanged.emit()
         self.settingSaved.emit("Hintergrundbild aktualisiert")
+
+    @Slot(float)
+    def setCustomBackgroundOpacity(self, opacity: float) -> None:
+        self._store.settings["custom_background_opacity"] = max(0.05, min(1.0, float(opacity)))
+        self._store.save()
+        self.settingsChanged.emit()
+
+    @Slot(str)
+    def setCustomBackgroundFillMode(self, mode: str) -> None:
+        self._store.settings["custom_background_fill_mode"] = str(mode)
+        self._store.save()
+        self.settingsChanged.emit()
 
     @Slot(result=str)
     def pickBackgroundImage(self) -> str:

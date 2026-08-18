@@ -10,7 +10,7 @@ class EzSplashScreen(QSplashScreen):
     and vivid EzClient neon green branding.
     """
 
-    def __init__(self, version: str = "1.0.8"):
+    def __init__(self, version: str = "1.1.0"):
         self.version = version
         self.current_msg = "EzClient wird geladen…"
         self.current_pct = 15

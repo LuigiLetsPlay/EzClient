@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont, QIcon, QPixmap, QColor
 
 APP_NAME = "EzClient"
-APP_VERSION = "1.0.8"
+APP_VERSION = "1.1.0"
 DEFAULT_INSTALL_DIR = Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Programs" / "EzClient"
 
 
@@ -307,12 +307,12 @@ class InstallerWindow(QWidget):
 
             dir_row = QHBoxLayout()
             dir_row.setSpacing(8)
-            browse_btn = QPushButton("Durchsuchen…")
-            browse_btn.setObjectName("secondary")
-            browse_btn.clicked.connect(self.browse_dir)
-            dir_row.addWidget(self.dir_input)
-            dir_row.addWidget(browse_btn)
-            layout.addLayout(dir_row)
+        self.browse_btn = QPushButton("Durchsuchen…")
+        self.browse_btn.setObjectName("secondary")
+        self.browse_btn.clicked.connect(self.browse_dir)
+        dir_row.addWidget(self.dir_input)
+        dir_row.addWidget(self.browse_btn)
+        layout.addLayout(dir_row)
 
         # Checkboxes (only shown in fresh install mode)
         self.chk_desktop = QCheckBox("Desktop-Verknüpfung erstellen")
@@ -365,11 +365,16 @@ class InstallerWindow(QWidget):
 
     def start_install(self):
         target_dir = Path(self.dir_input.text().strip())
-        self.install_btn.setEnabled(False)
-        self.cancel_btn.setEnabled(False)
+        # Lock options & hide install button while in progress
+        self.install_btn.setVisible(False)
+        self.cancel_btn.setVisible(True)
+        self.cancel_btn.setEnabled(True)
         self.dir_input.setEnabled(False)
+        if hasattr(self, 'browse_btn'):
+            self.browse_btn.setEnabled(False)
         self.chk_desktop.setEnabled(False)
         self.chk_startmenu.setEnabled(False)
+        self.chk_launch.setEnabled(False)
         self.progress_bar.setVisible(True)
         self.status_label.setVisible(True)
 
@@ -387,6 +392,8 @@ class InstallerWindow(QWidget):
             self.installed_exe = Path(msg)
             self.status_label.setText("✓ EzClient wurde erfolgreich aktualisiert!" if self.is_update else "✓ EzClient wurde erfolgreich installiert!")
             self.status_label.setStyleSheet("font-size: 12px; color: #24d677; font-weight: bold;")
+            self.cancel_btn.setVisible(False)
+            self.install_btn.setVisible(True)
             self.install_btn.setText("Fertigstellen")
             self.install_btn.setEnabled(True)
             self.install_btn.clicked.disconnect()
@@ -397,6 +404,7 @@ class InstallerWindow(QWidget):
         else:
             self.status_label.setText(f"Fehler: {msg}")
             self.status_label.setStyleSheet("font-size: 11px; color: #ff5555;")
+            self.cancel_btn.setText("Schließen")
             self.cancel_btn.setEnabled(True)
 
     def finish_and_exit(self):

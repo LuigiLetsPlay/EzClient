@@ -155,7 +155,13 @@ Item {
 
                         Image {
                             anchors.fill: parent
-                            source: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage) ? ("file:///" + profileController.customBackgroundImage.replace(/\\/g, "/")) : "assets/hero_bg.jpg"
+                            source: {
+                                var p = (typeof profileController !== "undefined" && profileController) ? profileController.customBackgroundImage : "";
+                                if (!p) return "assets/hero_bg.jpg";
+                                if (p.startsWith("file:///") || p.startsWith("http://") || p.startsWith("https://") || p.startsWith("qrc:/")) return p;
+                                var clean = p.replace(/\\/g, "/");
+                                return clean.startsWith("/") ? ("file://" + clean) : ("file:///" + clean);
+                            }
                             fillMode: Image.PreserveAspectCrop
                         }
                     }
@@ -171,7 +177,7 @@ Item {
                             color: EzTheme.text
                         }
                         Text {
-                            text: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage) ? "Eigenes Bild aktiv" : "Standard Minecraft Artwork aktiv"
+                            text: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage) ? "Eigenes Bild aktiv · " + Math.round((profileController.customBackgroundOpacity || 0.6) * 100) + "% Deckkraft" : "Standard Minecraft Artwork aktiv"
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 10
                             color: EzTheme.textMuted
@@ -183,12 +189,11 @@ Item {
                         Layout.alignment: Qt.AlignVCenter
 
                         EzButton {
-                            text: "Bild wählen…"
+                            text: "Anpassen & Vorschau…"
                             mcFont: true
+                            primary: true
                             implicitHeight: 32
-                            onClicked: {
-                                if (profileController) profileController.pickBackgroundImage()
-                            }
+                            onClicked: bgModal.open()
                         }
 
                         EzButton {
@@ -837,5 +842,10 @@ Item {
 
             Item { height: 32 }
         }
+    }
+
+    // Background customizer & live preview modal
+    BackgroundModal {
+        id: bgModal
     }
 }
