@@ -38,7 +38,7 @@ def build_exe():
         "backend.services.minecraft",
         "backend.services.direct_launch",
         "backend.services.mod_downloader",
-        "backend.services.modrinth_api",
+        "backend.services.modrinth",
         "backend.services.updater",
         "backend.controllers.profile_controller",
         "backend.controllers.modrinth_controller",
