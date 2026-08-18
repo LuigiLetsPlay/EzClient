@@ -24,6 +24,7 @@ class LiveLogService(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._is_running: bool = False
+        self._intentional_stop: bool = False
         self._current_process = None
         self._current_pid: int | None = None
         self._start_time: float = 0
@@ -34,6 +35,10 @@ class LiveLogService(QObject):
         self._lines_buffer: list[dict[str, str]] = []
         self._instance_name: str = "Minecraft"
         self._loader_version: str = "Fabric 26.2"
+
+    @property
+    def intentional_stop(self) -> bool:
+        return self._intentional_stop
 
     @Property(bool, notify=isRunningChanged)
     def isRunning(self) -> bool:
@@ -60,6 +65,7 @@ class LiveLogService(QObject):
             self._stats_thread.join(timeout=1.0)
 
         self._stop_event.clear()
+        self._intentional_stop = False
         self._current_process = proc
         self._current_pid = proc.pid if proc else None
         self._log_file_path = log_file
@@ -168,7 +174,8 @@ class LiveLogService(QObject):
 
     @Slot()
     def stopInstance(self) -> None:
-        """Kills the active running Minecraft process."""
+        """Kills the active running Minecraft process upon user request."""
+        self._intentional_stop = True
         if self._current_process:
             try:
                 self._current_process.terminate()

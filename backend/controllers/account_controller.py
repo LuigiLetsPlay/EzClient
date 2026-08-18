@@ -254,9 +254,15 @@ class AccountController(QObject):
             "Minecraft Skin (*.png);;Alle Dateien (*.*)"
         )
         if file_path:
-            from backend.services.skin_service import add_skin_to_history
-            add_skin_to_history(Path(file_path).stem, file_path)
+            from backend.services.skin_service import generate_skin_renders, add_skin_to_history
+            body_p, av_p = generate_skin_renders(file_path)
+            clean_name = Path(file_path).stem.replace("_", " ").replace("-", " ").title()
+            av_url = ("file:///" + str(Path(av_p)).replace("\\", "/")) if av_p else ""
+            body_url = ("file:///" + str(Path(body_p)).replace("\\", "/")) if body_p else ""
+            
+            add_skin_to_history(clean_name, file_path, av_url)
             self.skinHistoryChanged.emit()
+            self.skinFetched.emit(file_path, body_url)
         return file_path or ""
 
     @Slot(str, str)
@@ -289,10 +295,14 @@ class AccountController(QObject):
                 self.skinUploadStatusChanged.emit(msg, not ok)
                 if ok:
                     self._skin_version = int(time.time())
-                    from backend.services.skin_service import add_skin_to_history
-                    add_skin_to_history(Path(file_path).stem, file_path, f"https://mc-heads.net/avatar/{self._username}/64?t={self._skin_version}")
+                    from backend.services.skin_service import generate_skin_renders, add_skin_to_history
+                    body_p, av_p = generate_skin_renders(file_path)
+                    clean_name = Path(file_path).stem.replace("_", " ").replace("-", " ").title()
+                    av_url = ("file:///" + str(Path(av_p)).replace("\\", "/")) if av_p else ""
+                    add_skin_to_history(clean_name, file_path, av_url)
                     self._load_account(force_refresh=True)
                     self.skinHistoryChanged.emit()
+                    self.accountChanged.emit()
             except Exception as e:
                 self.skinUploadStatusChanged.emit(f"Fehler: {e}", True)
 

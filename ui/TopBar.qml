@@ -423,6 +423,7 @@ Rectangle {
                                 anchors.fill: parent
                                 source: root.avatarSource
                                 fillMode: Image.PreserveAspectCrop
+                                cache: false
                                 visible: status === Image.Ready
                             }
                             Text {
@@ -490,6 +491,7 @@ Rectangle {
                                     anchors.fill: parent
                                     source: root.avatarSource
                                     fillMode: Image.PreserveAspectCrop
+                                    cache: false
                                 }
                             }
 

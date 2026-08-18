@@ -203,12 +203,30 @@ Rectangle {
                         border.width: 1
                         clip: true
 
+                        property real previewRotation: 0
+
                         Image {
+                            id: modalPreviewImg
                             anchors.fill: parent
-                            anchors.margins: 2
-                            source: skinModal.previewBodyUrl ? skinModal.previewBodyUrl : (skinModal.selectedFilePath ? ("file:///" + skinModal.selectedFilePath.replace(/\\/g, "/")) : (accountController ? accountController.bodyUrl : ""))
+                            anchors.margins: 4
+                            source: skinModal.previewBodyUrl ? skinModal.previewBodyUrl : (accountController ? accountController.bodyUrl : "")
                             fillMode: Image.PreserveAspectFit
-                            smooth: false
+                            smooth: true
+                            cache: false
+                            rotation: parent.previewRotation
+                            Behavior on rotation { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onPositionChanged: {
+                                var cDist = (mouse.x - width / 2) / (width / 2)
+                                parent.previewRotation = cDist * 12
+                            }
+                            onExited: {
+                                parent.previewRotation = 0
+                            }
                         }
                     }
 

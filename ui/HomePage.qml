@@ -154,6 +154,9 @@ Item {
             width: 220
             height: 260
 
+            property real currentRotation: 0
+            property real dragStartX: 0
+
             // Ambient Shadow under player feet
             Rectangle {
                 anchors.bottom: parent.bottom
@@ -176,15 +179,21 @@ Item {
                 height: 230
                 source: root.bodyUrl !== "" ? root.bodyUrl : "https://mc-heads.net/body/Steve/360"
                 fillMode: Image.PreserveAspectFit
-                smooth: false
+                smooth: true
+                cache: false
 
                 Behavior on anchors.verticalCenterOffset {
                     NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
                 }
 
-                // Subtle rotation on hover
-                rotation: charHover.containsMouse ? 2 : 0
-                Behavior on rotation { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+                // Interactive 3D tilt and smooth rotation
+                rotation: parent.currentRotation
+                scale: charHover.containsMouse ? 1.04 : 1.0
+                Behavior on scale { NumberAnimation { duration: 200 } }
+                Behavior on rotation {
+                    enabled: !charHover.pressed
+                    NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+                }
             }
 
             // Fallback avatar
@@ -206,12 +215,29 @@ Item {
                 id: charHover
                 anchors.fill: parent
                 hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
+                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                onPressed: {
+                    parent.dragStartX = mouse.x
+                }
+                onPositionChanged: {
+                    if (pressed) {
+                        var delta = mouse.x - parent.dragStartX
+                        parent.currentRotation = Math.max(-25, Math.min(25, delta * 0.4))
+                    } else {
+                        var centerDist = (mouse.x - width / 2) / (width / 2)
+                        parent.currentRotation = centerDist * 8
+                    }
+                }
+                onExited: {
+                    parent.currentRotation = 0
+                }
                 onClicked: {
-                    if (typeof window !== "undefined" && window.openSkinModal) {
-                        window.openSkinModal()
-                    } else if (typeof globalSkinModal !== "undefined" && globalSkinModal) {
-                        globalSkinModal.open()
+                    if (Math.abs(parent.currentRotation) < 5) {
+                        if (typeof window !== "undefined" && window.openSkinModal) {
+                            window.openSkinModal()
+                        } else if (typeof globalSkinModal !== "undefined" && globalSkinModal) {
+                            globalSkinModal.open()
+                        }
                     }
                 }
             }

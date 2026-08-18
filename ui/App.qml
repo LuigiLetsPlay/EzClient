@@ -165,18 +165,35 @@ ApplicationWindow {
             toastTimer.restart()
         }
         function onLaunchStatusChanged(statusText, isError) {
-            if (!isError && (statusText.indexOf("Minecraft läuft") >= 0 || statusText.indexOf("Launcher wird gestartet") >= 0 || statusText.indexOf("Spiel gestartet") >= 0)) {
-                if (profileController && profileController.showLiveLogs) {
-                    globalLiveLogsWindow.show()
-                    globalLiveLogsWindow.raise()
-                    globalLiveLogsWindow.requestActivate()
+            if (!isError) {
+                if (statusText.indexOf("wird vorbereitet") >= 0 || statusText.indexOf("Minecraft läuft") >= 0 || statusText.indexOf("Launcher wird gestartet") >= 0 || statusText.indexOf("Spiel gestartet") >= 0) {
+                    if (profileController && profileController.showLiveLogs) {
+                        globalLiveLogsWindow.show()
+                        globalLiveLogsWindow.showNormal()
+                        globalLiveLogsWindow.raise()
+                        globalLiveLogsWindow.requestActivate()
+                        window.hide()
+                    } else if (profileController && profileController.closeOnLaunch) {
+                        window.showMinimized()
+                    }
+                } else if (statusText.indexOf("Spiel beendet") >= 0) {
+                    window.show()
+                    window.showNormal()
+                    window.raise()
+                    window.requestActivate()
                 }
-                if (profileController && profileController.closeOnLaunch) {
-                    window.showMinimized()
-                }
+            } else {
+                window.show()
+                window.showNormal()
+                window.raise()
+                window.requestActivate()
             }
         }
         function onGameCrashed(title, shortErr, fullLog) {
+            window.show()
+            window.showNormal()
+            window.raise()
+            window.requestActivate()
             window.crashTitle = title
             window.crashShortError = shortErr
             window.crashFullLog = fullLog

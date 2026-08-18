@@ -108,6 +108,93 @@ def get_skin_history() -> list[dict]:
     return []
 
 
+def generate_skin_renders(skin_path: str | Path) -> tuple[str, str]:
+    """
+    Renders both a full-body assembled character preview and a 64x64 head avatar from a raw skin texture PNG.
+    Returns (body_preview_path, avatar_preview_path).
+    """
+    path = Path(skin_path)
+    if not path.exists() or not path.is_file():
+        return "", ""
+
+    try:
+        from PySide6.QtGui import QImage, QPainter
+        from PySide6.QtCore import Qt, QRect
+
+        src = QImage(str(path))
+        if src.isNull():
+            return "", ""
+
+        is_64x64 = src.height() >= 64
+        previews_dir = get_skins_dir() / "renders"
+        previews_dir.mkdir(parents=True, exist_ok=True)
+        body_out = previews_dir / f"{path.stem}_body.png"
+        avatar_out = previews_dir / f"{path.stem}_avatar.png"
+
+        # 1. Render 64x64 Head Avatar
+        head_img = QImage(64, 64, QImage.Format_ARGB32_Premultiplied)
+        head_img.fill(Qt.transparent)
+        hp = QPainter(head_img)
+        hp.setRenderHint(QPainter.SmoothPixmapTransform, False)
+        # Head Base (8, 8, 8, 8) -> (0, 0, 64, 64)
+        hp.drawImage(QRect(0, 0, 64, 64), src, QRect(8, 8, 8, 8))
+        # Head Hat Overlay (40, 8, 8, 8)
+        hp.drawImage(QRect(0, 0, 64, 64), src, QRect(40, 8, 8, 8))
+        hp.end()
+        head_img.save(str(avatar_out), "PNG")
+
+        # 2. Render Assembled Front Full-Body (Width: 240, Height: 360)
+        body_img = QImage(240, 360, QImage.Format_ARGB32_Premultiplied)
+        body_img.fill(Qt.transparent)
+        bp = QPainter(body_img)
+        bp.setRenderHint(QPainter.SmoothPixmapTransform, False)
+
+        ox, oy, S = 40, 20, 10
+        # Head Base (8, 8, 8, 8)
+        bp.drawImage(QRect(ox + 4 * S, oy, 8 * S, 8 * S), src, QRect(8, 8, 8, 8))
+        # Head Hat (40, 8, 8, 8)
+        bp.drawImage(QRect(ox + 4 * S, oy, 8 * S, 8 * S), src, QRect(40, 8, 8, 8))
+
+        # Torso Base (20, 20, 8, 12)
+        bp.drawImage(QRect(ox + 4 * S, oy + 8 * S, 8 * S, 12 * S), src, QRect(20, 20, 8, 12))
+        if is_64x64:
+            # Torso Jacket (20, 36, 8, 12)
+            bp.drawImage(QRect(ox + 4 * S, oy + 8 * S, 8 * S, 12 * S), src, QRect(20, 36, 8, 12))
+
+        # Right Arm Base (44, 20, 4, 12)
+        bp.drawImage(QRect(ox, oy + 8 * S, 4 * S, 12 * S), src, QRect(44, 20, 4, 12))
+        if is_64x64:
+            # Right Arm Sleeve (44, 36, 4, 12)
+            bp.drawImage(QRect(ox, oy + 8 * S, 4 * S, 12 * S), src, QRect(44, 36, 4, 12))
+
+        # Left Arm Base (36, 52, 4, 12 if 64x64 else mirror)
+        if is_64x64:
+            bp.drawImage(QRect(ox + 12 * S, oy + 8 * S, 4 * S, 12 * S), src, QRect(36, 52, 4, 12))
+            bp.drawImage(QRect(ox + 12 * S, oy + 8 * S, 4 * S, 12 * S), src, QRect(52, 52, 4, 12))
+        else:
+            bp.drawImage(QRect(ox + 12 * S, oy + 8 * S, 4 * S, 12 * S), src, QRect(44, 20, 4, 12))
+
+        # Right Leg Base (4, 20, 4, 12)
+        bp.drawImage(QRect(ox + 4 * S, oy + 20 * S, 4 * S, 12 * S), src, QRect(4, 20, 4, 12))
+        if is_64x64:
+            bp.drawImage(QRect(ox + 4 * S, oy + 20 * S, 4 * S, 12 * S), src, QRect(4, 36, 4, 12))
+
+        # Left Leg Base (20, 52, 4, 12 if 64x64 else mirror)
+        if is_64x64:
+            bp.drawImage(QRect(ox + 8 * S, oy + 20 * S, 4 * S, 12 * S), src, QRect(20, 52, 4, 12))
+            bp.drawImage(QRect(ox + 8 * S, oy + 20 * S, 4 * S, 12 * S), src, QRect(4, 52, 4, 12))
+        else:
+            bp.drawImage(QRect(ox + 8 * S, oy + 20 * S, 4 * S, 12 * S), src, QRect(4, 20, 4, 12))
+
+        bp.end()
+        body_img.save(str(body_out), "PNG")
+
+        return str(body_out), str(avatar_out)
+    except Exception as e:
+        print(f"[SkinRenderer] Error rendering skin: {e}")
+        return "", ""
+
+
 def add_skin_to_history(username: str, path: str, preview_url: str = "") -> list[dict]:
     history = get_skin_history()
     u_clean = (username or "").strip().lower()
@@ -122,9 +209,15 @@ def add_skin_to_history(username: str, path: str, preview_url: str = "") -> list
             return True
         return False
 
+    # If preview_url is not set and path is a local file, generate rendered preview
+    if (not preview_url or "mc-heads.net" in preview_url) and path and Path(path).exists():
+        body_p, av_p = generate_skin_renders(path)
+        if av_p:
+            preview_url = "file:///" + str(Path(av_p)).replace("\\", "/")
+
     history = [h for h in history if not is_dup(h)]
     history.insert(0, {
-        "username": (username or "Skin").strip(),
+        "username": (username or "Custom Skin").strip(),
         "path": path or "",
         "previewUrl": preview_url or f"https://mc-heads.net/avatar/{username}/64"
     })

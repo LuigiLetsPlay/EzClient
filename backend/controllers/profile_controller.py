@@ -660,23 +660,44 @@ class ProfileController(QObject):
                     duration = time.time() - start_time
                     exit_code = proc.returncode
                     self._is_launching = False
+                    was_intentional_stop = self._live_log_service.intentional_stop
                     self._live_log_service.detach_process()
 
                     if self.minimizeToTray:
                         self.restoreFromTrayRequested.emit()
 
-                    # Check if game crashed or exited with error
-                    if exit_code != 0 or duration < 4.0:
-                        crash_reports_dir = self._active_profile.path / "crash-reports"
-                        crash_files = sorted(crash_reports_dir.glob("crash-*.txt"), key=lambda f: f.stat().st_mtime, reverse=True) if crash_reports_dir.exists() else []
-                        
+                    # Check for fresh crash reports generated during this specific run
+                    crash_reports_dir = self._active_profile.path / "crash-reports"
+                    fresh_crash_files = []
+                    if crash_reports_dir.exists():
+                        for f in crash_reports_dir.glob("crash-*.txt"):
+                            try:
+                                if f.stat().st_mtime >= (start_time - 1.0):
+                                    fresh_crash_files.append(f)
+                            except Exception:
+                                pass
+                        fresh_crash_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+
+                    # Only treat as crash if:
+                    # 1. User did not deliberately stop the instance
+                    # 2. AND either a fresh crash report exists, or duration was under 4s (failed to launch), or fatal exit code
+                    is_crash = False
+                    if not was_intentional_stop:
+                        if fresh_crash_files:
+                            is_crash = True
+                        elif duration < 4.0 and exit_code != 0:
+                            is_crash = True
+                        elif exit_code not in (0, 1, 130, 143, -15, -9, 259) and duration < 10.0:
+                            is_crash = True
+
+                    if is_crash:
                         error_title = "Minecraft konnte nicht gestartet werden" if duration < 4.0 else "Minecraft ist abgestürzt"
                         full_log = ""
                         short_err = f"Prozess wurde mit Fehlercode {exit_code} beendet."
 
-                        if crash_files:
+                        if fresh_crash_files:
                             try:
-                                full_log = crash_files[0].read_text(encoding="utf-8", errors="replace")
+                                full_log = fresh_crash_files[0].read_text(encoding="utf-8", errors="replace")
                                 for line in full_log.splitlines():
                                     if "Description:" in line or "java.lang." in line or "error:" in line.lower():
                                         short_err = line.strip()
