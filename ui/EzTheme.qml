@@ -40,8 +40,8 @@ QtObject {
     readonly property color warning: "#FBBF24"
 
     // ── TYPOGRAPHY ────────────────────────────────────────────────
-    readonly property string mcFontFamily: "Minecraft Default"
-    readonly property string fontFamily:   "Minecraft Default"
+    readonly property string mcFontFamily: "Minecraft"
+    readonly property string fontFamily:   "Segoe UI"
 
     // ── DIMENSIONS ────────────────────────────────────────────────
     readonly property int sidebarWidth: 224

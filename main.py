@@ -65,11 +65,11 @@ def main() -> None:
     # Load authentic Minecraft fonts
     fonts_dir = get_app_root() / "ui" / "fonts"
     if fonts_dir.exists():
-        for font_file in fonts_dir.glob("*.ttf"):
+        for font_file in list(fonts_dir.glob("*.ttf")) + list(fonts_dir.glob("*.otf")):
             QFontDatabase.addApplicationFont(str(font_file))
 
-    # Set Minecraft Default Bold font as global default application font for crisp readability
-    app.setFont(QFont("Minecraft Default", 11, QFont.Bold))
+    # Set crisp Segoe UI as global application font
+    app.setFont(QFont("Segoe UI", 10))
 
     # Backend
     store = ProfileStore()
