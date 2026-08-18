@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont, QIcon, QPixmap, QColor
 
 APP_NAME = "EzClient"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.1.1"
 DEFAULT_INSTALL_DIR = Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Programs" / "EzClient"
 
 
@@ -307,12 +307,12 @@ class InstallerWindow(QWidget):
 
             dir_row = QHBoxLayout()
             dir_row.setSpacing(8)
-        self.browse_btn = QPushButton("Durchsuchen…")
-        self.browse_btn.setObjectName("secondary")
-        self.browse_btn.clicked.connect(self.browse_dir)
-        dir_row.addWidget(self.dir_input)
-        dir_row.addWidget(self.browse_btn)
-        layout.addLayout(dir_row)
+            self.browse_btn = QPushButton("Durchsuchen…")
+            self.browse_btn.setObjectName("secondary")
+            self.browse_btn.clicked.connect(self.browse_dir)
+            dir_row.addWidget(self.dir_input)
+            dir_row.addWidget(self.browse_btn)
+            layout.addLayout(dir_row)
 
         # Checkboxes (only shown in fresh install mode)
         self.chk_desktop = QCheckBox("Desktop-Verknüpfung erstellen")

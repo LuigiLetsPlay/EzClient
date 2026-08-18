@@ -165,10 +165,11 @@ ApplicationWindow {
             toastTimer.restart()
         }
         function onLaunchStatusChanged(statusText, isError) {
-            if (!isError && (statusText.indexOf("Minecraft läuft") >= 0 || statusText.indexOf("Launcher wird gestartet") >= 0)) {
+            if (!isError && (statusText.indexOf("Minecraft läuft") >= 0 || statusText.indexOf("Launcher wird gestartet") >= 0 || statusText.indexOf("Spiel gestartet") >= 0)) {
                 if (profileController && profileController.showLiveLogs) {
                     globalLiveLogsWindow.show()
                     globalLiveLogsWindow.raise()
+                    globalLiveLogsWindow.requestActivate()
                 }
                 if (profileController && profileController.closeOnLaunch) {
                     window.showMinimized()

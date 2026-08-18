@@ -48,10 +48,17 @@ def create_app_icon() -> QIcon:
 
 
 def main() -> None:
-    # Ensure Windows taskbar & notifications show clean 'EzClient' branding
+    # Ensure Windows single-instance check
     if sys.platform == "win32":
         try:
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("EzClient")
+            mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "EzClientSingleInstanceMutex_v1")
+            if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+                hwnd = ctypes.windll.user32.FindWindowW(None, "EzClient")
+                if hwnd:
+                    ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+                    ctypes.windll.user32.SetForegroundWindow(hwnd)
+                sys.exit(0)
         except Exception:
             pass
 

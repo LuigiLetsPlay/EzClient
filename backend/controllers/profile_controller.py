@@ -54,7 +54,7 @@ class ProfileController(QObject):
     # ---- Global Settings Properties & Slots ----
     @Property(bool, notify=settingsChanged)
     def closeOnLaunch(self) -> bool:
-        return self._store.settings.get("close_on_launch", True)
+        return self._store.settings.get("close_on_launch", False)
 
     @Slot(bool)
     def setCloseOnLaunch(self, val: bool) -> None:
