@@ -201,26 +201,22 @@ Item {
                             border.width: 1
                             clip: true
 
-                            Item {
-                                id: modelRotateWrapper
+                            Image {
+                                id: modalPreviewImg
                                 anchors.fill: parent
-                                anchors.margins: 4
+                                anchors.margins: 6
+                                source: skinModal.previewBodyUrl ? skinModal.previewBodyUrl : (accountController ? accountController.bodyUrl : "")
+                                fillMode: Image.PreserveAspectFit
+                                smooth: true
+                                cache: false
+                                rotation: skinModal.modelAngle
+                                scale: previewDragArea.containsMouse ? 1.04 : 1.0
 
-                                transform: Rotation {
-                                    origin.x: modelRotateWrapper.width / 2
-                                    origin.y: modelRotateWrapper.height / 2
-                                    axis { x: 0; y: 1; z: 0 }
-                                    angle: skinModal.modelAngle
+                                Behavior on rotation {
+                                    enabled: !previewDragArea.pressed
+                                    NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
                                 }
-
-                                Image {
-                                    id: modalPreviewImg
-                                    anchors.fill: parent
-                                    source: skinModal.previewBodyUrl ? skinModal.previewBodyUrl : (accountController ? accountController.bodyUrl : "")
-                                    fillMode: Image.PreserveAspectFit
-                                    smooth: true
-                                    cache: false
-                                }
+                                Behavior on scale { NumberAnimation { duration: 180 } }
                             }
 
                             Rectangle {
@@ -231,7 +227,7 @@ Item {
                                 color: "#CC0B0C10"
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "↔ 3D Drehen"
+                                    text: "↔ Neigen / Bewegen"
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 8
                                     font.bold: true
@@ -243,16 +239,18 @@ Item {
                                 id: previewDragArea
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                cursorShape: Qt.SizeHorCursor
-                                onPressed: {
-                                    skinModal.lastDragX = mouse.x
-                                }
+                                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.PointingHandCursor
                                 onPositionChanged: {
                                     if (pressed) {
-                                        var dx = mouse.x - skinModal.lastDragX
-                                        skinModal.modelAngle = (skinModal.modelAngle + dx * 2.0) % 360
-                                        skinModal.lastDragX = mouse.x
+                                        var offset = mouse.x - width / 2
+                                        skinModal.modelAngle = Math.max(-25, Math.min(25, (offset / (width / 2)) * 20))
+                                    } else {
+                                        var hoverOff = mouse.x - width / 2
+                                        skinModal.modelAngle = Math.max(-8, Math.min(8, (hoverOff / (width / 2)) * 6))
                                     }
+                                }
+                                onExited: {
+                                    skinModal.modelAngle = 0
                                 }
                             }
                         }
@@ -267,7 +265,7 @@ Item {
                                 Text { text: "↺"; font.pixelSize: 10; color: EzTheme.text; anchors.centerIn: parent }
                                 MouseArea {
                                     id: rotLMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: skinModal.modelAngle = (skinModal.modelAngle - 45) % 360
+                                    onClicked: skinModal.modelAngle = -15
                                 }
                             }
                             Rectangle {
@@ -287,7 +285,7 @@ Item {
                                 Text { text: "↻"; font.pixelSize: 10; color: EzTheme.text; anchors.centerIn: parent }
                                 MouseArea {
                                     id: rotRMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: skinModal.modelAngle = (skinModal.modelAngle + 45) % 360
+                                    onClicked: skinModal.modelAngle = 15
                                 }
                             }
                         }
