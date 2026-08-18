@@ -5,7 +5,7 @@ import "components"
 
 Rectangle {
     id: root
-    height: 52
+    height: 56
     color: EzTheme.titlebarBg
 
     property string currentRoute: "home"
@@ -20,14 +20,20 @@ Rectangle {
     readonly property string accountUser: typeof accountController !== "undefined" && accountController ? accountController.username : "Player"
     readonly property string avatarSource: typeof accountController !== "undefined" && accountController ? accountController.avatarUrl : ""
 
-    // 1px bottom border
+    // Gradient bottom border (accent glow line)
     Rectangle {
         anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
         height: 1
-        color: EzTheme.border
+        gradient: Gradient {
+            orientation: Gradient.Horizontal
+            GradientStop { position: 0.0; color: "transparent" }
+            GradientStop { position: 0.3; color: EzTheme.border }
+            GradientStop { position: 0.7; color: EzTheme.border }
+            GradientStop { position: 1.0; color: "transparent" }
+        }
     }
 
-    // Draggable background (behind interactive items, z: -1)
+    // Draggable background
     MouseArea {
         anchors.fill: parent
         z: -1
@@ -42,21 +48,21 @@ Rectangle {
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 16
+        anchors.leftMargin: 18
         anchors.rightMargin: 0
-        spacing: 12
+        spacing: 14
 
         // ── LEFT: Logo + Active Profile Switcher ──
         RowLayout {
-            spacing: 10
+            spacing: 12
 
             // Logo mark
             RowLayout {
                 spacing: 8
                 Image {
                     source: "assets/logo.svg"
-                    Layout.preferredWidth: 24
-                    Layout.preferredHeight: 24
+                    Layout.preferredWidth: 26
+                    Layout.preferredHeight: 26
                     fillMode: Image.PreserveAspectFit
                     smooth: true
                 }
@@ -64,57 +70,65 @@ Rectangle {
                 Text {
                     text: "EzClient"
                     font.family: EzTheme.mcFontFamily
-                    font.pixelSize: 16
+                    font.pixelSize: 17
                     font.bold: true
                     color: EzTheme.text
                 }
             }
 
-            Rectangle { width: 1; height: 20; color: EzTheme.border }
+            Rectangle { width: 1; height: 22; color: EzTheme.border; opacity: 0.5 }
 
-            // Active Profile Quick-Switcher Dropdown Pill (Expands dynamically to fit full name)
+            // Active Profile Quick-Switcher Dropdown Pill
             Rectangle {
                 id: profilePill
-                height: 32
-                width: Math.max(130, pillNameText.implicitWidth + 44)
-                radius: EzTheme.radiusSm
+                height: 34
+                width: Math.max(140, pillNameText.implicitWidth + 50)
+                radius: 17
                 color: profMouse.containsMouse || profPopup.opened ? EzTheme.surface3 : EzTheme.surface2
                 border.color: profPopup.opened ? EzTheme.accent : (profMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)
                 border.width: 1
 
-                Behavior on color { ColorAnimation { duration: 100 } }
-                Behavior on border.color { ColorAnimation { duration: 100 } }
+                Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
+                Behavior on border.color { ColorAnimation { duration: EzTheme.animNormal } }
 
                 RowLayout {
                     id: profilePillRow
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    anchors.leftMargin: 10
-                    anchors.rightMargin: 10
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 8
 
+                    // Active indicator dot with pulse
                     Rectangle {
-                        width: 7; height: 7; radius: 3.5; color: EzTheme.accent
+                        width: 8; height: 8; radius: 4; color: EzTheme.accent
                         Layout.alignment: Qt.AlignVCenter
+
+                        SequentialAnimation on opacity {
+                            loops: Animation.Infinite
+                            NumberAnimation { to: 0.4; duration: 1200; easing.type: Easing.InOutSine }
+                            NumberAnimation { to: 1.0; duration: 1200; easing.type: Easing.InOutSine }
+                        }
                     }
 
                     Text {
                         id: pillNameText
                         text: root.hasProfile ? root.activeName : EzI18n.t("topbar_select_profile", "Profil wählen")
-                        font.family: EzTheme.mcFontFamily
-                        font.pixelSize: 13
+                        font.family: EzTheme.fontFamily
+                        font.pixelSize: 12
                         font.bold: true
                         color: EzTheme.text
                         Layout.fillWidth: true
+                        elide: Text.ElideRight
                     }
 
                     Text {
                         text: "▾"
-                        font.pixelSize: 10
+                        font.pixelSize: 9
                         color: profPopup.opened ? EzTheme.accent : EzTheme.textMuted
                         rotation: profPopup.opened ? 180 : 0
-                        Behavior on rotation { NumberAnimation { duration: 150 } }
+                        Behavior on rotation { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                         Layout.alignment: Qt.AlignVCenter
                     }
                 }
@@ -127,26 +141,31 @@ Rectangle {
                     onClicked: profPopup.opened ? profPopup.close() : profPopup.open()
                 }
 
-                // Profile Switcher Popup (Roomy 360px)
+                // Profile Switcher Popup
                 Popup {
                     id: profPopup
-                    y: profilePill.height + 6
-                    width: 360
-                    height: Math.min((profileController && profileController.profileModel ? profileController.profileModel.rowCount() : 1) * 52 + 56, 380)
-                    padding: 8
+                    y: profilePill.height + 8
+                    width: 380
+                    height: Math.min((profileController && profileController.profileModel ? profileController.profileModel.rowCount() : 1) * 56 + 60, 400)
+                    padding: 10
                     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
 
                     background: Rectangle {
                         radius: EzTheme.radius
-                        color: EzTheme.surface2
+                        color: EzTheme.surface
                         border.color: EzTheme.borderLight
                         border.width: 1
+
+                        // Top highlight
+                        Rectangle {
+                            anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+                            height: 1; radius: parent.radius; color: "#ffffff06"
+                        }
                     }
 
                     contentItem: ColumnLayout {
                         spacing: 4
 
-                        // Profiles list
                         ListView {
                             id: pList
                             Layout.fillWidth: true
@@ -157,18 +176,18 @@ Rectangle {
 
                             delegate: Rectangle {
                                 width: pList.width
-                                height: 46
-                                radius: 6
+                                height: 50
+                                radius: EzTheme.radiusSm
                                 color: (model.profileId === profileController.activeId)
                                        ? EzTheme.surfaceActive
                                        : (pItemMouse.containsMouse ? EzTheme.surface3 : "transparent")
 
-                                Behavior on color { ColorAnimation { duration: 80 } }
+                                Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
 
                                 RowLayout {
                                     anchors.fill: parent
-                                    anchors.leftMargin: 12
-                                    anchors.rightMargin: 12
+                                    anchors.leftMargin: 14
+                                    anchors.rightMargin: 14
                                     spacing: 10
 
                                     Rectangle {
@@ -200,7 +219,7 @@ Rectangle {
                                     Text {
                                         text: "✓"
                                         font.bold: true
-                                        font.pixelSize: 12
+                                        font.pixelSize: 13
                                         color: EzTheme.accentLight
                                         visible: model.profileId === profileController.activeId
                                     }
@@ -221,18 +240,18 @@ Rectangle {
 
                         Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border }
 
-                        // Create New Profile Button in popup
                         Rectangle {
                             Layout.fillWidth: true
-                            height: 32
-                            radius: 4
+                            height: 36
+                            radius: EzTheme.radiusSm
                             color: newProfMouse.containsMouse ? EzTheme.surface3 : "transparent"
+                            Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
 
                             RowLayout {
                                 anchors.centerIn: parent
                                 spacing: 6
-                                Text { text: "+"; font.family: EzTheme.fontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.accentLight }
-                                Text { text: EzI18n.t("topbar_new_profile", "Neues Profil anlegen…"); font.family: EzTheme.fontFamily; font.pixelSize: 11; font.bold: true; color: EzTheme.accentLight }
+                                Text { text: "+"; font.family: EzTheme.fontFamily; font.pixelSize: 14; font.bold: true; color: EzTheme.accentLight }
+                                Text { text: EzI18n.t("topbar_new_profile", "Neues Profil anlegen…"); font.family: EzTheme.fontFamily; font.pixelSize: 12; font.bold: true; color: EzTheme.accentLight }
                             }
 
                             MouseArea {
@@ -250,17 +269,18 @@ Rectangle {
                 }
             }
 
-            // Glowing Update Badge (when update is available)
+            // Glowing Update Badge
             Rectangle {
                 id: updateBadge
                 height: 28
                 visible: typeof updateController !== "undefined" && updateController && updateController.updateAvailable
-                width: updateBadgeRow.implicitWidth + 16
-                radius: EzTheme.radiusSm
+                width: updateBadgeRow.implicitWidth + 18
+                radius: 14
                 color: updateMouse.containsMouse ? "#1c3829" : "#13281c"
                 border.color: EzTheme.accent
                 border.width: 1
                 scale: updateMouse.pressed ? 0.96 : 1.0
+                Behavior on scale { NumberAnimation { duration: 80 } }
 
                 RowLayout {
                     id: updateBadgeRow
@@ -288,73 +308,82 @@ Rectangle {
 
         Item { Layout.fillWidth: true }
 
-        // ── CENTER: Top Navigation Tabs ──
-        Row {
+        // ── CENTER: Navigation Tabs with Sliding Indicator ──
+        Item {
             Layout.alignment: Qt.AlignHCenter
-            spacing: 4
+            implicitWidth: navTabsRow.implicitWidth
+            implicitHeight: navTabsRow.implicitHeight
 
-            Repeater {
-                model: [
-                    { id: "home",           labelKey: "nav_home",           fallback: "Home",          icon: "home.svg" },
-                    { id: "profiles",       labelKey: "nav_profiles",       fallback: "Profile",       icon: "box.svg" },
-                    { id: "installed_mods", labelKey: "nav_installed_mods", fallback: "Mods",          icon: "mods.svg" },
-                    { id: "mods",           labelKey: "nav_modrinth",       fallback: "Modrinth",      icon: "modrinth.svg" },
-                    { id: "settings",       labelKey: "nav_settings",       fallback: "Einstellungen", icon: "settings.svg" }
-                ]
+            Row {
+                id: navTabsRow
+                spacing: 2
 
-                Rectangle {
-                    width: tabRow.implicitWidth + 24
-                    height: 34
-                    radius: EzTheme.radiusSm
-                    color: root.currentRoute === modelData.id
-                           ? EzTheme.surfaceActive
-                           : (tabMouse.containsMouse ? EzTheme.surface2 : "transparent")
-                    border.color: root.currentRoute === modelData.id ? EzTheme.borderAccent : "transparent"
-                    border.width: 1
+                Repeater {
+                    id: tabRepeater
+                    model: [
+                        { id: "home",           labelKey: "nav_home",           fallback: "Home",          icon: "home.svg" },
+                        { id: "profiles",       labelKey: "nav_profiles",       fallback: "Profile",       icon: "box.svg" },
+                        { id: "installed_mods", labelKey: "nav_installed_mods", fallback: "Mods",          icon: "mods.svg" },
+                        { id: "mods",           labelKey: "nav_modrinth",       fallback: "Modrinth",      icon: "modrinth.svg" },
+                        { id: "settings",       labelKey: "nav_settings",       fallback: "Einstellungen", icon: "settings.svg" }
+                    ]
 
-                    Behavior on color { ColorAnimation { duration: 100 } }
-
-                    RowLayout {
-                        id: tabRow
-                        anchors.centerIn: parent
-                        spacing: 7
-
-                        Image {
-                            source: "icons/" + modelData.icon
-                            width: 13; height: 13
-                            fillMode: Image.PreserveAspectFit
-                            opacity: root.currentRoute === modelData.id ? 1.0 : (tabMouse.containsMouse ? 0.8 : 0.45)
-                            Behavior on opacity { NumberAnimation { duration: 100 } }
-                        }
-
-                        Text {
-                            text: EzI18n.t(modelData.labelKey, modelData.fallback)
-                            font.family: EzTheme.mcFontFamily
-                            font.pixelSize: 12
-                            font.bold: true
-                            color: root.currentRoute === modelData.id
-                                   ? EzTheme.accentLight
-                                   : (tabMouse.containsMouse ? EzTheme.text : EzTheme.textSecondary)
-                            Behavior on color { ColorAnimation { duration: 100 } }
-                        }
-                    }
-
-                    // Active bottom bar glow
                     Rectangle {
-                        anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter }
-                        width: parent.width - 16
-                        height: 2
-                        radius: 1
-                        color: EzTheme.accent
-                        visible: root.currentRoute === modelData.id
-                    }
+                        id: tabItem
+                        width: tabRowInner.implicitWidth + 28
+                        height: 38
+                        radius: EzTheme.radiusSm
+                        color: root.currentRoute === modelData.id
+                               ? EzTheme.surfaceActive
+                               : (tabMouse.containsMouse ? EzTheme.surface2 : "transparent")
+                        border.color: root.currentRoute === modelData.id ? EzTheme.borderAccent : "transparent"
+                        border.width: 1
 
-                    MouseArea {
-                        id: tabMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.navigate(modelData.id)
+                        Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
+                        Behavior on border.color { ColorAnimation { duration: EzTheme.animNormal } }
+
+                        RowLayout {
+                            id: tabRowInner
+                            anchors.centerIn: parent
+                            spacing: 7
+
+                            Image {
+                                source: "icons/" + modelData.icon
+                                width: 14; height: 14
+                                fillMode: Image.PreserveAspectFit
+                                opacity: root.currentRoute === modelData.id ? 1.0 : (tabMouse.containsMouse ? 0.8 : 0.4)
+                                Behavior on opacity { NumberAnimation { duration: EzTheme.animNormal } }
+                            }
+
+                            Text {
+                                text: EzI18n.t(modelData.labelKey, modelData.fallback)
+                                font.family: EzTheme.fontFamily
+                                font.pixelSize: 12
+                                font.bold: true
+                                color: root.currentRoute === modelData.id
+                                       ? EzTheme.accentLight
+                                       : (tabMouse.containsMouse ? EzTheme.text : EzTheme.textSecondary)
+                                Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
+                            }
+                        }
+
+                        // Active bottom accent bar
+                        Rectangle {
+                            anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: 2 }
+                            width: root.currentRoute === modelData.id ? (parent.width - 20) : 0
+                            height: 2
+                            radius: 1
+                            color: EzTheme.accent
+                            Behavior on width { NumberAnimation { duration: EzTheme.animSlow; easing.type: Easing.OutCubic } }
+                        }
+
+                        MouseArea {
+                            id: tabMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.navigate(modelData.id)
+                        }
                     }
                 }
             }
@@ -362,62 +391,78 @@ Rectangle {
 
         Item { Layout.fillWidth: true }
 
-        // ── RIGHT: Gamer Profile Deco + Window Controls ──
+        // ── RIGHT: Account Pill + Window Controls ──
         RowLayout {
             spacing: 10
 
-            // Player Avatar & Username (Interactive Account Switcher / Login)
+            // Player Avatar & Username
             Rectangle {
                 id: accPill
-                height: 32
-                width: accRow.implicitWidth + 24
-                radius: 16
+                height: 34
+                width: accRow.implicitWidth + 28
+                radius: 17
                 color: accMouse.containsMouse || accPopup.opened ? EzTheme.surface3 : EzTheme.surface2
                 border.color: accPopup.opened ? EzTheme.accent : (accMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)
                 border.width: 1
 
-                Behavior on color { ColorAnimation { duration: 100 } }
-                Behavior on border.color { ColorAnimation { duration: 100 } }
+                Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
+                Behavior on border.color { ColorAnimation { duration: EzTheme.animNormal } }
 
                 RowLayout {
                     id: accRow
                     anchors.centerIn: parent
-                    spacing: 7
+                    spacing: 8
 
-                    // Avatar head
-                    Rectangle {
-                        width: 20; height: 20; radius: 10
-                        color: EzTheme.surface3
-                        clip: true
+                    // Avatar head with glow ring
+                    Item {
+                        width: 26; height: 26
 
-                        Image {
-                            id: avatarImg
+                        // Online glow ring
+                        Rectangle {
                             anchors.fill: parent
-                            source: root.avatarSource
-                            fillMode: Image.PreserveAspectCrop
-                            visible: status === Image.Ready
+                            anchors.margins: -2
+                            radius: 15
+                            color: "transparent"
+                            border.color: (typeof accountController !== "undefined" && accountController && accountController.isOnline) ? EzTheme.accentGlow : "transparent"
+                            border.width: 2
                         }
-                        Text {
-                            visible: avatarImg.status !== Image.Ready
-                            text: root.accountUser ? root.accountUser.charAt(0).toUpperCase() : "P"
-                            font.family: EzTheme.fontFamily
-                            font.pixelSize: 10
-                            font.bold: true
-                            color: EzTheme.accentLight
-                            anchors.centerIn: parent
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 13
+                            color: EzTheme.surface3
+                            clip: true
+
+                            Image {
+                                id: avatarImg
+                                anchors.fill: parent
+                                source: root.avatarSource
+                                fillMode: Image.PreserveAspectCrop
+                                visible: status === Image.Ready
+                            }
+                            Text {
+                                visible: avatarImg.status !== Image.Ready
+                                text: root.accountUser ? root.accountUser.charAt(0).toUpperCase() : "P"
+                                font.family: EzTheme.fontFamily
+                                font.pixelSize: 11
+                                font.bold: true
+                                color: EzTheme.accentLight
+                                anchors.centerIn: parent
+                            }
                         }
                     }
 
                     Text {
                         text: root.accountUser
                         font.family: EzTheme.fontFamily
-                        font.pixelSize: 11
+                        font.pixelSize: 12
                         font.bold: true
                         color: EzTheme.text
                     }
 
+                    // Status dot
                     Rectangle {
-                        width: 6; height: 6; radius: 3
+                        width: 7; height: 7; radius: 3.5
                         color: (typeof accountController !== "undefined" && accountController && accountController.isOnline) ? EzTheme.accent : EzTheme.textMuted
                     }
                 }
@@ -433,26 +478,31 @@ Rectangle {
                 // Account Management Popup
                 Popup {
                     id: accPopup
-                    y: accPill.height + 6
+                    y: accPill.height + 8
                     x: Math.round(accPill.width - width)
-                    width: 280
-                    padding: 12
+                    width: 300
+                    padding: 14
                     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
 
                     background: Rectangle {
                         radius: EzTheme.radius
-                        color: "#13171F"
+                        color: EzTheme.surface
                         border.color: EzTheme.borderLight
                         border.width: 1
+
+                        Rectangle {
+                            anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+                            height: 1; radius: parent.radius; color: "#ffffff06"
+                        }
                     }
 
                     contentItem: ColumnLayout {
                         spacing: 10
 
                         RowLayout {
-                            spacing: 10
+                            spacing: 12
                             Rectangle {
-                                width: 36; height: 36; radius: 18
+                                width: 40; height: 40; radius: 20
                                 color: EzTheme.surface3
                                 clip: true
 
@@ -464,12 +514,12 @@ Rectangle {
                             }
 
                             ColumnLayout {
-                                spacing: 1
+                                spacing: 2
                                 Layout.fillWidth: true
                                 Text {
                                     text: root.accountUser
                                     font.family: EzTheme.fontFamily
-                                    font.pixelSize: 13
+                                    font.pixelSize: 14
                                     font.bold: true
                                     color: EzTheme.text
                                 }
@@ -486,14 +536,15 @@ Rectangle {
 
                         Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border }
 
-                        // Microsoft Login / Switch Button
+                        // Microsoft Login
                         Rectangle {
                             Layout.fillWidth: true
-                            height: 34
-                            radius: 6
+                            height: 38
+                            radius: EzTheme.radiusSm
                             color: loginBtnMouse.containsMouse ? EzTheme.surfaceActive : EzTheme.surface2
                             border.color: loginBtnMouse.containsMouse ? EzTheme.accent : EzTheme.border
                             border.width: 1
+                            Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
 
                             RowLayout {
                                 anchors.centerIn: parent
@@ -502,7 +553,7 @@ Rectangle {
                                 Text {
                                     text: EzI18n.t("topbar_login_btn", "Microsoft Konto anmelden")
                                     font.family: EzTheme.fontFamily
-                                    font.pixelSize: 11
+                                    font.pixelSize: 12
                                     font.bold: true
                                     color: EzTheme.accentLight
                                 }
@@ -522,16 +573,16 @@ Rectangle {
                             }
                         }
 
-                        // Refresh Session Button
+                        // Refresh Session
                         Rectangle {
                             Layout.fillWidth: true
-                            height: 30
-                            radius: 6
+                            height: 34
+                            radius: EzTheme.radiusSm
                             color: refBtnMouse.containsMouse ? EzTheme.surface3 : "transparent"
+                            Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
 
                             RowLayout {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 8
+                                anchors.left: parent.left; anchors.leftMargin: 10
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 8
                                 Text { text: "🔄"; font.pixelSize: 11 }
@@ -557,16 +608,16 @@ Rectangle {
                             }
                         }
 
-                        // Logout Button
+                        // Logout
                         Rectangle {
                             Layout.fillWidth: true
-                            height: 30
-                            radius: 6
+                            height: 34
+                            radius: EzTheme.radiusSm
                             color: logoutBtnMouse.containsMouse ? "#3B1119" : "transparent"
+                            Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
 
                             RowLayout {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 8
+                                anchors.left: parent.left; anchors.leftMargin: 10
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 8
                                 Text { text: "🚪"; font.pixelSize: 11 }
@@ -595,23 +646,25 @@ Rectangle {
                 }
             }
 
-            // Window Controls
+            // ── Window Controls (macOS-inspired circles) ──
             Row {
+                spacing: 0
+
                 // Minimize
                 Rectangle {
-                    width: 44; height: root.height
+                    width: 46; height: root.height
                     color: minMouse.containsMouse ? EzTheme.surface3 : "transparent"
-                    Behavior on color { ColorAnimation { duration: 80 } }
-                    Text { text: "─"; font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textMuted; anchors.centerIn: parent }
+                    Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
+                    Text { text: "─"; font.family: EzTheme.fontFamily; font.pixelSize: 12; color: minMouse.containsMouse ? EzTheme.text : EzTheme.textMuted; anchors.centerIn: parent; Behavior on color { ColorAnimation { duration: EzTheme.animFast } } }
                     MouseArea { id: minMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor; onClicked: if (root.windowRef) root.windowRef.showMinimized() }
                 }
 
                 // Maximize
                 Rectangle {
-                    width: 44; height: root.height
+                    width: 46; height: root.height
                     color: maxMouse.containsMouse ? EzTheme.surface3 : "transparent"
-                    Behavior on color { ColorAnimation { duration: 80 } }
-                    Text { text: "□"; font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textMuted; anchors.centerIn: parent }
+                    Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
+                    Text { text: "□"; font.family: EzTheme.fontFamily; font.pixelSize: 12; color: maxMouse.containsMouse ? EzTheme.text : EzTheme.textMuted; anchors.centerIn: parent; Behavior on color { ColorAnimation { duration: EzTheme.animFast } } }
                     MouseArea {
                         id: maxMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor
                         onClicked: {
@@ -623,10 +676,10 @@ Rectangle {
 
                 // Close
                 Rectangle {
-                    width: 46; height: root.height
+                    width: 48; height: root.height
                     color: closeMouse.containsMouse ? "#C42B1C" : "transparent"
-                    Behavior on color { ColorAnimation { duration: 80 } }
-                    Text { text: "✕"; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: closeMouse.containsMouse ? "#ffffff" : EzTheme.textMuted; anchors.centerIn: parent; Behavior on color { ColorAnimation { duration: 80 } } }
+                    Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
+                    Text { text: "✕"; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: closeMouse.containsMouse ? "#ffffff" : EzTheme.textMuted; anchors.centerIn: parent; Behavior on color { ColorAnimation { duration: EzTheme.animFast } } }
                     MouseArea { id: closeMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor; onClicked: if (root.windowRef) root.windowRef.close() }
                 }
             }

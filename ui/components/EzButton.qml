@@ -10,22 +10,22 @@ Button {
     property bool mcFont: true
     property string iconSource: ""
 
-    implicitHeight: 32
-    implicitWidth: Math.max(80, contentItem.implicitWidth + 24)
+    implicitHeight: 36
+    implicitWidth: Math.max(90, contentItem.implicitWidth + 28)
 
-    scale: control.down ? 0.95 : (control.hovered ? 1.025 : 1.0)
-    Behavior on scale { NumberAnimation { duration: 90; easing.type: Easing.OutQuad } }
+    scale: control.down ? 0.96 : (control.hovered ? 1.02 : 1.0)
+    Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
     font.family: control.mcFont ? EzTheme.mcFontFamily : EzTheme.fontFamily
-    font.pixelSize: control.mcFont ? 13 : 11
+    font.pixelSize: control.mcFont ? 13 : 12
     font.bold: true
 
     background: Rectangle {
-        radius: 6
+        radius: EzTheme.radiusSm
         color: {
             if (!control.enabled) return EzTheme.surface2
             if (control.primary) {
-                return control.down ? "#16A358" : (control.hovered ? "#24E07B" : EzTheme.accent)
+                return control.down ? "#18A858" : (control.hovered ? "#2EE080" : EzTheme.accent)
             }
             if (control.danger) {
                 return control.down ? "#3A0D15" : (control.hovered ? "#4C0519" : EzTheme.surface2)
@@ -36,15 +36,28 @@ Button {
             return control.down ? EzTheme.surface3 : (control.hovered ? EzTheme.surfaceHover : EzTheme.surface2)
         }
         border.color: {
-            if (control.primary) return control.hovered ? EzTheme.accentLight : "transparent"
+            if (control.primary) return control.hovered ? EzTheme.accentLight : EzTheme.accentGlow
             if (control.danger && control.hovered) return EzTheme.danger
             if (control.cyan && control.hovered) return EzTheme.cyan
             return control.hovered ? EzTheme.borderLight : EzTheme.border
         }
         border.width: 1
 
-        Behavior on color { ColorAnimation { duration: 100 } }
-        Behavior on border.color { ColorAnimation { duration: 100 } }
+        Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
+        Behavior on border.color { ColorAnimation { duration: EzTheme.animNormal } }
+
+        // Subtle inner glow for primary buttons
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            visible: control.primary && control.enabled
+            gradient: Gradient {
+                orientation: Gradient.Vertical
+                GradientStop { position: 0.0; color: "#ffffff18" }
+                GradientStop { position: 0.5; color: "transparent" }
+                GradientStop { position: 1.0; color: "#00000020" }
+            }
+        }
     }
 
     // Windows Cursor Hand Feedback
@@ -55,29 +68,29 @@ Button {
     }
 
     contentItem: Row {
-        spacing: 6
+        spacing: 8
         anchors.centerIn: parent
 
         Image {
-            id: btnIcon
+            source: control.iconSource
             visible: control.iconSource !== ""
-            source: control.iconSource !== "" ? (control.iconSource.indexOf("/") !== -1 ? control.iconSource : "../icons/" + control.iconSource) : ""
             width: 14
             height: 14
-            anchors.verticalCenter: parent.verticalCenter
             fillMode: Image.PreserveAspectFit
+            anchors.verticalCenter: parent.verticalCenter
         }
 
         Text {
             text: control.text
             font: control.font
             color: {
-                if (!control.enabled) return EzTheme.textSubtle
+                if (!control.enabled) return EzTheme.textMuted
                 if (control.primary) return "#000000"
-                if (control.danger) return EzTheme.danger
-                if (control.cyan) return EzTheme.cyan
+                if (control.danger) return control.hovered ? EzTheme.danger : EzTheme.text
+                if (control.cyan) return control.hovered ? EzTheme.cyan : EzTheme.text
                 return EzTheme.text
             }
+            Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
             anchors.verticalCenter: parent.verticalCenter
         }
     }

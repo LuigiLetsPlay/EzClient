@@ -25,110 +25,168 @@ Item {
         anchors.fill: parent
         source: "assets/hero_bg.jpg"
         fillMode: Image.PreserveAspectCrop
-        opacity: 0.42
+        opacity: 0.35
     }
 
-    // Cinematic Vignette Overlay (Dark top & bottom gradients)
+    // Cinematic Vignette Overlay
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
             orientation: Gradient.Vertical
-            GradientStop { position: 0.0; color: "#EE0B0F14" }
-            GradientStop { position: 0.25; color: "#550B0F14" }
-            GradientStop { position: 0.65; color: "#550B0F14" }
-            GradientStop { position: 1.0; color: "#F0080C10" }
+            GradientStop { position: 0.0; color: "#F00A0A0F" }
+            GradientStop { position: 0.2; color: "#600A0A0F" }
+            GradientStop { position: 0.7; color: "#600A0A0F" }
+            GradientStop { position: 1.0; color: "#F50A0A0F" }
         }
     }
 
-    // Ambient radial glow behind the center character
+    // Side vignette
+    Rectangle {
+        anchors.fill: parent
+        gradient: Gradient {
+            orientation: Gradient.Horizontal
+            GradientStop { position: 0.0; color: "#880A0A0F" }
+            GradientStop { position: 0.15; color: "transparent" }
+            GradientStop { position: 0.85; color: "transparent" }
+            GradientStop { position: 1.0; color: "#880A0A0F" }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // AMBIENT FLOATING PARTICLES (Subtle Minecraft aesthetic)
+    // ─────────────────────────────────────────────────────────
+    Repeater {
+        model: 12
+        Rectangle {
+            property real startX: Math.random() * root.width
+            property real startY: Math.random() * root.height
+            property real duration: 4000 + Math.random() * 6000
+
+            x: startX
+            width: 2 + Math.random() * 3
+            height: width
+            radius: width / 2
+            color: EzTheme.accent
+            opacity: 0.08 + Math.random() * 0.12
+
+            SequentialAnimation on y {
+                loops: Animation.Infinite
+                NumberAnimation { from: startY; to: startY - 80 - Math.random() * 120; duration: duration; easing.type: Easing.InOutSine }
+                NumberAnimation { from: startY - 80 - Math.random() * 120; to: startY; duration: duration; easing.type: Easing.InOutSine }
+            }
+            SequentialAnimation on opacity {
+                loops: Animation.Infinite
+                NumberAnimation { to: 0.02; duration: duration * 0.8 }
+                NumberAnimation { to: 0.08 + Math.random() * 0.12; duration: duration * 0.8 }
+            }
+        }
+    }
+
+    // Ambient radial glow behind center
     Rectangle {
         anchors.centerIn: parent
-        anchors.verticalCenterOffset: -40
-        width: 480
-        height: 480
-        radius: 240
+        anchors.verticalCenterOffset: -30
+        width: 400
+        height: 400
+        radius: 200
         color: "transparent"
-        border.color: "transparent"
 
         Rectangle {
             anchors.centerIn: parent
-            width: 320
-            height: 320
-            radius: 160
+            width: 280
+            height: 280
+            radius: 140
             color: EzTheme.accent
-            opacity: 0.12
+            opacity: 0.08
             SequentialAnimation on opacity {
                 loops: Animation.Infinite
-                NumberAnimation { to: 0.22; duration: 2500; easing.type: Easing.InOutQuad }
-                NumberAnimation { to: 0.12; duration: 2500; easing.type: Easing.InOutQuad }
+                NumberAnimation { to: 0.16; duration: 3000; easing.type: Easing.InOutSine }
+                NumberAnimation { to: 0.08; duration: 3000; easing.type: Easing.InOutSine }
             }
         }
     }
 
     // ─────────────────────────────────────────────────────────
-    // 2. MAIN CENTER HERO CONTENT (Character + Launch Button)
+    // 2. MAIN CENTER HERO CONTENT
     // ─────────────────────────────────────────────────────────
     ColumnLayout {
         anchors.centerIn: parent
         spacing: 0
 
+        // ── Welcome Text ──
+        Text {
+            Layout.alignment: Qt.AlignHCenter
+            text: EzI18n.t("home_welcome", "Willkommen zurück") + ","
+            font.family: EzTheme.fontFamily
+            font.pixelSize: 14
+            color: EzTheme.textSecondary
+            opacity: 0.8
+        }
+        Text {
+            Layout.alignment: Qt.AlignHCenter
+            text: root.accountUser
+            font.family: EzTheme.mcFontFamily
+            font.pixelSize: 22
+            font.bold: true
+            color: EzTheme.text
+        }
+
+        Item { height: 10 }
+
         // ── 3D Minecraft Character Render ──
         Item {
             Layout.alignment: Qt.AlignHCenter
-            width: 240
-            height: 280
+            width: 220
+            height: 260
 
             // Ambient Shadow under player feet
             Rectangle {
                 anchors.bottom: parent.bottom
-                anchors.bottomMargin: 10
+                anchors.bottomMargin: 8
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: 140
-                height: 20
-                radius: 10
+                width: 120
+                height: 16
+                radius: 8
                 color: "#000000"
-                opacity: 0.6
-                scale: charHover.containsMouse ? 1.08 : 1.0
+                opacity: 0.5
+                scale: charHover.containsMouse ? 1.06 : 1.0
                 Behavior on scale { NumberAnimation { duration: 200 } }
             }
 
-            // Full-body 3D Character Skin Image
+            // Full-body Character
             Image {
                 id: skinBody
                 anchors.centerIn: parent
-                anchors.verticalCenterOffset: charHover.containsMouse ? -6 : 0
-                height: 250
+                anchors.verticalCenterOffset: charHover.containsMouse ? -5 : 0
+                height: 230
                 source: root.bodyUrl !== "" ? root.bodyUrl : "https://mc-heads.net/body/Steve/360"
                 fillMode: Image.PreserveAspectFit
                 smooth: false
 
                 Behavior on anchors.verticalCenterOffset {
-                    NumberAnimation { duration: 180; easing.type: Easing.OutQuad }
+                    NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
                 }
+
+                // Subtle rotation on hover
+                rotation: charHover.containsMouse ? 2 : 0
+                Behavior on rotation { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
             }
 
-            // Fallback avatar box if skin loading
+            // Fallback avatar
             Rectangle {
                 anchors.centerIn: parent
-                width: 72
-                height: 72
-                radius: 16
+                width: 72; height: 72; radius: EzTheme.radius
                 color: EzTheme.surface2
-                border.color: EzTheme.accent
-                border.width: 1.5
+                border.color: EzTheme.accent; border.width: 1.5
                 visible: skinBody.status !== Image.Ready
 
                 Text {
                     text: root.accountUser ? root.accountUser.charAt(0).toUpperCase() : "P"
-                    font.family: EzTheme.mcFontFamily
-                    font.pixelSize: 28
-                    font.bold: true
-                    color: EzTheme.accentLight
-                    anchors.centerIn: parent
+                    font.family: EzTheme.mcFontFamily; font.pixelSize: 28; font.bold: true
+                    color: EzTheme.accentLight; anchors.centerIn: parent
                 }
             }
 
-            // Interactive hover on skin
             MouseArea {
                 id: charHover
                 anchors.fill: parent
@@ -142,21 +200,22 @@ Item {
             }
         }
 
-        Item { height: 16 }
+        Item { height: 14 }
 
         // ── Active Profile Pill ──
         Rectangle {
             Layout.alignment: Qt.AlignHCenter
-            height: 30
-            width: profPillRow.implicitWidth + 24
-            radius: 15
-            color: "#161D24"
+            height: 32
+            width: profPillRow.implicitWidth + 28
+            radius: 16
+            color: profPillMouse.containsMouse ? "#1A2520" : "#111B17"
             border.color: profPillMouse.containsMouse ? EzTheme.accentLight : EzTheme.borderLight
             border.width: 1
             scale: profPillMouse.containsMouse ? 1.03 : 1.0
 
-            Behavior on scale { NumberAnimation { duration: 100 } }
-            Behavior on border.color { ColorAnimation { duration: 100 } }
+            Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+            Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
+            Behavior on border.color { ColorAnimation { duration: EzTheme.animNormal } }
 
             RowLayout {
                 id: profPillRow
@@ -168,14 +227,14 @@ Item {
                     color: EzTheme.accent
                     SequentialAnimation on opacity {
                         loops: Animation.Infinite
-                        NumberAnimation { to: 0.3; duration: 500 }
-                        NumberAnimation { to: 1.0; duration: 500 }
+                        NumberAnimation { to: 0.3; duration: 600; easing.type: Easing.InOutSine }
+                        NumberAnimation { to: 1.0; duration: 600; easing.type: Easing.InOutSine }
                     }
                 }
 
                 Text {
                     text: (root.hasProfile ? root.activeName : EzI18n.t("home_default_profile", "Standard Profil")) + "  ·  " + root.activeLoader + " " + root.activeVersion + "  ·  " + root.activeModsCount + " Mods"
-                    font.family: EzTheme.mcFontFamily
+                    font.family: EzTheme.fontFamily
                     font.pixelSize: 11
                     font.bold: true
                     color: EzTheme.text
@@ -195,49 +254,71 @@ Item {
             }
         }
 
-        Item { height: 16 }
+        Item { height: 20 }
 
-        // ── GIANT EPIC MINECRAFT LAUNCH BUTTON ──
+        // ── GIANT EPIC PLAY BUTTON ──
         Rectangle {
             id: launchBtn
             Layout.alignment: Qt.AlignHCenter
-            width: 320
-            height: 58
-            radius: 8
+            width: 340
+            height: 62
+            radius: EzTheme.radius
 
-            scale: launchMouse.pressed ? 0.95 : (launchMouse.containsMouse ? 1.03 : 1.0)
-            Behavior on scale { NumberAnimation { duration: 100; easing.type: Easing.OutQuad } }
+            scale: launchMouse.pressed ? 0.95 : (launchMouse.containsMouse ? 1.04 : 1.0)
+            Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
             gradient: Gradient {
                 orientation: Gradient.Vertical
                 GradientStop {
                     position: 0.0
-                    color: root.isLaunching ? "#F59E0B" : (launchMouse.containsMouse ? "#33FF8A" : EzTheme.accent)
+                    color: root.isLaunching ? "#F59E0B" : (launchMouse.containsMouse ? "#36FFa0" : "#2EE080")
                 }
                 GradientStop {
                     position: 1.0
-                    color: root.isLaunching ? "#D97706" : (launchMouse.containsMouse ? "#00E676" : "#00C853")
+                    color: root.isLaunching ? "#D97706" : (launchMouse.containsMouse ? "#22C96E" : "#18A858")
                 }
             }
 
-            // Glow Border
-            border.color: root.isLaunching ? "#FDE68A" : (launchMouse.containsMouse ? "#B9F6CA" : "#00E676")
+            border.color: root.isLaunching ? "#FDE68A" : (launchMouse.containsMouse ? "#5AEEA0" : "#22C96E50")
             border.width: 2
+
+            // Outer glow effect
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: -4
+                radius: parent.radius + 4
+                color: "transparent"
+                border.color: root.isLaunching ? "#F59E0B20" : EzTheme.accentGlow
+                border.width: 3
+                opacity: launchMouse.containsMouse ? 0.8 : 0.4
+                Behavior on opacity { NumberAnimation { duration: EzTheme.animNormal } }
+            }
+
+            // Inner highlight
+            Rectangle {
+                anchors.fill: parent
+                radius: parent.radius
+                gradient: Gradient {
+                    orientation: Gradient.Vertical
+                    GradientStop { position: 0.0; color: "#ffffff20" }
+                    GradientStop { position: 0.3; color: "transparent" }
+                    GradientStop { position: 1.0; color: "#00000015" }
+                }
+            }
 
             RowLayout {
                 anchors.centerIn: parent
-                spacing: 12
+                spacing: 14
 
                 Image {
                     source: "icons/play.svg"
-                    width: 18
-                    height: 18
+                    width: 20; height: 20
                     fillMode: Image.PreserveAspectFit
                     visible: !root.isLaunching
                 }
 
                 Rectangle {
-                    width: 14; height: 14; radius: 7
+                    width: 16; height: 16; radius: 8
                     color: "#000000"
                     visible: root.isLaunching
                     SequentialAnimation on scale {
@@ -250,9 +331,10 @@ Item {
                 Text {
                     text: root.isLaunching ? EzI18n.t("home_launching", "STARTET…") : EzI18n.t("home_play", "SPIELEN")
                     font.family: EzTheme.mcFontFamily
-                    font.pixelSize: 18
+                    font.pixelSize: 20
                     font.bold: true
                     color: "#000000"
+                    font.letterSpacing: 2
                 }
             }
 
@@ -269,21 +351,20 @@ Item {
             }
         }
 
-        Item { height: 12 }
+        Item { height: 14 }
 
-        // ── ONLINE AUTHENTICATION STATUS BADGE & TOOLTIP ──
+        // ── AUTH STATUS BADGE ──
         Rectangle {
             id: launchModePill
             Layout.alignment: Qt.AlignHCenter
-            height: 24
-            width: modeRow.implicitWidth + 20
-            radius: 12
+            height: 26
+            width: modeRow.implicitWidth + 22
+            radius: 13
             color: modeMouse.containsMouse ? "#1A261F" : "#111C15"
-            border.color: EzTheme.accent
+            border.color: EzTheme.accentGlow
             border.width: 1
 
-            Behavior on color { ColorAnimation { duration: 120 } }
-            Behavior on border.color { ColorAnimation { duration: 120 } }
+            Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
 
             RowLayout {
                 id: modeRow
@@ -295,17 +376,18 @@ Item {
                     color: EzTheme.accent
                     SequentialAnimation on opacity {
                         loops: Animation.Infinite
-                        NumberAnimation { to: 0.3; duration: 600 }
-                        NumberAnimation { to: 1.0; duration: 600 }
+                        NumberAnimation { to: 0.3; duration: 700; easing.type: Easing.InOutSine }
+                        NumberAnimation { to: 1.0; duration: 700; easing.type: Easing.InOutSine }
                     }
                 }
 
                 Text {
                     text: "⚡ " + EzI18n.t("home_direct_badge", "DIREKTSTART AKTIV") + " (" + (typeof accountController !== "undefined" && accountController && accountController.isOnline ? "Microsoft Auth" : "Direct") + ")"
-                    font.family: EzTheme.mcFontFamily
+                    font.family: EzTheme.fontFamily
                     font.pixelSize: 9
                     font.bold: true
                     color: EzTheme.accentLight
+                    font.letterSpacing: 0.5
                 }
 
                 Text {
@@ -323,75 +405,100 @@ Item {
                 onClicked: infoPopup.opened ? infoPopup.close() : infoPopup.open()
             }
 
-            // Interactive Info Popup explaining 100% online authentication & direct launch
             Popup {
                 id: infoPopup
-                x: Math.round((launchModePill.width - 320) / 2)
-                y: launchModePill.height + 8
-                width: 320
-                padding: 14
+                x: Math.round((launchModePill.width - 340) / 2)
+                y: launchModePill.height + 10
+                width: 340
+                padding: 16
                 closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
 
                 background: Rectangle {
-                    color: "#13171F"
-                    radius: 10
+                    color: EzTheme.surface
+                    radius: EzTheme.radius
                     border.color: EzTheme.accent
                     border.width: 1
 
                     Rectangle {
-                        anchors.fill: parent
-                        anchors.margins: -4
-                        radius: 14
-                        color: "transparent"
-                        border.color: EzTheme.accentGlow
-                        border.width: 1.5
-                        opacity: 0.3
+                        anchors.fill: parent; anchors.margins: -4
+                        radius: parent.radius + 4; color: "transparent"
+                        border.color: EzTheme.accentGlow; border.width: 2; opacity: 0.3
                     }
                 }
 
                 contentItem: ColumnLayout {
-                    spacing: 8
+                    spacing: 10
 
-                    RowLayout {
-                        spacing: 8
-                        Text {
-                            text: EzI18n.t("home_direct_modal_title", "🟢 Direktstart & Online Verifiziert")
-                            font.family: EzTheme.fontFamily
-                            font.pixelSize: 13
-                            font.bold: true
-                            color: EzTheme.accentLight
-                        }
+                    Text {
+                        text: EzI18n.t("home_direct_modal_title", "🟢 Direktstart & Online Verifiziert")
+                        font.family: EzTheme.fontFamily; font.pixelSize: 14; font.bold: true
+                        color: EzTheme.accentLight
                     }
 
                     Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border }
 
                     Text {
                         text: EzI18n.t("home_direct_modal_desc", "EzClient startet Minecraft blitzschnell direkt über Java mit deinem aus dem .minecraft-Ordner ausgelesenen Microsoft/Xbox-Token – komplett ohne den Minecraft Launcher zu öffnen!")
-                        font.family: EzTheme.fontFamily
-                        font.pixelSize: 11
-                        color: EzTheme.text
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
+                        font.family: EzTheme.fontFamily; font.pixelSize: 12
+                        color: EzTheme.text; wrapMode: Text.WordWrap; Layout.fillWidth: true
                     }
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: infoNoteText.implicitHeight + 14
-                        radius: 6
+                        Layout.preferredHeight: infoNoteText.implicitHeight + 16
+                        radius: EzTheme.radiusSm
                         color: "#0B0F14"
-                        border.color: EzTheme.borderLight
-                        border.width: 1
+                        border.color: EzTheme.borderLight; border.width: 1
 
                         Text {
                             id: infoNoteText
-                            anchors.fill: parent
-                            anchors.margins: 7
+                            anchors.fill: parent; anchors.margins: 8
                             text: EzI18n.t("home_direct_modal_note", "⚡ 100% Online-kompatibel für alle Multiplayer-Server (z.B. Hypixel), Realms und authentische Skins.")
-                            font.family: EzTheme.fontFamily
-                            font.pixelSize: 10
-                            color: EzTheme.cyan
-                            wrapMode: Text.WordWrap
+                            font.family: EzTheme.fontFamily; font.pixelSize: 11
+                            color: EzTheme.cyan; wrapMode: Text.WordWrap
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 3. BOTTOM STATUS BAR (Stats & Quick Info)
+    // ─────────────────────────────────────────────────────────
+    RowLayout {
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 16
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: 20
+
+        Repeater {
+            model: [
+                { icon: "⚡", label: root.activeModsCount + " Mods", color: EzTheme.accentLight },
+                { icon: "💾", label: Math.round(root.activeRamMb / 1024 * 10) / 10 + " GB RAM", color: EzTheme.cyan },
+                { icon: "🎮", label: root.activeLoader + " " + root.activeVersion, color: EzTheme.purple }
+            ]
+
+            Rectangle {
+                height: 28
+                width: statRow.implicitWidth + 20
+                radius: 14
+                color: "#0A0A0F80"
+                border.color: EzTheme.border
+                border.width: 1
+
+                RowLayout {
+                    id: statRow
+                    anchors.centerIn: parent
+                    spacing: 6
+
+                    Text { text: modelData.icon; font.pixelSize: 10 }
+                    Text {
+                        text: modelData.label
+                        font.family: EzTheme.fontFamily
+                        font.pixelSize: 10
+                        font.bold: true
+                        color: modelData.color
                     }
                 }
             }

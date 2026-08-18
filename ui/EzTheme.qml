@@ -4,33 +4,42 @@ pragma Singleton
 
 QtObject {
     // ── BACKGROUNDS ──────────────────────────────────────────────
-    readonly property color bg:           "#09090C"   // near-black, warmish
-    readonly property color titlebarBg:   "#060608"
-    readonly property color sidebarBg:    "#0D0D12"   // very slightly lighter
-    readonly property color surface:      "#111118"   // primary card/panel
-    readonly property color surface2:     "#17171F"   // raised elements
-    readonly property color surface3:     "#1E1E28"   // hover/selected
-    readonly property color surfaceHover: "#232330"
-    readonly property color surfaceActive:"#14261C"   // active nav item (green tint)
-    readonly property color overlay:      "#00000080"
+    readonly property color bg:           "#0A0A0F"
+    readonly property color titlebarBg:   "#08080D"
+    readonly property color sidebarBg:    "#0E0E15"
+    readonly property color surface:      "#12121B"
+    readonly property color surface2:     "#181823"
+    readonly property color surface3:     "#1F1F2C"
+    readonly property color surfaceHover: "#252534"
+    readonly property color surfaceActive:"#0F2818"
+    readonly property color overlay:      "#00000088"
+
+    // ── GLASSMORPHISM ────────────────────────────────────────────
+    readonly property color glass:        "#15152240"
+    readonly property color glassBorder:  "#ffffff08"
 
     // ── BORDERS ──────────────────────────────────────────────────
-    readonly property color border:       "#1E1E2A"
-    readonly property color borderLight:  "#2A2A38"
-    readonly property color borderAccent: "#1DB96840"
+    readonly property color border:       "#1A1A28"
+    readonly property color borderLight:  "#28283A"
+    readonly property color borderAccent: "#22C96E30"
 
     // ── TEXT ─────────────────────────────────────────────────────
-    readonly property color text:          "#FFFFFF"
-    readonly property color textSecondary: "#A0A0B8"
-    readonly property color textMuted:     "#606078"
-    readonly property color textSubtle:    "#3A3A52"
+    readonly property color text:          "#F0F0F5"
+    readonly property color textSecondary: "#9898B0"
+    readonly property color textMuted:     "#55556A"
+    readonly property color textSubtle:    "#353548"
 
     // ── ACCENT — vivid EzClient green ────────────────────────────
-    readonly property color accent:      "#1DB968"
-    readonly property color accentHover: "#25D474"
-    readonly property color accentDark:  "#0A3D22"
-    readonly property color accentLight: "#4AE896"
-    readonly property color accentGlow:  "#1DB96830"
+    readonly property color accent:      "#22C96E"
+    readonly property color accentHover: "#2EE080"
+    readonly property color accentDark:  "#0C3D24"
+    readonly property color accentLight: "#5AEEA0"
+    readonly property color accentGlow:  "#22C96E25"
+    readonly property color accentSoft:  "#22C96E12"
+
+    // ── GRADIENTS (start / end) ──────────────────────────────────
+    readonly property color gradStart:   "#22C96E"
+    readonly property color gradEnd:     "#18A858"
 
     // ── SEMANTIC ──────────────────────────────────────────────────
     readonly property color cyan:    "#38BDF8"
@@ -47,6 +56,12 @@ QtObject {
     readonly property int sidebarWidth: 224
     readonly property int titlebarHeight: 40
     readonly property int statusbarHeight: 28
-    readonly property int radius: 8
-    readonly property int radiusSm: 5
+    readonly property int radius: 12
+    readonly property int radiusSm: 6
+    readonly property int radiusLg: 16
+
+    // ── ANIMATION DURATIONS ──────────────────────────────────────
+    readonly property int animFast: 100
+    readonly property int animNormal: 180
+    readonly property int animSlow: 300
 }

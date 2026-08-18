@@ -13,12 +13,12 @@ RowLayout {
 
     ColumnLayout {
         Layout.fillWidth: true
-        spacing: 1
+        spacing: 2
 
         Text {
             text: control.label
             font.family: EzTheme.fontFamily
-            font.pixelSize: 12
+            font.pixelSize: 13
             font.bold: true
             color: EzTheme.text
         }
@@ -26,7 +26,7 @@ RowLayout {
         Text {
             text: control.sub
             font.family: EzTheme.fontFamily
-            font.pixelSize: 10
+            font.pixelSize: 11
             color: EzTheme.textMuted
             visible: control.sub !== ""
             elide: Text.ElideRight
@@ -34,29 +34,60 @@ RowLayout {
         }
     }
 
+    // iOS-style premium toggle switch
     Rectangle {
-        width: 34
-        height: 18
-        radius: 9
+        id: toggleTrack
+        width: 44
+        height: 24
+        radius: 12
         color: control.toggleValue ? EzTheme.accent : EzTheme.surface3
-        border.color: control.toggleValue ? EzTheme.accent : EzTheme.borderLight
-        border.width: 1
+        border.color: control.toggleValue ? EzTheme.accentHover : EzTheme.borderLight
+        border.width: 1.5
 
-        Behavior on color { ColorAnimation { duration: 120 } }
-        Behavior on border.color { ColorAnimation { duration: 120 } }
+        Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
+        Behavior on border.color { ColorAnimation { duration: EzTheme.animNormal } }
 
+        // Active glow effect
         Rectangle {
-            width: 12
-            height: 12
-            radius: 6
-            color: "#FFFFFF"
+            anchors.fill: parent
+            anchors.margins: -3
+            radius: parent.radius + 3
+            color: "transparent"
+            border.color: control.toggleValue ? EzTheme.accentGlow : "transparent"
+            border.width: 2
+            Behavior on border.color { ColorAnimation { duration: EzTheme.animSlow } }
+        }
+
+        // Toggle knob
+        Rectangle {
+            id: toggleKnob
+            width: 18
+            height: 18
+            radius: 9
             anchors.verticalCenter: parent.verticalCenter
             x: control.toggleValue ? parent.width - width - 3 : 3
 
-            Behavior on x { NumberAnimation { duration: 130; easing.type: Easing.InOutQuad } }
+            color: "#FFFFFF"
+
+            // Subtle inner shadow on knob
+            Rectangle {
+                anchors.fill: parent
+                radius: parent.radius
+                gradient: Gradient {
+                    orientation: Gradient.Vertical
+                    GradientStop { position: 0.0; color: "#ffffff" }
+                    GradientStop { position: 1.0; color: "#e8e8e8" }
+                }
+            }
+
+            Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.InOutCubic } }
+
+            scale: toggleMouse.pressed ? 0.85 : 1.0
+            Behavior on scale { NumberAnimation { duration: 80 } }
         }
 
         MouseArea {
+            id: toggleMouse
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
             onClicked: {

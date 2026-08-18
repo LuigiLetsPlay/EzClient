@@ -39,7 +39,7 @@ ApplicationWindow {
         TopBar {
             id: topbar
             Layout.fillWidth: true
-            Layout.preferredHeight: 52
+            Layout.preferredHeight: 56
             currentRoute: navController.currentRoute
             windowRef: window
             visible: !window.needsOnboarding
