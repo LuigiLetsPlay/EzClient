@@ -20,6 +20,10 @@ ApplicationWindow {
         if (height < minimumHeight) height = minimumHeight
     }
 
+    function openSkinModal() {
+        globalSkinModal.open()
+    }
+
     // Load authentic Minecraft TrueType Fonts into QML
     FontLoader {
         id: mcRegularFont

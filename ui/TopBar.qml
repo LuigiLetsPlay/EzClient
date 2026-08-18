@@ -154,12 +154,6 @@ Rectangle {
                         color: EzTheme.surface
                         border.color: EzTheme.borderLight
                         border.width: 1
-
-                        // Top highlight
-                        Rectangle {
-                            anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
-                            height: 1; radius: parent.radius; color: "#ffffff06"
-                        }
                     }
 
                     contentItem: ColumnLayout {
@@ -480,11 +474,6 @@ Rectangle {
                         color: EzTheme.surface
                         border.color: EzTheme.borderLight
                         border.width: 1
-
-                        Rectangle {
-                            anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
-                            height: 1; radius: parent.radius; color: "#ffffff06"
-                        }
                     }
 
                     contentItem: ColumnLayout {

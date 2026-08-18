@@ -207,6 +207,35 @@ class AccountController(QObject):
         self._account_type = "Offline"
         self.accountChanged.emit()
 
+    skinFetched = Signal(str, str)  # local_path, preview_url
+    skinHistoryChanged = Signal()
+
+    @Property("QVariantList", notify=skinHistoryChanged)
+    def skinHistory(self) -> list[dict]:
+        from backend.services.skin_service import get_skin_history
+        return get_skin_history()
+
+    @Slot(str)
+    def fetchSkinByUsername(self, username: str) -> None:
+        """Fetches skin PNG texture and 3D preview for any player username."""
+        if not username.strip():
+            self.skinUploadStatusChanged.emit("Bitte gib einen Spielernamen ein.", True)
+            return
+
+        self.skinUploadStatusChanged.emit(f"Lade Skin für '{username.strip()}'…", False)
+
+        def worker():
+            from backend.services.skin_service import fetch_skin_by_username
+            ok, path, preview = fetch_skin_by_username(username.strip())
+            if ok:
+                self.skinFetched.emit(path, preview)
+                self.skinHistoryChanged.emit()
+                self.skinUploadStatusChanged.emit(f"Skin von {username.strip()} geladen!", False)
+            else:
+                self.skinUploadStatusChanged.emit(preview, True)
+
+        threading.Thread(target=worker, daemon=True).start()
+
     @Slot()
     def refresh(self) -> None:
         self._load_account(force_refresh=True)
@@ -220,6 +249,10 @@ class AccountController(QObject):
             "",
             "Minecraft Skin (*.png);;Alle Dateien (*.*)"
         )
+        if file_path:
+            from backend.services.skin_service import add_skin_to_history
+            add_skin_to_history(Path(file_path).stem, file_path)
+            self.skinHistoryChanged.emit()
         return file_path or ""
 
     @Slot(str, str)

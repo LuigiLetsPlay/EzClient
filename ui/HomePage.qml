@@ -196,8 +196,10 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                    if (typeof window !== "undefined" && window.navigateTo) {
-                        window.navigateTo("profile_detail")
+                    if (typeof window !== "undefined" && window.openSkinModal) {
+                        window.openSkinModal()
+                    } else if (typeof globalSkinModal !== "undefined" && globalSkinModal) {
+                        globalSkinModal.open()
                     }
                 }
             }
@@ -411,7 +413,7 @@ Item {
             Popup {
                 id: infoPopup
                 x: Math.round((launchModePill.width - 340) / 2)
-                y: launchModePill.height + 10
+                y: -height - 10
                 width: 340
                 padding: 16
                 closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent

@@ -81,7 +81,7 @@ def reset_skin_to_default(access_token: str) -> tuple[bool, str]:
             MOJANG_SKIN_URL,
             headers={
                 "Authorization": f"Bearer {access_token}",
-                "User-Agent": "EzClient/1.0.3"
+                "User-Agent": "EzClient/1.0.8"
             },
             method="DELETE"
         )
@@ -89,3 +89,70 @@ def reset_skin_to_default(access_token: str) -> tuple[bool, str]:
             return True, "Skin auf Standard zurückgesetzt."
     except Exception as e:
         return False, f"Fehler beim Zurücksetzen: {e}"
+
+
+def get_skins_dir() -> Path:
+    from backend.models.types import DATA_DIR
+    p = DATA_DIR / "skins"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def get_skin_history() -> list[dict]:
+    hist_file = get_skins_dir() / "history.json"
+    if hist_file.exists():
+        try:
+            return json.loads(hist_file.read_text("utf-8"))
+        except Exception:
+            return []
+    return []
+
+
+def add_skin_to_history(username: str, path: str, preview_url: str = "") -> list[dict]:
+    history = get_skin_history()
+    # Filter duplicate
+    history = [h for h in history if h.get("username", "").lower() != username.lower() and h.get("path") != path]
+    history.insert(0, {
+        "username": username,
+        "path": path,
+        "previewUrl": preview_url or f"https://mc-heads.net/avatar/{username}/64"
+    })
+    history = history[:12]  # keep up to 12 recent skins
+    try:
+        (get_skins_dir() / "history.json").write_text(json.dumps(history, indent=2), "utf-8")
+    except Exception:
+        pass
+    return history
+
+
+def fetch_skin_by_username(username: str) -> tuple[bool, str, str]:
+    """
+    Downloads full skin texture PNG for any given Minecraft player username.
+    Returns (success, local_path, preview_url)
+    """
+    name = username.strip()
+    if not name:
+        return False, "", "Kein Spielername angegeben."
+
+    target_png = get_skins_dir() / f"{name}.png"
+    urls = [
+        f"https://minotar.net/skin/{name}",
+        f"https://mc-heads.net/download/{name}",
+        f"https://crafatar.com/skins/{name}"
+    ]
+
+    for url in urls:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "EzClient/1.0.8"})
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                if resp.getcode() == 200:
+                    content = resp.read()
+                    if len(content) > 500:
+                        target_png.write_bytes(content)
+                        preview_url = f"https://mc-heads.net/body/{name}/360"
+                        add_skin_to_history(name, str(target_png), preview_url)
+                        return True, str(target_png), preview_url
+        except Exception:
+            continue
+
+    return False, "", f"Skin für '{name}' konnte nicht gefunden werden."

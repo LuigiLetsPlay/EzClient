@@ -6,7 +6,7 @@ import ".."
 Rectangle {
     id: skinModal
     anchors.fill: parent
-    color: "#C005070A"
+    color: "#D005070A"
     z: 99999
     visible: opacity > 0.001
     opacity: 0.0
@@ -15,13 +15,16 @@ Rectangle {
 
     property string selectedFilePath: ""
     property string skinVariant: "classic" // "classic" or "slim"
+    property string previewBodyUrl: ""
     property string statusMsg: ""
     property bool isError: false
 
     function open() {
         selectedFilePath = ""
+        previewBodyUrl = ""
         statusMsg = ""
         isError = false
+        skinNameInput.text = ""
         skinModal.opacity = 1.0
     }
 
@@ -35,26 +38,35 @@ Rectangle {
             skinModal.statusMsg = msg
             skinModal.isError = isErr
         }
+        function onSkinFetched(path, preview) {
+            skinModal.selectedFilePath = path
+            skinModal.previewBodyUrl = preview
+        }
     }
 
     MouseArea {
         anchors.fill: parent
-        onClicked: {} // block clicks to background
+        onClicked: skinModal.close()
     }
 
     Rectangle {
         anchors.centerIn: parent
-        width: Math.min(520, parent.width - 32)
-        height: Math.min(560, parent.height - 32)
+        width: Math.min(560, parent.width - 32)
+        height: Math.min(620, parent.height - 32)
         radius: 16
         color: "#12141C"
         border.color: EzTheme.borderLight
         border.width: 1
 
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {} // consume clicks
+        }
+
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 24
-            spacing: 16
+            anchors.margins: 22
+            spacing: 12
 
             // Header
             RowLayout {
@@ -69,14 +81,14 @@ Rectangle {
                 ColumnLayout {
                     spacing: 2
                     Text {
-                        text: "Minecraft Skin ändern"
-                        font.family: EzTheme.mcFontFamily
+                        text: "Minecraft Skin wechseln"
+                        font.family: EzTheme.fontFamily
                         font.pixelSize: 16
                         font.bold: true
                         color: EzTheme.text
                     }
                     Text {
-                        text: "Wird direkt bei Mojang gespeichert (Kein Client-Neustart nötig)"
+                        text: "Direkt bei Mojang synchronisiert · Kein Client-Neustart nötig"
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
                         color: EzTheme.textSecondary
@@ -97,10 +109,82 @@ Rectangle {
                 }
             }
 
-            // Skin Preview Area
+            // ── Username Grabber Row ──
             Rectangle {
                 Layout.fillWidth: true
-                height: 180
+                height: 42
+                radius: 8
+                color: "#0B0C10"
+                border.color: skinNameInput.activeFocus ? EzTheme.accent : EzTheme.border
+                border.width: 1
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 4
+                    spacing: 6
+
+                    Text {
+                        text: " 🔍"
+                        font.pixelSize: 12
+                    }
+
+                    TextInput {
+                        id: skinNameInput
+                        Layout.fillWidth: true
+                        font.family: EzTheme.fontFamily
+                        font.pixelSize: 12
+                        color: EzTheme.text
+                        selectByMouse: true
+                        clip: true
+                        verticalAlignment: TextInput.AlignVCenter
+                        onAccepted: {
+                            if (skinNameInput.text.trim() && accountController) {
+                                accountController.fetchSkinByUsername(skinNameInput.text.trim())
+                            }
+                        }
+
+                        Text {
+                            text: "Minecraft-Spielernamen eingeben (z.B. Lu1giLP)…"
+                            color: EzTheme.textMuted
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 12
+                            visible: !skinNameInput.text && !skinNameInput.activeFocus
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+
+                    Rectangle {
+                        height: 32
+                        width: 95
+                        radius: 6
+                        color: fetchBtnMouse.containsMouse ? EzTheme.accentHover : EzTheme.accent
+                        Text {
+                            text: "Skin laden"
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 11
+                            font.bold: true
+                            color: "#000000"
+                            anchors.centerIn: parent
+                        }
+                        MouseArea {
+                            id: fetchBtnMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (skinNameInput.text.trim() && accountController) {
+                                    accountController.fetchSkinByUsername(skinNameInput.text.trim())
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Skin Preview & Model Selector Area ──
+            Rectangle {
+                Layout.fillWidth: true
+                height: 165
                 radius: 10
                 color: "#0B0C10"
                 border.color: EzTheme.border
@@ -108,12 +192,12 @@ Rectangle {
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.margins: 14
-                    spacing: 16
+                    anchors.margins: 12
+                    spacing: 14
 
                     // Player Model Body preview
                     Rectangle {
-                        width: 100; height: 152; radius: 8
+                        width: 95; height: 141; radius: 8
                         color: "#151821"
                         border.color: EzTheme.border
                         border.width: 1
@@ -121,8 +205,8 @@ Rectangle {
 
                         Image {
                             anchors.fill: parent
-                            anchors.margins: 4
-                            source: skinModal.selectedFilePath ? ("file:///" + skinModal.selectedFilePath.replace(/\\/g, "/")) : (accountController ? accountController.bodyUrl : "")
+                            anchors.margins: 2
+                            source: skinModal.previewBodyUrl ? skinModal.previewBodyUrl : (skinModal.selectedFilePath ? ("file:///" + skinModal.selectedFilePath.replace(/\\/g, "/")) : (accountController ? accountController.bodyUrl : ""))
                             fillMode: Image.PreserveAspectFit
                             smooth: false
                         }
@@ -131,10 +215,10 @@ Rectangle {
                     // Skin Details & Variant selector
                     ColumnLayout {
                         Layout.fillWidth: true
-                        spacing: 10
+                        spacing: 8
 
                         Text {
-                            text: skinModal.selectedFilePath ? ("Ausgewählt: " + skinModal.selectedFilePath.split("/").pop().split("\\").pop()) : "Aktueller Skin aktiv"
+                            text: skinModal.selectedFilePath ? ("Ausgewählt: " + skinModal.selectedFilePath.split("/").pop().split("\\").pop()) : "Aktiver Account-Skin"
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 12
                             font.bold: true
@@ -144,7 +228,7 @@ Rectangle {
                         }
 
                         Text {
-                            text: "Modell-Typ wählen:"
+                            text: "Modell-Armbreite:"
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 11
                             color: EzTheme.textSecondary
@@ -154,7 +238,7 @@ Rectangle {
                             spacing: 8
                             // Classic 4px button
                             Rectangle {
-                                height: 32
+                                height: 30
                                 Layout.preferredWidth: 105
                                 radius: 6
                                 color: skinModal.skinVariant === "classic" ? EzTheme.surfaceActive : (cMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2)
@@ -179,7 +263,7 @@ Rectangle {
 
                             // Slim 3px button
                             Rectangle {
-                                height: 32
+                                height: 30
                                 Layout.preferredWidth: 105
                                 radius: 6
                                 color: skinModal.skinVariant === "slim" ? EzTheme.surfaceActive : (sMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2)
@@ -205,7 +289,7 @@ Rectangle {
 
                         // Pick file button
                         Rectangle {
-                            height: 34
+                            height: 32
                             Layout.fillWidth: true
                             radius: 6
                             color: pickMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
@@ -216,7 +300,7 @@ Rectangle {
                                 spacing: 8
                                 Text { text: "📁"; font.pixelSize: 12 }
                                 Text {
-                                    text: "Skin-Datei (.png) auswählen…"
+                                    text: "Eigene Skin-Datei (.png) wählen…"
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 11
                                     font.bold: true
@@ -231,7 +315,85 @@ Rectangle {
                                 onClicked: {
                                     if (accountController) {
                                         var p = accountController.pickSkinFile()
-                                        if (p) skinModal.selectedFilePath = p
+                                        if (p) {
+                                            skinModal.selectedFilePath = p
+                                            skinModal.previewBodyUrl = ""
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Recent Skins History ──
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 6
+                visible: typeof accountController !== "undefined" && accountController && accountController.skinHistory && accountController.skinHistory.length > 0
+
+                Text {
+                    text: "Zuletzt verwendete Skins:"
+                    font.family: EzTheme.fontFamily
+                    font.pixelSize: 11
+                    color: EzTheme.textSecondary
+                }
+
+                ScrollView {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 52
+                    contentWidth: histRow.implicitWidth
+                    clip: true
+
+                    Row {
+                        id: histRow
+                        spacing: 8
+
+                        Repeater {
+                            model: (typeof accountController !== "undefined" && accountController) ? accountController.skinHistory : []
+
+                            Rectangle {
+                                width: 120
+                                height: 44
+                                radius: 8
+                                color: histItemMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
+                                border.color: skinModal.selectedFilePath === modelData.path ? EzTheme.accent : EzTheme.border
+                                border.width: 1
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 6
+                                    spacing: 6
+
+                                    Image {
+                                        source: modelData.previewUrl ? modelData.previewUrl : "https://mc-heads.net/avatar/" + (modelData.username || "Steve") + "/32"
+                                        Layout.preferredWidth: 26
+                                        Layout.preferredHeight: 26
+                                        fillMode: Image.PreserveAspectFit
+                                    }
+
+                                    Text {
+                                        text: modelData.username || "Skin"
+                                        font.family: EzTheme.fontFamily
+                                        font.pixelSize: 11
+                                        font.bold: true
+                                        color: EzTheme.text
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: histItemMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (modelData.path) {
+                                            skinModal.selectedFilePath = modelData.path
+                                            skinModal.previewBodyUrl = modelData.previewUrl || ("https://mc-heads.net/body/" + (modelData.username || "Steve") + "/360")
+                                        }
                                     }
                                 }
                             }
@@ -243,7 +405,7 @@ Rectangle {
             // Status message
             Rectangle {
                 Layout.fillWidth: true
-                height: 38
+                height: 36
                 radius: 6
                 visible: skinModal.statusMsg !== ""
                 color: skinModal.isError ? "#301014" : "#102C1E"
@@ -251,7 +413,7 @@ Rectangle {
                 border.width: 1
                 RowLayout {
                     anchors.fill: parent
-                    anchors.margins: 10
+                    anchors.margins: 8
                     spacing: 8
                     Text { text: skinModal.isError ? "⚠️" : "✓"; font.pixelSize: 12 }
                     Text {
@@ -309,7 +471,7 @@ Rectangle {
                     border.color: EzTheme.border
                     border.width: 1
                     Text {
-                        text: "Abbrechen"
+                        text: "Schließen"
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
                         color: EzTheme.textSecondary

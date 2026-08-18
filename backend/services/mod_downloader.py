@@ -97,6 +97,7 @@ def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = No
 
         # Check if already present on disk
         if target_jar.exists() and target_jar.stat().st_size > 1024:
+            active_filenames.add(target_jar.name)
             continue
 
         # Check cache
@@ -104,6 +105,7 @@ def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = No
         if cached.exists() and cached.stat().st_size > 1024:
             try:
                 shutil.copy2(cached, target_jar)
+                active_filenames.add(target_jar.name)
                 continue
             except Exception:
                 pass
