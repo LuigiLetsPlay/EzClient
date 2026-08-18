@@ -37,6 +37,13 @@ def build_installer():
         "--hidden-import=PySide6.QtCore",
         "--hidden-import=PySide6.QtGui",
         "--hidden-import=PySide6.QtWidgets",
+        "--exclude-module=PySide6.QtWebEngineWidgets",
+        "--exclude-module=PySide6.QtWebEngineCore",
+        "--exclude-module=PySide6.QtQuick",
+        "--exclude-module=PySide6.QtQml",
+        "--exclude-module=PySide6.QtOpenGL",
+        "--exclude-module=tkinter",
+        "--exclude-module=unittest",
         str(root / "installer" / "installer_gui.py")
     ]
 
