@@ -23,19 +23,38 @@ def get_resource_path(relative_path: str) -> Path:
     return Path(__file__).resolve().parent.parent / relative_path
 
 
+def run_silent(cmd: list[str]) -> subprocess.CompletedProcess:
+    """Runs a subprocess command in the background with zero visible window or console flash."""
+    creationflags = 0
+    startupinfo = None
+    if sys.platform == "win32":
+        creationflags = subprocess.CREATE_NO_WINDOW
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0  # SW_HIDE
+
+    return subprocess.run(
+        cmd,
+        capture_output=True,
+        creationflags=creationflags,
+        startupinfo=startupinfo,
+        text=True
+    )
+
+
 def create_windows_shortcut(target: Path, shortcut_path: Path, description: str = "EzClient Minecraft Client") -> None:
-    """Creates a Windows .lnk shortcut using PowerShell."""
+    """Creates a Windows .lnk shortcut silently in the background without any console or window flash."""
     shortcut_path.parent.mkdir(parents=True, exist_ok=True)
-    ps_cmd = f"""
-$ws = New-Object -ComObject WScript.Shell
-$s = $ws.CreateShortcut('{shortcut_path}')
-$s.TargetPath = '{target}'
-$s.WorkingDirectory = '{target.parent}'
-$s.Description = '{description}'
-$s.IconLocation = '{target},0'
-$s.Save()
-"""
-    subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_cmd], capture_output=True)
+    ps_cmd = (
+        f"$ws = New-Object -ComObject WScript.Shell; "
+        f"$s = $ws.CreateShortcut('{shortcut_path}'); "
+        f"$s.TargetPath = '{target}'; "
+        f"$s.WorkingDirectory = '{target.parent}'; "
+        f"$s.Description = '{description}'; "
+        f"$s.IconLocation = '{target},0'; "
+        f"$s.Save()"
+    )
+    run_silent(["powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps_cmd])
 
 
 def register_uninstall(install_dir: Path, exe_path: Path) -> None:
@@ -48,7 +67,7 @@ def register_uninstall(install_dir: Path, exe_path: Path) -> None:
             winreg.SetValueEx(key, "Publisher", 0, winreg.REG_SZ, "Luigi / EzClient")
             winreg.SetValueEx(key, "DisplayIcon", 0, winreg.REG_SZ, f"{exe_path},0")
             winreg.SetValueEx(key, "InstallLocation", 0, winreg.REG_SZ, str(install_dir))
-            winreg.SetValueEx(key, "UninstallString", 0, winreg.REG_SZ, f'powershell -Command "Remove-Item -Recurse -Force \'{install_dir}\'; Remove-Item -Path \'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\EzClient\' -Recurse -Force -ErrorAction SilentlyContinue"')
+            winreg.SetValueEx(key, "UninstallString", 0, winreg.REG_SZ, f'powershell -WindowStyle Hidden -NoProfile -Command "Remove-Item -Recurse -Force \'{install_dir}\'; Remove-Item -Path \'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\EzClient\' -Recurse -Force -ErrorAction SilentlyContinue"')
             winreg.SetValueEx(key, "NoModify", 0, winreg.REG_DWORD, 1)
             winreg.SetValueEx(key, "NoRepair", 0, winreg.REG_DWORD, 1)
     except Exception as e:
@@ -67,13 +86,13 @@ class InstallWorker(QThread):
 
     def run(self):
         try:
-            # 1. Terminate any running EzClient instances to release file locks
+            # 1. Terminate any running EzClient instances silently to release file locks
             self.progress.emit(10, "Schließe laufende EzClient-Instanzen…")
             if sys.platform == "win32":
                 try:
-                    subprocess.run(["taskkill", "/F", "/IM", "EzClient.exe", "/T"], capture_output=True)
+                    run_silent(["taskkill", "/F", "/IM", "EzClient.exe", "/T"])
                     import time
-                    time.sleep(0.6)
+                    time.sleep(0.5)
                 except Exception:
                     pass
 
@@ -101,11 +120,11 @@ class InstallWorker(QThread):
                     last_err = ex
                     if sys.platform == "win32":
                         try:
-                            subprocess.run(["taskkill", "/F", "/IM", "EzClient.exe", "/T"], capture_output=True)
+                            run_silent(["taskkill", "/F", "/IM", "EzClient.exe", "/T"])
                         except Exception:
                             pass
                     import time
-                    time.sleep(0.5)
+                    time.sleep(0.4)
 
             if not copied and last_err:
                 raise last_err
@@ -364,7 +383,10 @@ class InstallerWindow(QWidget):
 
     def finish_and_exit(self):
         if self.chk_launch.isChecked() and self.installed_exe and self.installed_exe.exists():
-            subprocess.Popen([str(self.installed_exe)])
+            creationflags = 0
+            if sys.platform == "win32":
+                creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+            subprocess.Popen([str(self.installed_exe)], creationflags=creationflags, close_fds=True)
         self.close()
 
 
