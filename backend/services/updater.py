@@ -75,7 +75,7 @@ def check_for_updates(current_version: str = APP_VERSION, repo: str = GITHUB_REP
     asset_name = ""
     asset_size = 0
 
-    # Prefer EzClient-Setup.exe or EzClient.exe
+    # Prefer EzClient_Setup_x64.exe or EzClient-Setup.exe installer asset
     for a in assets:
         name = a.get("name", "")
         if name.endswith(".exe"):
@@ -84,14 +84,25 @@ def check_for_updates(current_version: str = APP_VERSION, repo: str = GITHUB_REP
                 asset_name = name
                 asset_size = a.get("size", 0)
                 break
-            elif not download_url:
+
+    # If no explicit setup name found, pick any exe
+    if not download_url:
+        for a in assets:
+            name = a.get("name", "")
+            if name.endswith(".exe"):
                 download_url = a.get("browser_download_url", "")
                 asset_name = name
                 asset_size = a.get("size", 0)
+                break
 
     # If no exe asset in release, point to release page
     if not download_url:
         download_url = html_url
+
+    # Ensure saved filename is always distinguishable from running launcher
+    target_asset_name = asset_name or "EzClient_Setup_x64.exe"
+    if target_asset_name.lower() == "ezclient.exe":
+        target_asset_name = "EzClient_Update_Setup.exe"
 
     return {
         "update_available": is_newer,
@@ -101,7 +112,7 @@ def check_for_updates(current_version: str = APP_VERSION, repo: str = GITHUB_REP
         "changelog": body.strip() or "Keine Versionshinweise verfügbar.",
         "published_at": published_at,
         "download_url": download_url,
-        "asset_name": asset_name or f"EzClient-{tag_name}.exe",
+        "asset_name": target_asset_name,
         "asset_size_mb": round(asset_size / (1024 * 1024), 2) if asset_size else 0.0,
         "html_url": html_url,
     }
@@ -164,10 +175,10 @@ def run_installer_and_exit(installer_path: Path) -> None:
             install_dir = Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Programs" / "EzClient"
 
         args = [str(installer_path), "--update", f"--dir={install_dir}"]
+        creationflags = 0
         if sys.platform == "win32":
-            subprocess.Popen(args, shell=False)
-        else:
-            subprocess.Popen(args)
+            creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+        subprocess.Popen(args, creationflags=creationflags, close_fds=True)
 
         # Force exit immediately so Windows releases file locks on EzClient.exe
         import os

@@ -74,6 +74,17 @@ def register_uninstall(install_dir: Path, exe_path: Path) -> None:
         print(f"[Installer] Registry error: {e}")
 
 
+def kill_other_ezclient_instances() -> None:
+    """Terminates other running EzClient instances without terminating this installer process."""
+    my_pid = os.getpid()
+    if sys.platform == "win32":
+        try:
+            ps_cmd = f"Get-Process -Name 'EzClient' -ErrorAction SilentlyContinue | Where-Object {{ $_.Id -ne {my_pid} }} | Stop-Process -Force -ErrorAction SilentlyContinue"
+            run_silent(["powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps_cmd])
+        except Exception:
+            pass
+
+
 class InstallWorker(QThread):
     progress = Signal(int, str)
     finished = Signal(bool, str)
@@ -88,13 +99,9 @@ class InstallWorker(QThread):
         try:
             # 1. Terminate any running EzClient instances silently to release file locks
             self.progress.emit(10, "Schließe laufende EzClient-Instanzen…")
-            if sys.platform == "win32":
-                try:
-                    run_silent(["taskkill", "/F", "/IM", "EzClient.exe", "/T"])
-                    import time
-                    time.sleep(0.5)
-                except Exception:
-                    pass
+            kill_other_ezclient_instances()
+            import time
+            time.sleep(0.5)
 
             self.progress.emit(25, "Erstelle Installationsverzeichnis…")
             self.target_dir.mkdir(parents=True, exist_ok=True)
@@ -118,12 +125,7 @@ class InstallWorker(QThread):
                     break
                 except Exception as ex:
                     last_err = ex
-                    if sys.platform == "win32":
-                        try:
-                            run_silent(["taskkill", "/F", "/IM", "EzClient.exe", "/T"])
-                        except Exception:
-                            pass
-                    import time
+                    kill_other_ezclient_instances()
                     time.sleep(0.4)
 
             if not copied and last_err:
