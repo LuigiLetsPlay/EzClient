@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/Minecraft-1.21.4%20%7C%20Fabric-24D677?style=flat-square" alt="Minecraft" />
   <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python" />
   <img src="https://img.shields.io/badge/UI-PySide6%20%2F%20QML-41CD52?style=flat-square&logo=qt&logoColor=white" alt="Qt" />
-  <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/badge/License-EzClient%20License-purple?style=flat-square" alt="License" />
 </p>
 
 ---
@@ -108,4 +108,6 @@ EzClient/
 
 ## 📜 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **EzClient License** (Personal, non-commercial use only). See the [LICENSE](LICENSE) file for details.
+
+Contributions, feature suggestions and issue reports are welcome!
