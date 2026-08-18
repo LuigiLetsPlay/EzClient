@@ -18,8 +18,10 @@ Item {
         contentWidth: availableWidth
 
         ColumnLayout {
-            width: Math.min(root.width - 48, 900)
-            x: 24
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: 32
+            anchors.rightMargin: 32
             spacing: 0
 
             Item { height: 20 }
@@ -176,23 +178,26 @@ Item {
                         }
                     }
 
-                    Row {
+                    RowLayout {
                         spacing: 8
+                        Layout.alignment: Qt.AlignVCenter
 
                         EzButton {
                             text: "Bild wählen…"
                             mcFont: true
-                            Layout.preferredHeight: 32
+                            implicitHeight: 32
                             onClicked: {
                                 if (profileController) profileController.pickBackgroundImage()
                             }
                         }
 
                         EzButton {
-                            text: "Standard"
+                            text: "Zurücksetzen"
                             mcFont: true
-                            Layout.preferredHeight: 32
-                            visible: typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage !== ""
+                            implicitHeight: 32
+                            danger: true
+                            enabled: typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage !== ""
+                            opacity: enabled ? 1.0 : 0.4
                             onClicked: {
                                 if (profileController) profileController.setCustomBackgroundImage("")
                             }

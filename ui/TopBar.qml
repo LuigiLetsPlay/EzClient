@@ -268,41 +268,6 @@ Rectangle {
                 }
             }
 
-            // Glowing Update Badge
-            Rectangle {
-                id: updateBadge
-                height: 28
-                visible: typeof updateController !== "undefined" && updateController && updateController.updateAvailable
-                width: updateBadgeRow.implicitWidth + 18
-                radius: 14
-                color: updateMouse.containsMouse ? "#1c3829" : "#13281c"
-                border.color: EzTheme.accent
-                border.width: 1
-                scale: updateMouse.pressed ? 0.96 : 1.0
-                Behavior on scale { NumberAnimation { duration: 80 } }
-
-                RowLayout {
-                    id: updateBadgeRow
-                    anchors.centerIn: parent
-                    spacing: 6
-                    Text { text: "⚡"; font.pixelSize: 11; color: EzTheme.accent }
-                    Text {
-                        text: "v" + (typeof updateController !== "undefined" && updateController ? updateController.latestVersion : "") + " Update"
-                        font.family: EzTheme.mcFontFamily
-                        font.pixelSize: 10
-                        font.bold: true
-                        color: EzTheme.accentLight
-                    }
-                }
-
-                MouseArea {
-                    id: updateMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.navigate("settings")
-                }
-            }
         }
 
     // ── CENTER: Navigation Tabs with Sliding Indicator ──
@@ -384,6 +349,42 @@ Rectangle {
         anchors.rightMargin: 0
         anchors.verticalCenter: parent.verticalCenter
         spacing: 10
+
+            // Glowing Update Badge
+            Rectangle {
+                id: updateBadge
+                height: 28
+                visible: typeof updateController !== "undefined" && updateController && updateController.updateAvailable
+                width: updateBadgeRow.implicitWidth + 18
+                radius: 14
+                color: updateMouse.containsMouse ? "#1c3829" : "#13281c"
+                border.color: EzTheme.accent
+                border.width: 1
+                scale: updateMouse.pressed ? 0.96 : 1.0
+                Behavior on scale { NumberAnimation { duration: 80 } }
+
+                RowLayout {
+                    id: updateBadgeRow
+                    anchors.centerIn: parent
+                    spacing: 6
+                    Text { text: "⚡"; font.pixelSize: 11; color: EzTheme.accent }
+                    Text {
+                        text: "v" + (typeof updateController !== "undefined" && updateController ? updateController.latestVersion : "") + " Update"
+                        font.family: EzTheme.mcFontFamily
+                        font.pixelSize: 10
+                        font.bold: true
+                        color: EzTheme.accentLight
+                    }
+                }
+
+                MouseArea {
+                    id: updateMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.navigate("settings")
+                }
+            }
 
             // Player Avatar & Username
             Rectangle {

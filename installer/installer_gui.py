@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont, QIcon, QPixmap, QColor
 
 APP_NAME = "EzClient"
-APP_VERSION = "1.0.6"
+APP_VERSION = "1.0.7"
 DEFAULT_INSTALL_DIR = Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Programs" / "EzClient"
 
 
@@ -43,18 +43,28 @@ def run_silent(cmd: list[str]) -> subprocess.CompletedProcess:
 
 
 def create_windows_shortcut(target: Path, shortcut_path: Path, description: str = "EzClient Minecraft Client") -> None:
-    """Creates a Windows .lnk shortcut silently in the background without any console or window flash."""
+    """Creates a Windows .lnk shortcut cleanly without suspicious shell invocations."""
     shortcut_path.parent.mkdir(parents=True, exist_ok=True)
-    ps_cmd = (
-        f"$ws = New-Object -ComObject WScript.Shell; "
-        f"$s = $ws.CreateShortcut('{shortcut_path}'); "
-        f"$s.TargetPath = '{target}'; "
-        f"$s.WorkingDirectory = '{target.parent}'; "
-        f"$s.Description = '{description}'; "
-        f"$s.IconLocation = '{target},0'; "
-        f"$s.Save()"
-    )
-    run_silent(["powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps_cmd])
+    vbs_content = f'''Set ws = CreateObject("WScript.Shell")
+Set s = ws.CreateShortcut("{shortcut_path}")
+s.TargetPath = "{target}"
+s.WorkingDirectory = "{target.parent}"
+s.Description = "{description}"
+s.IconLocation = "{target},0"
+s.Save
+'''
+    temp_vbs = Path(os.environ.get("TEMP", ".")) / f"ez_sc_{os.getpid()}.vbs"
+    try:
+        temp_vbs.write_text(vbs_content, encoding="utf-8")
+        subprocess.run(["wscript.exe", str(temp_vbs)], creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+    except Exception as e:
+        print(f"[Installer] Shortcut creation note: {e}")
+    finally:
+        if temp_vbs.exists():
+            try:
+                temp_vbs.unlink()
+            except Exception:
+                pass
 
 
 def register_uninstall(install_dir: Path, exe_path: Path) -> None:
@@ -67,7 +77,8 @@ def register_uninstall(install_dir: Path, exe_path: Path) -> None:
             winreg.SetValueEx(key, "Publisher", 0, winreg.REG_SZ, "Luigi / EzClient")
             winreg.SetValueEx(key, "DisplayIcon", 0, winreg.REG_SZ, f"{exe_path},0")
             winreg.SetValueEx(key, "InstallLocation", 0, winreg.REG_SZ, str(install_dir))
-            winreg.SetValueEx(key, "UninstallString", 0, winreg.REG_SZ, f'powershell -WindowStyle Hidden -NoProfile -Command "Remove-Item -Recurse -Force \'{install_dir}\'; Remove-Item -Path \'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\EzClient\' -Recurse -Force -ErrorAction SilentlyContinue"')
+            cmd_uninstall = f'cmd.exe /c "rmdir /s /q \\"{install_dir}\\" & reg delete \\"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\EzClient\\" /f"'
+            winreg.SetValueEx(key, "UninstallString", 0, winreg.REG_SZ, cmd_uninstall)
             winreg.SetValueEx(key, "NoModify", 0, winreg.REG_DWORD, 1)
             winreg.SetValueEx(key, "NoRepair", 0, winreg.REG_DWORD, 1)
     except Exception as e:
@@ -75,14 +86,19 @@ def register_uninstall(install_dir: Path, exe_path: Path) -> None:
 
 
 def kill_other_ezclient_instances() -> None:
-    """Terminates other running EzClient instances without terminating this installer process."""
+    """Terminates other running EzClient instances cleanly using psutil without PowerShell."""
     my_pid = os.getpid()
-    if sys.platform == "win32":
-        try:
-            ps_cmd = f"Get-Process -Name 'EzClient' -ErrorAction SilentlyContinue | Where-Object {{ $_.Id -ne {my_pid} }} | Stop-Process -Force -ErrorAction SilentlyContinue"
-            run_silent(["powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps_cmd])
-        except Exception:
-            pass
+    try:
+        import psutil
+        for proc in psutil.process_iter(['pid', 'name']):
+            try:
+                pname = proc.info.get('name') or ''
+                if 'ezclient' in pname.lower() and proc.info.get('pid') != my_pid:
+                    proc.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied, Exception):
+                pass
+    except Exception:
+        pass
 
 
 class InstallWorker(QThread):
