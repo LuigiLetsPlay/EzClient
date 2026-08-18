@@ -154,13 +154,23 @@ def download_update_file(download_url: str, target_filename: str, progress_callb
 
 def run_installer_and_exit(installer_path: Path) -> None:
     """
-    Spawns installer process and terminates current launcher instance cleanly.
+    Spawns installer process in update mode and terminates current launcher instance cleanly.
     """
     try:
-        if sys.platform == "win32":
-            subprocess.Popen([str(installer_path)], shell=True)
+        current_exe = Path(sys.executable)
+        if getattr(sys, "frozen", False):
+            install_dir = current_exe.parent
         else:
-            subprocess.Popen([str(installer_path)])
-        sys.exit(0)
+            install_dir = Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Programs" / "EzClient"
+
+        args = [str(installer_path), "--update", f"--dir={install_dir}"]
+        if sys.platform == "win32":
+            subprocess.Popen(args, shell=False)
+        else:
+            subprocess.Popen(args)
+
+        # Force exit immediately so Windows releases file locks on EzClient.exe
+        import os
+        os._exit(0)
     except Exception as e:
         print(f"[Updater] Error launching installer: {e}")

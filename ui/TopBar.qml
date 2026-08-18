@@ -82,7 +82,7 @@ Rectangle {
             Rectangle {
                 id: profilePill
                 height: 34
-                width: Math.max(140, pillNameText.implicitWidth + 50)
+                width: Math.min(200, Math.max(120, pillNameText.implicitWidth + 44))
                 radius: 17
                 color: profMouse.containsMouse || profPopup.opened ? EzTheme.surface3 : EzTheme.surface2
                 border.color: profPopup.opened ? EzTheme.accent : (profMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)
@@ -330,7 +330,7 @@ Rectangle {
 
                     Rectangle {
                         id: tabItem
-                        width: tabRowInner.implicitWidth + 28
+                        width: root.width < 1180 ? (tabRowInner.implicitWidth + 14) : (tabRowInner.implicitWidth + 26)
                         height: 38
                         radius: EzTheme.radiusSm
                         color: root.currentRoute === modelData.id
@@ -345,7 +345,7 @@ Rectangle {
                         RowLayout {
                             id: tabRowInner
                             anchors.centerIn: parent
-                            spacing: 7
+                            spacing: root.width < 1180 ? 5 : 7
 
                             Image {
                                 source: "icons/" + modelData.icon
@@ -399,7 +399,7 @@ Rectangle {
             Rectangle {
                 id: accPill
                 height: 34
-                width: accRow.implicitWidth + 28
+                width: Math.min(180, accRow.implicitWidth + 24)
                 radius: 17
                 color: accMouse.containsMouse || accPopup.opened ? EzTheme.surface3 : EzTheme.surface2
                 border.color: accPopup.opened ? EzTheme.accent : (accMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)

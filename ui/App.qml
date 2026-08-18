@@ -5,14 +5,20 @@ import "components"
 
 ApplicationWindow {
     id: window
-    visible: true
     width: 1280
     height: 820
-    minimumWidth: 1000
-    minimumHeight: 640
+    minimumWidth: 1040
+    minimumHeight: 680
     title: "EzClient"
     flags: Qt.Window | Qt.FramelessWindowHint
     color: EzTheme.bg
+
+    onWidthChanged: {
+        if (width < minimumWidth) width = minimumWidth
+    }
+    onHeightChanged: {
+        if (height < minimumHeight) height = minimumHeight
+    }
 
     // Load authentic Minecraft TrueType Fonts into QML
     FontLoader {

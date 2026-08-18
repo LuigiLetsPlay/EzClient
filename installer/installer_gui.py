@@ -67,22 +67,50 @@ class InstallWorker(QThread):
 
     def run(self):
         try:
-            self.progress.emit(10, "Erstelle Installationsverzeichnis…")
+            # 1. Terminate any running EzClient instances to release file locks
+            self.progress.emit(10, "Schließe laufende EzClient-Instanzen…")
+            if sys.platform == "win32":
+                try:
+                    subprocess.run(["taskkill", "/F", "/IM", "EzClient.exe", "/T"], capture_output=True)
+                    import time
+                    time.sleep(0.6)
+                except Exception:
+                    pass
+
+            self.progress.emit(25, "Erstelle Installationsverzeichnis…")
             self.target_dir.mkdir(parents=True, exist_ok=True)
 
-            self.progress.emit(30, "Entpacke EzClient.exe…")
+            self.progress.emit(45, "Installiere EzClient.exe…")
             bundled_exe = get_resource_path("EzClient.exe")
             target_exe = self.target_dir / "EzClient.exe"
 
-            if bundled_exe.exists():
-                shutil.copy2(bundled_exe, target_exe)
-            else:
-                # Fallback to local dist if running dev mode
-                dist_exe = Path(__file__).resolve().parent.parent / "dist" / "EzClient.exe"
-                if dist_exe.exists():
-                    shutil.copy2(dist_exe, target_exe)
+            # Copy with retry loop in case Windows needs a moment to release file handles
+            copied = False
+            last_err = None
+            for attempt in range(6):
+                try:
+                    if bundled_exe.exists():
+                        shutil.copy2(bundled_exe, target_exe)
+                    else:
+                        dist_exe = Path(__file__).resolve().parent.parent / "dist" / "EzClient.exe"
+                        if dist_exe.exists():
+                            shutil.copy2(dist_exe, target_exe)
+                    copied = True
+                    break
+                except Exception as ex:
+                    last_err = ex
+                    if sys.platform == "win32":
+                        try:
+                            subprocess.run(["taskkill", "/F", "/IM", "EzClient.exe", "/T"], capture_output=True)
+                        except Exception:
+                            pass
+                    import time
+                    time.sleep(0.5)
 
-            self.progress.emit(60, "Richte Verknüpfungen ein…")
+            if not copied and last_err:
+                raise last_err
+
+            self.progress.emit(70, "Richte Verknüpfungen ein…")
             if self.create_desktop:
                 desktop = Path(os.getenv("USERPROFILE", "")) / "Desktop"
                 if desktop.exists():
@@ -93,10 +121,10 @@ class InstallWorker(QThread):
                 if start_menu.exists():
                     create_windows_shortcut(target_exe, start_menu / "EzClient.lnk")
 
-            self.progress.emit(85, "Registriere App in Windows…")
+            self.progress.emit(90, "Registriere App in Windows…")
             register_uninstall(self.target_dir, target_exe)
 
-            self.progress.emit(100, "Installation erfolgreich abgeschlossen!")
+            self.progress.emit(100, "Erfolgreich aktualisiert / installiert!")
             self.finished.emit(True, str(target_exe))
         except Exception as e:
             self.finished.emit(False, str(e))
@@ -105,8 +133,28 @@ class InstallWorker(QThread):
 class InstallerWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("EzClient Setup")
-        self.setFixedSize(520, 380)
+        
+        # Check if launched in update mode (--update / -u)
+        self.is_update = False
+        target_dir_arg = None
+        for arg in sys.argv[1:]:
+            if arg in ("--update", "-u"):
+                self.is_update = True
+            elif arg.startswith("--dir="):
+                target_dir_arg = arg.split("=", 1)[1]
+
+        # Check existing installation in registry if not specified
+        if not target_dir_arg and self.is_update:
+            try:
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall\EzClient") as key:
+                    target_dir_arg, _ = winreg.QueryValueEx(key, "InstallLocation")
+            except Exception:
+                pass
+
+        self.initial_dir = Path(target_dir_arg) if target_dir_arg else DEFAULT_INSTALL_DIR
+
+        self.setWindowTitle("EzClient Aktualisierung" if self.is_update else "EzClient Setup")
+        self.setFixedSize(520, 320 if self.is_update else 380)
         self.setStyleSheet("""
             QWidget {
                 background-color: #0d0e11;
@@ -192,9 +240,11 @@ class InstallerWindow(QWidget):
 
         title_col = QVBoxLayout()
         title_col.setSpacing(2)
-        title = QLabel("EzClient Installation")
+        title_text = "EzClient Aktualisierung" if self.is_update else "EzClient Installation"
+        title = QLabel(title_text)
         title.setStyleSheet("font-size: 18px; font-weight: bold; color: #ffffff;")
-        subtitle = QLabel(f"Version {APP_VERSION} · High-Performance Minecraft Client")
+        sub_text = f"Version {APP_VERSION} wird installiert…" if self.is_update else f"Version {APP_VERSION} · High-Performance Minecraft Client"
+        subtitle = QLabel(sub_text)
         subtitle.setStyleSheet("font-size: 11px; color: #8b929e;")
         title_col.addWidget(title)
         title_col.addWidget(subtitle)
@@ -207,22 +257,27 @@ class InstallerWindow(QWidget):
         sep.setStyleSheet("color: #1f2228;")
         layout.addWidget(sep)
 
-        # Install Directory
-        dir_label = QLabel("Installationsordner:")
-        dir_label.setStyleSheet("font-weight: bold; font-size: 12px;")
-        layout.addWidget(dir_label)
+        # In update mode, show simple directory info instead of interactive browser
+        self.dir_input = QLineEdit(str(self.initial_dir))
+        if self.is_update:
+            info_label = QLabel(f"Aktualisiere EzClient in: <b>{self.initial_dir}</b>")
+            info_label.setStyleSheet("font-size: 12px; color: #8b929e;")
+            layout.addWidget(info_label)
+        else:
+            dir_label = QLabel("Installationsordner:")
+            dir_label.setStyleSheet("font-weight: bold; font-size: 12px;")
+            layout.addWidget(dir_label)
 
-        dir_row = QHBoxLayout()
-        dir_row.setSpacing(8)
-        self.dir_input = QLineEdit(str(DEFAULT_INSTALL_DIR))
-        browse_btn = QPushButton("Durchsuchen…")
-        browse_btn.setObjectName("secondary")
-        browse_btn.clicked.connect(self.browse_dir)
-        dir_row.addWidget(self.dir_input)
-        dir_row.addWidget(browse_btn)
-        layout.addLayout(dir_row)
+            dir_row = QHBoxLayout()
+            dir_row.setSpacing(8)
+            browse_btn = QPushButton("Durchsuchen…")
+            browse_btn.setObjectName("secondary")
+            browse_btn.clicked.connect(self.browse_dir)
+            dir_row.addWidget(self.dir_input)
+            dir_row.addWidget(browse_btn)
+            layout.addLayout(dir_row)
 
-        # Checkboxes
+        # Checkboxes (only shown in fresh install mode)
         self.chk_desktop = QCheckBox("Desktop-Verknüpfung erstellen")
         self.chk_desktop.setChecked(True)
         self.chk_startmenu = QCheckBox("Startmenü-Eintrag erstellen")
@@ -230,17 +285,18 @@ class InstallerWindow(QWidget):
         self.chk_launch = QCheckBox("EzClient nach Abschluss starten")
         self.chk_launch.setChecked(True)
 
-        layout.addWidget(self.chk_desktop)
-        layout.addWidget(self.chk_startmenu)
-        layout.addWidget(self.chk_launch)
+        if not self.is_update:
+            layout.addWidget(self.chk_desktop)
+            layout.addWidget(self.chk_startmenu)
+            layout.addWidget(self.chk_launch)
 
         # Progress
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
-        self.progress_bar.setVisible(False)
-        self.status_label = QLabel("")
+        self.progress_bar.setVisible(self.is_update)
+        self.status_label = QLabel("Bereite Update vor…" if self.is_update else "")
         self.status_label.setStyleSheet("font-size: 11px; color: #8b929e;")
-        self.status_label.setVisible(False)
+        self.status_label.setVisible(self.is_update)
         layout.addWidget(self.status_label)
         layout.addWidget(self.progress_bar)
 
@@ -252,13 +308,18 @@ class InstallerWindow(QWidget):
         self.cancel_btn = QPushButton("Abbrechen")
         self.cancel_btn.setObjectName("secondary")
         self.cancel_btn.clicked.connect(self.close)
-        self.install_btn = QPushButton("Installieren")
+        self.install_btn = QPushButton("Aktualisieren" if self.is_update else "Installieren")
         self.install_btn.clicked.connect(self.start_install)
         btn_row.addWidget(self.cancel_btn)
         btn_row.addWidget(self.install_btn)
         layout.addLayout(btn_row)
 
         self.installed_exe = None
+
+        if self.is_update:
+            # Auto-start update immediately
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(400, self.start_install)
 
     def browse_dir(self):
         folder = QFileDialog.getExistingDirectory(self, "Installationsordner wählen", self.dir_input.text())
@@ -287,12 +348,15 @@ class InstallerWindow(QWidget):
     def on_finished(self, success: bool, msg: str):
         if success:
             self.installed_exe = Path(msg)
-            self.status_label.setText("✓ EzClient wurde erfolgreich installiert!")
+            self.status_label.setText("✓ EzClient wurde erfolgreich aktualisiert!" if self.is_update else "✓ EzClient wurde erfolgreich installiert!")
             self.status_label.setStyleSheet("font-size: 12px; color: #24d677; font-weight: bold;")
             self.install_btn.setText("Fertigstellen")
             self.install_btn.setEnabled(True)
             self.install_btn.clicked.disconnect()
             self.install_btn.clicked.connect(self.finish_and_exit)
+            if self.is_update:
+                from PySide6.QtCore import QTimer
+                QTimer.singleShot(800, self.finish_and_exit)
         else:
             self.status_label.setText(f"Fehler: {msg}")
             self.status_label.setStyleSheet("font-size: 11px; color: #ff5555;")
