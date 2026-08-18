@@ -62,11 +62,13 @@ def main() -> None:
     app_icon = create_app_icon()
     app.setWindowIcon(app_icon)
 
-    # Load authentic Minecraft fonts
+    # Load essential authentic Minecraft fonts fast
     fonts_dir = get_app_root() / "ui" / "fonts"
     if fonts_dir.exists():
-        for font_file in list(fonts_dir.glob("*.ttf")) + list(fonts_dir.glob("*.otf")):
-            QFontDatabase.addApplicationFont(str(font_file))
+        for fname in ("Minecraft-Bold.ttf", "MinecraftDefault-Bold.ttf", "MinecraftDefault-Regular.ttf"):
+            fpath = fonts_dir / fname
+            if fpath.exists():
+                QFontDatabase.addApplicationFont(str(fpath))
 
     # Set crisp Segoe UI as global application font
     app.setFont(QFont("Segoe UI", 10))

@@ -35,7 +35,7 @@ class ModrinthController(QObject):
         self._category: str = "All"
         self._sort: str = "relevance"
         self._offset: int = 0
-        self._game_versions: list[str] = ["All", "1.21.4", "1.21.1", "1.21", "1.20.6", "1.20.4", "1.20.1", "1.19.4", "1.18.2", "1.16.5"]
+        self._game_versions: list[str] = ["All", "26.2", "26.1", "1.21.8", "1.21.7", "1.21.6", "1.21.5", "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21", "1.20.6", "1.20.4", "1.20.1", "1.19.4", "1.18.2", "1.16.5"]
 
         # Connect internal thread signals to main thread slots
         self._searchDoneSignal.connect(self._on_search_done)

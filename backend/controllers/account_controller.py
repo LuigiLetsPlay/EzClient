@@ -4,7 +4,6 @@ import urllib.parse
 import webbrowser
 from PySide6.QtCore import QObject, Signal, Slot, Property, QUrl, Qt
 from PySide6.QtWidgets import QDialog, QVBoxLayout
-from PySide6.QtWebEngineWidgets import QWebEngineView
 
 from backend.services.msa_auth import (
     get_minecraft_session,
@@ -21,6 +20,7 @@ class MicrosoftLoginDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        from PySide6.QtWebEngineWidgets import QWebEngineView
         self.setWindowTitle("Microsoft Anmeldung · EzClient")
         self.resize(520, 680)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
