@@ -202,7 +202,13 @@ class ProfileStore:
         needs_save = False
         icon_map = {pm.slug.lower(): pm.icon_url for pm in ESSENTIALS_MODS}
 
+        seen_ids = set()
         for raw in data.get("profiles", []):
+            prof_id = raw.get("id")
+            if prof_id in seen_ids:
+                needs_save = True
+                continue
+            seen_ids.add(prof_id)
             mods = []
             existing_slugs = set()
             for mod_dict in raw.pop("mods", []):
@@ -257,7 +263,7 @@ class ProfileStore:
                 return found
         return self.profiles[0] if self.profiles else None
 
-    def create_profile(self, name: str, version: str, optimize: bool = True, preset: str = "performance") -> ProfileData:
+    def create_profile(self, name: str, version: str, loader: str = "Fabric", preset: str = "performance", optimize: bool = True) -> ProfileData:
         slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "profile"
         profile_mods: list[ModData] = []
         if preset == "performance":
@@ -269,6 +275,7 @@ class ProfileStore:
             id=f"{slug}-{uuid.uuid4().hex[:8]}",
             name=name,
             minecraft_version=version,
+            loader=loader,
             optimize=optimize,
             mods=profile_mods
         )

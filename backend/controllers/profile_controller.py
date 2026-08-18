@@ -281,16 +281,13 @@ class ProfileController(QObject):
         def worker():
             import shutil
             import time
-            profile = self._store.create_profile(name, version, loader, preset)
+            profile = self._store.create_profile(name, version, loader=loader, preset=preset)
             svc = ModrinthService()
             try:
                 from backend.services.direct_launch import ensure_profile_defaults
                 ensure_profile_defaults(profile.path)
             except Exception:
                 pass
-            self._store.profiles.insert(0, profile)
-            self._store.settings["last_profile"] = profile.id
-            self._store.save()
 
             total = len(profile.mods)
             for idx, m in enumerate(profile.mods):
