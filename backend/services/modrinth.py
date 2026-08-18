@@ -37,9 +37,11 @@ class ModrinthService:
             return FALLBACK_VERSIONS
 
     def search_mods(self, query: str, mc_version: str | None = None, category: str = "All",
-                    sort: str = "relevance", loader: str = "fabric", offset: int = 0, limit: int = 20) -> dict[str, Any]:
-        facets = [["project_type:mod"]]
-        if loader and loader.lower() != "all":
+                    sort: str = "relevance", loader: str = "fabric", offset: int = 0, limit: int = 20,
+                    project_type: str = "mod") -> dict[str, Any]:
+        ptype = project_type.lower() if project_type else "mod"
+        facets = [[f"project_type:{ptype}"]]
+        if ptype == "mod" and loader and loader.lower() != "all":
             facets.append([f"categories:{loader.lower()}"])
         if mc_version and mc_version.lower() != "all":
             facets.append([f"versions:{mc_version}"])

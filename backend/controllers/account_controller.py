@@ -14,6 +14,10 @@ from backend.services.msa_auth import (
 )
 
 
+from backend.services.skin_service import upload_skin_file, reset_skin_to_default
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QFileDialog
+
+
 class MicrosoftLoginDialog(QDialog):
     """Native Microsoft Login Dialog with embedded WebEngine."""
     codeReceived = Signal(str)
@@ -49,11 +53,12 @@ class MicrosoftLoginDialog(QDialog):
 
 class AccountController(QObject):
     """
-    Manages the Minecraft account session and direct Microsoft Login.
+    Manages the Minecraft account session, direct Microsoft Login, and Skin customization.
     """
     accountChanged = Signal()
     loginStatusChanged = Signal(str, bool)
     loginSuccess = Signal(str)
+    skinUploadStatusChanged = Signal(str, bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -205,3 +210,62 @@ class AccountController(QObject):
     @Slot()
     def refresh(self) -> None:
         self._load_account(force_refresh=True)
+
+    @Slot(result=str)
+    def pickSkinFile(self) -> str:
+        """Opens file dialog for selecting a Minecraft Skin PNG."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            None,
+            "Minecraft Skin (.png) auswählen",
+            "",
+            "Minecraft Skin (*.png);;Alle Dateien (*.*)"
+        )
+        return file_path or ""
+
+    @Slot(str, str)
+    def uploadSkin(self, file_path: str, variant: str = "classic") -> None:
+        """Uploads a local skin PNG file to Mojang servers."""
+        if not file_path:
+            self.skinUploadStatusChanged.emit("Keine Skin-Datei ausgewählt.", True)
+            return
+
+        self.skinUploadStatusChanged.emit("Skin wird zu Mojang übertragen…", False)
+
+        def worker():
+            try:
+                session = get_minecraft_session()
+                token = session.access_token if session else ""
+                if not token:
+                    self.skinUploadStatusChanged.emit("Nicht mit Microsoft eingeloggt.", True)
+                    return
+
+                ok, msg = upload_skin_file(token, file_path, variant)
+                self.skinUploadStatusChanged.emit(msg, not ok)
+                if ok:
+                    self._load_account(force_refresh=True)
+            except Exception as e:
+                self.skinUploadStatusChanged.emit(f"Fehler: {e}", True)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    @Slot()
+    def resetSkin(self) -> None:
+        """Resets active skin to default."""
+        self.skinUploadStatusChanged.emit("Skin wird zurückgesetzt…", False)
+
+        def worker():
+            try:
+                session = get_minecraft_session()
+                token = session.access_token if session else ""
+                if not token:
+                    self.skinUploadStatusChanged.emit("Nicht mit Microsoft eingeloggt.", True)
+                    return
+
+                ok, msg = reset_skin_to_default(token)
+                self.skinUploadStatusChanged.emit(msg, not ok)
+                if ok:
+                    self._load_account(force_refresh=True)
+            except Exception as e:
+                self.skinUploadStatusChanged.emit(f"Fehler: {e}", True)
+
+        threading.Thread(target=worker, daemon=True).start()

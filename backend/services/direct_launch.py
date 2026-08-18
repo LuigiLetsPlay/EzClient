@@ -133,8 +133,8 @@ def find_version_meta(mc_dir: Path, mc_version: str, loader: str = "Fabric") -> 
 
     return fabric_path, fabric_data, vanilla_path, vanilla_data
 
-def extract_natives(mc_dir: Path, libraries: List[dict[str, Any]], natives_dir: Path) -> None:
-    """Extracts required native DLLs into the profile's natives directory."""
+def extract_natives(mc_dir: Path, libraries: list[dict[str, Any]], natives_dir: Path) -> None:
+    """Extracts required native DLLs to profile natives directory."""
     natives_dir.mkdir(parents=True, exist_ok=True)
     is_win = sys.platform.startswith("win")
 
@@ -145,8 +145,10 @@ def extract_natives(mc_dir: Path, libraries: List[dict[str, Any]], natives_dir: 
 
         # Look for native library markers
         is_native = False
-        if is_win and ":natives-windows" in name and not ("-arm64" in name or "-x86" in name):
-            is_native = True
+        if is_win:
+            if ":natives-windows" in name:
+                if "-arm64" not in name and not (name.endswith("-x86") or ":natives-windows-x86:" in name):
+                    is_native = True
         elif sys.platform == "darwin" and ":natives-macos" in name:
             is_native = True
         elif sys.platform.startswith("linux") and ":natives-linux" in name:
@@ -364,13 +366,7 @@ def launch_minecraft_direct(
 
     creationflags = 0
 
-    # Ensure dedicated high-performance GPU is used on Windows
     env = os.environ.copy()
-    env["__NV_PRIME_RENDER_OFFLOAD"] = "1"
-    env["__GLX_VENDOR_LIBRARY_NAME"] = "nvidia"
-    env["DRI_PRIME"] = "1"
-    env["SHIM_MCCOMPAT"] = "0x80000000"
-    env["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 
     log_file = profile.path / "ezclient_latest_run.log"
     try:

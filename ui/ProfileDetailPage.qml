@@ -9,7 +9,7 @@ Item {
     property string selectedTab: "overview"
 
     readonly property string activeName: typeof profileController !== "undefined" && profileController ? profileController.activeName : ""
-    readonly property string activeVersion: typeof profileController !== "undefined" && profileController ? profileController.activeVersion : "1.21.4"
+    readonly property string activeVersion: typeof profileController !== "undefined" && profileController ? profileController.activeVersion : "26.2"
     readonly property string activeLoader: typeof profileController !== "undefined" && profileController ? profileController.activeLoader : "Fabric"
     readonly property int activeModsCount: typeof profileController !== "undefined" && profileController ? profileController.activeModsCount : 0
 
@@ -457,32 +457,114 @@ Item {
                         model: profileController ? profileController.modModel : null
                         Rectangle {
                             Layout.fillWidth: true
-                            height: 48
-                            radius: EzTheme.radiusSm
+                            height: 64
+                            radius: 10
                             color: modItemMouse.containsMouse ? EzTheme.surface2 : EzTheme.surface
-                            border.color: EzTheme.border
+                            border.color: model.enabled ? (modItemMouse.containsMouse ? EzTheme.borderLight : EzTheme.border) : "#1A1A22"
                             border.width: 1
+                            opacity: model.enabled ? 1.0 : 0.65
                             Behavior on color { ColorAnimation { duration: 90 } }
+                            Behavior on opacity { NumberAnimation { duration: 90 } }
 
                             RowLayout {
                                 anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                spacing: 10
+                                anchors.leftMargin: 14
+                                anchors.rightMargin: 14
+                                spacing: 12
 
-                                // Toggle
+                                // Mod Icon / Fallback Initial
                                 Rectangle {
-                                    Layout.preferredWidth: 30
-                                    Layout.preferredHeight: 16
+                                    Layout.preferredWidth: 38
+                                    Layout.preferredHeight: 38
                                     radius: 8
+                                    color: EzTheme.surface3
+                                    clip: true
+
+                                    Image {
+                                        id: pModIcon
+                                        anchors.fill: parent
+                                        source: model.icon_url || ""
+                                        fillMode: Image.PreserveAspectCrop
+                                        visible: status === Image.Ready
+                                    }
+
+                                    Text {
+                                        visible: pModIcon.status !== Image.Ready
+                                        text: model.name ? model.name.charAt(0).toUpperCase() : "M"
+                                        font.family: EzTheme.mcFontFamily
+                                        font.pixelSize: 15
+                                        font.bold: true
+                                        color: EzTheme.accentLight
+                                        anchors.centerIn: parent
+                                    }
+                                }
+
+                                // Mod Info (Title, Version Badge, Description)
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 3
+
+                                    RowLayout {
+                                        spacing: 8
+                                        Text {
+                                            text: model.name
+                                            font.family: EzTheme.fontFamily
+                                            font.pixelSize: 13
+                                            font.bold: true
+                                            color: model.enabled ? EzTheme.text : EzTheme.textMuted
+                                        }
+
+                                        Rectangle {
+                                            height: 18
+                                            width: pVerTxt.implicitWidth + 10
+                                            radius: 4
+                                            color: "#16221A"
+                                            border.color: "#22C96E40"
+                                            border.width: 1
+
+                                            Text {
+                                                id: pVerTxt
+                                                text: model.version || "Latest"
+                                                font.family: "Consolas, monospace"
+                                                font.pixelSize: 9
+                                                font.bold: true
+                                                color: EzTheme.accentLight
+                                                anchors.centerIn: parent
+                                            }
+                                        }
+
+                                        Text {
+                                            text: "von " + (model.author || "Modrinth")
+                                            font.family: EzTheme.fontFamily
+                                            font.pixelSize: 10
+                                            color: EzTheme.textMuted
+                                            visible: model.author !== ""
+                                        }
+                                    }
+
+                                    Text {
+                                        text: model.description || "Keine Beschreibung hinterlegt"
+                                        font.family: EzTheme.fontFamily
+                                        font.pixelSize: 10
+                                        color: EzTheme.textMuted
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
+                                    }
+                                }
+
+                                // Toggle Switch
+                                Rectangle {
+                                    Layout.preferredWidth: 36
+                                    Layout.preferredHeight: 20
+                                    radius: 10
                                     color: model.enabled ? EzTheme.accent : EzTheme.surface3
                                     border.color: model.enabled ? EzTheme.accent : EzTheme.borderLight
                                     border.width: 1
 
                                     Rectangle {
-                                        width: 10
-                                        height: 10
-                                        radius: 5
+                                        width: 14
+                                        height: 14
+                                        radius: 7
                                         color: "#FFFFFF"
                                         anchors.verticalCenter: parent.verticalCenter
                                         x: model.enabled ? parent.width - width - 3 : 3
@@ -496,20 +578,28 @@ Item {
                                     }
                                 }
 
-                                Text {
-                                    text: model.name
-                                    font.family: EzTheme.fontFamily
-                                    font.pixelSize: 12
-                                    font.bold: true
-                                    color: model.enabled ? EzTheme.text : EzTheme.textSubtle
-                                    Layout.fillWidth: true
-                                }
+                                // Delete Button (hidden for essential/core mods)
+                                Rectangle {
+                                    Layout.preferredWidth: 28
+                                    Layout.preferredHeight: 28
+                                    radius: 6
+                                    color: pDelM.containsMouse ? "#3B1119" : "transparent"
+                                    visible: !model.essential && (model.slug !== "fabric-api" && model.slug !== "ezclient")
 
-                                Text {
-                                    text: model.version || "—"
-                                    font.family: EzTheme.fontFamily
-                                    font.pixelSize: 11
-                                    color: EzTheme.textSecondary
+                                    Text {
+                                        text: "✕"
+                                        font.pixelSize: 12
+                                        color: pDelM.containsMouse ? EzTheme.danger : EzTheme.textMuted
+                                        anchors.centerIn: parent
+                                    }
+
+                                    MouseArea {
+                                        id: pDelM
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: profileController.uninstallMod(model.slug || model.name, model.name)
+                                    }
                                 }
                             }
 

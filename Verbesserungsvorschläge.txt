@@ -1,0 +1,11 @@
+- Bild im Main Menu verändern können
+- 26.2 Standard ausgewählt, jedoch im Launcher wird 1.21.4 angezeigt
+- Skin im Launcher wechseln (Ohne den Minecraft Client neustarten zu müssen. Also am besten einfach Welt rejoinen)
+- Live Logs Fenster nachdem starten des Minecraft Clients (standardmäßig an, kann jedoch simpel ausgeschaltet werden) (SIEHE BILD)
+- 2x auf Installieren drücken um es zu installieren soll zu 1x installieren werden.
+- Wenn auf Mods auf "Hinzufügen" gedrückt wird und zu Modrinth Store verschoben wird, dann wird im Topbar aber Modrinth Store nicht ausgewählt.
+- Gelber Strich den man sieht bei Einstellungen, oben rechts auf Account, oben linsk auf das aktuelle Profil soll entfernt werden. Dieser gelbe strich macht ja alles so unsatisfying.
+- Nächste Version auf Github hochladen
+- Anstatt "Modrinth Store" simpel "Modrinth"
+- Im "Modrinth" soll Texture Packs & Shaders verfügbar sein
+-> Wenn Shader installiert wird soll empfohlen werden also im Popup halt Iris Shader zu installieren, weil ansonsten es nicht klappt.

@@ -14,11 +14,14 @@ from backend.services.minecraft import detect_launcher, launch_minecraft_officia
 from backend.services.mod_downloader import sync_profile_mods
 from backend.services.process_watcher import MinecraftWatcher
 from backend.services.direct_launch import launch_minecraft_direct
+from backend.services.live_log_service import LiveLogService
+from PySide6.QtWidgets import QFileDialog
 
 class ProfileController(QObject):
     activeProfileChanged = Signal()
     profilesChanged = Signal()
     launchStatusChanged = Signal(str, bool)
+    gameCrashed = Signal(str, str, str)  # (title, shortError, fullLog)
     settingsChanged = Signal()
     settingSaved = Signal(str)
     hideToTrayRequested = Signal()
@@ -32,12 +35,17 @@ class ProfileController(QObject):
         self._store = store
         self._profile_model = profile_model
         self._mod_model = mod_model
+        self._live_log_service = LiveLogService(self)
         self._active_profile: ProfileData | None = self._store.get_last_or_default()
         self._is_launching: bool = False
         self._syncNeeded.connect(self._sync_models)
         self._sync_models()
         if self._active_profile:
             threading.Thread(target=lambda: sync_profile_mods(self._active_profile), daemon=True).start()
+
+    @Property(QObject, constant=True)
+    def liveLogService(self) -> QObject:
+        return self._live_log_service
 
     @Property(bool, notify=launchStatusChanged)
     def isLaunching(self) -> bool:
@@ -137,6 +145,41 @@ class ProfileController(QObject):
         self.settingsChanged.emit()
         self.settingSaved.emit("Schriftart-Einstellung gespeichert")
 
+    @Property(bool, notify=settingsChanged)
+    def showLiveLogs(self) -> bool:
+        return self._store.settings.get("show_live_logs", True)
+
+    @Slot(bool)
+    def setShowLiveLogs(self, val: bool) -> None:
+        self._store.settings["show_live_logs"] = val
+        self._store.save()
+        self.settingsChanged.emit()
+        self.settingSaved.emit("Live-Log Anzeige gespeichert")
+
+    @Property(str, notify=settingsChanged)
+    def customBackgroundImage(self) -> str:
+        return self._store.settings.get("custom_background_image", "")
+
+    @Slot(str)
+    def setCustomBackgroundImage(self, path_or_url: str) -> None:
+        self._store.settings["custom_background_image"] = str(path_or_url).strip()
+        self._store.save()
+        self.settingsChanged.emit()
+        self.settingSaved.emit("Hintergrundbild aktualisiert")
+
+    @Slot(result=str)
+    def pickBackgroundImage(self) -> str:
+        file_path, _ = QFileDialog.getOpenFileName(
+            None,
+            "Hintergrundbild auswählen",
+            "",
+            "Bilder (*.png *.jpg *.jpeg *.webp);;Alle Dateien (*.*)"
+        )
+        if file_path:
+            self.setCustomBackgroundImage(file_path)
+            return file_path
+        return ""
+
     @Slot()
     def _sync_models(self) -> None:
         self._profile_model.set_profiles(self._store.profiles)
@@ -150,6 +193,10 @@ class ProfileController(QObject):
     @Property(str, notify=activeProfileChanged)
     def activeId(self) -> str:
         return self._active_profile.id if self._active_profile else ""
+
+    @Property(str, notify=activeProfileChanged)
+    def activeProfilePath(self) -> str:
+        return str(self._active_profile.path) if self._active_profile else ""
 
     @Property(str, notify=activeProfileChanged)
     def activeName(self) -> str:
@@ -385,6 +432,24 @@ class ProfileController(QObject):
         svc = ModrinthService()
         return svc.get_dependencies(mod_id, mc_version=self._active_profile.minecraft_version, loader=self._active_profile.loader)
 
+    @Slot(result=bool)
+    def isIrisInstalled(self) -> bool:
+        """Returns True if Iris or Oculus shader loader mod is installed in active profile."""
+        if not self._active_profile:
+            return False
+        for m in self._active_profile.mods:
+            slug = (m.slug or "").lower()
+            name = (m.name or "").lower()
+            pid = (m.project_id or "").lower()
+            if "iris" in slug or "iris" in name or "iris" in pid or "oculus" in slug or "oculus" in name:
+                return True
+        return False
+
+    @Slot()
+    def installIris(self) -> None:
+        """Auto-installs Iris Shaders into the active profile."""
+        self.installMod("YL57xq9U", "Iris Shaders", "Latest", "iris.jar", "Iris Team", "Shader-Unterstützung mit hoher Performance", "https://cdn.modrinth.com/data/YL57xq9U/icon.png")
+
     @Slot(str, str, str, str, str, str, str)
     def installMod(self, mod_id: str, name: str, version: str, filename: str, author: str, description: str, icon_url: str) -> None:
         if not self._active_profile:
@@ -556,18 +621,63 @@ class ProfileController(QObject):
                     )
 
                 if proc is not None:
-                    # Direct Launch successful!
+                    # Direct Launch started!
+                    self._live_log_service.attach_process(
+                        proc,
+                        self._active_profile.path / "ezclient_latest_run.log",
+                        instance_name=self._active_profile.name,
+                        loader_version=f"{self._active_profile.loader} {self._active_profile.minecraft_version}"
+                    )
+
                     if self.minimizeToTray:
                         self.hideToTrayRequested.emit()
                     self.launchStatusChanged.emit(f"Minecraft läuft (Direktstart) · {self._active_profile.name}", False)
 
-                    # Monitor standalone Java process
+                    start_time = time.time()
                     while proc.poll() is None:
                         time.sleep(0.5)
 
+                    duration = time.time() - start_time
+                    exit_code = proc.returncode
                     self._is_launching = False
+                    self._live_log_service.detach_process()
+
                     if self.minimizeToTray:
                         self.restoreFromTrayRequested.emit()
+
+                    # Check if game crashed or exited with error
+                    if exit_code != 0 or duration < 4.0:
+                        crash_reports_dir = self._active_profile.path / "crash-reports"
+                        crash_files = sorted(crash_reports_dir.glob("crash-*.txt"), key=lambda f: f.stat().st_mtime, reverse=True) if crash_reports_dir.exists() else []
+                        
+                        error_title = "Minecraft konnte nicht gestartet werden" if duration < 4.0 else "Minecraft ist abgestürzt"
+                        full_log = ""
+                        short_err = f"Prozess wurde mit Fehlercode {exit_code} beendet."
+
+                        if crash_files:
+                            try:
+                                full_log = crash_files[0].read_text(encoding="utf-8", errors="replace")
+                                for line in full_log.splitlines():
+                                    if "Description:" in line or "java.lang." in line or "error:" in line.lower():
+                                        short_err = line.strip()
+                                        break
+                            except Exception:
+                                pass
+
+                        if not full_log:
+                            log_file = self._active_profile.path / "ezclient_latest_run.log"
+                            if log_file.exists():
+                                try:
+                                    full_log = log_file.read_text(encoding="utf-8", errors="replace")
+                                    lines = [l for l in full_log.strip().splitlines() if l.strip()]
+                                    short_err = "\n".join(lines[-4:])
+                                except Exception:
+                                    pass
+
+                        self.launchStatusChanged.emit(f"Minecraft Absturz (Code {exit_code})", True)
+                        self.gameCrashed.emit(error_title, short_err, full_log or f"Prozess wurde nach {duration:.1f}s mit Exit-Code {exit_code} beendet.")
+                        return
+
                     self.launchStatusChanged.emit(f"Spiel beendet ({self._active_profile.name})", False)
                     return
 
@@ -602,9 +712,40 @@ class ProfileController(QObject):
                 if self.minimizeToTray:
                     self.restoreFromTrayRequested.emit()
                 self.launchStatusChanged.emit(f"Fehler: {exc}", True)
+                self.gameCrashed.emit("Start-Fehler", str(exc), str(exc))
 
         t = threading.Thread(target=worker, daemon=True)
         t.start()
+
+    @Slot(str)
+    def copyToClipboard(self, text: str) -> None:
+        """Copies given text to Windows / OS clipboard and shows toast."""
+        try:
+            from PySide6.QtGui import QGuiApplication
+            clipboard = QGuiApplication.clipboard()
+            if clipboard:
+                clipboard.setText(text)
+                self.settingSaved.emit("Fehler in Zwischenablage kopiert!")
+        except Exception as e:
+            print(f"[ProfileController] Clipboard error: {e}")
+
+    @Slot(str)
+    def openFolder(self, path_str: str) -> None:
+        """Opens folder in Windows Explorer / OS File Manager."""
+        try:
+            p = Path(path_str)
+            if not p.exists():
+                p.mkdir(parents=True, exist_ok=True)
+            if sys.platform == "win32":
+                os.startfile(str(p))
+            elif sys.platform == "darwin":
+                import subprocess
+                subprocess.Popen(["open", str(p)])
+            else:
+                import subprocess
+                subprocess.Popen(["xdg-open", str(p)])
+        except Exception as e:
+            print(f"[ProfileController] openFolder error: {e}")
 
     @Slot(str, result="QVariantList")
     def checkDependentMods(self, mod_id: str) -> list[str]:

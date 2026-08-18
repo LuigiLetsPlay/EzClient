@@ -100,6 +100,8 @@ def main() -> None:
         sys.exit(-1)
 
     window = engine.rootObjects()[0]
+    from PySide6.QtCore import QSize
+    window.setMinimumSize(QSize(1040, 680))
 
     # ── System Tray Icon Setup ──
     tray_icon = QSystemTrayIcon(app_icon, app)

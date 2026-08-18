@@ -20,8 +20,38 @@ Item {
     readonly property string curActiveName: (typeof profileController !== "undefined" && profileController && profileController.activeName) ? profileController.activeName : ""
     readonly property bool isCoreMod: Boolean(root.selMod && (root.selMod.slug === "fabric-api" || root.selMod.project_id === "P7dR8mSH" || (root.selMod.title && root.selMod.title.toLowerCase() === "fabric api")))
 
+    property var pendingShaderMod: null
+
+    function triggerInstall(modItem) {
+        if (!modItem) return
+        var pType = modItem.project_type || (modrinthController ? modrinthController.projectType : "mod")
+        if (pType === "shader" && profileController && !profileController.isIrisInstalled()) {
+            irisPromptModal.open(modItem)
+            return
+        }
+        performInstall(modItem)
+    }
+
+    function performInstall(modItem) {
+        if (!profileController || !modItem) return
+        var pType = modItem.project_type || (modrinthController ? modrinthController.projectType : "mod")
+        var slug = modItem.slug || modItem.project_id || modItem.id || "item"
+        var title = modItem.title || modItem.name || slug
+        var ext = (pType === "shader" || pType === "resourcepack") ? ".zip" : ".jar"
+        var file = (modItem.filename) ? modItem.filename : (slug + ext)
+        profileController.installMod(
+            modItem.project_id || slug,
+            title,
+            "Latest",
+            file,
+            modItem.author || "Modrinth",
+            modItem.description || "",
+            modItem.icon_url || ""
+        )
+    }
+
     Component.onCompleted: {
-        var actVer = (typeof profileController !== "undefined" && profileController && profileController.activeVersion) ? profileController.activeVersion : "1.21.4"
+        var actVer = (typeof profileController !== "undefined" && profileController && profileController.activeVersion) ? profileController.activeVersion : "26.2"
         if (actVer) {
             var idx = versionCombo.find(actVer)
             if (idx >= 0) versionCombo.currentIndex = idx
@@ -67,6 +97,52 @@ Item {
                 anchors.leftMargin: 16
                 anchors.rightMargin: 16
                 spacing: 10
+
+                // Project Type Selector Tabs
+                Row {
+                    spacing: 4
+                    Repeater {
+                        model: [
+                            { id: "mod",          label: "Mods",           icon: "📦" },
+                            { id: "shader",       label: "Shader",         icon: "✨" },
+                            { id: "resourcepack", label: "Resource Packs", icon: "🎨" }
+                        ]
+                        Rectangle {
+                            height: 32
+                            width: typeRow.implicitWidth + 14
+                            radius: 6
+                            color: (modrinthController && modrinthController.projectType === modelData.id) ? EzTheme.surfaceActive : (tMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2)
+                            border.color: (modrinthController && modrinthController.projectType === modelData.id) ? EzTheme.accent : EzTheme.border
+                            border.width: 1
+
+                            RowLayout {
+                                id: typeRow
+                                anchors.centerIn: parent
+                                spacing: 6
+                                Text { text: modelData.icon; font.pixelSize: 11 }
+                                Text {
+                                    text: modelData.label
+                                    font.family: EzTheme.fontFamily
+                                    font.pixelSize: 11
+                                    font.bold: (modrinthController && modrinthController.projectType === modelData.id)
+                                    color: (modrinthController && modrinthController.projectType === modelData.id) ? EzTheme.accentLight : EzTheme.text
+                                }
+                            }
+
+                            MouseArea {
+                                id: tMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (modrinthController) {
+                                        modrinthController.setProjectType(modelData.id)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // Search input
                 Rectangle {
@@ -424,6 +500,47 @@ Item {
                                         color: EzTheme.textMuted
                                         elide: Text.ElideRight
                                         Layout.fillWidth: true
+                                    }
+                                }
+
+                                // 1-Click Quick Install Button
+                                Rectangle {
+                                    Layout.preferredWidth: 96
+                                    Layout.preferredHeight: 30
+                                    radius: 6
+                                    color: resultItem.isInstalled ? "#14281E" : (cInstMouse.containsMouse ? EzTheme.accentHover : EzTheme.accent)
+                                    border.color: resultItem.isInstalled ? EzTheme.accent : "transparent"
+                                    border.width: 1
+                                    z: 10
+
+                                    RowLayout {
+                                        anchors.centerIn: parent
+                                        spacing: 4
+                                        Text {
+                                            text: resultItem.isInstalled ? "✓" : "+"
+                                            font.family: EzTheme.fontFamily
+                                            font.pixelSize: 11
+                                            font.bold: true
+                                            color: resultItem.isInstalled ? EzTheme.accentLight : "#000000"
+                                        }
+                                        Text {
+                                            text: resultItem.isInstalled ? "Installiert" : "Installieren"
+                                            font.family: EzTheme.mcFontFamily
+                                            font.pixelSize: 10
+                                            font.bold: true
+                                            color: resultItem.isInstalled ? EzTheme.accentLight : "#000000"
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: cInstMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        enabled: !resultItem.isInstalled
+                                        onClicked: {
+                                            root.triggerInstall(modelData)
+                                        }
                                     }
                                 }
                             }
@@ -1060,6 +1177,116 @@ Item {
                             profileController.uninstallMod(root.pendingDeleteMod.slug || root.pendingDeleteMod.project_id || root.pendingDeleteMod.title)
                         }
                         depWarningModal.close()
+                    }
+                }
+            }
+        }
+    }
+
+    // ─── IRIS SHADERS AUTO-PROMPT DIALOG ───
+    Rectangle {
+        id: irisPromptModal
+        anchors.fill: parent
+        color: "#C805070A"
+        z: 99999
+        visible: opacity > 0.001
+        opacity: 0.0
+
+        Behavior on opacity { NumberAnimation { duration: 180 } }
+
+        function open(shaderMod) {
+            root.pendingShaderMod = shaderMod
+            irisPromptModal.opacity = 1.0
+        }
+        function close() {
+            irisPromptModal.opacity = 0.0
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {}
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: Math.min(480, parent.width - 32)
+            height: 280
+            radius: 14
+            color: "#12151E"
+            border.color: "#38BDF8"
+            border.width: 1
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 20
+                spacing: 14
+
+                RowLayout {
+                    spacing: 10
+                    Text { text: "✨"; font.pixelSize: 22 }
+                    ColumnLayout {
+                        spacing: 2
+                        Text {
+                            text: "Iris Shaders Mod empfohlen"
+                            font.family: EzTheme.mcFontFamily
+                            font.pixelSize: 14
+                            font.bold: true
+                            color: "#38BDF8"
+                        }
+                        Text {
+                            text: "Shader benötigen eine Shader-Engine wie Iris, um in Minecraft dargestellt zu werden."
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 11
+                            color: EzTheme.textSecondary
+                            wrapMode: Text.Wrap
+                            Layout.fillWidth: true
+                        }
+                    }
+                }
+
+                Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border }
+
+                Text {
+                    text: "Möchtest du Iris Shaders automatisch mitinstallieren?"
+                    font.family: EzTheme.fontFamily
+                    font.pixelSize: 12
+                    font.bold: true
+                    color: EzTheme.text
+                }
+
+                Item { Layout.fillHeight: true }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+
+                    EzButton {
+                        text: "Nur Shader installieren"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 34
+                        onClicked: {
+                            irisPromptModal.close()
+                            if (root.pendingShaderMod) {
+                                root.performInstall(root.pendingShaderMod)
+                            }
+                        }
+                    }
+
+                    EzButton {
+                        text: "✓ Iris & Shader installieren"
+                        primary: true
+                        mcFont: true
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 34
+                        onClicked: {
+                            irisPromptModal.close()
+                            if (profileController) {
+                                profileController.installIris()
+                            }
+                            if (root.pendingShaderMod) {
+                                root.performInstall(root.pendingShaderMod)
+                            }
+                        }
                     }
                 }
             }

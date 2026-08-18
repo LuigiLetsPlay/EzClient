@@ -10,27 +10,28 @@ Rectangle {
 
     property string currentRoute: "home"
     property var windowRef: null
+    property var skinModalRef: null
     signal navigate(string route)
 
     readonly property bool hasProfile: typeof profileController !== "undefined" && profileController && profileController.activeName !== "No Profile" && profileController.activeName !== ""
     readonly property string activeName: typeof profileController !== "undefined" && profileController ? profileController.activeName : ""
-    readonly property string activeVersion: typeof profileController !== "undefined" && profileController ? profileController.activeVersion : "1.21.4"
+    readonly property string activeVersion: typeof profileController !== "undefined" && profileController ? profileController.activeVersion : "26.2"
     readonly property string activeLoader: typeof profileController !== "undefined" && profileController ? profileController.activeLoader : "Fabric"
 
     readonly property string accountUser: typeof accountController !== "undefined" && accountController ? accountController.username : "Player"
     readonly property string avatarSource: typeof accountController !== "undefined" && accountController ? accountController.avatarUrl : ""
 
-    // Gradient bottom border (accent glow line)
-    Rectangle {
-        anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
-        height: 1
-        gradient: Gradient {
-            orientation: Gradient.Horizontal
-            GradientStop { position: 0.0; color: "transparent" }
-            GradientStop { position: 0.3; color: EzTheme.border }
-            GradientStop { position: 0.7; color: EzTheme.border }
-            GradientStop { position: 1.0; color: "transparent" }
+    function isTabActive(tabId) {
+        if (tabId === "mods") {
+            return root.currentRoute === "mods" || root.currentRoute === "modrinth" || root.currentRoute === "store"
         }
+        if (tabId === "profiles") {
+            return root.currentRoute === "profiles" || root.currentRoute === "profile_detail"
+        }
+        if (tabId === "installed_mods") {
+            return root.currentRoute === "installed_mods" || root.currentRoute === "mods_installed"
+        }
+        return root.currentRoute === tabId
     }
 
     // Draggable background
@@ -46,15 +47,13 @@ Rectangle {
         }
     }
 
+    // ── LEFT: Logo + Active Profile Switcher ──
     RowLayout {
-        anchors.fill: parent
+        id: leftSection
+        anchors.left: parent.left
         anchors.leftMargin: 18
-        anchors.rightMargin: 0
-        spacing: 14
-
-        // ── LEFT: Logo + Active Profile Switcher ──
-        RowLayout {
-            spacing: 12
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 12
 
             // Logo mark
             RowLayout {
@@ -306,94 +305,85 @@ Rectangle {
             }
         }
 
-        Item { Layout.fillWidth: true }
+    // ── CENTER: Navigation Tabs with Sliding Indicator ──
+    Item {
+        id: centerSection
+        anchors.centerIn: parent
+        implicitWidth: navTabsRow.implicitWidth
+        implicitHeight: navTabsRow.implicitHeight
 
-        // ── CENTER: Navigation Tabs with Sliding Indicator ──
-        Item {
-            Layout.alignment: Qt.AlignHCenter
-            implicitWidth: navTabsRow.implicitWidth
-            implicitHeight: navTabsRow.implicitHeight
+        Row {
+            id: navTabsRow
+            spacing: 2
 
-            Row {
-                id: navTabsRow
-                spacing: 2
+            Repeater {
+                id: tabRepeater
+                model: [
+                    { id: "home",           labelKey: "nav_home",           fallback: "Home",          icon: "home.svg" },
+                    { id: "profiles",       labelKey: "nav_profiles",       fallback: "Profile",       icon: "box.svg" },
+                    { id: "installed_mods", labelKey: "nav_installed_mods", fallback: "Mods",          icon: "mods.svg" },
+                    { id: "mods",           labelKey: "nav_modrinth",       fallback: "Modrinth",      icon: "modrinth.svg" },
+                    { id: "settings",       labelKey: "nav_settings",       fallback: "Einstellungen", icon: "settings.svg" }
+                ]
 
-                Repeater {
-                    id: tabRepeater
-                    model: [
-                        { id: "home",           labelKey: "nav_home",           fallback: "Home",          icon: "home.svg" },
-                        { id: "profiles",       labelKey: "nav_profiles",       fallback: "Profile",       icon: "box.svg" },
-                        { id: "installed_mods", labelKey: "nav_installed_mods", fallback: "Mods",          icon: "mods.svg" },
-                        { id: "mods",           labelKey: "nav_modrinth",       fallback: "Modrinth",      icon: "modrinth.svg" },
-                        { id: "settings",       labelKey: "nav_settings",       fallback: "Einstellungen", icon: "settings.svg" }
-                    ]
+                Rectangle {
+                    id: tabItem
+                    width: root.width < 1180 ? (tabRowInner.implicitWidth + 14) : (tabRowInner.implicitWidth + 26)
+                    height: 36
+                    radius: 8
+                    color: root.isTabActive(modelData.id)
+                           ? EzTheme.surfaceActive
+                           : (tabMouse.containsMouse ? EzTheme.surface2 : "transparent")
+                    border.color: root.isTabActive(modelData.id) ? "#254832" : "transparent"
+                    border.width: 1
 
-                    Rectangle {
-                        id: tabItem
-                        width: root.width < 1180 ? (tabRowInner.implicitWidth + 14) : (tabRowInner.implicitWidth + 26)
-                        height: 38
-                        radius: EzTheme.radiusSm
-                        color: root.currentRoute === modelData.id
-                               ? EzTheme.surfaceActive
-                               : (tabMouse.containsMouse ? EzTheme.surface2 : "transparent")
-                        border.color: root.currentRoute === modelData.id ? EzTheme.borderAccent : "transparent"
-                        border.width: 1
+                    Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
+                    Behavior on border.color { ColorAnimation { duration: EzTheme.animNormal } }
 
-                        Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
-                        Behavior on border.color { ColorAnimation { duration: EzTheme.animNormal } }
+                    RowLayout {
+                        id: tabRowInner
+                        anchors.centerIn: parent
+                        spacing: root.width < 1180 ? 5 : 7
 
-                        RowLayout {
-                            id: tabRowInner
-                            anchors.centerIn: parent
-                            spacing: root.width < 1180 ? 5 : 7
-
-                            Image {
-                                source: "icons/" + modelData.icon
-                                width: 14; height: 14
-                                fillMode: Image.PreserveAspectFit
-                                opacity: root.currentRoute === modelData.id ? 1.0 : (tabMouse.containsMouse ? 0.8 : 0.4)
-                                Behavior on opacity { NumberAnimation { duration: EzTheme.animNormal } }
-                            }
-
-                            Text {
-                                text: EzI18n.t(modelData.labelKey, modelData.fallback)
-                                font.family: EzTheme.fontFamily
-                                font.pixelSize: 12
-                                font.bold: true
-                                color: root.currentRoute === modelData.id
-                                       ? EzTheme.accentLight
-                                       : (tabMouse.containsMouse ? EzTheme.text : EzTheme.textSecondary)
-                                Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
-                            }
+                        Image {
+                            source: "icons/" + modelData.icon
+                            width: 14; height: 14
+                            fillMode: Image.PreserveAspectFit
+                            opacity: root.isTabActive(modelData.id) ? 1.0 : (tabMouse.containsMouse ? 0.8 : 0.45)
+                            Behavior on opacity { NumberAnimation { duration: EzTheme.animNormal } }
                         }
 
-                        // Active bottom accent bar
-                        Rectangle {
-                            anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: 2 }
-                            width: root.currentRoute === modelData.id ? (parent.width - 20) : 0
-                            height: 2
-                            radius: 1
-                            color: EzTheme.accent
-                            Behavior on width { NumberAnimation { duration: EzTheme.animSlow; easing.type: Easing.OutCubic } }
+                        Text {
+                            text: EzI18n.t(modelData.labelKey, modelData.fallback)
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 12
+                            font.bold: true
+                            color: root.isTabActive(modelData.id)
+                                   ? EzTheme.accentLight
+                                   : (tabMouse.containsMouse ? EzTheme.text : EzTheme.textSecondary)
+                            Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
                         }
+                    }
 
-                        MouseArea {
-                            id: tabMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.navigate(modelData.id)
-                        }
+                    MouseArea {
+                        id: tabMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.navigate(modelData.id)
                     }
                 }
             }
         }
+    }
 
-        Item { Layout.fillWidth: true }
-
-        // ── RIGHT: Account Pill + Window Controls ──
-        RowLayout {
-            spacing: 10
+    // ── RIGHT: Account Pill + Window Controls ──
+    RowLayout {
+        id: rightSection
+        anchors.right: parent.right
+        anchors.rightMargin: 0
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 10
 
             // Player Avatar & Username
             Rectangle {
@@ -573,6 +563,42 @@ Rectangle {
                             }
                         }
 
+                        // Skin Changer Action
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 34
+                            radius: EzTheme.radiusSm
+                            color: skinBtnMouse.containsMouse ? EzTheme.surface3 : "transparent"
+                            Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
+
+                            RowLayout {
+                                anchors.left: parent.left; anchors.leftMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 8
+                                Text { text: "👕"; font.pixelSize: 11 }
+                                Text {
+                                    text: "Skin ändern (Mojang API)"
+                                    font.family: EzTheme.fontFamily
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                    color: EzTheme.accentLight
+                                }
+                            }
+
+                            MouseArea {
+                                id: skinBtnMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    accPopup.close()
+                                    if (typeof skinModalRef !== "undefined" && skinModalRef) {
+                                        skinModalRef.open()
+                                    }
+                                }
+                            }
+                        }
+
                         // Refresh Session
                         Rectangle {
                             Layout.fillWidth: true
@@ -685,4 +711,3 @@ Rectangle {
             }
         }
     }
-}

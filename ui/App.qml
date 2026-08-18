@@ -48,6 +48,7 @@ ApplicationWindow {
             Layout.preferredHeight: 56
             currentRoute: navController.currentRoute
             windowRef: window
+            skinModalRef: globalSkinModal
             visible: !window.needsOnboarding
             onNavigate: function(route) {
                 navController.navigate(route)
@@ -141,6 +142,12 @@ ApplicationWindow {
         }
     }
 
+    // Crash & Error properties
+    property bool showCrashModal: false
+    property string crashTitle: ""
+    property string crashShortError: ""
+    property string crashFullLog: ""
+
     Connections {
         target: (typeof profileController !== "undefined") ? profileController : null
         function onProfilesChanged() {
@@ -154,11 +161,21 @@ ApplicationWindow {
             toastTimer.restart()
         }
         function onLaunchStatusChanged(statusText, isError) {
-            if (!isError && statusText.indexOf("Launcher wird gestartet") >= 0) {
+            if (!isError && (statusText.indexOf("Minecraft läuft") >= 0 || statusText.indexOf("Launcher wird gestartet") >= 0)) {
+                if (profileController && profileController.showLiveLogs) {
+                    globalLiveLogsWindow.show()
+                    globalLiveLogsWindow.raise()
+                }
                 if (profileController && profileController.closeOnLaunch) {
                     window.showMinimized()
                 }
             }
+        }
+        function onGameCrashed(title, shortErr, fullLog) {
+            window.crashTitle = title
+            window.crashShortError = shortErr
+            window.crashFullLog = fullLog
+            window.showCrashModal = true
         }
     }
 
@@ -184,6 +201,252 @@ ApplicationWindow {
                 mainStack.currentIndex = indexMap[route]
             }
         }
+    }
+
+    // ─────────────────────────────────────────
+    // MINECRAFT CRASH & ERROR MODAL DIALOG
+    // ─────────────────────────────────────────
+    Rectangle {
+        id: crashModalOverlay
+        anchors.fill: parent
+        color: "#B805070A"
+        z: 99998
+        visible: window.showCrashModal
+        opacity: visible ? 1.0 : 0.0
+        Behavior on opacity { NumberAnimation { duration: 180 } }
+
+        MouseArea {
+            anchors.fill: parent
+            // blocks interaction with underlying pages
+        }
+
+        Rectangle {
+            id: crashCard
+            anchors.centerIn: parent
+            width: Math.min(680, parent.width - 60)
+            height: Math.min(520, parent.height - 60)
+            radius: 16
+            color: "#12141A"
+            border.color: "#FF453A"
+            border.width: 1.5
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 22
+                spacing: 14
+
+                // Header Row
+                RowLayout {
+                    spacing: 12
+                    Rectangle {
+                        width: 38; height: 38; radius: 19
+                        color: "#381214"
+                        border.color: "#FF453A"
+                        border.width: 1
+                        Text { text: "⚠️"; font.pixelSize: 18; anchors.centerIn: parent }
+                    }
+                    ColumnLayout {
+                        spacing: 2
+                        Text {
+                            text: window.crashTitle || "Minecraft Start-Fehler"
+                            font.family: EzTheme.mcFontFamily
+                            font.pixelSize: 16
+                            font.bold: true
+                            color: "#FF453A"
+                        }
+                        Text {
+                            text: "Das Spiel konnte nicht gestartet werden oder ist abgestürzt."
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 12
+                            color: EzTheme.textSecondary
+                        }
+                    }
+                    Item { Layout.fillWidth: true }
+                    // Close X button
+                    Rectangle {
+                        width: 28; height: 28; radius: 14
+                        color: closeCrashMouse.containsMouse ? "#2A2E39" : "transparent"
+                        Text { text: "✕"; color: EzTheme.textMuted; anchors.centerIn: parent; font.pixelSize: 13 }
+                        MouseArea {
+                            id: closeCrashMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: window.showCrashModal = false
+                        }
+                    }
+                }
+
+                // Error summary box
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 44
+                    radius: 8
+                    color: "#1E1214"
+                    border.color: "#5C1D24"
+                    border.width: 1
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 8
+                        Text {
+                            text: window.crashShortError || "Unbekannter Fehler"
+                            font.family: "Consolas, monospace"
+                            font.pixelSize: 11
+                            color: "#FFA099"
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+
+                // Monospace Log View
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: 8
+                    color: "#0A0B0E"
+                    border.color: EzTheme.border
+                    border.width: 1
+                    clip: true
+
+                    Flickable {
+                        id: logFlick
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        contentWidth: logText.implicitWidth
+                        contentHeight: logText.implicitHeight
+                        clip: true
+
+                        TextEdit {
+                            id: logText
+                            text: window.crashFullLog || "Keine Log-Ausgabe vorhanden."
+                            font.family: "Consolas, monospace"
+                            font.pixelSize: 11
+                            color: "#C5C8D0"
+                            readOnly: true
+                            selectByMouse: true
+                            selectionColor: EzTheme.accent
+                            selectedTextColor: "#000000"
+                        }
+                    }
+                }
+
+                // Actions footer
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 12
+
+                    // Copy Error Button
+                    Rectangle {
+                        height: 36
+                        Layout.preferredWidth: copyRow.implicitWidth + 28
+                        radius: 8
+                        color: copyBtnMouse.containsMouse ? "#32734A" : "#24D677"
+                        Behavior on color { ColorAnimation { duration: 120 } }
+                        RowLayout {
+                            id: copyRow
+                            anchors.centerIn: parent
+                            spacing: 8
+                            Text { text: "📋"; font.pixelSize: 13 }
+                            Text {
+                                text: "Fehler kopieren"
+                                font.family: EzTheme.fontFamily
+                                font.pixelSize: 12
+                                font.bold: true
+                                color: "#000000"
+                            }
+                        }
+                        MouseArea {
+                            id: copyBtnMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (profileController) {
+                                    profileController.copyToClipboard(window.crashFullLog || window.crashShortError)
+                                }
+                            }
+                        }
+                    }
+
+                    // Open Crash Folder Button
+                    Rectangle {
+                        height: 36
+                        Layout.preferredWidth: openFoldRow.implicitWidth + 24
+                        radius: 8
+                        color: openFoldMouse.containsMouse ? "#2A2E39" : "#1A1D24"
+                        border.color: EzTheme.border
+                        border.width: 1
+                        RowLayout {
+                            id: openFoldRow
+                            anchors.centerIn: parent
+                            spacing: 8
+                            Text { text: "📁"; font.pixelSize: 13 }
+                            Text {
+                                text: "Ordner öffnen"
+                                font.family: EzTheme.fontFamily
+                                font.pixelSize: 12
+                                font.bold: true
+                                color: EzTheme.text
+                            }
+                        }
+                        MouseArea {
+                            id: openFoldMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (profileController && profileController.activeProfilePath) {
+                                    profileController.openFolder(profileController.activeProfilePath + "/crash-reports")
+                                }
+                            }
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    // Close Button
+                    Rectangle {
+                        height: 36
+                        Layout.preferredWidth: 90
+                        radius: 8
+                        color: closeBtnMouse.containsMouse ? "#2A2E39" : "#1A1D24"
+                        border.color: EzTheme.border
+                        border.width: 1
+                        Text {
+                            text: "Schließen"
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 12
+                            font.bold: true
+                            color: EzTheme.textSecondary
+                            anchors.centerIn: parent
+                        }
+                        MouseArea {
+                            id: closeBtnMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: window.showCrashModal = false
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────
+    // GLOBAL SKIN CHANGER MODAL
+    // ─────────────────────────────────────────
+    SkinModal {
+        id: globalSkinModal
+    }
+
+    // ─────────────────────────────────────────
+    // LIVE LOGS WINDOW
+    // ─────────────────────────────────────────
+    LiveLogsWindow {
+        id: globalLiveLogsWindow
     }
 
     // ─────────────────────────────────────────

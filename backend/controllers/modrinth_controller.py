@@ -5,6 +5,7 @@ from backend.services.modrinth import ModrinthService
 
 
 class ModrinthController(QObject):
+    projectTypeChanged = Signal()
     searchResultsChanged = Signal()
     selectedModChanged = Signal()
     loadingChanged = Signal()
@@ -31,7 +32,8 @@ class ModrinthController(QObject):
         self._version_type_filter: str = "release"  # Release is standard filter!
         self._loading: bool = False
         self._query: str = ""
-        self._mc_version: str = "1.21.4"  # Default to active version!
+        self._project_type: str = "mod"  # "mod", "shader", "resourcepack"
+        self._mc_version: str = "26.2"  # Default to 26.2!
         self._category: str = "All"
         self._sort: str = "relevance"
         self._offset: int = 0
@@ -71,6 +73,18 @@ class ModrinthController(QObject):
     @Property(str, notify=versionTypeFilterChanged)
     def versionTypeFilter(self) -> str:
         return self._version_type_filter
+
+    @Property(str, notify=projectTypeChanged)
+    def projectType(self) -> str:
+        return self._project_type
+
+    @Slot(str)
+    def setProjectType(self, pt: str) -> None:
+        val = str(pt).lower().strip()
+        if val in ("mod", "shader", "resourcepack", "datapack") and self._project_type != val:
+            self._project_type = val
+            self.projectTypeChanged.emit()
+            self.search()
 
     @Property(str, notify=mcVersionChanged)
     def mcVersion(self) -> str:
@@ -130,6 +144,7 @@ class ModrinthController(QObject):
         cat = self._category
         sort = self._sort
         offset = self._offset
+        ptype = self._project_type
 
         def worker():
             try:
@@ -139,7 +154,8 @@ class ModrinthController(QObject):
                     category=cat,
                     sort=sort,
                     offset=offset,
-                    limit=25
+                    limit=25,
+                    project_type=ptype
                 )
                 self._searchDoneSignal.emit(result, append)
             except Exception as e:

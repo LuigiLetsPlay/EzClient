@@ -20,7 +20,7 @@ QtObject {
             "nav_home": "Home",
             "nav_profiles": "Profile",
             "nav_installed_mods": "Mods",
-            "nav_modrinth": "Modrinth Store",
+            "nav_modrinth": "Modrinth",
             "nav_settings": "Einstellungen",
 
             // Sidebar & TopBar

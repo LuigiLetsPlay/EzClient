@@ -7,7 +7,7 @@ Item {
     id: root
 
     property string createName: ""
-    property string createVersion: "1.21.4"
+    property string createVersion: "26.2"
     property string createLoader: "Fabric"
     property string createPreset: "performance"
 

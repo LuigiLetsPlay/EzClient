@@ -132,6 +132,75 @@ Item {
                 }
             }
 
+            Item { height: 10 }
+
+            // Custom Background Setting Card
+            EzSurface {
+                Layout.fillWidth: true
+                implicitHeight: 76
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 14
+                    spacing: 14
+
+                    Rectangle {
+                        width: 44; height: 44; radius: 8
+                        color: "#0F121A"
+                        border.color: EzTheme.border
+                        border.width: 1
+                        clip: true
+
+                        Image {
+                            anchors.fill: parent
+                            source: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage) ? ("file:///" + profileController.customBackgroundImage.replace(/\\/g, "/")) : "assets/hero_bg.jpg"
+                            fillMode: Image.PreserveAspectCrop
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 2
+                        Text {
+                            text: "Hintergrundbild (Hauptmenü)"
+                            font.family: EzTheme.mcFontFamily
+                            font.pixelSize: 13
+                            font.bold: true
+                            color: EzTheme.text
+                        }
+                        Text {
+                            text: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage) ? "Eigenes Bild aktiv" : "Standard Minecraft Artwork aktiv"
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 10
+                            color: EzTheme.textMuted
+                        }
+                    }
+
+                    Row {
+                        spacing: 8
+
+                        EzButton {
+                            text: "Bild wählen…"
+                            mcFont: true
+                            Layout.preferredHeight: 32
+                            onClicked: {
+                                if (profileController) profileController.pickBackgroundImage()
+                            }
+                        }
+
+                        EzButton {
+                            text: "Standard"
+                            mcFont: true
+                            Layout.preferredHeight: 32
+                            visible: typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage !== ""
+                            onClicked: {
+                                if (profileController) profileController.setCustomBackgroundImage("")
+                            }
+                        }
+                    }
+                }
+            }
+
             Item { height: 18 }
 
             // ─── MINECRAFT ACCOUNT (MICROSOFT AUTH) ───
@@ -426,6 +495,15 @@ Item {
                     anchors.fill: parent
                     anchors.margins: 16
                     spacing: 0
+
+                    EzToggleRow {
+                        label: "Live-Logs Konsole beim Spielstart anzeigen"
+                        sub: "Öffnet das moderne Terminal-Fenster mit Syntax-Highlighting, Filter-Pills und Echtzeit-Statistiken"
+                        toggleValue: profileController ? profileController.showLiveLogs : true
+                        onToggled: function(val) { if (profileController) profileController.setShowLiveLogs(val) }
+                    }
+
+                    Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border; opacity: 0.6; Layout.topMargin: 8; Layout.bottomMargin: 8 }
 
                     EzToggleRow {
                         label: EzI18n.t("settings_direct_launch", "Direktstart (Direkt mit Java starten)")

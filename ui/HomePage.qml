@@ -8,7 +8,7 @@ Item {
 
     readonly property bool hasProfile: typeof profileController !== "undefined" && profileController && profileController.activeName !== "No Profile" && profileController.activeName !== ""
     readonly property string activeName: typeof profileController !== "undefined" && profileController ? profileController.activeName : ""
-    readonly property string activeVersion: typeof profileController !== "undefined" && profileController ? profileController.activeVersion : "1.21.4"
+    readonly property string activeVersion: typeof profileController !== "undefined" && profileController ? profileController.activeVersion : "26.2"
     readonly property string activeLoader: typeof profileController !== "undefined" && profileController ? profileController.activeLoader : "Fabric"
     readonly property int activeModsCount: typeof profileController !== "undefined" && profileController ? profileController.activeModsCount : 0
     readonly property int activeRamMb: typeof profileController !== "undefined" && profileController ? profileController.activeRamMb : 4096
@@ -23,9 +23,12 @@ Item {
     Image {
         id: bgHero
         anchors.fill: parent
-        source: "assets/hero_bg.jpg"
+        source: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage) 
+                ? (profileController.customBackgroundImage.indexOf(":") >= 0 ? profileController.customBackgroundImage : ("file:///" + profileController.customBackgroundImage.replace(/\\/g, "/"))) 
+                : "assets/hero_bg.jpg"
         fillMode: Image.PreserveAspectCrop
-        opacity: 0.35
+        opacity: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage) ? 0.55 : 0.35
+        Behavior on opacity { NumberAnimation { duration: 300 } }
     }
 
     // Cinematic Vignette Overlay
