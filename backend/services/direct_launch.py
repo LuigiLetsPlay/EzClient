@@ -334,7 +334,6 @@ def launch_minecraft_direct(
         "-XX:+DisableExplicitGC",
         "--sun-misc-unsafe-memory-access=allow",
         "--enable-native-access=ALL-UNNAMED",
-        "-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=false",
         "-DFabricMcEmu= net.minecraft.client.main.Main ",
         f"-Dfabric.modsFolder={profile.mods_path}",
         f"-Dfabric.gameVersion={profile.minecraft_version}",
@@ -367,6 +366,7 @@ def launch_minecraft_direct(
     creationflags = 0
 
     env = os.environ.copy()
+    env["PATH"] = f"{natives_dir};{env.get('PATH', '')}"
 
     log_file = profile.path / "ezclient_latest_run.log"
     try:

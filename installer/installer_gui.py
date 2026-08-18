@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont, QIcon, QPixmap, QColor
 
 APP_NAME = "EzClient"
-APP_VERSION = "1.0.5"
+APP_VERSION = "1.0.6"
 DEFAULT_INSTALL_DIR = Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Programs" / "EzClient"
 
 

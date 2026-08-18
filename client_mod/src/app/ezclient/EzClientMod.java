@@ -219,25 +219,56 @@ public class EzClientMod implements ClientModInitializer {
 
     /**
      * Starts a background thread that sets and maintains the window title to "EzClient"
-     * and applies the custom EzClient icon via GLFW.
+     * and applies the custom EzClient icon via GLFW safely after Minecraft initializes.
      */
     private void startWindowDaemon() {
         Thread thread = new Thread(() -> {
+            try {
+                // Allow Minecraft to complete GLFW initialization first
+                Thread.sleep(3000);
+            } catch (InterruptedException ignored) {
+                return;
+            }
+
             long lastWindow = 0L;
             int attempts = 0;
             boolean iconApplied = false;
 
             while (running && attempts < 1000) {
                 try {
-                    Thread.sleep(150);
+                    Thread.sleep(500);
                     attempts++;
 
-                    long window = GLFW.glfwGetCurrentContext();
+                    long window = 0L;
+                    try {
+                        Class<?> mcClass = Class.forName("net.minecraft.client.MinecraftClient");
+                        Object instance = mcClass.getMethod("getInstance").invoke(null);
+                        if (instance != null) {
+                            for (java.lang.reflect.Method m : mcClass.getMethods()) {
+                                if (m.getParameterCount() == 0 && m.getReturnType().getSimpleName().equals("Window")) {
+                                    Object winObj = m.invoke(instance);
+                                    if (winObj != null) {
+                                        for (java.lang.reflect.Method wm : winObj.getClass().getMethods()) {
+                                            if (wm.getName().equals("getHandle") && wm.getParameterCount() == 0) {
+                                                Object handle = wm.invoke(winObj);
+                                                if (handle instanceof Long) {
+                                                    window = (Long) handle;
+                                                }
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (Throwable ignored) {}
+
                     if (window == 0L) {
                         continue;
                     }
 
-                    // Always enforce clean "EzClient" title
+                    // Enforce clean "EzClient" title
                     GLFW.glfwSetWindowTitle(window, CLIENT_TITLE);
 
                     // Apply custom icon once window is available

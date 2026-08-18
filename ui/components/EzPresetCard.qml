@@ -19,19 +19,25 @@ Rectangle {
     radius: EzTheme.radiusSm
     color: selected ? EzTheme.surfaceActive : (cardMouse.containsMouse ? EzTheme.surface2 : EzTheme.surface)
     border.color: selected ? EzTheme.accent : (cardMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)
-    border.width: selected ? 1.5 : 1
+    border.width: 1
 
     Behavior on color { ColorAnimation { duration: 110 } }
     Behavior on border.color { ColorAnimation { duration: 110 } }
 
     RowLayout {
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 12
+        anchors.leftMargin: 14
+        anchors.rightMargin: 14
+        anchors.topMargin: 10
+        anchors.bottomMargin: 10
+        spacing: 14
 
         // Radio Circle
         Rectangle {
-            width: 18; height: 18; radius: 9
+            Layout.preferredWidth: 20
+            Layout.preferredHeight: 20
+            Layout.alignment: Qt.AlignVCenter
+            radius: 10
             color: selected ? EzTheme.accent : "transparent"
             border.color: selected ? EzTheme.accent : EzTheme.borderLight
             border.width: 1.5
@@ -46,10 +52,12 @@ Rectangle {
 
         ColumnLayout {
             Layout.fillWidth: true
+            Layout.alignment: Qt.AlignVCenter
             spacing: 2
 
             RowLayout {
                 spacing: 8
+                Layout.alignment: Qt.AlignLeft
                 Text {
                     text: pCard.title
                     font.family: EzTheme.fontFamily
