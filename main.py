@@ -116,6 +116,7 @@ def main() -> None:
         splash.close()
         sys.exit(-1)
 
+    window = engine.rootObjects()[0]
     from PySide6.QtCore import QSize
     try:
         window.setMinimumSize(QSize(1040, 680))
