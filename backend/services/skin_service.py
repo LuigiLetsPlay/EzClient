@@ -124,7 +124,7 @@ def set_active_skin(name: str, path: str, body_url: str, avatar_url: str) -> dic
 
 def generate_skin_renders(skin_path: str | Path) -> tuple[str, str]:
     """
-    Renders both a full-body assembled character preview and a 64x64 head avatar from a raw skin texture PNG.
+    Renders both a full 3D isometric character body preview and a 64x64 head avatar from a raw skin texture PNG.
     Returns (body_preview_path, avatar_preview_path).
     """
     path = Path(skin_path)
@@ -132,8 +132,9 @@ def generate_skin_renders(skin_path: str | Path) -> tuple[str, str]:
         return "", ""
 
     try:
-        from PySide6.QtGui import QImage, QPainter
-        from PySide6.QtCore import Qt, QRect
+        from PySide6.QtGui import QImage, QPainter, QPolygonF, QTransform, QColor
+        from PySide6.QtCore import Qt, QPointF, QRect
+        import math
 
         src = QImage(str(path))
         if src.isNull():
@@ -157,55 +158,107 @@ def generate_skin_renders(skin_path: str | Path) -> tuple[str, str]:
         hp.end()
         head_img.save(str(avatar_out), "PNG")
 
-        # 2. Render Assembled Front Full-Body (Width: 240, Height: 360)
-        body_img = QImage(240, 360, QImage.Format_ARGB32_Premultiplied)
+        # 2. Render Full 3D Isometric Character (Width: 280, Height: 420)
+        body_img = QImage(280, 420, QImage.Format_ARGB32_Premultiplied)
         body_img.fill(Qt.transparent)
         bp = QPainter(body_img)
+        bp.setRenderHint(QPainter.Antialiasing, True)
         bp.setRenderHint(QPainter.SmoothPixmapTransform, False)
 
-        ox, oy, S = 40, 20, 10
-        # Head Base (8, 8, 8, 8)
-        bp.drawImage(QRect(ox + 4 * S, oy, 8 * S, 8 * S), src, QRect(8, 8, 8, 8))
-        # Head Hat (40, 8, 8, 8)
-        bp.drawImage(QRect(ox + 4 * S, oy, 8 * S, 8 * S), src, QRect(40, 8, 8, 8))
+        def draw_textured_quad(src_img, src_rect, p0, p1, p2, p3, brightness=1.0):
+            if src_rect.width() <= 0 or src_rect.height() <= 0:
+                return
+            cropped = src_img.copy(src_rect)
+            w, h = src_rect.width(), src_rect.height()
+            quad_src = QPolygonF([QPointF(0, 0), QPointF(w, 0), QPointF(w, h), QPointF(0, h)])
+            quad_dst = QPolygonF([p0, p1, p2, p3])
 
-        # Torso Base (20, 20, 8, 12)
-        bp.drawImage(QRect(ox + 4 * S, oy + 8 * S, 8 * S, 12 * S), src, QRect(20, 20, 8, 12))
-        if is_64x64:
-            # Torso Jacket (20, 36, 8, 12)
-            bp.drawImage(QRect(ox + 4 * S, oy + 8 * S, 8 * S, 12 * S), src, QRect(20, 36, 8, 12))
+            t = QTransform()
+            if QTransform.quadToQuad(quad_src, quad_dst, t):
+                bp.save()
+                bp.setTransform(t, True)
+                bp.drawImage(0, 0, cropped)
+                if brightness < 0.99:
+                    bp.setCompositionMode(QPainter.CompositionMode_Darken)
+                    bp.fillRect(0, 0, w, h, QColor(0, 0, 0, int((1.0 - brightness) * 255)))
+                bp.restore()
 
-        # Right Arm Base (44, 20, 4, 12)
-        bp.drawImage(QRect(ox, oy + 8 * S, 4 * S, 12 * S), src, QRect(44, 20, 4, 12))
-        if is_64x64:
-            # Right Arm Sleeve (44, 36, 4, 12)
-            bp.drawImage(QRect(ox, oy + 8 * S, 4 * S, 12 * S), src, QRect(44, 36, 4, 12))
+        def draw_3d_box(src_img, top_r, front_r, side_r, top_p, front_p, side_p, b_top=1.0, b_front=0.92, b_side=0.72):
+            if top_r:
+                draw_textured_quad(src_img, top_r, top_p[0], top_p[1], top_p[2], top_p[3], b_top)
+            if front_r:
+                draw_textured_quad(src_img, front_r, front_p[0], front_p[1], front_p[2], front_p[3], b_front)
+            if side_r:
+                draw_textured_quad(src_img, side_r, side_p[0], side_p[1], side_p[2], side_p[3], b_side)
 
-        # Left Arm Base (36, 52, 4, 12 if 64x64 else mirror)
+        S = 8.5
+        ang = math.radians(24.0)
+        ux, uy = math.cos(ang) * S, math.sin(ang) * S
+        vx, vy = -math.cos(ang) * S * 0.72, math.sin(ang) * S * 0.72
+
+        def make_box_points(bx, by, w, h, d, z_off=0):
+            p0 = QPointF(bx + z_off * vx, by + z_off * vy)
+            p1 = QPointF(p0.x() + w * ux, p0.y() + w * uy)
+            p2 = QPointF(p1.x() + d * vx, p1.y() + d * vy)
+            p3 = QPointF(p0.x() + d * vx, p0.y() + d * vy)
+            f0 = p0
+            f1 = p1
+            f2 = QPointF(f1.x(), f1.y() + h * S * 1.25)
+            f3 = QPointF(f0.x(), f0.y() + h * S * 1.25)
+            s0 = p3
+            s1 = p0
+            s2 = f3
+            s3 = QPointF(s0.x(), s0.y() + h * S * 1.25)
+            return (p0, p1, p2, p3), (f0, f1, f2, f3), (s0, s1, s2, s3)
+
+        cx, cy = 135.0, 115.0
+
+        # Torso & Jacket
+        t_top, t_front, t_side = make_box_points(cx, cy, 8, 12, 4)
+        draw_3d_box(src, QRect(20, 16, 8, 4), QRect(20, 20, 8, 12), QRect(16, 20, 4, 12), t_top, t_front, t_side)
         if is_64x64:
-            bp.drawImage(QRect(ox + 12 * S, oy + 8 * S, 4 * S, 12 * S), src, QRect(36, 52, 4, 12))
-            bp.drawImage(QRect(ox + 12 * S, oy + 8 * S, 4 * S, 12 * S), src, QRect(52, 52, 4, 12))
+            draw_3d_box(src, QRect(20, 32, 8, 4), QRect(20, 36, 8, 12), QRect(16, 36, 4, 12), t_top, t_front, t_side)
+
+        # Right Arm (Front)
+        r_top, r_front, r_side = make_box_points(cx - 4 * ux - 0.5 * vx, cy - 4 * uy - 0.5 * vy + 2, 4, 12, 4)
+        draw_3d_box(src, QRect(44, 16, 4, 4), QRect(44, 20, 4, 12), QRect(40, 20, 4, 12), r_top, r_front, r_side)
+        if is_64x64:
+            draw_3d_box(src, QRect(44, 32, 4, 4), QRect(44, 36, 4, 12), QRect(40, 36, 4, 12), r_top, r_front, r_side)
+
+        # Left Arm (Back)
+        l_top, l_front, l_side = make_box_points(cx + 8 * ux, cy + 8 * uy + 2, 4, 12, 4)
+        if is_64x64:
+            draw_3d_box(src, QRect(36, 48, 4, 4), QRect(36, 52, 4, 12), QRect(32, 52, 4, 12), l_top, l_front, l_side)
+            draw_3d_box(src, QRect(52, 48, 4, 4), QRect(52, 52, 4, 12), QRect(48, 52, 4, 12), l_top, l_front, l_side)
         else:
-            bp.drawImage(QRect(ox + 12 * S, oy + 8 * S, 4 * S, 12 * S), src, QRect(44, 20, 4, 12))
+            draw_3d_box(src, QRect(44, 16, 4, 4), QRect(44, 20, 4, 12), QRect(40, 20, 4, 12), l_top, l_front, l_side)
 
-        # Right Leg Base (4, 20, 4, 12)
-        bp.drawImage(QRect(ox + 4 * S, oy + 20 * S, 4 * S, 12 * S), src, QRect(4, 20, 4, 12))
+        # Right Leg
+        rl_top, rl_front, rl_side = make_box_points(cx + 0.5 * ux, cy + 12 * S * 1.25, 4, 12, 4)
+        draw_3d_box(src, None, QRect(4, 20, 4, 12), QRect(0, 20, 4, 12), rl_top, rl_front, rl_side)
         if is_64x64:
-            bp.drawImage(QRect(ox + 4 * S, oy + 20 * S, 4 * S, 12 * S), src, QRect(4, 36, 4, 12))
+            draw_3d_box(src, None, QRect(4, 36, 4, 12), QRect(0, 36, 4, 12), rl_top, rl_front, rl_side)
 
-        # Left Leg Base (20, 52, 4, 12 if 64x64 else mirror)
+        # Left Leg
+        ll_top, ll_front, ll_side = make_box_points(cx + 4.5 * ux, cy + 4 * uy + 12 * S * 1.25, 4, 12, 4)
         if is_64x64:
-            bp.drawImage(QRect(ox + 8 * S, oy + 20 * S, 4 * S, 12 * S), src, QRect(20, 52, 4, 12))
-            bp.drawImage(QRect(ox + 8 * S, oy + 20 * S, 4 * S, 12 * S), src, QRect(4, 52, 4, 12))
+            draw_3d_box(src, None, QRect(20, 52, 4, 12), QRect(16, 52, 4, 12), ll_top, ll_front, ll_side)
+            draw_3d_box(src, None, QRect(4, 52, 4, 12), QRect(0, 52, 4, 12), ll_top, ll_front, ll_side)
         else:
-            bp.drawImage(QRect(ox + 8 * S, oy + 20 * S, 4 * S, 12 * S), src, QRect(4, 20, 4, 12))
+            draw_3d_box(src, None, QRect(4, 20, 4, 12), QRect(0, 20, 4, 12), ll_top, ll_front, ll_side)
+
+        # Head + Hat (3D isometric box)
+        hx, hy = cx + 0.5 * ux + 0.5 * vx, cy - 8 * S * 1.25 + 14
+        h_top, h_front, h_side = make_box_points(hx, hy, 8, 8, 8)
+        draw_3d_box(src, QRect(8, 0, 8, 8), QRect(8, 8, 8, 8), QRect(0, 8, 8, 8), h_top, h_front, h_side)
+        draw_3d_box(src, QRect(40, 0, 8, 8), QRect(40, 8, 8, 8), QRect(32, 8, 8, 8), h_top, h_front, h_side)
 
         bp.end()
         body_img.save(str(body_out), "PNG")
 
         return str(body_out), str(avatar_out)
     except Exception as e:
-        print(f"[SkinRenderer] Error rendering skin: {e}")
+        print(f"[SkinRenderer] Error rendering 3D skin: {e}")
         return "", ""
 
 

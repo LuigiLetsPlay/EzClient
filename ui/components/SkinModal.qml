@@ -116,7 +116,7 @@ Item {
                 Layout.fillWidth: true
                 height: 42
                 radius: 8
-                color: EzTheme.surface1
+                color: "#0F121A"
                 border.color: skinNameInput.activeFocus ? EzTheme.accent : EzTheme.border
                 border.width: 1
 
@@ -135,11 +135,13 @@ Item {
                         id: skinNameInput
                         Layout.fillWidth: true
                         placeholderText: "Spielernamen eingeben (z. B. Jektross, Notch)..."
-                        placeholderTextColor: EzTheme.textMuted
-                        color: EzTheme.text
+                        placeholderTextColor: "#727B8E"
+                        color: "#FFFFFF"
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 12
-                        background: null
+                        background: Rectangle {
+                            color: "transparent"
+                        }
                         onAccepted: fetchBtnMouse.clicked(null)
                     }
 
@@ -371,28 +373,30 @@ Item {
             // ── Section 3: Save Current Skin ──
             Rectangle {
                 Layout.fillWidth: true
-                height: 38
+                height: 40
                 radius: 8
-                color: EzTheme.surface1
-                border.color: EzTheme.border
+                color: "#0F121A"
+                border.color: saveSkinNameInput.activeFocus ? EzTheme.accent : EzTheme.border
                 border.width: 1
                 RowLayout {
                     anchors.fill: parent
-                    anchors.margins: 3
+                    anchors.margins: 4
                     spacing: 8
                     TextField {
                         id: saveSkinNameInput
                         Layout.fillWidth: true
                         placeholderText: "Skin-Name für Bibliothek..."
-                        placeholderTextColor: EzTheme.textMuted
-                        color: EzTheme.text
+                        placeholderTextColor: "#727B8E"
+                        color: "#FFFFFF"
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
-                        background: null
+                        background: Rectangle {
+                            color: "transparent"
+                        }
                         onAccepted: saveSkinBtnMouse.clicked(null)
                     }
                     Rectangle {
-                        width: 125; height: 30; radius: 6
+                        width: 125; height: 32; radius: 6
                         color: saveSkinBtnMouse.containsMouse ? EzTheme.surfaceActive : EzTheme.surface2
                         border.color: EzTheme.accent; border.width: 1
                         RowLayout { anchors.centerIn: parent; spacing: 4
