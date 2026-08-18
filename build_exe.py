@@ -45,6 +45,7 @@ def build_exe():
         "backend.controllers.modrinth_controller",
         "backend.controllers.account_controller",
         "backend.controllers.update_controller",
+        "backend.ui_splash",
         "psutil",
     ]
 

@@ -8,6 +8,7 @@ from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtCore import QUrl, Qt
 
+from backend.models.types import APP_VERSION
 from backend.services.store import ProfileStore
 from backend.models.profile_model import ProfileModel
 from backend.models.mod_model import ModModel
@@ -15,6 +16,7 @@ from backend.controllers.profile_controller import ProfileController
 from backend.controllers.modrinth_controller import ModrinthController
 from backend.controllers.account_controller import AccountController
 from backend.controllers.update_controller import UpdateController
+from backend.ui_splash import EzSplashScreen
 
 
 def get_app_root() -> Path:
@@ -62,7 +64,15 @@ def main() -> None:
     app_icon = create_app_icon()
     app.setWindowIcon(app_icon)
 
+    # ── Instant Splash Screen (Shows within 50ms) ──
+    splash = EzSplashScreen(APP_VERSION)
+    splash.show()
+    app.processEvents()
+
     # Load essential authentic Minecraft fonts fast
+    splash.setMessage("Lade Minecraft Schriften & Assets…", 25)
+    app.processEvents()
+
     fonts_dir = get_app_root() / "ui" / "fonts"
     if fonts_dir.exists():
         for fname in ("Minecraft-Bold.ttf", "MinecraftDefault-Bold.ttf", "MinecraftDefault-Regular.ttf"):
@@ -73,7 +83,10 @@ def main() -> None:
     # Set crisp Segoe UI as global application font
     app.setFont(QFont("Segoe UI", 10))
 
-    # Backend
+    # Backend initialization
+    splash.setMessage("Lade Profile & Einstellungen…", 50)
+    app.processEvents()
+
     store = ProfileStore()
     profile_model = ProfileModel()
     mod_model = ModModel()
@@ -83,6 +96,9 @@ def main() -> None:
     update_controller = UpdateController()
 
     # QML Engine
+    splash.setMessage("Initialisiere Benutzeroberfläche…", 75)
+    app.processEvents()
+
     engine = QQmlApplicationEngine()
     qml_dir = get_app_root() / "ui"
     engine.addImportPath(str(qml_dir))
@@ -97,11 +113,16 @@ def main() -> None:
     engine.load(QUrl.fromLocalFile(str(qml_file)))
 
     if not engine.rootObjects():
+        splash.close()
         sys.exit(-1)
 
     window = engine.rootObjects()[0]
     from PySide6.QtCore import QSize
     window.setMinimumSize(QSize(1040, 680))
+
+    splash.setMessage("Bereit!", 100)
+    app.processEvents()
+    splash.finish(window)
 
     # ── System Tray Icon Setup ──
     tray_icon = QSystemTrayIcon(app_icon, app)
