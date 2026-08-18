@@ -206,7 +206,22 @@ QtObject {
             "onboard_btn_back": "Zurück",
             "onboard_btn_create": "Client-Profil erstellen & starten",
             "onboard_downloading": "Richte EzClient ein & lade Mods…",
-            "onboard_finished": "Fertig! Viel Spaß beim Spielen."
+            "onboard_finished": "Fertig! Viel Spaß beim Spielen.",
+
+            // Updates & GitHub
+            "update_section_title": "UPDATES & VERSION",
+            "update_current_version": "Installierte Version",
+            "update_latest_version": "Neueste Version",
+            "update_check_btn": "Nach Updates suchen",
+            "update_checking": "Prüfe auf GitHub…",
+            "update_up_to_date": "✓ EzClient ist auf dem neuesten Stand",
+            "update_available_badge": "UPDATE VERFÜGBAR",
+            "update_download_btn": "Update herunterladen & installieren",
+            "update_downloading": "Lade Update herunter…",
+            "update_install_now": "Jetzt neu starten & installieren",
+            "update_release_notes": "Versionshinweise / Changelog",
+            "update_view_github": "Auf GitHub ansehen",
+            "update_banner_text": "Ein neues Update ist verfügbar:"
         },
         "en": {
             // Navigation
@@ -399,7 +414,22 @@ QtObject {
             "onboard_btn_back": "Back",
             "onboard_btn_create": "Create & Launch EzClient",
             "onboard_downloading": "Setting up EzClient & downloading mods…",
-            "onboard_finished": "Done! Enjoy the game."
+            "onboard_finished": "Done! Enjoy the game.",
+
+            // Updates & GitHub
+            "update_section_title": "UPDATES & VERSION",
+            "update_current_version": "Installed Version",
+            "update_latest_version": "Latest Version",
+            "update_check_btn": "Check for Updates",
+            "update_checking": "Checking GitHub…",
+            "update_up_to_date": "✓ EzClient is up to date",
+            "update_available_badge": "UPDATE AVAILABLE",
+            "update_download_btn": "Download & Install Update",
+            "update_downloading": "Downloading update…",
+            "update_install_now": "Restart & Install Now",
+            "update_release_notes": "Release Notes / Changelog",
+            "update_view_github": "View on GitHub",
+            "update_banner_text": "A new update is available:"
         }
     })
 

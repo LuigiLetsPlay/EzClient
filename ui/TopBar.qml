@@ -249,6 +249,41 @@ Rectangle {
                     }
                 }
             }
+
+            // Glowing Update Badge (when update is available)
+            Rectangle {
+                id: updateBadge
+                height: 28
+                visible: typeof updateController !== "undefined" && updateController && updateController.updateAvailable
+                width: updateBadgeRow.implicitWidth + 16
+                radius: EzTheme.radiusSm
+                color: updateMouse.containsMouse ? "#1c3829" : "#13281c"
+                border.color: EzTheme.accent
+                border.width: 1
+                scale: updateMouse.pressed ? 0.96 : 1.0
+
+                RowLayout {
+                    id: updateBadgeRow
+                    anchors.centerIn: parent
+                    spacing: 6
+                    Text { text: "⚡"; font.pixelSize: 11; color: EzTheme.accent }
+                    Text {
+                        text: "v" + (typeof updateController !== "undefined" && updateController ? updateController.latestVersion : "") + " Update"
+                        font.family: EzTheme.mcFontFamily
+                        font.pixelSize: 10
+                        font.bold: true
+                        color: EzTheme.accentLight
+                    }
+                }
+
+                MouseArea {
+                    id: updateMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.navigate("settings")
+                }
+            }
         }
 
         Item { Layout.fillWidth: true }

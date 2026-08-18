@@ -4,6 +4,9 @@ from pathlib import Path
 import os
 import sys
 
+APP_VERSION = "1.0.0"
+GITHUB_REPO = "LuigiLetsPlay/EzClient"
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 

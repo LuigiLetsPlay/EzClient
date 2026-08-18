@@ -14,6 +14,7 @@ from backend.models.mod_model import ModModel
 from backend.controllers.profile_controller import ProfileController
 from backend.controllers.modrinth_controller import ModrinthController
 from backend.controllers.account_controller import AccountController
+from backend.controllers.update_controller import UpdateController
 
 
 def get_app_root() -> Path:
@@ -77,6 +78,7 @@ def main() -> None:
     profile_controller = ProfileController(store, profile_model, mod_model)
     modrinth_controller = ModrinthController()
     account_controller = AccountController()
+    update_controller = UpdateController()
 
     # QML Engine
     engine = QQmlApplicationEngine()
@@ -87,6 +89,7 @@ def main() -> None:
     engine.rootContext().setContextProperty("profileController", profile_controller)
     engine.rootContext().setContextProperty("modrinthController", modrinth_controller)
     engine.rootContext().setContextProperty("accountController", account_controller)
+    engine.rootContext().setContextProperty("updateController", update_controller)
 
     qml_file = qml_dir / "App.qml"
     engine.load(QUrl.fromLocalFile(str(qml_file)))

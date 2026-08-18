@@ -39,9 +39,11 @@ def build_exe():
         "backend.services.direct_launch",
         "backend.services.mod_downloader",
         "backend.services.modrinth_api",
+        "backend.services.updater",
         "backend.controllers.profile_controller",
         "backend.controllers.modrinth_controller",
         "backend.controllers.account_controller",
+        "backend.controllers.update_controller",
     ]
 
     cmd = [

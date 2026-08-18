@@ -525,6 +525,184 @@ Item {
 
             Item { height: 20 }
 
+            // ─── UPDATES & GITHUB SECTION ───
+            Text {
+                text: EzI18n.t("update_section_title", "UPDATES & VERSION")
+                font.family: EzTheme.mcFontFamily
+                font.pixelSize: 11
+                color: EzTheme.textSecondary
+            }
+            Item { height: 8 }
+
+            EzSurface {
+                Layout.fillWidth: true
+                implicitHeight: updateCol.implicitHeight + 28
+
+                ColumnLayout {
+                    id: updateCol
+                    anchors.fill: parent
+                    anchors.margins: 14
+                    spacing: 12
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 12
+
+                        Image {
+                            source: "icons/zap.svg"
+                            Layout.preferredWidth: 24
+                            Layout.preferredHeight: 24
+                            fillMode: Image.PreserveAspectFit
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+
+                            Text {
+                                text: (typeof updateController !== "undefined" && updateController)
+                                      ? "EzClient v" + updateController.currentVersion
+                                      : "EzClient v1.0.0"
+                                font.family: EzTheme.mcFontFamily
+                                font.pixelSize: 13
+                                font.bold: true
+                                color: EzTheme.text
+                            }
+
+                            Text {
+                                text: (typeof updateController !== "undefined" && updateController)
+                                      ? updateController.statusMessage
+                                      : EzI18n.t("update_up_to_date", "✓ EzClient ist auf dem neuesten Stand")
+                                font.family: EzTheme.fontFamily
+                                font.pixelSize: 10
+                                color: (typeof updateController !== "undefined" && updateController && updateController.updateAvailable)
+                                       ? EzTheme.accentLight
+                                       : EzTheme.textMuted
+                            }
+                        }
+
+                        // Check / Download Button
+                        EzButton {
+                            id: checkBtn
+                            text: (typeof updateController !== "undefined" && updateController && updateController.isChecking)
+                                  ? EzI18n.t("update_checking", "Prüfe…")
+                                  : EzI18n.t("update_check_btn", "Nach Updates suchen")
+                            Layout.preferredHeight: 32
+                            onClicked: {
+                                if (typeof updateController !== "undefined" && updateController) {
+                                    updateController.checkForUpdates(false)
+                                }
+                            }
+                        }
+
+                        EzButton {
+                            text: EzI18n.t("update_view_github", "GitHub")
+                            Layout.preferredHeight: 32
+                            onClicked: {
+                                if (typeof updateController !== "undefined" && updateController) {
+                                    updateController.openReleasePage()
+                                }
+                            }
+                        }
+                    }
+
+                    // Expandable update available box
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: updateAvailCol.implicitHeight + 20
+                        radius: EzTheme.radiusSm
+                        color: EzTheme.surfaceActive
+                        border.color: EzTheme.accent
+                        border.width: 1
+                        visible: typeof updateController !== "undefined" && updateController && updateController.updateAvailable
+
+                        ColumnLayout {
+                            id: updateAvailCol
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            spacing: 8
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                Text {
+                                    text: "⚡ " + (typeof updateController !== "undefined" && updateController ? updateController.releaseName : "Update")
+                                    font.family: EzTheme.mcFontFamily
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    color: EzTheme.accentLight
+                                    Layout.fillWidth: true
+                                }
+
+                                Text {
+                                    text: (typeof updateController !== "undefined" && updateController && updateController.assetSizeMb > 0)
+                                          ? "(" + updateController.assetSizeMb + " MB)"
+                                          : ""
+                                    font.family: EzTheme.fontFamily
+                                    font.pixelSize: 10
+                                    color: EzTheme.textMuted
+                                }
+                            }
+
+                            Text {
+                                text: (typeof updateController !== "undefined" && updateController) ? updateController.changelog : ""
+                                font.family: EzTheme.fontFamily
+                                font.pixelSize: 10
+                                color: EzTheme.textSecondary
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                                maximumLineCount: 4
+                                elide: Text.ElideRight
+                            }
+
+                            // Download progress bar
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 6
+                                radius: 3
+                                color: EzTheme.surface2
+                                visible: typeof updateController !== "undefined" && updateController && updateController.isDownloading
+
+                                Rectangle {
+                                    height: parent.height
+                                    radius: 3
+                                    color: EzTheme.accent
+                                    width: parent.width * (typeof updateController !== "undefined" && updateController ? updateController.downloadProgress : 0)
+                                    Behavior on width { NumberAnimation { duration: 100 } }
+                                }
+                            }
+
+                            // Action button (Download or Install)
+                            EzButton {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 34
+                                primary: true
+                                text: {
+                                    if (typeof updateController !== "undefined" && updateController) {
+                                        if (updateController.updateReady) return EzI18n.t("update_install_now", "Jetzt neu starten & installieren")
+                                        if (updateController.isDownloading) return updateController.downloadStatus || EzI18n.t("update_downloading", "Lade Update herunter…")
+                                        return EzI18n.t("update_download_btn", "Update herunterladen & installieren")
+                                    }
+                                    return "Update"
+                                }
+                                onClicked: {
+                                    if (typeof updateController !== "undefined" && updateController) {
+                                        if (updateController.updateReady) {
+                                            updateController.installAndRestart()
+                                        } else if (!updateController.isDownloading) {
+                                            updateController.startDownload()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Item { height: 20 }
+
             // ─── ABOUT ───
             Text { text: EzI18n.t("settings_about_title", "ÜBER EZCLIENT"); font.family: EzTheme.mcFontFamily; font.pixelSize: 11; color: EzTheme.textSecondary }
             Item { height: 8 }
@@ -549,7 +727,7 @@ Item {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 2
-                        Text { text: "EzClient Launcher v2.0.0 (Release)"; font.family: EzTheme.mcFontFamily; font.pixelSize: 14; font.bold: true; color: EzTheme.text }
+                        Text { text: "EzClient Launcher v" + (typeof updateController !== "undefined" && updateController ? updateController.currentVersion : "1.0.0") + " (Release)"; font.family: EzTheme.mcFontFamily; font.pixelSize: 14; font.bold: true; color: EzTheme.text }
                         Text { text: EzI18n.t("settings_about_edition", "Offizielle Vollversion · PySide6 & Qt Quick Edition · High-Performance Minecraft Client"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
                     }
 
