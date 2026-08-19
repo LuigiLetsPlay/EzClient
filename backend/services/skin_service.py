@@ -49,7 +49,7 @@ def upload_skin_file(access_token: str, file_path: str | Path, variant: str = "c
             headers={
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": f"multipart/form-data; boundary={boundary}",
-                "User-Agent": "EzClient/1.1.8"
+                "User-Agent": "EzClient/1.1.9"
             },
             method="POST"
         )
@@ -81,7 +81,7 @@ def reset_skin_to_default(access_token: str) -> tuple[bool, str]:
             MOJANG_SKIN_URL,
             headers={
                 "Authorization": f"Bearer {access_token}",
-                "User-Agent": "EzClient/1.1.8"
+                "User-Agent": "EzClient/1.1.9"
             },
             method="DELETE"
         )

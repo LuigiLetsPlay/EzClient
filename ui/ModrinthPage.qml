@@ -98,6 +98,54 @@ Item {
                 anchors.rightMargin: 16
                 spacing: 10
 
+                // Source Selector (All / Modrinth / CurseForge)
+                Row {
+                    spacing: 4
+                    Repeater {
+                        model: [
+                            { id: "all",        label: "Alle",        icon: "🌐" },
+                            { id: "modrinth",   label: "Modrinth",   icon: "🟢" },
+                            { id: "curseforge", label: "CurseForge", icon: "🔥" }
+                        ]
+                        Rectangle {
+                            height: 32
+                            width: srcRow.implicitWidth + 14
+                            radius: 6
+                            color: (modrinthController && modrinthController.source === modelData.id) ? EzTheme.surfaceActive : (sMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2)
+                            border.color: (modrinthController && modrinthController.source === modelData.id) ? EzTheme.accent : EzTheme.border
+                            border.width: 1
+
+                            RowLayout {
+                                id: srcRow
+                                anchors.centerIn: parent
+                                spacing: 5
+                                Text { text: modelData.icon; font.pixelSize: 10 }
+                                Text {
+                                    text: modelData.label
+                                    font.family: EzTheme.fontFamily
+                                    font.pixelSize: 11
+                                    font.bold: (modrinthController && modrinthController.source === modelData.id)
+                                    color: (modrinthController && modrinthController.source === modelData.id) ? EzTheme.accentLight : EzTheme.text
+                                }
+                            }
+
+                            MouseArea {
+                                id: sMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (modrinthController) {
+                                        modrinthController.setSource(modelData.id)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle { width: 1; height: 20; color: EzTheme.border }
+
                 // Project Type Selector Tabs
                 Row {
                     spacing: 4
@@ -397,14 +445,16 @@ Item {
                             height: 70
                             readonly property bool isSel: root.selectedProjectId !== "" && root.selectedProjectId === (modelData.project_id || modelData.id || modelData.slug)
                             readonly property bool isInstalled: {
-                                if (!profileController || !profileController.installedModIdentifiers) return false
-                                var ids = profileController.installedModIdentifiers
-                                var t = (modelData.title || "").toLowerCase()
-                                var s = (modelData.slug || "").toLowerCase()
-                                var p = (modelData.project_id || modelData.id || "").toLowerCase()
-                                return (t !== "" && ids.indexOf(t) !== -1) ||
-                                       (s !== "" && ids.indexOf(s) !== -1) ||
-                                       (p !== "" && ids.indexOf(p) !== -1)
+                                if (modelData.is_installed) return true
+                                if (typeof profileController !== "undefined" && profileController && profileController.isModInstalled) {
+                                    return profileController.isModInstalled(
+                                        modelData.project_id || modelData.id || "",
+                                        modelData.slug || "",
+                                        modelData.title || modelData.name || "",
+                                        modelData.filename || ""
+                                    )
+                                }
+                                return false
                             }
 
                             color: isSel ? EzTheme.surface3 : (rowMouse.containsMouse ? EzTheme.surface2 : "transparent")
@@ -461,6 +511,26 @@ Item {
                                             color: resultItem.isSel ? EzTheme.accentLight : EzTheme.text
                                             elide: Text.ElideRight
                                             Layout.fillWidth: true
+                                        }
+
+                                        // Source badge (Modrinth / CurseForge)
+                                        Rectangle {
+                                            height: 16
+                                            width: srcText.implicitWidth + 8
+                                            radius: 3
+                                            color: (modelData.source === "curseforge") ? "#2B140B" : "#0D2616"
+                                            border.color: (modelData.source === "curseforge") ? "#E04E14" : EzTheme.accent
+                                            border.width: 1
+
+                                            Text {
+                                                id: srcText
+                                                text: (modelData.source === "curseforge") ? "CurseForge" : "Modrinth"
+                                                font.family: EzTheme.mcFontFamily
+                                                font.pixelSize: 8
+                                                font.bold: true
+                                                color: (modelData.source === "curseforge") ? "#F57C00" : EzTheme.accentLight
+                                                anchors.centerIn: parent
+                                            }
                                         }
 
                                         // INSTALLED BADGE IN STORE LIST (Instant visual feedback!)
@@ -697,14 +767,16 @@ Item {
                             border.width: 1
 
                             readonly property bool isInstalled: {
-                                if (!profileController || !root.selMod || !profileController.installedModIdentifiers) return false
-                                var ids = profileController.installedModIdentifiers
-                                var t = (root.selMod.title || root.selMod.name || "").toLowerCase()
-                                var s = (root.selMod.slug || "").toLowerCase()
-                                var p = (root.selMod.project_id || root.selMod.id || "").toLowerCase()
-                                return (t !== "" && ids.indexOf(t) !== -1) ||
-                                       (s !== "" && ids.indexOf(s) !== -1) ||
-                                       (p !== "" && ids.indexOf(p) !== -1)
+                                if (root.selMod && root.selMod.is_installed) return true
+                                if (typeof profileController !== "undefined" && profileController && profileController.isModInstalled && root.selMod) {
+                                    return profileController.isModInstalled(
+                                        root.selMod.project_id || root.selMod.id || "",
+                                        root.selMod.slug || "",
+                                        root.selMod.title || root.selMod.name || "",
+                                        root.selMod.filename || ""
+                                    )
+                                }
+                                return false
                             }
 
                             RowLayout {
@@ -735,14 +807,17 @@ Item {
                                         }
                                         var latestVer = bestVer ? (bestVer.version_number || "Latest") : "Latest"
                                         var file = (bestVer && bestVer.files && bestVer.files.length > 0) ? bestVer.files[0].filename : (mod.slug + ".jar")
+                                        var src = mod.source || (modrinthController ? modrinthController.source : "modrinth")
+                                        if (src === "all") src = "modrinth"
                                         profileController.installMod(
                                             mod.project_id || mod.slug,
                                             mod.title || mod.name || "",
                                             latestVer,
                                             file,
-                                            mod.author || "Modrinth",
+                                            mod.author || (src === "curseforge" ? "CurseForge" : "Modrinth"),
                                             mod.description || "",
-                                            mod.icon_url || ""
+                                            mod.icon_url || "",
+                                            src
                                         )
                                     }
                                 }
@@ -762,7 +837,7 @@ Item {
                                             root.pendingDeleteDeps = deps
                                             depWarningModal.open()
                                         } else {
-                                            profileController.uninstallMod(slug, root.selMod.title || "")
+                                            profileController.uninstallMod(slug, root.selMod.title || root.selMod.name || "")
                                         }
                                     }
                                 }
@@ -1144,7 +1219,7 @@ Item {
             Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border }
 
             Text {
-                text: "Der Mod '" + (root.pendingDeleteMod ? (root.pendingDeleteMod.title || root.pendingDeleteMod.name || "") : "") + "' wird von anderen installierten Mods benötigt (" + root.pendingDeleteDeps.join(", ") + ").\n\nEin Entfernen kann das Starten von Minecraft verhindern."
+                text: "Warnung: Die Mod '" + (root.pendingDeleteMod ? (root.pendingDeleteMod.title || root.pendingDeleteMod.name || "") : "") + "' wird von folgenden installierten Mods benötigt: " + root.pendingDeleteDeps.join(", ") + ".\n\nDas Löschen kann zu Spielabstürzen führen."
                 font.family: EzTheme.fontFamily
                 font.pixelSize: 11
                 color: EzTheme.text
@@ -1162,7 +1237,7 @@ Item {
                 EzButton {
                     text: "Abbrechen"
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 32
+                    Layout.preferredHeight: 34
                     onClicked: depWarningModal.close()
                 }
 
@@ -1171,10 +1246,10 @@ Item {
                     danger: true
                     mcFont: true
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 32
+                    Layout.preferredHeight: 34
                     onClicked: {
                         if (root.pendingDeleteMod) {
-                            profileController.uninstallMod(root.pendingDeleteMod.slug || root.pendingDeleteMod.project_id || root.pendingDeleteMod.title)
+                            profileController.uninstallMod(root.pendingDeleteMod.slug || root.pendingDeleteMod.project_id || root.pendingDeleteMod.title, root.pendingDeleteMod.title || root.pendingDeleteMod.name || "")
                         }
                         depWarningModal.close()
                     }

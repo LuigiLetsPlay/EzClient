@@ -19,8 +19,9 @@ QtObject {
             // Navigation
             "nav_home": "Home",
             "nav_profiles": "Profile",
-            "nav_installed_mods": "Mods",
-            "nav_modrinth": "Modrinth",
+            "nav_installed_mods": "Installierte Mods",
+            "nav_modrinth": "Entdecken",
+            "nav_discover": "Entdecken",
             "nav_settings": "Einstellungen",
 
             // Sidebar & TopBar
@@ -227,8 +228,9 @@ QtObject {
             // Navigation
             "nav_home": "Home",
             "nav_profiles": "Profiles",
-            "nav_installed_mods": "Mods",
-            "nav_modrinth": "Modrinth Store",
+            "nav_installed_mods": "Installed Mods",
+            "nav_modrinth": "Discover",
+            "nav_discover": "Discover",
             "nav_settings": "Settings",
 
             // Sidebar & TopBar

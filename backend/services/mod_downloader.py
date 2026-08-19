@@ -114,11 +114,21 @@ def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = No
             status_callback(f"Lade {m.name} herunter…")
 
         try:
-            versions = svc.get_project_versions(slug_or_id, mc_version=profile.minecraft_version, loader=profile.loader)
+            versions = []
+            if getattr(m, 'source', '') == 'curseforge':
+                from backend.services.curseforge import CurseForgeService
+                cf_svc = CurseForgeService()
+                versions = cf_svc.get_project_versions(slug_or_id, mc_version=profile.minecraft_version, loader=profile.loader)
+            if not versions:
+                versions = svc.get_project_versions(slug_or_id, mc_version=profile.minecraft_version, loader=profile.loader)
             if not versions:
                 versions = svc.get_project_versions(slug_or_id, loader=profile.loader)
             if not versions:
                 versions = svc.get_project_versions(slug_or_id)
+            if not versions:
+                from backend.services.curseforge import CurseForgeService
+                cf_svc = CurseForgeService()
+                versions = cf_svc.get_project_versions(slug_or_id, mc_version=profile.minecraft_version, loader=profile.loader)
             
             if versions:
                 best_ver = next((v for v in versions if v.get("version_type") == "release"), versions[0])

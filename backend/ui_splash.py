@@ -5,12 +5,9 @@ from PySide6.QtCore import Qt
 
 
 class EzSplashScreen(QSplashScreen):
-    """
-    Ultra-fast native startup splash screen with modern dark glassmorphism
-    and vivid EzClient neon green branding.
-    """
+    """Modern Minecraft-themed splash screen matching EzTheme."""
 
-    def __init__(self, version: str = "1.1.8"):
+    def __init__(self, version: str = "1.1.9"):
         self.version = version
         self.current_msg = "EzClient wird geladen…"
         self.current_pct = 15

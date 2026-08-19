@@ -229,7 +229,7 @@ Rectangle {
                     opacity: root.currentRoute === "installed_mods" ? 1.0 : 0.55
                 }
                 Text {
-                    text: EzI18n.t("nav_installed_mods", "Mods")
+                    text: EzI18n.t("nav_installed_mods", "Installierte Mods")
                     font.family: EzTheme.mcFontFamily
                     font.pixelSize: 11
                     font.bold: root.currentRoute === "installed_mods"
@@ -246,7 +246,7 @@ Rectangle {
             }
         }
 
-        // MODRINTH EXPLORER
+        // DISCOVER / EXPLORER
         Rectangle {
             id: modrinthItem
             Layout.fillWidth: true
@@ -272,14 +272,14 @@ Rectangle {
                 anchors.rightMargin: 10
                 spacing: 9
                 Image {
-                    source: "icons/modrinth.svg"
+                    source: "icons/compass.svg"
                     Layout.preferredWidth: 15
                     Layout.preferredHeight: 15
                     fillMode: Image.PreserveAspectFit
                     opacity: root.currentRoute === "mods" ? 1.0 : 0.55
                 }
                 Text {
-                    text: EzI18n.t("nav_modrinth", "Modrinth Store")
+                    text: EzI18n.t("nav_discover", "Entdecken")
                     font.family: EzTheme.mcFontFamily
                     font.pixelSize: 11
                     font.bold: root.currentRoute === "mods"

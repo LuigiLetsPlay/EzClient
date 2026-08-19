@@ -15,6 +15,7 @@ from backend.services.mod_downloader import sync_profile_mods
 from backend.services.process_watcher import MinecraftWatcher
 from backend.services.direct_launch import launch_minecraft_direct
 from backend.services.live_log_service import LiveLogService
+from backend.services.mod_scanner import InstalledModRegistry
 from PySide6.QtWidgets import QFileDialog
 
 class ProfileController(QObject):
@@ -37,6 +38,7 @@ class ProfileController(QObject):
         self._mod_model = mod_model
         self._live_log_service = LiveLogService(self)
         self._active_profile: ProfileData | None = self._store.get_last_or_default()
+        self._installed_registry = InstalledModRegistry()
         self._is_launching: bool = False
         self._syncNeeded.connect(self._sync_models)
         self._sync_models()
@@ -204,11 +206,20 @@ class ProfileController(QObject):
     def _sync_models(self) -> None:
         self._profile_model.set_profiles(self._store.profiles)
         if self._active_profile:
+            try:
+                self._installed_registry.scan_directory(self._active_profile.mods_path, self._active_profile.mods)
+            except Exception as e:
+                print(f"[ProfileController] Registry scan error: {e}")
             self._mod_model.set_mods(self._active_profile.mods)
         else:
+            self._installed_registry.scan_directory(Path("/nonexistent"))
             self._mod_model.set_mods([])
         self.profilesChanged.emit()
         self.activeProfileChanged.emit()
+
+    @Property("QVariantList", notify=activeProfileChanged)
+    def installedMods(self) -> list:
+        return self._installed_registry.installed_mods
 
     @Property(str, notify=activeProfileChanged)
     def activeId(self) -> str:
@@ -471,15 +482,19 @@ class ProfileController(QObject):
         self.installMod("YL57xq9U", "Iris Shaders", "Latest", "iris.jar", "Iris Team", "Shader-Unterstützung mit hoher Performance", "https://cdn.modrinth.com/data/YL57xq9U/icon.png")
 
     @Slot(str, str, str, str, str, str, str)
-    def installMod(self, mod_id: str, name: str, version: str, filename: str, author: str, description: str, icon_url: str) -> None:
+    @Slot(str, str, str, str, str, str, str, str)
+    def installMod(self, mod_id: str, name: str, version: str, filename: str, author: str, description: str, icon_url: str, source: str = "modrinth") -> None:
         if not self._active_profile:
             return
         mid = str(mod_id).strip().lower()
         name_clean = str(name).strip().lower()
+        clean_fn = str(filename).strip().lower() if filename else ""
+
         for m in self._active_profile.mods:
             if (m.project_id and m.project_id.lower() == mid) or \
                (m.slug and m.slug.lower() == mid) or \
-               (m.name and m.name.lower() == name_clean):
+               (m.name and m.name.lower() == name_clean) or \
+               (clean_fn and m.filename and m.filename.lower() == clean_fn):
                 m.version = version or m.version
                 m.enabled = True
                 self._store.save()
@@ -501,38 +516,42 @@ class ProfileController(QObject):
             enabled=True,
             essential=False,
             icon_url=icon_url,
-            author=author or "Modrinth",
-            description=description
+            author=author or ("CurseForge" if source == "curseforge" else "Modrinth"),
+            description=description,
+            source=source
         )
         self._active_profile.mods.append(new_mod)
 
-        # Check and auto-install required dependencies
-        svc = ModrinthService()
+        # Check and auto-install required dependencies from Modrinth if Modrinth mod
         dep_names = []
-        try:
-            deps = svc.get_dependencies(mod_id, mc_version=self._active_profile.minecraft_version, loader=self._active_profile.loader)
-            existing_slugs = {(m.slug or "").lower() for m in self._active_profile.mods} | {(m.project_id or "").lower() for m in self._active_profile.mods}
-            for d in deps:
-                d_slug = (d.get("slug") or d.get("project_id") or "").lower()
-                if d_slug and d_slug not in existing_slugs:
-                    dep_mod = ModData(
-                        project_id=d.get("project_id", d_slug),
-                        slug=d.get("slug", d_slug),
-                        name=d.get("name", d_slug),
-                        version_id="",
-                        version="Latest",
-                        filename=f"{d_slug}.jar",
-                        enabled=True,
-                        essential=False,
-                        icon_url=d.get("icon_url", ""),
-                        author=d.get("author", "Modrinth"),
-                        description=d.get("description", "Automatisch installierte Abhängigkeit")
-                    )
-                    self._active_profile.mods.append(dep_mod)
-                    dep_names.append(d.get("name", d_slug))
-                    existing_slugs.add(d_slug)
-        except Exception as e:
-            print(f"[ProfileController] Dependency check error for {name}: {e}")
+        if source == "modrinth":
+            from backend.services.modrinth import ModrinthService
+            svc = ModrinthService()
+            try:
+                deps = svc.get_dependencies(mod_id, mc_version=self._active_profile.minecraft_version, loader=self._active_profile.loader)
+                existing_slugs = {(m.slug or "").lower() for m in self._active_profile.mods} | {(m.project_id or "").lower() for m in self._active_profile.mods}
+                for d in deps:
+                    d_slug = (d.get("slug") or d.get("project_id") or "").lower()
+                    if d_slug and d_slug not in existing_slugs and not self._installed_registry.is_installed(slug=d_slug):
+                        dep_mod = ModData(
+                            project_id=d.get("project_id", d_slug),
+                            slug=d.get("slug", d_slug),
+                            name=d.get("name", d_slug),
+                            version_id="",
+                            version="Latest",
+                            filename=f"{d_slug}.jar",
+                            enabled=True,
+                            essential=False,
+                            icon_url=d.get("icon_url", ""),
+                            author=d.get("author", "Modrinth"),
+                            description=d.get("description", "Automatisch installierte Abhängigkeit"),
+                            source="modrinth"
+                        )
+                        self._active_profile.mods.append(dep_mod)
+                        dep_names.append(d.get("name", d_slug))
+                        existing_slugs.add(d_slug)
+            except Exception as e:
+                print(f"[ProfileController] Dependency check error for {name}: {e}")
 
         self._store.save()
         self._sync_models()
@@ -573,18 +592,23 @@ class ProfileController(QObject):
                 new_mods.append(m)
         self._active_profile.mods = new_mods
         self._store.save()
+
+        # Remove jar from disk
+        try:
+            for target in targets:
+                for f in self._active_profile.mods_path.glob(f"*{target}*"):
+                    try:
+                        f.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+        except Exception as ex:
+            print(f"[ProfileController] Error unlinking mod jars: {ex}")
+
         self._sync_models()
         self.profilesChanged.emit()
         self.activeProfileChanged.emit()
         if removed_name:
-            self.settingSaved.emit(f"Mod deinstalliert: {removed_name}")
-            # Remove jar from disk
-            try:
-                for target in targets:
-                    for f in self._active_profile.mods_path.glob(f"*{target}*"):
-                        f.unlink(missing_ok=True)
-            except Exception:
-                pass
+            self.settingSaved.emit(f"Mod gelöscht: {removed_name}")
 
     @Slot(str, str)
     def updateModVersion(self, mod_id: str, new_version: str) -> None:
@@ -606,16 +630,19 @@ class ProfileController(QObject):
                 return
 
     @Slot(str, result=bool)
-    def isModInstalled(self, mod_id: str) -> bool:
-        if not self._active_profile or not mod_id:
+    @Slot(str, str, result=bool)
+    @Slot(str, str, str, result=bool)
+    @Slot(str, str, str, str, result=bool)
+    def isModInstalled(self, project_id: str = "", slug: str = "", name: str = "", filename: str = "") -> bool:
+        """Cross-platform check: returns True if this mod is installed in active profile."""
+        if not self._active_profile:
             return False
-        mid = str(mod_id).strip().lower()
-        for m in self._active_profile.mods:
-            if (m.project_id and m.project_id.lower() == mid) or \
-               (m.slug and m.slug.lower() == mid) or \
-               (m.name and m.name.lower() == mid):
-                return True
-        return False
+        return self._installed_registry.is_installed(
+            project_id=project_id,
+            slug=slug,
+            name=name,
+            filename=filename
+        )
 
     @Slot()
     def launchActiveProfile(self) -> None:
@@ -788,22 +815,16 @@ class ProfileController(QObject):
             print(f"[ProfileController] openFolder error: {e}")
 
     @Slot(str, result="QVariantList")
-    def checkDependentMods(self, mod_id: str) -> list[str]:
-        """Check if deleting this mod would break dependencies of other installed mods."""
+    def getDependentMods(self, mod_id_or_slug: str) -> list[str]:
+        """Check if deleting this mod would break dependencies of other installed mods using deep metadata inspection."""
         if not self._active_profile:
             return []
-        
-        mid = mod_id.lower()
-        if mid in ("fabric-api", "fabric", "p7dr8msh", "fabric api"):
-            return [m.name for m in self._active_profile.mods if m.slug != "fabric-api" and m.project_id != "fabric-api"]
-        
-        if mid in ("architectury-api", "architectury"):
-            return [m.name for m in self._active_profile.mods if "architectury" in m.description.lower() or m.slug in ("ftb-chunks", "ftb-quests", "roughly-enough-items")]
-            
-        if mid in ("cloth-config", "cloth-config-v2"):
-            return [m.name for m in self._active_profile.mods if m.slug in ("zoomify", "modmenu", "appleskin")]
+        return self._installed_registry.get_dependent_mods(mod_id_or_slug)
 
-        return []
+    @Slot(str, result="QVariantList")
+    def checkDependentMods(self, mod_id: str) -> list[str]:
+        """Compatibility alias for getDependentMods."""
+        return self.getDependentMods(mod_id)
 
     @Slot(bool)
     def enableAllMods(self, enable: bool) -> None:

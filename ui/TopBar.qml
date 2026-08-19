@@ -278,11 +278,11 @@ Rectangle {
             Repeater {
                 id: tabRepeater
                 model: [
-                    { id: "home",           labelKey: "nav_home",           fallback: "Home",          icon: "home.svg" },
-                    { id: "profiles",       labelKey: "nav_profiles",       fallback: "Profile",       icon: "box.svg" },
-                    { id: "installed_mods", labelKey: "nav_installed_mods", fallback: "Mods",          icon: "mods.svg" },
-                    { id: "mods",           labelKey: "nav_modrinth",       fallback: "Modrinth",      icon: "modrinth.svg" },
-                    { id: "settings",       labelKey: "nav_settings",       fallback: "Einstellungen", icon: "settings.svg" }
+                    { id: "home",           labelKey: "nav_home",           fallback: "Home",             icon: "home.svg" },
+                    { id: "profiles",       labelKey: "nav_profiles",       fallback: "Profile",          icon: "box.svg" },
+                    { id: "installed_mods", labelKey: "nav_installed_mods", fallback: "Installierte Mods", icon: "mods.svg" },
+                    { id: "mods",           labelKey: "nav_discover",       fallback: "Entdecken",        icon: "compass.svg" },
+                    { id: "settings",       labelKey: "nav_settings",       fallback: "Einstellungen",    icon: "settings.svg" }
                 ]
 
                 Rectangle {

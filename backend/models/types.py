@@ -5,7 +5,7 @@ import os
 import sys
 
 APP_NAME = "EzClient"
-APP_VERSION = "1.1.8"
+APP_VERSION = "1.1.9"
 GITHUB_REPO = "LuigiLetsPlay/EzClient"
 
 def now_iso() -> str:
@@ -38,6 +38,7 @@ class ModData:
     icon_url: str = ""
     author: str = ""
     description: str = ""
+    source: str = "modrinth"
 
 @dataclass
 class ProfileData:

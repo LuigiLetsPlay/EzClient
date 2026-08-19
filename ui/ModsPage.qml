@@ -506,7 +506,7 @@ Item {
             Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border }
 
             Text {
-                text: "Der Mod '" + (root.pendingDeleteMod ? root.pendingDeleteMod.name : "") + "' wird von anderen installierten Mods benötigt (" + root.pendingDeleteDeps.join(", ") + ").\n\nEin Entfernen kann das Starten von Minecraft verhindern."
+                text: "Warnung: Die Mod '" + (root.pendingDeleteMod ? root.pendingDeleteMod.name : "") + "' wird von folgenden installierten Mods benötigt: " + root.pendingDeleteDeps.join(", ") + ".\n\nDas Löschen kann zu Spielabstürzen führen."
                 font.family: EzTheme.fontFamily
                 font.pixelSize: 11
                 color: EzTheme.text
@@ -524,19 +524,19 @@ Item {
                 EzButton {
                     text: "Abbrechen"
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 32
+                    Layout.preferredHeight: 34
                     onClicked: depWarningModal.close()
                 }
 
                 EzButton {
-                    text: "Löschen"
+                    text: "Trotzdem löschen"
                     danger: true
                     mcFont: true
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 32
+                    Layout.preferredHeight: 34
                     onClicked: {
                         if (root.pendingDeleteMod) {
-                            profileController.uninstallMod(root.pendingDeleteMod.slug || root.pendingDeleteMod.name)
+                            profileController.uninstallMod(root.pendingDeleteMod.slug || root.pendingDeleteMod.name, root.pendingDeleteMod.name)
                         }
                         depWarningModal.close()
                     }

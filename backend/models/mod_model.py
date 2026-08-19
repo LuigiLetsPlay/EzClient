@@ -13,6 +13,7 @@ class ModModel(QAbstractListModel):
     AuthorRole = Qt.UserRole + 8
     DescriptionRole = Qt.UserRole + 9
     IconUrlRole = Qt.UserRole + 10
+    SourceRole = Qt.UserRole + 11
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -30,6 +31,7 @@ class ModModel(QAbstractListModel):
             self.AuthorRole: QByteArray(b"author"),
             self.DescriptionRole: QByteArray(b"description"),
             self.IconUrlRole: QByteArray(b"iconUrl"),
+            self.SourceRole: QByteArray(b"source"),
         }
 
     def rowCount(self, parent=QModelIndex()) -> int:
@@ -59,6 +61,8 @@ class ModModel(QAbstractListModel):
             return m.description
         elif role == self.IconUrlRole:
             return m.icon_url
+        elif role == self.SourceRole:
+            return getattr(m, "source", "modrinth")
         return None
 
     def set_mods(self, mods: list[ModData]) -> None:

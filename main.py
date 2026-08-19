@@ -132,7 +132,7 @@ def main() -> None:
     profile_model = ProfileModel()
     mod_model = ModModel()
     profile_controller = ProfileController(store, profile_model, mod_model)
-    modrinth_controller = ModrinthController()
+    modrinth_controller = ModrinthController(profile_controller=profile_controller)
     account_controller = AccountController()
     update_controller = UpdateController()
 
