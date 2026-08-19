@@ -409,8 +409,9 @@ Rectangle {
                     Image {
                         id: avatarImg
                         anchors.fill: parent
-                        source: root.accountUser !== "" ? ("https://mc-heads.net/avatar/" + root.accountUser + "/30") : ""
+                        source: (typeof accountController !== "undefined" && accountController && accountController.avatarUrl) ? accountController.avatarUrl : (root.accountUser !== "" ? ("https://mc-heads.net/avatar/" + root.accountUser + "/30") : "")
                         fillMode: Image.PreserveAspectCrop
+                        cache: false
                         visible: status === Image.Ready
                     }
                     Text {

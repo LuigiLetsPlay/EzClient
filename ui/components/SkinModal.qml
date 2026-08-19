@@ -84,8 +84,8 @@ Item {
 
     Rectangle {
         anchors.centerIn: parent
-        width: Math.min(740, parent.width - 32)
-        height: Math.min(650, parent.height - 24)
+        width: Math.min(860, parent.width - 32)
+        height: Math.min(660, parent.height - 24)
         radius: 16
         color: "#12141C"
         border.color: EzTheme.borderLight
@@ -136,7 +136,7 @@ Item {
                 // State Badge: Preview vs. Applied
                 Rectangle {
                     height: 26
-                    width: stateBadgeText.implicitWidth + 20
+                    width: stateBadgeText.implicitWidth + 24
                     radius: 13
                     color: skinModal.isApplied ? "#122E1F" : "#302610"
                     border.color: skinModal.isApplied ? "#22C96E" : "#E5A93C"
@@ -178,11 +178,14 @@ Item {
             RowLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                spacing: 14
+                spacing: 16
 
                 // ════ LEFT COLUMN: 3D Stage & Pose Controls ════
                 ColumnLayout {
-                    Layout.preferredWidth: 260
+                    Layout.preferredWidth: 320
+                    Layout.maximumWidth: 340
+                    Layout.minimumWidth: 300
+                    Layout.fillWidth: false
                     Layout.fillHeight: true
                     spacing: 8
 
@@ -190,7 +193,7 @@ Item {
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        Layout.minimumHeight: 230
+                        Layout.minimumHeight: 240
                         radius: 12
                         color: "#0A0C12"
                         border.color: skinModal.isApplied ? "#1E2A22" : (skinModal.previewTextureUrl ? EzTheme.accent : EzTheme.border)
@@ -253,7 +256,7 @@ Item {
                         spacing: 4
 
                         Rectangle {
-                            Layout.fillWidth: true; height: 24; radius: 5
+                            Layout.fillWidth: true; height: 26; radius: 5
                             color: rotLMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
                             border.color: EzTheme.border; border.width: 1
                             Text { text: "↺ -90°"; font.pixelSize: 9; color: EzTheme.text; anchors.centerIn: parent }
@@ -263,7 +266,7 @@ Item {
                             }
                         }
                         Rectangle {
-                            Layout.fillWidth: true; height: 24; radius: 5
+                            Layout.fillWidth: true; height: 26; radius: 5
                             color: rotRstMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
                             border.color: EzTheme.border; border.width: 1
                             Text { text: "0° Front"; font.pixelSize: 9; color: EzTheme.textSecondary; anchors.centerIn: parent }
@@ -273,7 +276,7 @@ Item {
                             }
                         }
                         Rectangle {
-                            Layout.fillWidth: true; height: 24; radius: 5
+                            Layout.fillWidth: true; height: 26; radius: 5
                             color: rotRMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
                             border.color: EzTheme.border; border.width: 1
                             Text { text: "↻ +90°"; font.pixelSize: 9; color: EzTheme.text; anchors.centerIn: parent }
@@ -283,7 +286,7 @@ Item {
                             }
                         }
                         Rectangle {
-                            Layout.fillWidth: true; height: 24; radius: 5
+                            Layout.fillWidth: true; height: 26; radius: 5
                             color: rotBackMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
                             border.color: EzTheme.border; border.width: 1
                             Text { text: "180° Rück"; font.pixelSize: 9; color: EzTheme.textSecondary; anchors.centerIn: parent }
@@ -300,7 +303,7 @@ Item {
                         spacing: 6
 
                         Rectangle {
-                            Layout.fillWidth: true; height: 26; radius: 6
+                            Layout.fillWidth: true; height: 28; radius: 6
                             color: skinModal.skinVariant === "classic" ? EzTheme.surfaceActive : (cMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2)
                             border.color: skinModal.skinVariant === "classic" ? EzTheme.accent : EzTheme.border
                             border.width: 1
@@ -319,7 +322,7 @@ Item {
                         }
 
                         Rectangle {
-                            Layout.fillWidth: true; height: 26; radius: 6
+                            Layout.fillWidth: true; height: 28; radius: 6
                             color: skinModal.skinVariant === "slim" ? EzTheme.surfaceActive : (sMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2)
                             border.color: skinModal.skinVariant === "slim" ? EzTheme.accent : EzTheme.border
                             border.width: 1
@@ -351,7 +354,7 @@ Item {
                                 { label: "👋 Wave", id: "wave" }
                             ]
                             Rectangle {
-                                Layout.fillWidth: true; height: 24; radius: 5
+                                Layout.fillWidth: true; height: 26; radius: 5
                                 color: skinModal.currentAnim === modelData.id ? EzTheme.surfaceActive : (animMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2)
                                 border.color: skinModal.currentAnim === modelData.id ? EzTheme.accent : EzTheme.border
                                 border.width: 1
@@ -375,7 +378,7 @@ Item {
                     }
                 }
 
-                // ════ RIGHT COLUMN: Actions, Status, Save & Library ════
+                // ════ RIGHT COLUMN: Controls, Action, Save & Library ════
                 ColumnLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -384,7 +387,7 @@ Item {
                     // ── Card 1: Neuen Skin laden (Username oder Datei) ──
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 96
+                        Layout.preferredHeight: 90
                         radius: 10
                         color: "#0F121A"
                         border.color: EzTheme.border
@@ -392,11 +395,11 @@ Item {
 
                         ColumnLayout {
                             anchors.fill: parent
-                            anchors.margins: 8
+                            anchors.margins: 10
                             spacing: 6
 
                             Text {
-                                text: "Skin auswählen & Vorschau laden:"
+                                text: "Skin auswählen & in 3D-Vorschau laden:"
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 11
                                 font.bold: true
@@ -523,14 +526,14 @@ Item {
                                 Layout.fillWidth: true
                                 spacing: 6
                                 Text {
-                                    text: skinModal.isApplied ? "✓" : "⚠️"
+                                    text: skinModal.isApplied ? "✓" : "👁️"
                                     font.pixelSize: 11
                                     color: skinModal.isApplied ? "#80EEAA" : "#F5D075"
                                 }
                                 Text {
                                     text: skinModal.isApplied ?
                                           ("Skin '" + skinModal.previewName + "' ist aktiv ausgewählt.") :
-                                          ("Vorschau aktiv für '" + skinModal.previewName + "'. Noch nicht angewendet!")
+                                          ("Vorschau aktiv für '" + skinModal.previewName + "'. Noch nicht ausgewählt!")
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 10
                                     font.bold: true
@@ -593,7 +596,7 @@ Item {
                         color: "#0F121A"
                         border.color: skinModal.isApplied ? (saveSkinNameInput.activeFocus ? EzTheme.accent : EzTheme.border) : "#1E2028"
                         border.width: 1
-                        opacity: skinModal.isApplied ? 1.0 : 0.65
+                        opacity: skinModal.isApplied ? 1.0 : 0.6
 
                         ColumnLayout {
                             anchors.fill: parent
@@ -687,7 +690,7 @@ Item {
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        Layout.minimumHeight: 80
+                        Layout.minimumHeight: 90
                         radius: 10
                         color: "#0F121A"
                         border.color: EzTheme.border
@@ -731,7 +734,7 @@ Item {
                                     Repeater {
                                         model: (typeof accountController !== "undefined" && accountController) ? accountController.savedSkins : []
                                         Rectangle {
-                                            width: 145; height: 42; radius: 8
+                                            width: 155; height: 44; radius: 8
                                             color: savedMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
                                             border.color: (skinModal.previewFilePath === modelData.path || skinModal.previewName === modelData.name) ? EzTheme.accent : EzTheme.border
                                             border.width: (skinModal.previewFilePath === modelData.path || skinModal.previewName === modelData.name) ? 2 : 1
@@ -743,14 +746,14 @@ Item {
 
                                                 Image {
                                                     source: modelData.previewUrl ? modelData.previewUrl : ("https://mc-heads.net/avatar/" + (modelData.name || "Steve") + "/32")
-                                                    Layout.preferredWidth: 26
-                                                    Layout.preferredHeight: 26
+                                                    Layout.preferredWidth: 28
+                                                    Layout.preferredHeight: 28
                                                     fillMode: Image.PreserveAspectFit
                                                 }
 
                                                 ColumnLayout {
                                                     Layout.fillWidth: true
-                                                    spacing: 0
+                                                    spacing: 1
                                                     Text {
                                                         text: modelData.name || "Skin"
                                                         font.family: EzTheme.fontFamily
@@ -769,11 +772,11 @@ Item {
                                                 }
 
                                                 Rectangle {
-                                                    width: 18; height: 18; radius: 9
+                                                    width: 20; height: 20; radius: 10
                                                     color: delMouse.containsMouse ? "#4A181C" : "transparent"
                                                     Text {
                                                         text: "✕"
-                                                        font.pixelSize: 9
+                                                        font.pixelSize: 10
                                                         color: EzTheme.textMuted
                                                         anchors.centerIn: parent
                                                     }
@@ -794,7 +797,7 @@ Item {
                                             MouseArea {
                                                 id: savedMouse
                                                 anchors.fill: parent
-                                                anchors.rightMargin: 20
+                                                anchors.rightMargin: 24
                                                 hoverEnabled: true
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: {

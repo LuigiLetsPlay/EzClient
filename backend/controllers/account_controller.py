@@ -139,8 +139,27 @@ class AccountController(QObject):
 
     @Property(str, notify=accountChanged)
     def avatarUrl(self) -> str:
-        if self._active_custom_avatar:
+        from backend.services.skin_service import extract_head_avatar_data_uri, get_skins_dir
+
+        # 1. Real-time head avatar extraction from active custom skin file
+        if self._active_custom_path and Path(self._active_custom_path).exists():
+            uri = extract_head_avatar_data_uri(self._active_custom_path)
+            if uri:
+                return uri
+
+        # 2. Check local skins directory for current user
+        if self._username:
+            user_png = get_skins_dir() / f"{self._username}.png"
+            if user_png.exists():
+                uri = extract_head_avatar_data_uri(user_png)
+                if uri:
+                    return uri
+
+        # 3. If stored active avatar is a valid data URI
+        if self._active_custom_avatar and self._active_custom_avatar.startswith("data:image"):
             return self._active_custom_avatar
+
+        # 4. Fallback online Mojang head avatar by username / skin version
         if self._username:
             return f"https://mc-heads.net/avatar/{self._username}/64?t={self._skin_version}"
         return ""

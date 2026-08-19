@@ -213,6 +213,42 @@ def generate_skin_renders(skin_path: str | Path) -> tuple[str, str]:
         return "", ""
 
 
+def extract_head_avatar_data_uri(skin_source: str | Path | bytes) -> str:
+    """
+    Extracts the 64x64 Minecraft head avatar (with outer hat layer) from skin bytes or file path
+    and returns a base64 data URI string `data:image/png;base64,...`.
+    Fast, in-memory, 100% in sync with whatever skin texture is active.
+    """
+    try:
+        from PIL import Image
+        import io
+        import base64
+
+        if isinstance(skin_source, bytes):
+            skin = Image.open(io.BytesIO(skin_source)).convert("RGBA")
+        elif isinstance(skin_source, (str, Path)):
+            p = Path(skin_source)
+            if not p.exists() or not p.is_file():
+                return ""
+            skin = Image.open(str(p)).convert("RGBA")
+        else:
+            return ""
+
+        av_img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+        head_base = skin.crop((8, 8, 16, 16)).resize((64, 64), Image.Resampling.NEAREST)
+        head_hat = skin.crop((40, 8, 48, 16)).resize((64, 64), Image.Resampling.NEAREST)
+        av_img.alpha_composite(head_base, (0, 0))
+        av_img.alpha_composite(head_hat, (0, 0))
+
+        buf = io.BytesIO()
+        av_img.save(buf, format="PNG")
+        b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+        return f"data:image/png;base64,{b64}"
+    except Exception as e:
+        print(f"[SkinRenderer] Error extracting head avatar data URI: {e}")
+        return ""
+
+
 def get_saved_skins() -> list[dict]:
     saved_file = get_skins_dir() / "saved_skins.json"
     if saved_file.exists():
