@@ -29,7 +29,7 @@ PERFORMANCE_MODS: list[ModData] = [
     ModData(
         project_id="ezclient", slug="ezclient", name="EzClient Core", version_id="v-core", version="1.0.0",
         filename="EzClient.jar", enabled=True, recommended=True, essential=True,
-        icon_url="https://raw.githubusercontent.com/ezclient/branding/main/logo.png", author="EzClient Team", description="EzClient Core Mod – Fenstertitel 'EzClient', Icon, Narrator-Bypass & Auto-Optimierung."
+        icon_url="", author="EzClient Team", description="EzClient Core Mod – Fenstertitel 'EzClient', Icon, Narrator-Bypass & Auto-Optimierung."
     ),
     ModData(
         project_id="fabric-api", slug="fabric-api", name="Fabric API", version_id="v1", version="0.115.0",

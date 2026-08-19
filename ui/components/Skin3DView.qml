@@ -64,8 +64,9 @@ Item {
         settings.localContentCanAccessRemoteUrls: true
         settings.localContentCanAccessFileUrls: true
 
-        onLoadingChanged: {
-            if (loadRequest.status === WebEngineView.LoadSucceededStatus) {
+        onLoadingChanged: function(loadingInfo) {
+            var s = loadingInfo ? loadingInfo.status : (typeof loadRequest !== "undefined" ? loadRequest.status : 2)
+            if (s === WebEngineView.LoadStatusSuccess || s === WebEngineView.LoadSucceededStatus || s === 2) {
                 skin3dRoot.isLoaded = true
                 applyTimer.start()
             }

@@ -76,7 +76,7 @@ Item {
         Rectangle {
             property real startX: Math.random() * root.width
             property real startY: Math.random() * root.height
-            property real duration: 4000 + Math.random() * 6000
+            property real animDuration: 4000 + Math.random() * 6000
 
             x: startX
             width: 2 + Math.random() * 3
@@ -87,13 +87,13 @@ Item {
 
             SequentialAnimation on y {
                 loops: Animation.Infinite
-                NumberAnimation { from: startY; to: startY - 80 - Math.random() * 120; duration: duration; easing.type: Easing.InOutSine }
-                NumberAnimation { from: startY - 80 - Math.random() * 120; to: startY; duration: duration; easing.type: Easing.InOutSine }
+                NumberAnimation { from: startY; to: startY - 80 - Math.random() * 120; duration: animDuration; easing.type: Easing.InOutSine }
+                NumberAnimation { from: startY - 80 - Math.random() * 120; to: startY; duration: animDuration; easing.type: Easing.InOutSine }
             }
             SequentialAnimation on opacity {
                 loops: Animation.Infinite
-                NumberAnimation { to: 0.02; duration: duration * 0.8 }
-                NumberAnimation { to: 0.08 + Math.random() * 0.12; duration: duration * 0.8 }
+                NumberAnimation { to: 0.02; duration: animDuration * 0.8 }
+                NumberAnimation { to: 0.08 + Math.random() * 0.12; duration: animDuration * 0.8 }
             }
         }
     }

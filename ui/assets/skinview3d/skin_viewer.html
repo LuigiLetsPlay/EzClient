@@ -121,26 +121,28 @@
 
   function setAnimation(name, speed) {
     if (!skinViewer) return;
-    if (currentAnim) {
-      currentAnim.resetAndRemove();
-      currentAnim = null;
-    }
     const spd = speed !== undefined ? speed : 0.7;
-    if (name === "idle") {
-      currentAnim = skinViewer.animations.add(skinview3d.IdleAnimation);
-      currentAnim.speed = spd;
-    } else if (name === "walk") {
-      currentAnim = skinViewer.animations.add(skinview3d.WalkingAnimation);
-      currentAnim.speed = spd;
-    } else if (name === "run") {
-      currentAnim = skinViewer.animations.add(skinview3d.RunningAnimation);
-      currentAnim.speed = spd;
-    } else if (name === "fly") {
-      currentAnim = skinViewer.animations.add(skinview3d.FlyingAnimation);
-      currentAnim.speed = spd;
-    } else if (name === "wave") {
-      currentAnim = skinViewer.animations.add(skinview3d.WaveAnimation);
-      currentAnim.speed = spd;
+    try {
+      if (name === "idle" && skinview3d.IdleAnimation) {
+        skinViewer.animation = new skinview3d.IdleAnimation();
+        if (skinViewer.animation) skinViewer.animation.speed = spd;
+      } else if (name === "walk" && skinview3d.WalkingAnimation) {
+        skinViewer.animation = new skinview3d.WalkingAnimation();
+        if (skinViewer.animation) skinViewer.animation.speed = spd;
+      } else if (name === "run" && skinview3d.RunningAnimation) {
+        skinViewer.animation = new skinview3d.RunningAnimation();
+        if (skinViewer.animation) skinViewer.animation.speed = spd;
+      } else if (name === "fly" && skinview3d.FlyingAnimation) {
+        skinViewer.animation = new skinview3d.FlyingAnimation();
+        if (skinViewer.animation) skinViewer.animation.speed = spd;
+      } else if (name === "wave" && skinview3d.WaveAnimation) {
+        skinViewer.animation = new skinview3d.WaveAnimation();
+        if (skinViewer.animation) skinViewer.animation.speed = spd;
+      } else {
+        skinViewer.animation = null;
+      }
+    } catch (e) {
+      console.warn("[SkinViewer] setAnimation note:", e);
     }
   }
 

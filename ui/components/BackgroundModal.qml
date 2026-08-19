@@ -31,7 +31,7 @@ Rectangle {
     }
 
     function formatUrl(p) {
-        if (!p) return "assets/hero_bg.jpg";
+        if (!p) return Qt.resolvedUrl("../assets/hero_bg.jpg").toString();
         if (p.startsWith("file:///") || p.startsWith("http://") || p.startsWith("https://") || p.startsWith("qrc:/")) return p;
         var clean = p.replace(/\\/g, "/");
         if (clean.startsWith("/")) return "file://" + clean;

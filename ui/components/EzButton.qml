@@ -72,7 +72,13 @@ Button {
         anchors.centerIn: parent
 
         Image {
-            source: control.iconSource
+            source: {
+                if (!control.iconSource) return ""
+                if (control.iconSource.indexOf("/") !== -1 || control.iconSource.startsWith("qrc:") || control.iconSource.startsWith("data:") || control.iconSource.startsWith("http")) {
+                    return control.iconSource
+                }
+                return Qt.resolvedUrl("../icons/" + control.iconSource).toString()
+            }
             visible: control.iconSource !== ""
             width: 14
             height: 14
