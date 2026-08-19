@@ -83,6 +83,12 @@ def main() -> None:
             pass
 
     QQuickStyle.setStyle("Basic")
+    try:
+        import PySide6.QtWebEngineQuick
+        PySide6.QtWebEngineQuick.QtWebEngineQuick.initialize()
+    except Exception as e:
+        print(f"[WebEngineQuick] Init warning: {e}")
+
     app = QApplication(sys.argv)
     app.setApplicationName("EzClient")
     app.setApplicationDisplayName("EzClient Launcher")

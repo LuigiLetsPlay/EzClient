@@ -5,3 +5,5 @@ EzDropDown 1.0 EzDropDown.qml
 EzToggleRow 1.0 EzToggleRow.qml
 EzPresetCard 1.0 EzPresetCard.qml
 WindowResizeHandles 1.0 WindowResizeHandles.qml
+SkinModal 1.0 SkinModal.qml
+Skin3DView 1.0 Skin3DView.qml

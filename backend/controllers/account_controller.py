@@ -161,6 +161,67 @@ class AccountController(QObject):
             return f"https://mc-heads.net/body/{self._username}/360?t={self._skin_version}"
         return ""
 
+    @Property(str, notify=accountChanged)
+    def skinTextureUrl(self) -> str:
+        import base64
+        # 1. Custom active skin file
+        if self._active_custom_path and Path(self._active_custom_path).exists():
+            try:
+                raw = Path(self._active_custom_path).read_bytes()
+                return f"data:image/png;base64,{base64.b64encode(raw).decode('ascii')}"
+            except Exception:
+                pass
+
+        # 2. Check local skins directory for current user
+        from backend.services.skin_service import get_skins_dir
+        if self._username:
+            user_png = get_skins_dir() / f"{self._username}.png"
+            if user_png.exists():
+                try:
+                    raw = user_png.read_bytes()
+                    return f"data:image/png;base64,{base64.b64encode(raw).decode('ascii')}"
+                except Exception:
+                    pass
+
+        # 3. Online session skin
+        if self._skin_url:
+            return self._skin_url
+
+        # 4. Fallback online lookup by username
+        if self._username and self._username.lower() != "player":
+            return f"https://minotar.net/skin/{self._username}"
+
+        return ""
+
+    @Slot(str, result=str)
+    def getSkinTextureUrl(self, path_or_username: str) -> str:
+        val = (path_or_username or "").strip()
+        if not val:
+            return self.skinTextureUrl
+
+        import base64
+        p = Path(val)
+        if p.exists() and p.is_file():
+            try:
+                raw = p.read_bytes()
+                return f"data:image/png;base64,{base64.b64encode(raw).decode('ascii')}"
+            except Exception:
+                pass
+
+        from backend.services.skin_service import get_skins_dir
+        user_png = get_skins_dir() / f"{val}.png"
+        if user_png.exists():
+            try:
+                raw = user_png.read_bytes()
+                return f"data:image/png;base64,{base64.b64encode(raw).decode('ascii')}"
+            except Exception:
+                pass
+
+        if val.startswith("http://") or val.startswith("https://") or val.startswith("data:") or val.startswith("file:"):
+            return val
+
+        return f"https://minotar.net/skin/{val}"
+
     @Slot()
     def openLoginDialog(self) -> None:
         """Opens the embedded native Microsoft login window."""

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EzClient 3D Skin Viewer</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+  }
+  #container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  canvas {
+    outline: none;
+    cursor: grab;
+  }
+  canvas:active {
+    cursor: grabbing;
+  }
+</style>
+<script src="skinview3d.bundle.js"></script>
+</head>
+<body>
+<div id="container">
+  <canvas id="skin_canvas"></canvas>
+</div>
+
+<script>
+  let skinViewer = null;
+  let currentAnim = null;
+  let isAutoRotating = false;
+  let pendingSkin = null;
+
+  function init() {
+    const canvas = document.getElementById("skin_canvas");
+    const container = document.getElementById("container");
+    const w = container.clientWidth || 240;
+    const h = container.clientHeight || 300;
+
+    skinViewer = new skinview3d.SkinViewer({
+      canvas: canvas,
+      width: w,
+      height: h,
+      skin: "../skins/steve.png"
+    });
+
+    // Camera settings
+    skinViewer.camera.position.x = 0;
+    skinViewer.camera.position.y = 0;
+    skinViewer.camera.position.z = 65;
+
+    // Enhanced lighting for crisp Minecraft 3D look
+    if (skinViewer.renderer) {
+      skinViewer.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    }
+
+    // Controls
+    skinViewer.controls.enableRotate = true;
+    skinViewer.controls.enableZoom = true;
+    skinViewer.controls.enablePan = false;
+    skinViewer.controls.maxDistance = 120;
+    skinViewer.controls.minDistance = 30;
+
+    // Subtle idle animation
+    setAnimation("idle", 0.7);
+
+    if (pendingSkin) {
+      setSkin(pendingSkin.url, pendingSkin.model);
+      pendingSkin = null;
+    }
+
+    window.addEventListener("resize", () => {
+      if (skinViewer) {
+        skinViewer.setSize(container.clientWidth, container.clientHeight);
+      }
+    });
+  }
+
+  function setSkin(textureUrl, modelType) {
+    if (!skinViewer) {
+      pendingSkin = { url: textureUrl, model: modelType };
+      return;
+    }
+    const opt = {};
+    if (modelType === "slim") {
+      opt.model = "slim";
+    } else {
+      opt.model = "default";
+    }
+    skinViewer.loadSkin(textureUrl, opt).catch(err => {
+      console.warn("SkinView3D loadSkin note:", err);
+    });
+  }
+
+  function setCape(capeUrl) {
+    if (!skinViewer) return;
+    if (!capeUrl) {
+      skinViewer.resetCape();
+    } else {
+      skinViewer.loadCape(capeUrl);
+    }
+  }
+
+  function setAnimation(name, speed) {
+    if (!skinViewer) return;
+    if (currentAnim) {
+      currentAnim.resetAndRemove();
+      currentAnim = null;
+    }
+    const spd = speed !== undefined ? speed : 0.7;
+    if (name === "idle") {
+      currentAnim = skinViewer.animations.add(skinview3d.IdleAnimation);
+      currentAnim.speed = spd;
+    } else if (name === "walk") {
+      currentAnim = skinViewer.animations.add(skinview3d.WalkingAnimation);
+      currentAnim.speed = spd;
+    } else if (name === "run") {
+      currentAnim = skinViewer.animations.add(skinview3d.RunningAnimation);
+      currentAnim.speed = spd;
+    } else if (name === "fly") {
+      currentAnim = skinViewer.animations.add(skinview3d.FlyingAnimation);
+      currentAnim.speed = spd;
+    } else if (name === "wave") {
+      currentAnim = skinViewer.animations.add(skinview3d.WaveAnimation);
+      currentAnim.speed = spd;
+    }
+  }
+
+  function setAutoRotate(enabled, speed) {
+    if (!skinViewer) return;
+    isAutoRotating = !!enabled;
+    skinViewer.autoRotate = isAutoRotating;
+    skinViewer.autoRotateSpeed = speed || 1.0;
+  }
+
+  function rotateY(deg) {
+    if (!skinViewer) return;
+    skinViewer.playerObject.rotation.y = (deg * Math.PI) / 180;
+  }
+
+  function resetView() {
+    if (!skinViewer) return;
+    skinViewer.controls.reset();
+    skinViewer.camera.position.x = 0;
+    skinViewer.camera.position.y = 0;
+    skinViewer.camera.position.z = 65;
+    skinViewer.playerObject.rotation.x = 0;
+    skinViewer.playerObject.rotation.y = 0;
+    skinViewer.playerObject.rotation.z = 0;
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+</script>
+</body>
+</html>

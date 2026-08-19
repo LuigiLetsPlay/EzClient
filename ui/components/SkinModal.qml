@@ -12,22 +12,22 @@ Item {
     Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
     property string selectedFilePath: ""
-    property string previewBodyUrl: ""
+    property string previewTextureUrl: ""
     property string skinVariant: "classic"
     property string statusMsg: ""
     property bool isError: false
-    property real modelAngle: 0
-    property real lastDragX: 0
 
     function open() {
         selectedFilePath = ""
-        previewBodyUrl = ""
+        previewTextureUrl = ""
         statusMsg = ""
         isError = false
-        modelAngle = 0
         skinNameInput.text = ""
         saveSkinNameInput.text = ""
         skinModal.opacity = 1.0
+        if (modalSkin3D) {
+            modalSkin3D.resetView()
+        }
     }
 
     function close() {
@@ -42,7 +42,9 @@ Item {
         }
         function onSkinFetched(path, preview) {
             skinModal.selectedFilePath = path
-            skinModal.previewBodyUrl = preview
+            if (accountController) {
+                skinModal.previewTextureUrl = accountController.getSkinTextureUrl(path)
+            }
         }
     }
 
@@ -53,8 +55,8 @@ Item {
 
     Rectangle {
         anchors.centerIn: parent
-        width: Math.min(580, parent.width - 32)
-        height: Math.min(680, parent.height - 24)
+        width: Math.min(600, parent.width - 32)
+        height: Math.min(690, parent.height - 24)
         radius: 16
         color: "#12141C"
         border.color: EzTheme.borderLight
@@ -174,10 +176,10 @@ Item {
                 }
             }
 
-            // ── Section 2: Skin Preview & 3D Control Area ──
+            // ── Section 2: Real 3D Skin Preview & Controls ──
             Rectangle {
                 Layout.fillWidth: true
-                height: 175
+                height: 190
                 radius: 10
                 color: "#0B0C10"
                 border.color: EzTheme.border
@@ -191,101 +193,86 @@ Item {
                     // 3D Player Model preview box
                     ColumnLayout {
                         spacing: 4
-                        Layout.preferredWidth: 110
+                        Layout.preferredWidth: 125
 
                         Rectangle {
                             id: previewBox
-                            width: 110; height: 130; radius: 8
+                            width: 125; height: 140; radius: 8
                             color: "#151821"
-                            border.color: previewDragArea.containsMouse ? EzTheme.accent : EzTheme.border
+                            border.color: EzTheme.border
                             border.width: 1
                             clip: true
 
-                            Image {
-                                id: modalPreviewImg
+                            Skin3DView {
+                                id: modalSkin3D
                                 anchors.fill: parent
-                                anchors.margins: 6
-                                source: skinModal.previewBodyUrl ? skinModal.previewBodyUrl : (accountController ? accountController.bodyUrl : "")
-                                fillMode: Image.PreserveAspectFit
-                                smooth: true
-                                cache: false
-                                rotation: skinModal.modelAngle
-                                scale: previewDragArea.containsMouse ? 1.04 : 1.0
-
-                                Behavior on rotation {
-                                    enabled: !previewDragArea.pressed
-                                    NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
-                                }
-                                Behavior on scale { NumberAnimation { duration: 180 } }
+                                anchors.margins: 2
+                                skinSource: skinModal.previewTextureUrl ? skinModal.previewTextureUrl : (accountController ? accountController.skinTextureUrl : "")
+                                skinVariant: skinModal.skinVariant
+                                animation: "idle"
+                                autoRotate: false
                             }
 
                             Rectangle {
                                 anchors.bottom: parent.bottom
                                 anchors.left: parent.left
                                 anchors.right: parent.right
-                                height: 18
-                                color: "#CC0B0C10"
+                                height: 16
+                                color: "#D00B0C10"
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "↔ Neigen / Bewegen"
+                                    text: "🖱️ 3D Drehen"
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 8
                                     font.bold: true
                                     color: EzTheme.accentLight
                                 }
                             }
-
-                            MouseArea {
-                                id: previewDragArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.PointingHandCursor
-                                onPositionChanged: {
-                                    if (pressed) {
-                                        var offset = mouse.x - width / 2
-                                        skinModal.modelAngle = Math.max(-25, Math.min(25, (offset / (width / 2)) * 20))
-                                    } else {
-                                        var hoverOff = mouse.x - width / 2
-                                        skinModal.modelAngle = Math.max(-8, Math.min(8, (hoverOff / (width / 2)) * 6))
-                                    }
-                                }
-                                onExited: {
-                                    skinModal.modelAngle = 0
-                                }
-                            }
                         }
 
+                        // 3D Angle presets row
                         RowLayout {
                             Layout.alignment: Qt.AlignHCenter
-                            spacing: 4
+                            spacing: 3
+
                             Rectangle {
-                                width: 32; height: 18; radius: 4
+                                width: 28; height: 20; radius: 4
                                 color: rotLMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
                                 border.color: EzTheme.border; border.width: 1
-                                Text { text: "↺"; font.pixelSize: 10; color: EzTheme.text; anchors.centerIn: parent }
+                                Text { text: "↺"; font.pixelSize: 11; color: EzTheme.text; anchors.centerIn: parent }
                                 MouseArea {
                                     id: rotLMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: skinModal.modelAngle = -15
+                                    onClicked: modalSkin3D.setRotateY(-90)
                                 }
                             }
                             Rectangle {
-                                width: 36; height: 18; radius: 4
+                                width: 28; height: 20; radius: 4
                                 color: rotRstMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
                                 border.color: EzTheme.border; border.width: 1
                                 Text { text: "0°"; font.pixelSize: 9; color: EzTheme.textSecondary; anchors.centerIn: parent }
                                 MouseArea {
                                     id: rotRstMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: skinModal.modelAngle = 0
+                                    onClicked: modalSkin3D.resetView()
                                 }
                             }
                             Rectangle {
-                                width: 32; height: 18; radius: 4
+                                width: 28; height: 20; radius: 4
                                 color: rotRMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
                                 border.color: EzTheme.border; border.width: 1
-                                Text { text: "↻"; font.pixelSize: 10; color: EzTheme.text; anchors.centerIn: parent }
+                                Text { text: "↻"; font.pixelSize: 11; color: EzTheme.text; anchors.centerIn: parent }
                                 MouseArea {
                                     id: rotRMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: skinModal.modelAngle = 15
+                                    onClicked: modalSkin3D.setRotateY(90)
+                                }
+                            }
+                            Rectangle {
+                                width: 34; height: 20; radius: 4
+                                color: rotBackMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
+                                border.color: EzTheme.border; border.width: 1
+                                Text { text: "180°"; font.pixelSize: 9; color: EzTheme.textSecondary; anchors.centerIn: parent }
+                                MouseArea {
+                                    id: rotBackMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                    onClicked: modalSkin3D.setRotateY(180)
                                 }
                             }
                         }
@@ -293,7 +280,7 @@ Item {
 
                     ColumnLayout {
                         Layout.fillWidth: true
-                        spacing: 6
+                        spacing: 8
 
                         Text {
                             text: skinModal.selectedFilePath ? ("Datei: " + skinModal.selectedFilePath.split("/").pop().split("\\").pop()) : "Aktiver Skin"
@@ -309,7 +296,7 @@ Item {
                             spacing: 8
                             Rectangle {
                                 height: 28
-                                Layout.preferredWidth: 105
+                                Layout.preferredWidth: 110
                                 radius: 6
                                 color: skinModal.skinVariant === "classic" ? EzTheme.surfaceActive : (cMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2)
                                 border.color: skinModal.skinVariant === "classic" ? EzTheme.accent : EzTheme.border
@@ -322,7 +309,7 @@ Item {
                             }
                             Rectangle {
                                 height: 28
-                                Layout.preferredWidth: 105
+                                Layout.preferredWidth: 110
                                 radius: 6
                                 color: skinModal.skinVariant === "slim" ? EzTheme.surfaceActive : (sMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2)
                                 border.color: skinModal.skinVariant === "slim" ? EzTheme.accent : EzTheme.border
@@ -336,7 +323,7 @@ Item {
                         }
 
                         Rectangle {
-                            height: 32
+                            height: 34
                             Layout.fillWidth: true
                             radius: 6
                             color: pickMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
@@ -358,7 +345,7 @@ Item {
                                         var p = accountController.pickSkinFile()
                                         if (p) {
                                             skinModal.selectedFilePath = p
-                                            skinModal.previewBodyUrl = accountController.bodyUrl
+                                            skinModal.previewTextureUrl = accountController.getSkinTextureUrl(p)
                                         }
                                     }
                                 }
@@ -445,7 +432,21 @@ Item {
                                         MouseArea { id: delMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: if (accountController) accountController.deleteSavedSkin(modelData.id || modelData.name) }
                                     }
                                 }
-                                MouseArea { id: savedMouse; anchors.fill: parent; anchors.rightMargin: 20; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { if (modelData.path) { skinModal.selectedFilePath = modelData.path; if (accountController) accountController.uploadSkin(modelData.path, skinModal.skinVariant) } else if (modelData.name) { skinNameInput.text = modelData.name; if (accountController) accountController.fetchSkinByUsername(modelData.name) } } }
+                                MouseArea {
+                                    id: savedMouse; anchors.fill: parent; anchors.rightMargin: 20; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (modelData.path) {
+                                            skinModal.selectedFilePath = modelData.path
+                                            if (accountController) {
+                                                skinModal.previewTextureUrl = accountController.getSkinTextureUrl(modelData.path)
+                                                accountController.uploadSkin(modelData.path, skinModal.skinVariant)
+                                            }
+                                        } else if (modelData.name) {
+                                            skinNameInput.text = modelData.name
+                                            if (accountController) accountController.fetchSkinByUsername(modelData.name)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

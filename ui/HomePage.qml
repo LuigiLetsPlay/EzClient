@@ -16,6 +16,7 @@ Item {
 
     readonly property string accountUser: typeof accountController !== "undefined" && accountController ? accountController.username : "Player"
     readonly property string bodyUrl: typeof accountController !== "undefined" && accountController ? accountController.bodyUrl : ""
+    readonly property string skinTextureUrl: typeof accountController !== "undefined" && accountController ? accountController.skinTextureUrl : ""
 
     function formatImageUrl(path) {
         if (!path) return "assets/hero_bg.jpg";
@@ -148,98 +149,108 @@ Item {
 
         Item { height: 10 }
 
-        // ── 3D Minecraft Character Render ──
+        // ── Real Authentic 3D Minecraft Character ──
         Item {
+            id: skinContainer
             Layout.alignment: Qt.AlignHCenter
-            width: 220
-            height: 260
-
-            property real currentRotation: 0
-            property real dragStartX: 0
+            width: 250
+            height: 270
 
             // Ambient Shadow under player feet
             Rectangle {
                 anchors.bottom: parent.bottom
-                anchors.bottomMargin: 8
+                anchors.bottomMargin: 10
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: 120
+                width: 130
                 height: 16
                 radius: 8
                 color: "#000000"
-                opacity: 0.5
-                scale: charHover.containsMouse ? 1.06 : 1.0
-                Behavior on scale { NumberAnimation { duration: 200 } }
+                opacity: 0.55
             }
 
-            // Full-body Character
-            Image {
-                id: skinBody
-                anchors.centerIn: parent
-                anchors.verticalCenterOffset: charHover.containsMouse ? -5 : 0
-                height: 230
-                source: root.bodyUrl !== "" ? root.bodyUrl : "https://mc-heads.net/body/Steve/360"
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-                cache: false
-
-                Behavior on anchors.verticalCenterOffset {
-                    NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
-                }
-
-                // Interactive 3D tilt and smooth rotation
-                rotation: parent.currentRotation
-                scale: charHover.containsMouse ? 1.04 : 1.0
-                Behavior on scale { NumberAnimation { duration: 200 } }
-                Behavior on rotation {
-                    enabled: !charHover.pressed
-                    NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
-                }
+            // Real 3D Minecraft Skin Model
+            Skin3DView {
+                id: homeSkin3D
+                anchors.fill: parent
+                skinSource: root.skinTextureUrl
+                animation: "idle"
+                autoRotate: false
             }
 
-            // Fallback avatar
-            Rectangle {
-                anchors.centerIn: parent
-                width: 72; height: 72; radius: EzTheme.radius
-                color: EzTheme.surface2
-                border.color: EzTheme.accent; border.width: 1.5
-                visible: skinBody.status !== Image.Ready
+            // Floating 3D Hint & Quick Skin Actions
+            RowLayout {
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: -6
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: 6
+                opacity: (skinHoverArea.containsMouse || skinCustomPill.containsMouse) ? 1.0 : 0.6
+                Behavior on opacity { NumberAnimation { duration: 200 } }
 
-                Text {
-                    text: root.accountUser ? root.accountUser.charAt(0).toUpperCase() : "P"
-                    font.family: EzTheme.mcFontFamily; font.pixelSize: 28; font.bold: true
-                    color: EzTheme.accentLight; anchors.centerIn: parent
+                Rectangle {
+                    id: skinCustomPill
+                    height: 22
+                    width: skinPillContent.implicitWidth + 14
+                    radius: 11
+                    color: skinPillMouse.containsMouse ? EzTheme.surfaceActive : "#161B24CC"
+                    border.color: skinPillMouse.containsMouse ? EzTheme.accent : EzTheme.border
+                    border.width: 1
+
+                    RowLayout {
+                        id: skinPillContent
+                        anchors.centerIn: parent
+                        spacing: 4
+                        Text { text: "👕"; font.pixelSize: 10 }
+                        Text {
+                            text: EzI18n.t("home_skin_edit", "Skin anpassen")
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: skinPillMouse.containsMouse ? EzTheme.accentLight : EzTheme.textSecondary
+                        }
+                    }
+
+                    MouseArea {
+                        id: skinPillMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            if (typeof window !== "undefined" && window.openSkinModal) {
+                                window.openSkinModal()
+                            } else if (typeof globalSkinModal !== "undefined" && globalSkinModal) {
+                                globalSkinModal.open()
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: 22
+                    width: 22
+                    radius: 11
+                    color: resetRotMouse.containsMouse ? EzTheme.surfaceActive : "#161B24CC"
+                    border.color: resetRotMouse.containsMouse ? EzTheme.accent : EzTheme.border
+                    border.width: 1
+                    Text {
+                        anchors.centerIn: parent
+                        text: "🔄"
+                        font.pixelSize: 10
+                    }
+                    MouseArea {
+                        id: resetRotMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: homeSkin3D.resetView()
+                    }
                 }
             }
 
             MouseArea {
-                id: charHover
+                id: skinHoverArea
                 anchors.fill: parent
                 hoverEnabled: true
-                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.PointingHandCursor
-                onPressed: {
-                    parent.dragStartX = mouse.x
-                }
-                onPositionChanged: {
-                    if (pressed) {
-                        var delta = mouse.x - parent.dragStartX
-                        parent.currentRotation = Math.max(-25, Math.min(25, delta * 0.4))
-                    } else {
-                        var centerDist = (mouse.x - width / 2) / (width / 2)
-                        parent.currentRotation = centerDist * 8
-                    }
-                }
-                onExited: {
-                    parent.currentRotation = 0
-                }
-                onClicked: {
-                    if (Math.abs(parent.currentRotation) < 5) {
-                        if (typeof window !== "undefined" && window.openSkinModal) {
-                            window.openSkinModal()
-                        } else if (typeof globalSkinModal !== "undefined" && globalSkinModal) {
-                            globalSkinModal.open()
-                        }
-                    }
-                }
+                acceptedButtons: Qt.NoButton // let mouse events pass to WebEngine for 3D rotation
             }
         }
 
