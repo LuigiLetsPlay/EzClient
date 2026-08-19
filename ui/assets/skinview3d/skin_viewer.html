@@ -56,8 +56,7 @@
     skinViewer = new skinview3d.SkinViewer({
       canvas: canvas,
       width: w,
-      height: h,
-      skin: "../skins/steve.png"
+      height: h
     });
 
     // Camera settings
@@ -83,6 +82,8 @@
     if (pendingSkin) {
       setSkin(pendingSkin.url, pendingSkin.model);
       pendingSkin = null;
+    } else {
+      setSkin("../skins/steve.png", "classic");
     }
 
     window.addEventListener("resize", () => {
@@ -103,7 +104,8 @@
     } else {
       opt.model = "default";
     }
-    skinViewer.loadSkin(textureUrl, opt).catch(err => {
+    const targetUrl = textureUrl || "../skins/steve.png";
+    skinViewer.loadSkin(targetUrl, opt).catch(err => {
       console.warn("SkinView3D loadSkin note:", err);
     });
   }

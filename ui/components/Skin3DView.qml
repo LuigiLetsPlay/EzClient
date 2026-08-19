@@ -21,7 +21,8 @@ Item {
         if (src === "") {
             src = Qt.resolvedUrl("../assets/skins/steve.png").toString()
         }
-        var js = "setSkin('" + src.replace(/'/g, "\\'") + "', '" + variant + "');"
+        var cleanSrc = src.replace(/[\r\n]/g, "").replace(/'/g, "\\'")
+        var js = "setSkin('" + cleanSrc + "', '" + variant + "');"
         webEngine.runJavaScript(js)
     }
 
