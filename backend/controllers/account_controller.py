@@ -162,6 +162,14 @@ class AccountController(QObject):
         return ""
 
     @Property(str, notify=accountChanged)
+    def activeSkinName(self) -> str:
+        return self._active_custom_name or self._username or "Player"
+
+    @Property(str, notify=accountChanged)
+    def activeSkinPath(self) -> str:
+        return self._active_custom_path or ""
+
+    @Property(str, notify=accountChanged)
     def skinTextureUrl(self) -> str:
         import base64
         # 1. Custom active skin file
@@ -199,8 +207,14 @@ class AccountController(QObject):
         if not val:
             return self.skinTextureUrl
 
+        clean_path = val
+        if clean_path.startswith("file:///"):
+            clean_path = clean_path[8:]
+        elif clean_path.startswith("file://"):
+            clean_path = clean_path[7:]
+
         import base64
-        p = Path(val)
+        p = Path(clean_path)
         if p.exists() and p.is_file():
             try:
                 raw = p.read_bytes()
@@ -217,7 +231,7 @@ class AccountController(QObject):
             except Exception:
                 pass
 
-        if val.startswith("http://") or val.startswith("https://") or val.startswith("data:") or val.startswith("file:"):
+        if val.startswith("http://") or val.startswith("https://") or val.startswith("data:"):
             return val
 
         return f"https://minotar.net/skin/{val}"
@@ -328,30 +342,22 @@ class AccountController(QObject):
 
     @Slot(str)
     def fetchSkinByUsername(self, username: str) -> None:
-        """Fetches skin PNG texture and 3D preview for any player username."""
-        if not username.strip():
+        """Fetches skin PNG texture and 3D preview for any player username without applying it."""
+        name = (username or "").strip()
+        if not name:
             self.skinUploadStatusChanged.emit("Bitte gib einen Spielernamen ein.", True)
             return
 
-        self.skinUploadStatusChanged.emit(f"Lade Skin für '{username.strip()}'…", False)
+        self.skinUploadStatusChanged.emit(f"Lade Skin-Vorschau für '{name}'…", False)
 
         def worker():
-            from backend.services.skin_service import fetch_skin_by_username, generate_skin_renders, set_active_skin
-            ok, path, preview = fetch_skin_by_username(username.strip())
+            from backend.services.skin_service import fetch_skin_by_username, generate_skin_renders
+            ok, path, preview = fetch_skin_by_username(name)
             if ok:
                 body_p, av_p = generate_skin_renders(path)
                 body_url = ("file:///" + str(Path(body_p)).replace("\\", "/")) if body_p else preview
-                av_url = ("file:///" + str(Path(av_p)).replace("\\", "/")) if av_p else f"https://mc-heads.net/avatar/{username.strip()}/64"
-                self._active_custom_body = body_url
-                self._active_custom_avatar = av_url
-                self._active_custom_name = username.strip()
-                self._active_custom_path = path
-                set_active_skin(username.strip(), path, body_url, av_url)
-                self._skin_version = int(time.time())
                 self.skinFetched.emit(path, body_url)
-                self.accountChanged.emit()
-                self.skinHistoryChanged.emit()
-                self.skinUploadStatusChanged.emit(f"Skin von {username.strip()} geladen & synchronisiert!", False)
+                self.skinUploadStatusChanged.emit(f"Vorschau von '{name}' geladen. Klicke auf 'Skin anwenden'.", False)
             else:
                 self.skinUploadStatusChanged.emit(preview, True)
 
@@ -363,7 +369,7 @@ class AccountController(QObject):
 
     @Slot(result=str)
     def pickSkinFile(self) -> str:
-        """Opens file dialog for selecting a Minecraft Skin PNG."""
+        """Opens file dialog for selecting a Minecraft Skin PNG for preview."""
         file_path, _ = QFileDialog.getOpenFileName(
             None,
             "Minecraft Skin (.png) auswählen",
@@ -371,63 +377,75 @@ class AccountController(QObject):
             "Minecraft Skin (*.png);;Alle Dateien (*.*)"
         )
         if file_path:
-            from backend.services.skin_service import generate_skin_renders, add_skin_to_history, set_active_skin
+            from backend.services.skin_service import generate_skin_renders
             body_p, av_p = generate_skin_renders(file_path)
-            clean_name = Path(file_path).stem.replace("_", " ").replace("-", " ").title()
-            av_url = ("file:///" + str(Path(av_p)).replace("\\", "/")) if av_p else ""
             body_url = ("file:///" + str(Path(body_p)).replace("\\", "/")) if body_p else ""
-            
-            add_skin_to_history(clean_name, file_path, av_url)
-            self._active_custom_body = body_url
-            self._active_custom_avatar = av_url
-            self._active_custom_name = clean_name
-            self._active_custom_path = file_path
-            set_active_skin(clean_name, file_path, body_url, av_url)
-            self._skin_version = int(time.time())
-            self.skinHistoryChanged.emit()
             self.skinFetched.emit(file_path, body_url)
-            self.accountChanged.emit()
+            self.skinUploadStatusChanged.emit(f"Datei '{Path(file_path).name}' in Vorschau geladen. Klicke auf 'Skin anwenden'.", False)
         return file_path or ""
 
+    @Slot(str, str, str)
+    def applySkin(self, file_path_or_user: str, variant: str = "classic", custom_name: str = "") -> None:
+        """Applies and activates a skin (locally and to Mojang if online)."""
+        self._apply_and_upload_skin(file_path_or_user, variant, custom_name)
+
     @Slot(str, str)
-    def uploadSkin(self, file_path: str, variant: str = "classic") -> None:
-        """Uploads a local skin PNG file to Mojang servers."""
-        if not file_path:
+    def uploadSkin(self, file_path_or_user: str, variant: str = "classic") -> None:
+        """Uploads and activates a skin."""
+        self._apply_and_upload_skin(file_path_or_user, variant, "")
+
+    def _apply_and_upload_skin(self, file_path_or_user: str, variant: str = "classic", custom_name: str = "") -> None:
+        target = (file_path_or_user or "").strip()
+        if not target:
             self.skinUploadStatusChanged.emit("Keine Skin-Datei ausgewählt.", True)
             return
 
-        # 1. Immediately apply skin locally across all 3 UI views
-        from backend.services.skin_service import generate_skin_renders, add_skin_to_history, set_active_skin
-        body_p, av_p = generate_skin_renders(file_path)
-        clean_name = Path(file_path).stem.replace("_", " ").replace("-", " ").title()
-        av_url = ("file:///" + str(Path(av_p)).replace("\\", "/")) if av_p else ""
+        from backend.services.skin_service import generate_skin_renders, add_skin_to_history, set_active_skin, get_skins_dir
+
+        clean_path = target
+        if clean_path.startswith("file:///"):
+            clean_path = clean_path[8:]
+        elif clean_path.startswith("file://"):
+            clean_path = clean_path[7:]
+
+        p = Path(clean_path)
+        if not p.exists() or not p.is_file():
+            user_p = get_skins_dir() / f"{target}.png"
+            if user_p.exists():
+                p = user_p
+                clean_path = str(p)
+
+        body_p, av_p = generate_skin_renders(clean_path) if (p.exists() and p.is_file()) else ("", "")
+        clean_name = (custom_name or "").strip() or (p.stem.replace("_", " ").replace("-", " ").title() if p.exists() else target)
+        av_url = ("file:///" + str(Path(av_p)).replace("\\", "/")) if av_p else f"https://mc-heads.net/avatar/{clean_name}/64"
         body_url = ("file:///" + str(Path(body_p)).replace("\\", "/")) if body_p else ""
-        
+
         self._active_custom_body = body_url
         self._active_custom_avatar = av_url
         self._active_custom_name = clean_name
-        self._active_custom_path = file_path
-        set_active_skin(clean_name, file_path, body_url, av_url)
-        add_skin_to_history(clean_name, file_path, av_url)
+        self._active_custom_path = str(clean_path) if (p.exists() and p.is_file()) else ""
+        set_active_skin(clean_name, self._active_custom_path, body_url, av_url)
+        add_skin_to_history(clean_name, self._active_custom_path, av_url)
         self._skin_version = int(time.time())
         self.accountChanged.emit()
         self.skinHistoryChanged.emit()
-        self.skinUploadStatusChanged.emit("Skin aktiv & wird zu Mojang übertragen…", False)
+        self.skinUploadStatusChanged.emit("Skin erfolgreich ausgewählt & aktiviert!", False)
 
         def worker():
             try:
                 session = get_minecraft_session()
                 token = session.access_token if session else ""
                 if not token:
-                    self.skinUploadStatusChanged.emit("Skin lokal angewendet (Offline/Lokaler Modus).", False)
+                    self.skinUploadStatusChanged.emit("Skin lokal ausgewählt (Offline/Lokaler Modus).", False)
                     return
 
-                ok, msg = upload_skin_file(token, file_path, variant)
-                self.skinUploadStatusChanged.emit(msg, not ok)
-                if ok:
-                    self._load_account(force_refresh=True)
+                if p.exists() and p.is_file():
+                    ok, msg = upload_skin_file(token, clean_path, variant)
+                    self.skinUploadStatusChanged.emit(msg, not ok)
+                    if ok:
+                        self._load_account(force_refresh=True)
             except Exception as e:
-                self.skinUploadStatusChanged.emit(f"Fehler: {e}", True)
+                self.skinUploadStatusChanged.emit(f"Fehler beim Mojang-Upload: {e}", True)
 
         threading.Thread(target=worker, daemon=True).start()
 

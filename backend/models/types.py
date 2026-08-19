@@ -4,7 +4,8 @@ from pathlib import Path
 import os
 import sys
 
-APP_VERSION = "1.1.7"
+APP_NAME = "EzClient"
+APP_VERSION = "1.1.8"
 GITHUB_REPO = "LuigiLetsPlay/EzClient"
 
 def now_iso() -> str:

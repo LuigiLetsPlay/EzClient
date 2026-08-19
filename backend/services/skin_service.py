@@ -49,7 +49,7 @@ def upload_skin_file(access_token: str, file_path: str | Path, variant: str = "c
             headers={
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": f"multipart/form-data; boundary={boundary}",
-                "User-Agent": "EzClient/1.0.3"
+                "User-Agent": "EzClient/1.1.8"
             },
             method="POST"
         )
@@ -81,7 +81,7 @@ def reset_skin_to_default(access_token: str) -> tuple[bool, str]:
             MOJANG_SKIN_URL,
             headers={
                 "Authorization": f"Bearer {access_token}",
-                "User-Agent": "EzClient/1.0.8"
+                "User-Agent": "EzClient/1.1.8"
             },
             method="DELETE"
         )
@@ -336,7 +336,6 @@ def fetch_skin_by_username(username: str) -> tuple[bool, str, str]:
                             target_png.write_bytes(content)
                             body_p, av_p = generate_skin_renders(target_png)
                             preview_url = ("file:///" + str(Path(body_p)).replace("\\", "/")) if body_p else f"https://mc-heads.net/body/{name}/360"
-                            add_skin_to_history(name, str(target_png), preview_url)
                             return True, str(target_png), preview_url
     except Exception:
         pass
@@ -358,7 +357,6 @@ def fetch_skin_by_username(username: str) -> tuple[bool, str, str]:
                         target_png.write_bytes(content)
                         body_p, av_p = generate_skin_renders(target_png)
                         preview_url = ("file:///" + str(Path(body_p)).replace("\\", "/")) if body_p else f"https://mc-heads.net/body/{name}/360"
-                        add_skin_to_history(name, str(target_png), preview_url)
                         return True, str(target_png), preview_url
         except Exception:
             continue
