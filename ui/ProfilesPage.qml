@@ -134,10 +134,16 @@ Item {
                         Text { text: EzI18n.t("profiles_version_label", "Minecraft Version"); font.family: EzTheme.fontFamily; font.pixelSize: 11; font.bold: true; color: EzTheme.textSecondary }
 
                         EzDropDown {
+                            id: versionPicker
                             Layout.fillWidth: true
                             currentIndex: 0
-                            choices: ["26.2", "26.1", "1.21.8", "1.21.7", "1.21.6", "1.21.5", "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21", "1.20.6", "1.20.4", "1.20.1", "1.19.4", "1.18.2", "1.16.5"]
-                            onChoiceChanged: root.createVersion = choices[currentIndex]
+                            choices: ["26.2", "26.1", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5", "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21"]
+                            formatEzClientSupported: true
+                            onChoiceChanged: {
+                                root.createVersion = choices[currentIndex]
+                                // Trigger preset update
+                                presetPicker.updateChoices()
+                            }
                         }
                     }
 
@@ -162,14 +168,32 @@ Item {
                     Text { text: EzI18n.t("profiles_preset_label", "Client-Ausstattung"); font.family: EzTheme.fontFamily; font.pixelSize: 11; font.bold: true; color: EzTheme.textSecondary }
 
                     EzDropDown {
+                        id: presetPicker
                         Layout.fillWidth: true
                         currentIndex: 0
-                        choices: ["EzClient (Empfohlen)", "EzClient + Essentials", "Vanilla Pure (Keine Mods)"]
-                        onChoiceChanged: {
-                            if (currentIndex === 0) root.createPreset = "performance"
-                            else if (currentIndex === 1) root.createPreset = "essentials"
+                        
+                        function updateChoices() {
+                            var ver = versionPicker.choices[versionPicker.currentIndex]
+                            if (versionPicker.isEzClientSupported(ver)) {
+                                choices = ["EzClient + Essentials", "EzClient Only", "Performance Mods + Essentials", "Raw / Vanilla"]
+                            } else {
+                                choices = ["Performance Mods + Essentials", "Performance Mods", "Raw / Vanilla"]
+                            }
+                            currentIndex = 0 // Reset choice when choices change
+                            updatePresetKey()
+                        }
+                        
+                        function updatePresetKey() {
+                            var choice = choices[currentIndex]
+                            if (choice === "EzClient + Essentials") root.createPreset = "essentials"
+                            else if (choice === "EzClient Only") root.createPreset = "performance"
+                            else if (choice === "Performance Mods + Essentials") root.createPreset = "perf_essentials"
+                            else if (choice === "Performance Mods") root.createPreset = "perf_only"
                             else root.createPreset = "raw"
                         }
+                        
+                        Component.onCompleted: updateChoices()
+                        onChoiceChanged: updatePresetKey()
                     }
                 }
 

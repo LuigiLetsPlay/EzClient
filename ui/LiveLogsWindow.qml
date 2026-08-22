@@ -10,7 +10,8 @@ Window {
     minimumWidth: 800
     minimumHeight: 480
     title: "Minecraft Logs · EzClient"
-    flags: Qt.Window | Qt.FramelessWindowHint
+    flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowSystemMenuHint | Qt.WindowMinimizeButtonHint
+    transientParent: null
     color: "#0B0E14"
 
     property var liveLogService: (typeof profileController !== "undefined" && profileController) ? profileController.liveLogService : null
@@ -91,7 +92,7 @@ Window {
                 // Logo / Title
                 RowLayout {
                     spacing: 8
-                    Text { text: "🖥️"; font.pixelSize: 16 }
+                    Image { source: "icons/terminal.svg"; width: 16; height: 16; opacity: 0.8; fillMode: Image.PreserveAspectFit; sourceSize: Qt.size(16,16) }
                     Text {
                         text: "Minecraft Logs"
                         font.family: EzTheme.mcFontFamily
@@ -116,7 +117,7 @@ Window {
                         anchors.fill: parent
                         anchors.margins: 8
                         spacing: 6
-                        Text { text: "🔍"; font.pixelSize: 11; opacity: 0.6 }
+                        Image { source: "icons/search.svg"; width: 14; height: 14; opacity: 0.6; fillMode: Image.PreserveAspectFit; sourceSize: Qt.size(14,14) }
                         TextInput {
                             id: searchInput
                             Layout.fillWidth: true
@@ -298,7 +299,7 @@ Window {
                     // Sidebar Header
                     RowLayout {
                         spacing: 8
-                        Text { text: "🎮"; font.pixelSize: 14 }
+                        Image { source: "icons/box.svg"; width: 16; height: 16; opacity: 0.8; sourceSize: Qt.size(16,16) }
                         Text {
                             text: "Instances"
                             font.family: EzTheme.mcFontFamily
@@ -355,38 +356,55 @@ Window {
                             // Player & Uptime
                             RowLayout {
                                 Layout.fillWidth: true
-                                Text {
-                                    text: "👤 " + (accountController ? accountController.username : "Player")
-                                    font.family: EzTheme.fontFamily
-                                    font.pixelSize: 10
-                                    color: EzTheme.textSecondary
-                                    elide: Text.ElideRight
+                                RowLayout {
+                                    spacing: 4
                                     Layout.fillWidth: true
+                                    Image { source: "icons/user.svg"; width: 12; height: 12; opacity: 0.8; sourceSize: Qt.size(12,12) }
+                                    Text {
+                                        text: accountController ? accountController.username : "Player"
+                                        font.family: EzTheme.fontFamily
+                                        font.pixelSize: 10
+                                        color: EzTheme.textSecondary
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
+                                    }
                                 }
-                                Text {
-                                    text: "🟢 " + liveLogsWindow.uptimeStr
-                                    font.family: "Consolas, monospace"
-                                    font.pixelSize: 10
-                                    font.bold: true
-                                    color: "#22C96E"
+                                RowLayout {
+                                    spacing: 4
+                                    Rectangle { width: 6; height: 6; radius: 3; color: "#22C96E" }
+                                    Text {
+                                        text: liveLogsWindow.uptimeStr
+                                        font.family: "Consolas, monospace"
+                                        font.pixelSize: 10
+                                        font.bold: true
+                                        color: "#22C96E"
+                                    }
                                 }
                             }
 
                             // RAM & CPU Gauges
                             RowLayout {
                                 Layout.fillWidth: true
-                                Text {
-                                    text: "💾 RAM: " + liveLogsWindow.ramUsage
-                                    font.family: "Consolas, monospace"
-                                    font.pixelSize: 10
-                                    color: "#38BDF8"
+                                RowLayout {
+                                    spacing: 4
+                                    Image { source: "icons/database.svg"; width: 12; height: 12; opacity: 0.8; sourceSize: Qt.size(12,12) }
+                                    Text {
+                                        text: "RAM: " + liveLogsWindow.ramUsage
+                                        font.family: "Consolas, monospace"
+                                        font.pixelSize: 10
+                                        color: "#38BDF8"
+                                    }
                                 }
                                 Item { Layout.fillWidth: true }
-                                Text {
-                                    text: "⚙️ CPU: " + liveLogsWindow.cpuUsage
-                                    font.family: "Consolas, monospace"
-                                    font.pixelSize: 10
-                                    color: "#FB923C"
+                                RowLayout {
+                                    spacing: 4
+                                    Image { source: "icons/cpu.svg"; width: 12; height: 12; opacity: 0.8; sourceSize: Qt.size(12,12) }
+                                    Text {
+                                        text: "CPU: " + liveLogsWindow.cpuUsage
+                                        font.family: "Consolas, monospace"
+                                        font.pixelSize: 10
+                                        color: "#FB923C"
+                                    }
                                 }
                             }
                         }
@@ -405,7 +423,7 @@ Window {
                         RowLayout {
                             anchors.centerIn: parent
                             spacing: 8
-                            Text { text: "🛑"; font.pixelSize: 11 }
+                            Image { source: "icons/stop-circle.svg"; width: 14; height: 14; opacity: 0.8; sourceSize: Qt.size(14,14) }
                             Text {
                                 text: "Minecraft beenden"
                                 font.family: EzTheme.fontFamily
@@ -438,7 +456,7 @@ Window {
                         RowLayout {
                             anchors.centerIn: parent
                             spacing: 8
-                            Text { text: "📁"; font.pixelSize: 11 }
+                            Image { source: "icons/folder.svg"; width: 14; height: 14; opacity: 0.8; sourceSize: Qt.size(14,14) }
                             Text {
                                 text: "Profil-Ordner öffnen"
                                 font.family: EzTheme.fontFamily

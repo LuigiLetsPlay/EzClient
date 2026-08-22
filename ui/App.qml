@@ -7,18 +7,11 @@ ApplicationWindow {
     id: window
     width: 1280
     height: 820
-    minimumWidth: 1040
-    minimumHeight: 680
+    minimumWidth: 760
+    minimumHeight: 560
     title: "EzClient"
     flags: Qt.Window | Qt.FramelessWindowHint
     color: EzTheme.bg
-
-    onWidthChanged: {
-        if (width < minimumWidth) width = minimumWidth
-    }
-    onHeightChanged: {
-        if (height < minimumHeight) height = minimumHeight
-    }
 
     function openSkinModal() {
         globalSkinModal.open()
@@ -36,9 +29,18 @@ ApplicationWindow {
 
     // Determine if we need onboarding (no profiles yet)
     property bool needsOnboarding: typeof profileController !== "undefined" && profileController ? !profileController.hasProfiles : false
+    
+    // List of integrated mods
+    property var integratedMods: typeof profileController !== "undefined" && profileController ? profileController.integratedMods : []
 
     function navigateTo(route) {
         navController.navigate(route)
+    }
+
+    Binding {
+        target: EzTheme
+        property: "fontMode"
+        value: typeof profileController !== "undefined" && profileController ? profileController.appFontMode : "mixed"
     }
 
     ColumnLayout {
@@ -98,6 +100,8 @@ ApplicationWindow {
                     ProfileDetailPage {}
                     ModsPage {}
                     ModrinthPage {}
+                    CapePage { onNavigate: function(route) { window.navigateTo(route) } }
+                    CapeEditor { onNavigate: function(route) { window.navigateTo(route) } }
                     SettingsPage {}
                 }
             }
@@ -217,7 +221,9 @@ ApplicationWindow {
                 "mods":           4,
                 "modrinth":       4,
                 "store":          4,
-                "settings":       5
+                "cape":           5,
+                "cape_editor":    6,
+                "settings":       7
             }
             if (indexMap[route] !== undefined) {
                 mainStack.currentIndex = indexMap[route]
@@ -265,7 +271,7 @@ ApplicationWindow {
                         color: "#381214"
                         border.color: "#FF453A"
                         border.width: 1
-                        Text { text: "⚠️"; font.pixelSize: 18; anchors.centerIn: parent }
+                        Image { source: "icons/alert-triangle.svg"; width: 18; height: 18; anchors.centerIn: parent; sourceSize: Qt.size(18,18) }
                     }
                     ColumnLayout {
                         spacing: 2
@@ -370,7 +376,7 @@ ApplicationWindow {
                             id: copyRow
                             anchors.centerIn: parent
                             spacing: 8
-                            Text { text: "📋"; font.pixelSize: 13 }
+                            Image { source: "icons/copy.svg"; width: 14; height: 14; opacity: 0.8; sourceSize: Qt.size(14,14) }
                             Text {
                                 text: "Fehler kopieren"
                                 font.family: EzTheme.fontFamily
@@ -404,7 +410,7 @@ ApplicationWindow {
                             id: openFoldRow
                             anchors.centerIn: parent
                             spacing: 8
-                            Text { text: "📁"; font.pixelSize: 13 }
+                            Image { source: "icons/folder.svg"; width: 14; height: 14; opacity: 0.8; sourceSize: Qt.size(14,14) }
                             Text {
                                 text: "Ordner öffnen"
                                 font.family: EzTheme.fontFamily

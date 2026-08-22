@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "ezclient",
+"version": "1.5.1",
+  "name": "EzClient",
+  "description": "EzClient Core Client Mod - Performance Optimizer & Window Customizer",
+  "authors": [
+    "EzClient Team"
+  ],
+  "contact": {
+    "homepage": "https://ezclient.app"
+  },
+  "license": "MIT",
+  "icon": "assets/ezclient/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "app.ezclient.EzClientMod"
+    ],
+    "modmenu": [
+      "app.ezclient.integration.EzClientModMenu"
+    ]
+  },
+  "mixins": [
+    "ezclient.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

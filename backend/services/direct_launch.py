@@ -195,29 +195,29 @@ def ensure_profile_defaults(profile_path: Path) -> None:
         "particles": "2",
         "biomeBlendRadius": "0"
     }
-
-    existing: dict[str, str] = {}
     is_new = not options_file.exists()
-    if options_file.exists():
-        try:
-            for line in options_file.read_text("utf-8").splitlines():
-                if ":" in line:
-                    k, v = line.split(":", 1)
-                    existing[k] = v
-        except Exception:
-            pass
-
-    for k, v in defaults.items():
-        if is_new or k not in existing:
+    if not is_new:
+        # Nur Discord RPC fixen, wenn options.txt schon existiert
+        pass
+    else:
+        existing: dict[str, str] = {}
+        for k, v in defaults.items():
             existing[k] = v
-        elif k in ("onboardAccessibility", "narrator", "tutorialStep", "clouds", "entityShadows"):
-            existing[k] = v  # always ensure narrator modal and heavy shadows/clouds are kept optimized
-        elif k == "soundCategory_music" and (existing.get(k) == "1.0" or is_new):
-            existing[k] = "0.1"  # lower default 100% music down to 10%
+        lines = [f"{k}:{v}" for k, v in existing.items()]
+        options_file.parent.mkdir(parents=True, exist_ok=True)
+        options_file.write_text("\n".join(lines), encoding="utf-8")
 
-    lines = [f"{k}:{v}" for k, v in existing.items()]
-    options_file.parent.mkdir(parents=True, exist_ok=True)
-    options_file.write_text("\n".join(lines), encoding="utf-8")
+    # Disable Essential Discord RPC
+    essential_config = profile_path / "essential" / "config.toml"
+    if essential_config.exists():
+        try:
+            text = essential_config.read_text("utf-8")
+            if 'discord_rpc = true' in text or 'discord_integration = true' in text or 'discordRpc = true' in text or 'discord' in text.lower():
+                import re
+                text = re.sub(r'discord(?i)[a-z_]*\s*=\s*true', 'discord_integration = false', text)
+                essential_config.write_text(text, "utf-8")
+        except Exception as e:
+            print(f"[DirectLaunch] Failed to disable Essential RPC: {e}")
 
 def launch_minecraft_direct(
     profile: ProfileData,
@@ -311,26 +311,17 @@ def launch_minecraft_direct(
     asset_index = vanilla_data.get("assetIndex", {}).get("id", inherits)
     main_class = fabric_data.get("mainClass", "net.fabricmc.loader.impl.launch.knot.KnotClient") if fabric_data else vanilla_data.get("mainClass", "net.minecraft.client.main.Main")
 
-    # High-Performance JVM Flags (Zero-stutter Aikar/Fabric tuned flags with pre-allocated heap)
+    # High-Performance JVM Flags (Aggressive ZGC zero-stutter flags)
     jvm_args = [
         java_bin,
         f"-Xmx{ram}M",
         f"-Xms{ram}M",
         "-XX:+AlwaysPreTouch",
         "-XX:+UnlockExperimentalVMOptions",
-        "-XX:+UseG1GC",
-        "-XX:G1NewSizePercent=28",
-        "-XX:G1MaxNewSizePercent=38",
-        "-XX:G1ReservePercent=15",
-        "-XX:G1HeapWastePercent=5",
-        "-XX:G1MixedGCCountTarget=4",
-        "-XX:InitiatingHeapOccupancyPercent=15",
-        "-XX:G1MixedGCLiveThresholdPercent=90",
-        "-XX:G1RSetUpdatingPauseTimePercent=5",
-        "-XX:SurvivorRatio=32",
+        "-XX:+UseZGC",
+        "-XX:+ZProactive",
+        "-XX:ZUncommitDelay=60",
         "-XX:+PerfDisableSharedMem",
-        "-XX:MaxTenuringThreshold=1",
-        "-XX:+ParallelRefProcEnabled",
         "-XX:+DisableExplicitGC",
         "--sun-misc-unsafe-memory-access=allow",
         "--enable-native-access=ALL-UNNAMED",

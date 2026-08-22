@@ -212,6 +212,12 @@ def main() -> None:
     profile_controller.hideToTrayRequested.connect(hide_window_to_tray)
     profile_controller.restoreFromTrayRequested.connect(restore_window)
 
+    try:
+        from backend.services import discord_service
+        discord_service.init_rpc()
+    except Exception as e:
+        print(f"[Main] Discord RPC init failed: {e}")
+
     sys.exit(app.exec())
 
 

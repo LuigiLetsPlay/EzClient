@@ -75,6 +75,12 @@ class LiveLogService(QObject):
         self._is_running = True
         self.isRunningChanged.emit()
 
+        try:
+            from backend.services import discord_service
+            discord_service.set_rpc_state(f"Playing {instance_name}", "In Game")
+        except Exception:
+            pass
+
         # Start log tailing thread
         self._tail_thread = threading.Thread(target=self._tail_worker, daemon=True)
         self._tail_thread.start()
@@ -88,6 +94,12 @@ class LiveLogService(QObject):
         self._is_running = False
         self._stop_event.set()
         self.isRunningChanged.emit()
+        
+        try:
+            from backend.services import discord_service
+            discord_service.set_rpc_state("Im EzClient Launcher", "Navigating Menus")
+        except Exception:
+            pass
 
     def _tail_worker(self) -> None:
         last_pos = 0

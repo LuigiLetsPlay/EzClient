@@ -6,7 +6,7 @@ from dataclasses import asdict
 import threading
 import time
 from PySide6.QtCore import QObject, Signal, Slot, Property
-from backend.models.types import ProfileData, ModData
+from backend.models.types import ProfileData, ModData, DATA_DIR
 from backend.services.store import ProfileStore
 from backend.models.profile_model import ProfileModel
 from backend.models.mod_model import ModModel
@@ -29,7 +29,13 @@ class ProfileController(QObject):
     restoreFromTrayRequested = Signal()
     onboardingStepProgress = Signal(float, str, str)
     onboardingFinished = Signal(str)
+    
+    # New signals for instant install loading status
+    modInstallStarted = Signal(str)
+    modInstallFinished = Signal(str)
+    modUpdatesChanged = Signal()
     _syncNeeded = Signal()
+    _modUpdatesDone = Signal(dict)
 
     def __init__(self, store: ProfileStore, profile_model: ProfileModel, mod_model: ModModel, parent=None):
         super().__init__(parent)
@@ -40,7 +46,9 @@ class ProfileController(QObject):
         self._active_profile: ProfileData | None = self._store.get_last_or_default()
         self._installed_registry = InstalledModRegistry()
         self._is_launching: bool = False
+        self._mod_updates: dict[str, str] = {}
         self._syncNeeded.connect(self._sync_models)
+        self._modUpdatesDone.connect(self._set_mod_updates)
         self._sync_models()
         if self._active_profile:
             threading.Thread(target=lambda: sync_profile_mods(self._active_profile), daemon=True).start()
@@ -159,6 +167,17 @@ class ProfileController(QObject):
         self.settingSaved.emit("Live-Log Anzeige gespeichert")
 
     @Property(str, notify=settingsChanged)
+    def appFontMode(self) -> str:
+        return self._store.settings.get("app_font_mode", "mixed")
+
+    @Slot(str)
+    def setAppFontMode(self, mode: str) -> None:
+        self._store.settings["app_font_mode"] = mode
+        self._store.save()
+        self.settingsChanged.emit()
+        self.settingSaved.emit("Schriftart gespeichert")
+
+    @Property(str, notify=settingsChanged)
     def customBackgroundImage(self) -> str:
         return self._store.settings.get("custom_background_image", "")
 
@@ -193,9 +212,9 @@ class ProfileController(QObject):
     def pickBackgroundImage(self) -> str:
         file_path, _ = QFileDialog.getOpenFileName(
             None,
-            "Hintergrundbild auswählen",
+            "Hintergrundbild oder Clip auswählen",
             "",
-            "Bilder (*.png *.jpg *.jpeg *.webp);;Alle Dateien (*.*)"
+            "Bilder und Clips (*.png *.jpg *.jpeg *.webp *.mp4 *.webm *.mov);;Alle Dateien (*.*)"
         )
         if file_path:
             self.setCustomBackgroundImage(file_path)
@@ -208,6 +227,27 @@ class ProfileController(QObject):
         if self._active_profile:
             try:
                 self._installed_registry.scan_directory(self._active_profile.mods_path, self._active_profile.mods)
+                
+                # Update descriptions and authors from the scanned JAR metadata
+                # so we don't rely on translated/custom descriptions saved in profile.json
+                for pm in self._active_profile.mods:
+                    pm_slug = (pm.slug or "").lower()
+                    pm_fn = (pm.filename or "").lower()
+                    for scanned in self._installed_registry.installed_mods:
+                        sc_slug = scanned.get("slug", "").lower()
+                        sc_fn = scanned.get("filename", "").lower()
+                        if (pm_slug and pm_slug == sc_slug) or (pm_fn and pm_fn == sc_fn):
+                            if scanned.get("description"):
+                                pm.description = scanned["description"]
+                            if scanned.get("authors"):
+                                pm.author = scanned["authors"]
+                            break
+                    
+                    if pm.name == "EzClient" or pm_slug == "ezclient":
+                        import os
+                        from main import get_app_root
+                        pm.icon_url = Path(get_app_root() / "ui" / "assets" / "logo.png").as_uri()
+
             except Exception as e:
                 print(f"[ProfileController] Registry scan error: {e}")
             self._mod_model.set_mods(self._active_profile.mods)
@@ -216,10 +256,74 @@ class ProfileController(QObject):
             self._mod_model.set_mods([])
         self.profilesChanged.emit()
         self.activeProfileChanged.emit()
+        self.checkModUpdates()
+
+    @Property("QVariantMap", notify=modUpdatesChanged)
+    def modUpdates(self) -> dict:
+        return dict(self._mod_updates)
+
+    @Property(bool, notify=modUpdatesChanged)
+    def hasModUpdates(self) -> bool:
+        return bool(self._mod_updates)
+
+    @Slot()
+    def checkModUpdates(self) -> None:
+        """Fetch the newest compatible build for installed non-core mods."""
+        if not self._active_profile or not self.checkUpdates:
+            if self._mod_updates:
+                self._mod_updates = {}
+                self.modUpdatesChanged.emit()
+            return
+        profile = self._active_profile
+        mods = list(profile.mods)
+
+        def _check_task():
+            from backend.services.modrinth import ModrinthService
+            from backend.services.curseforge import CurseForgeService
+            modrinth = ModrinthService()
+            curseforge = CurseForgeService()
+            updates: dict[str, str] = {}
+            for mod in mods:
+                key = mod.project_id or mod.slug or mod.name
+                if not key or (mod.slug or "").lower() in ("ezclient", "fabric-api"):
+                    continue
+                try:
+                    versions = []
+                    if getattr(mod, "source", "modrinth") == "curseforge":
+                        versions = curseforge.get_project_versions(key, mc_version=profile.minecraft_version, loader=profile.loader)
+                    if not versions:
+                        versions = modrinth.get_project_versions(key, mc_version=profile.minecraft_version, loader=profile.loader)
+                    if versions:
+                        newest = str(versions[0].get("version_number", ""))
+                        if newest and newest != str(mod.version or ""):
+                            updates[key] = newest
+                except Exception as exc:
+                    print(f"[ProfileController] Update check skipped for {key}: {exc}")
+            self._modUpdatesDone.emit(updates)
+
+        threading.Thread(target=_check_task, daemon=True).start()
+
+    @Slot(dict)
+    def _set_mod_updates(self, updates: dict) -> None:
+        self._mod_updates = dict(updates)
+        self.modUpdatesChanged.emit()
 
     @Property("QVariantList", notify=activeProfileChanged)
     def installedMods(self) -> list:
         return self._installed_registry.installed_mods
+
+    @Slot(str, str, result=bool)
+    def hasModVersion(self, slug: str, version: str) -> bool:
+        if not self._active_profile:
+            return False
+        slug_clean = slug.strip().lower()
+        for m in self._active_profile.mods:
+            m_slug = (m.slug or "").lower()
+            m_pid = (m.project_id or "").lower()
+            if m_slug == slug_clean or m_pid == slug_clean:
+                if m.version == version:
+                    return True
+        return False
 
     @Property(str, notify=activeProfileChanged)
     def activeId(self) -> str:
@@ -232,6 +336,10 @@ class ProfileController(QObject):
     @Property(str, notify=activeProfileChanged)
     def activeName(self) -> str:
         return self._active_profile.name if self._active_profile else "No Profile"
+
+    @Property("QVariantList", notify=activeProfileChanged)
+    def integratedMods(self) -> list:
+        return self._active_profile.integrated_mods if self._active_profile else []
 
     @Property(str, notify=activeProfileChanged)
     def activeVersion(self) -> str:
@@ -350,8 +458,8 @@ class ProfileController(QObject):
         self.activeProfileChanged.emit()
         threading.Thread(target=lambda: sync_profile_mods(profile), daemon=True).start()
 
-    @Slot(str, str, str, str)
-    def createProfileWithLiveDownloads(self, name: str, version: str, loader: str, preset: str) -> None:
+    @Slot(str, str, str, str, "QVariantList")
+    def createAndOnboard(self, name: str, version: str, loader: str, preset: str, excluded_slugs: list = []) -> None:
         """Creates a profile and runs live mod downloads in background thread with progress feedback."""
         from backend.services.mod_downloader import download_file, sync_profile_mods
         from backend.services.modrinth import ModrinthService
@@ -360,6 +468,11 @@ class ProfileController(QObject):
             import shutil
             import time
             profile = self._store.create_profile(name, version, loader=loader, preset=preset)
+            
+            # Filter out excluded mods
+            if excluded_slugs:
+                profile.mods = [m for m in profile.mods if m.slug not in excluded_slugs]
+                
             svc = ModrinthService()
             try:
                 from backend.services.direct_launch import ensure_profile_defaults
@@ -371,32 +484,35 @@ class ProfileController(QObject):
             for idx, m in enumerate(profile.mods):
                 p = idx / max(1, total)
                 self.onboardingStepProgress.emit(p, m.name, f"Richte {m.name} ein… ({idx+1}/{total})")
-
-                is_ezclient = (m.slug and m.slug.lower() in ("ezclient", "ezclient-core")) or (m.filename and m.filename.lower() == "ezclient.jar") or ("ezclient" in m.name.lower())
+                target_filename = m.filename if m.filename else "EzClient.jar"
+                is_ezclient = (m.slug and m.slug.lower() in ("ezclient", "ezclient-core")) or (m.filename and m.filename.lower() in ("ezclient.jar", "ezclient-lite.jar")) or ("ezclient" in m.name.lower())
+                
                 if is_ezclient:
-                    # Resolve EzClient.jar across all candidate locations
+                    # Resolve EzClient.jar or EzClient-Lite.jar across all candidate locations
                     candidates = [
-                        Path(sys._MEIPASS) / "backend" / "assets" / "EzClient.jar" if hasattr(sys, "_MEIPASS") else None,
-                        Path(sys._MEIPASS) / "assets" / "EzClient.jar" if hasattr(sys, "_MEIPASS") else None,
-                        Path(__file__).resolve().parent.parent / "assets" / "EzClient.jar",
-                        Path(__file__).resolve().parent / "assets" / "EzClient.jar",
-                        Path(sys.executable).parent / "backend" / "assets" / "EzClient.jar",
-                        Path.cwd() / "backend" / "assets" / "EzClient.jar",
+                        DATA_DIR / "assets" / target_filename,
+                        Path(sys._MEIPASS) / "backend" / "assets" / target_filename if hasattr(sys, "_MEIPASS") else None,
+                        Path(sys._MEIPASS) / "assets" / target_filename if hasattr(sys, "_MEIPASS") else None,
+                        Path(__file__).resolve().parent.parent / "assets" / target_filename,
+                        Path(__file__).resolve().parent / "assets" / target_filename,
+                        Path(sys.executable).parent / "backend" / "assets" / target_filename,
+                        Path.cwd() / "backend" / "assets" / target_filename,
+                        Path.cwd() / "assets" / target_filename,
                     ]
                     copied = False
                     for c in candidates:
                         if c and c.exists() and c.is_file() and c.stat().st_size > 100:
                             try:
                                 profile.mods_path.mkdir(parents=True, exist_ok=True)
-                                shutil.copy2(c, profile.mods_path / "EzClient.jar")
+                                shutil.copy2(c, profile.mods_path / target_filename)
                                 copied = True
                                 break
                             except Exception as ex:
                                 print(f"[EzClient Copy] Error: {ex}")
                     if not copied:
-                        # Ensure empty file exists as fallback
                         try:
-                            (profile.mods_path / "EzClient.jar").touch(exist_ok=True)
+                            print(f"[ProfileController] Warning: Could not find local {target_filename} to copy.")
+                            (profile.mods_path / target_filename).touch(exist_ok=True)
                         except Exception:
                             pass
                     p_after = (idx + 1) / max(1, total)
@@ -425,18 +541,21 @@ class ProfileController(QObject):
                 self.onboardingStepProgress.emit(p_after, m.name, f"✓ {m.name} installiert ({idx+1}/{total})")
                 time.sleep(0.04)
 
-            # Final dependency sync pass to ensure 100% completeness
-            try:
-                sync_profile_mods(profile, svc)
-            except Exception as ex:
-                print(f"[Sync Profile Mods] Handled: {ex}")
-
             self._active_profile = profile
             self._store.save()
             self._syncNeeded.emit()
             self.onboardingStepProgress.emit(1.0, "Fertig", "Profil erfolgreich eingerichtet & optimiert!")
             time.sleep(0.4)
             self.onboardingFinished.emit(profile.id)
+
+            # Final dependency sync pass to ensure 100% completeness in background
+            def _bg_sync():
+                try:
+                    sync_profile_mods(profile, svc)
+                    self._syncNeeded.emit()
+                except Exception as ex:
+                    print(f"[Sync Profile Mods] Handled: {ex}")
+            threading.Thread(target=_bg_sync, daemon=True).start()
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -523,49 +642,62 @@ class ProfileController(QObject):
         self._active_profile.mods.append(new_mod)
 
         # Check and auto-install required dependencies from Modrinth if Modrinth mod
-        dep_names = []
-        if source == "modrinth":
-            from backend.services.modrinth import ModrinthService
-            svc = ModrinthService()
+        def _install_task():
+            self.modInstallStarted.emit(mod_id)
+            dep_names = []
+            if source == "modrinth":
+                from backend.services.modrinth import ModrinthService
+                svc = ModrinthService()
+                try:
+                    deps = svc.get_dependencies(mod_id, mc_version=self._active_profile.minecraft_version, loader=self._active_profile.loader)
+                    existing_slugs = {(m.slug or "").lower() for m in self._active_profile.mods} | {(m.project_id or "").lower() for m in self._active_profile.mods}
+                    for d in deps:
+                        d_slug = (d.get("slug") or d.get("project_id") or "").lower()
+                        if d_slug and d_slug not in existing_slugs and not self._installed_registry.is_installed(slug=d_slug):
+                            dep_mod = ModData(
+                                project_id=d.get("project_id", d_slug),
+                                slug=d.get("slug", d_slug),
+                                name=d.get("name", d_slug),
+                                version_id="",
+                                version="Latest",
+                                filename=f"{d_slug}.jar",
+                                enabled=True,
+                                essential=False,
+                                icon_url=d.get("icon_url", ""),
+                                author=d.get("author", "Modrinth"),
+                                description=d.get("description", "Automatisch installierte Abhängigkeit"),
+                                source="modrinth"
+                            )
+                            self._active_profile.mods.append(dep_mod)
+                            dep_names.append(d.get("name", d_slug))
+                            existing_slugs.add(d_slug)
+                except Exception as e:
+                    print(f"[ProfileController] Dependency check error for {name}: {e}")
+
+            self._store.save()
+            
+            # Emit signals to main thread instead of calling _sync_models directly
+            # to prevent UI blocking and thread crashes
+            self._syncNeeded.emit()
+            
+            if dep_names:
+                self.settingSaved.emit(f"✓ {name} & {len(dep_names)} benötigte Abhängigkeiten ({', '.join(dep_names)}) installiert!")
+            else:
+                self.settingSaved.emit(f"✓ Mod installiert: {name}")
+
+            # Download jar and all dependencies in background immediately
+            p_ref = self._active_profile
             try:
-                deps = svc.get_dependencies(mod_id, mc_version=self._active_profile.minecraft_version, loader=self._active_profile.loader)
-                existing_slugs = {(m.slug or "").lower() for m in self._active_profile.mods} | {(m.project_id or "").lower() for m in self._active_profile.mods}
-                for d in deps:
-                    d_slug = (d.get("slug") or d.get("project_id") or "").lower()
-                    if d_slug and d_slug not in existing_slugs and not self._installed_registry.is_installed(slug=d_slug):
-                        dep_mod = ModData(
-                            project_id=d.get("project_id", d_slug),
-                            slug=d.get("slug", d_slug),
-                            name=d.get("name", d_slug),
-                            version_id="",
-                            version="Latest",
-                            filename=f"{d_slug}.jar",
-                            enabled=True,
-                            essential=False,
-                            icon_url=d.get("icon_url", ""),
-                            author=d.get("author", "Modrinth"),
-                            description=d.get("description", "Automatisch installierte Abhängigkeit"),
-                            source="modrinth"
-                        )
-                        self._active_profile.mods.append(dep_mod)
-                        dep_names.append(d.get("name", d_slug))
-                        existing_slugs.add(d_slug)
+                from backend.services.mod_downloader import sync_profile_mods
+                sync_profile_mods(p_ref)
+                self._store.save()
+                self._syncNeeded.emit()
             except Exception as e:
-                print(f"[ProfileController] Dependency check error for {name}: {e}")
+                print(f"[ProfileController] Instant download error: {e}")
+                
+            self.modInstallFinished.emit(mod_id)
 
-        self._store.save()
-        self._sync_models()
-        self.profilesChanged.emit()
-        self.activeProfileChanged.emit()
-
-        if dep_names:
-            self.settingSaved.emit(f"✓ {name} & {len(dep_names)} benötigte Abhängigkeiten ({', '.join(dep_names)}) installiert!")
-        else:
-            self.settingSaved.emit(f"✓ Mod installiert: {name}")
-
-        # Download jar and all dependencies in background immediately
-        p_ref = self._active_profile
-        threading.Thread(target=lambda: sync_profile_mods(p_ref), daemon=True).start()
+        threading.Thread(target=_install_task, daemon=True).start()
 
     @Slot(str)
     @Slot(str, str)
@@ -593,22 +725,23 @@ class ProfileController(QObject):
         self._active_profile.mods = new_mods
         self._store.save()
 
-        # Remove jar from disk
-        try:
-            for target in targets:
-                for f in self._active_profile.mods_path.glob(f"*{target}*"):
-                    try:
-                        f.unlink(missing_ok=True)
-                    except Exception:
-                        pass
-        except Exception as ex:
-            print(f"[ProfileController] Error unlinking mod jars: {ex}")
+        # Remove jar from disk in background to prevent UI hang
+        def _uninstall_task():
+            try:
+                for target in targets:
+                    for f in self._active_profile.mods_path.glob(f"*{target}*"):
+                        try:
+                            f.unlink(missing_ok=True)
+                        except Exception:
+                            pass
+            except Exception as ex:
+                print(f"[ProfileController] Error unlinking mod jars: {ex}")
 
-        self._sync_models()
-        self.profilesChanged.emit()
-        self.activeProfileChanged.emit()
-        if removed_name:
-            self.settingSaved.emit(f"Mod gelöscht: {removed_name}")
+            self._syncNeeded.emit()
+            if removed_name:
+                self.settingSaved.emit(f"Mod gelöscht: {removed_name}")
+
+        threading.Thread(target=_uninstall_task, daemon=True).start()
 
     @Slot(str, str)
     def updateModVersion(self, mod_id: str, new_version: str) -> None:
@@ -619,15 +752,51 @@ class ProfileController(QObject):
             if (m.project_id and m.project_id.lower() == mid) or \
                (m.slug and m.slug.lower() == mid) or \
                (m.name and m.name.lower() == mid):
-                m.version = new_version
+                m.version = new_version or "Latest"
                 self._store.save()
-                self._sync_models()
-                self.profilesChanged.emit()
-                self.activeProfileChanged.emit()
-                self.settingSaved.emit(f"Version geändert: {m.name} ({new_version})")
-                p_ref = self._active_profile
-                threading.Thread(target=lambda: sync_profile_mods(p_ref), daemon=True).start()
+                
+                def _update_task():
+                    p_ref = self._active_profile
+                    old_jar = p_ref.mods_path / m.filename
+                    try:
+                        if old_jar.exists():
+                            old_jar.unlink()
+                    except OSError as exc:
+                        print(f"[ProfileController] Could not replace {old_jar.name}: {exc}")
+                    sync_profile_mods(p_ref)
+                    self._store.save()
+                    self._syncNeeded.emit()
+                    self.settingSaved.emit(f"Version geändert: {m.name} ({new_version})")
+
+                threading.Thread(target=_update_task, daemon=True).start()
                 return
+
+    @Slot()
+    def updateAllMods(self) -> None:
+        """Replace every non-core mod with the newest compatible build."""
+        if not self._active_profile:
+            return
+        mods = [m for m in self._active_profile.mods if (m.slug or "").lower() not in ("ezclient", "fabric-api")]
+        if not mods:
+            return
+        for mod in mods:
+            mod.version = "Latest"
+        self._store.save()
+
+        def _update_all_task():
+            for mod in mods:
+                try:
+                    old_jar = self._active_profile.mods_path / mod.filename
+                    if old_jar.exists():
+                        old_jar.unlink()
+                except OSError:
+                    pass
+            sync_profile_mods(self._active_profile)
+            self._store.save()
+            self._syncNeeded.emit()
+            self.settingSaved.emit(f"{len(mods)} Mods aktualisiert")
+
+        threading.Thread(target=_update_all_task, daemon=True).start()
 
     @Slot(str, result=bool)
     @Slot(str, str, result=bool)

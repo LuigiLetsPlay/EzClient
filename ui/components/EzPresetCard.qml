@@ -90,6 +90,9 @@ Rectangle {
                 font.family: EzTheme.fontFamily
                 font.pixelSize: 11
                 color: selected ? EzTheme.textSecondary : EzTheme.textMuted
+                Layout.alignment: Qt.AlignLeft
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
             }
 
             Text {
@@ -97,6 +100,9 @@ Rectangle {
                 font.family: EzTheme.fontFamily
                 font.pixelSize: 10
                 color: selected ? EzTheme.accentLight : EzTheme.textSubtle
+                Layout.alignment: Qt.AlignLeft
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
             }
         }
     }

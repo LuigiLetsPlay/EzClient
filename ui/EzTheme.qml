@@ -11,7 +11,7 @@ QtObject {
     readonly property color surface2:     "#181823"
     readonly property color surface3:     "#1F1F2C"
     readonly property color surfaceHover: "#252534"
-    readonly property color surfaceActive:"#0F2818"
+    readonly property color surfaceActive:"#21183A"
     readonly property color overlay:      "#00000088"
 
     // ── GLASSMORPHISM ────────────────────────────────────────────
@@ -21,7 +21,7 @@ QtObject {
     // ── BORDERS ──────────────────────────────────────────────────
     readonly property color border:       "#1A1A28"
     readonly property color borderLight:  "#28283A"
-    readonly property color borderAccent: "#22C96E30"
+    readonly property color borderAccent: "#A78BFA30"
 
     // ── TEXT ─────────────────────────────────────────────────────
     readonly property color text:          "#F0F0F5"
@@ -30,16 +30,16 @@ QtObject {
     readonly property color textSubtle:    "#353548"
 
     // ── ACCENT — vivid EzClient green ────────────────────────────
-    readonly property color accent:      "#22C96E"
-    readonly property color accentHover: "#2EE080"
-    readonly property color accentDark:  "#0C3D24"
-    readonly property color accentLight: "#5AEEA0"
-    readonly property color accentGlow:  "#22C96E25"
-    readonly property color accentSoft:  "#22C96E12"
+    readonly property color accent:      "#A78BFA"
+    readonly property color accentHover: "#B9A4FF"
+    readonly property color accentDark:  "#33235E"
+    readonly property color accentLight: "#C4B5FD"
+    readonly property color accentGlow:  "#A78BFA25"
+    readonly property color accentSoft:  "#A78BFA12"
 
     // ── GRADIENTS (start / end) ──────────────────────────────────
-    readonly property color gradStart:   "#22C96E"
-    readonly property color gradEnd:     "#18A858"
+    readonly property color gradStart:   "#A78BFA"
+    readonly property color gradEnd:     "#7C5CE0"
 
     // ── SEMANTIC ──────────────────────────────────────────────────
     readonly property color cyan:    "#38BDF8"
@@ -49,8 +49,10 @@ QtObject {
     readonly property color warning: "#FBBF24"
 
     // ── TYPOGRAPHY ────────────────────────────────────────────────
-    readonly property string mcFontFamily: "Minecraft"
-    readonly property string fontFamily:   "Segoe UI"
+    property string fontMode: "mixed" // "minecraft", "standard", "mixed"
+    
+    readonly property string mcFontFamily: fontMode === "standard" ? "Segoe UI" : "Minecraft"
+    readonly property string fontFamily: fontMode === "minecraft" ? "Minecraft" : "Segoe UI"
 
     // ── DIMENSIONS ────────────────────────────────────────────────
     readonly property int sidebarWidth: 224

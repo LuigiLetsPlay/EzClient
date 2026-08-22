@@ -27,7 +27,7 @@ def write_json(path: Path, value: Any) -> None:
 
 PERFORMANCE_MODS: list[ModData] = [
     ModData(
-        project_id="ezclient", slug="ezclient", name="EzClient Core", version_id="v-core", version="1.0.0",
+        project_id="ezclient", slug="ezclient", name="EzClient Core", version_id="v-core", version="1.3.0",
         filename="EzClient.jar", enabled=True, recommended=True, essential=True,
         icon_url="", author="EzClient Team", description="EzClient Core Mod – Fenstertitel 'EzClient', Icon, Narrator-Bypass & Auto-Optimierung."
     ),
@@ -41,6 +41,7 @@ PERFORMANCE_MODS: list[ModData] = [
         filename="modmenu.jar", enabled=True, recommended=True, essential=True,
         icon_url="https://cdn.modrinth.com/data/mOgUt4GM/5a20ed1450a0e1e79a1fe04e61bb4e5878bf1d20.png", author="Prospector", description="Fügt das interaktive 'Mods'-Menü in den Minecraft-Startbildschirm ein."
     ),
+
     ModData(
         project_id="sodium", slug="sodium", name="Sodium", version_id="v2", version="0.6.13",
         filename="sodium-fabric.jar", enabled=True, recommended=True, essential=False,
@@ -82,20 +83,10 @@ PERFORMANCE_MODS: list[ModData] = [
         icon_url="https://cdn.modrinth.com/data/Ha28R6CL/72c3d74aeb665e45aea93a945a01474cbce3b7da_96.webp", author="FabricMC", description="Kotlin Language Adapter für moderne Mods."
     ),
     ModData(
-        project_id="cloth-config", slug="cloth-config", name="Cloth Config API", version_id="v-cloth", version="Latest",
-        filename="cloth-config.jar", enabled=True, recommended=True, essential=True,
-        icon_url="https://cdn.modrinth.com/data/9s6osm5g/ed8a2316cbb6f4fc5f510e8e13a59a85cbbbff4d_96.webp", author="shedaniel", description="Konfigurations-Framework für Fabric Mods."
-    ),
-    ModData(
         project_id="yacl", slug="yacl", name="YetAnotherConfigLib (YACL)", version_id="v-yacl", version="Latest",
         filename="yet_another_config_lib.jar", enabled=True, recommended=True, essential=True,
         icon_url="https://cdn.modrinth.com/data/1eAoo2KR/08c0cd32515e260f4bb20bbc0696510041523f9a_96.webp", author="isXander", description="Konfigurations-Bibliothek für UI & Grafik."
-    ),
-    ModData(
-        project_id="zoomify", slug="zoomify", name="Zoomify", version_id="v-zoomify", version="Latest",
-        filename="zoomify.jar", enabled=True, recommended=True, essential=False,
-        icon_url="https://cdn.modrinth.com/data/w7ThoJFB/e2de67a0bfb9e8aa2347982ab3ec5463f26cca31_96.webp", author="isXander", description="Flüssiger, stufenloser OptiFine-Style Zoom per Taste (C)."
-    ),
+    )
 ]
 
 ESSENTIALS_MODS: list[ModData] = PERFORMANCE_MODS + [
@@ -103,6 +94,16 @@ ESSENTIALS_MODS: list[ModData] = PERFORMANCE_MODS + [
         project_id="essential", slug="essential", name="Essential Mod", version_id="v7", version="1.3.4",
         filename="essential.jar", enabled=True, recommended=False, essential=False,
         icon_url="https://cdn.modrinth.com/data/k2ZPuTBm/7f7ac7cf2a46d5f02e9644372c44b3095ad61ffb_96.webp", author="SparkUniverse", description="Welten hosten, Freunde, Chat, Kosmetik & Multi-World Support."
+    ),
+    ModData(
+        project_id="YL57xq9U", slug="iris", name="Iris Shaders", version_id="v-iris", version="Latest",
+        filename="iris.jar", enabled=True, recommended=False, essential=False,
+        icon_url="https://cdn.modrinth.com/data/YL57xq9U/icon.png", author="Iris Team", description="Shader-Unterstützung mit hoher Performance."
+    ),
+    ModData(
+        project_id="9eGKb6K1", slug="simple-voice-chat", name="Simple Voice Chat", version_id="v-voice", version="Latest",
+        filename="voicechat.jar", enabled=True, recommended=False, essential=False,
+        icon_url="https://cdn.modrinth.com/data/9eGKb6K1/icon.png", author="Henkelmax", description="Ein leistungsstarker Voice-Chat-Mod für Minecraft."
     ),
 ]
 
@@ -227,16 +228,28 @@ class ProfileStore:
                 mods.append(mod_obj)
 
             # Auto-upgrade profile to include EzClient Core mod if missing
-            if "ezclient" not in existing_slugs and not any(m.filename.lower() == "ezclient.jar" for m in mods):
+            mc_version = raw.get("minecraft_version", "")
+            is_26 = mc_version.startswith("26.")
+            
+            has_ez = any((m.slug or "").lower() == "ezclient" or (m.filename or "").lower().startswith("ezclient") for m in mods)
+            
+            # Add regular version if missing
+            if not any(m.filename.lower() == "ezclient.jar" for m in mods):
                 ez_mod = ModData(**asdict(PERFORMANCE_MODS[0]))
                 mods.insert(0, ez_mod)
+                existing_slugs.add("ezclient")
                 needs_save = True
 
-            # Auto-upgrade profile with new performance mods if they are missing
-            for new_m in (PERFORMANCE_MODS[6], PERFORMANCE_MODS[9]): # memoryleakfix, krypton
-                if (new_m.slug or "").lower() not in existing_slugs:
-                    mods.append(ModData(**asdict(new_m)))
-                    needs_save = True
+            # Auto-upgrade profile with new essential performance mods if they are missing
+            for default_m in PERFORMANCE_MODS:
+                if default_m.essential:
+                    slug_l = (default_m.slug or "").lower()
+                    if slug_l == "ezclient":
+                        continue
+                    if slug_l not in existing_slugs and not any(m.filename.lower() == default_m.filename.lower() for m in mods):
+                        mods.insert(1, ModData(**asdict(default_m)))
+                        existing_slugs.add(slug_l)
+                        needs_save = True
 
             p_keys = {k: v for k, v in raw.items() if k in ProfileData.__annotations__}
             prof = ProfileData(**p_keys, mods=mods)
@@ -271,13 +284,18 @@ class ProfileStore:
         elif preset == "essentials":
             profile_mods = [ModData(**asdict(m)) for m in ESSENTIALS_MODS]
 
+        if version.startswith("26.") and version not in ["26.1", "26.2"]:
+            # Only remove EzClient if it's a 26.x version that is NOT 26.1 or 26.2
+            profile_mods = [m for m in profile_mods if (m.slug or "").lower() != "ezclient"]
+
         profile = ProfileData(
             id=f"{slug}-{uuid.uuid4().hex[:8]}",
             name=name,
             minecraft_version=version,
             loader=loader,
             optimize=optimize,
-            mods=profile_mods
+            mods=profile_mods,
+            integrated_mods=list({m.slug for m in profile_mods if m.slug} | {m.project_id for m in profile_mods if m.project_id})
         )
         ensure(profile.mods_path)
         ensure(profile.path / "config")

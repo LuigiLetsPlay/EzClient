@@ -4,7 +4,7 @@ import shutil
 import urllib.request
 from pathlib import Path
 from typing import Callable, Any
-from backend.models.types import ProfileData, ModData, CACHE_DIR
+from backend.models.types import ProfileData, ModData, CACHE_DIR, DATA_DIR
 from backend.services.modrinth import ModrinthService, USER_AGENT
 
 MODS_CACHE_DIR = CACHE_DIR / "mods"
@@ -74,16 +74,19 @@ def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = No
             except Exception:
                 pass
 
-        # Built-in EzClient Core Mod handling
-        is_ezclient = (m.slug and m.slug.lower() in ("ezclient", "ezclient-core")) or (m.filename and m.filename.lower() == "ezclient.jar") or ("ezclient" in m.name.lower())
+        target_filename = m.filename if m.filename else "EzClient.jar"
+        is_ezclient = (m.slug and m.slug.lower() in ("ezclient", "ezclient-core")) or (m.filename and m.filename.lower() in ("ezclient.jar", "ezclient-lite.jar")) or ("ezclient" in m.name.lower())
+        
         if is_ezclient:
             candidates = [
-                Path(sys._MEIPASS) / "backend" / "assets" / "EzClient.jar" if hasattr(sys, "_MEIPASS") else None,
-                Path(sys._MEIPASS) / "assets" / "EzClient.jar" if hasattr(sys, "_MEIPASS") else None,
-                Path(__file__).resolve().parent.parent / "assets" / "EzClient.jar",
-                Path(__file__).resolve().parent / "assets" / "EzClient.jar",
-                Path(sys.executable).parent / "backend" / "assets" / "EzClient.jar",
-                Path.cwd() / "backend" / "assets" / "EzClient.jar",
+                DATA_DIR / "assets" / target_filename,
+                Path(sys._MEIPASS) / "backend" / "assets" / target_filename if hasattr(sys, "_MEIPASS") else None,
+                Path(sys._MEIPASS) / "assets" / target_filename if hasattr(sys, "_MEIPASS") else None,
+                Path(__file__).resolve().parent.parent / "assets" / target_filename,
+                Path(__file__).resolve().parent / "backend" / "assets" / target_filename,
+                Path(sys.executable).parent / "backend" / "assets" / target_filename,
+                Path.cwd() / "backend" / "assets" / target_filename,
+                Path.cwd() / "assets" / target_filename,
             ]
             for c in candidates:
                 if c and c.exists() and c.is_file() and c.stat().st_size > 100:
@@ -91,12 +94,13 @@ def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = No
                         shutil.copy2(c, target_jar)
                         break
                     except Exception as ex:
-                        print(f"[ModDownloader] Error copying EzClient.jar: {ex}")
+                        print(f"[ModDownloader] Error copying {target_filename}: {ex}")
             active_filenames.add(target_jar.name)
             continue
 
-        # Check if already present on disk
-        if target_jar.exists() and target_jar.stat().st_size > 1024:
+        # A "Latest" request deliberately replaces an already-downloaded JAR.
+        requested_version = (getattr(m, "version", "") or "").strip()
+        if requested_version.lower() != "latest" and target_jar.exists() and target_jar.stat().st_size > 1024:
             active_filenames.add(target_jar.name)
             continue
 
@@ -131,7 +135,13 @@ def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = No
                 versions = cf_svc.get_project_versions(slug_or_id, mc_version=profile.minecraft_version, loader=profile.loader)
             
             if versions:
-                best_ver = next((v for v in versions if v.get("version_type") == "release"), versions[0])
+                best_ver = next(
+                    (v for v in versions if requested_version and requested_version.lower() != "latest"
+                     and v.get("version_number") == requested_version),
+                    None,
+                )
+                if best_ver is None:
+                    best_ver = versions[0]
                 files = best_ver.get("files", [])
                 primary = next((f for f in files if f.get("primary")), files[0] if files else None)
                 if primary and primary.get("url"):
@@ -169,7 +179,7 @@ def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = No
             if not versions:
                 continue
 
-            best_ver = next((v for v in versions if v.get("version_type") == "release"), versions[0])
+            best_ver = versions[0]
             files = best_ver.get("files", [])
             primary = next((f for f in files if f.get("primary")), files[0] if files else None)
             if primary and primary.get("url"):
@@ -201,4 +211,3 @@ def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = No
                     pass
     except Exception:
         pass
-

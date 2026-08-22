@@ -20,8 +20,10 @@ Item {
     property var pendingDeleteMod: null
     property var pendingDeleteDeps: []
 
-    // Filter status state: "all", "enabled", "disabled"
+    // Filter status state: "all", "enabled", "disabled", "performance"
     property string filterStatus: "all"
+    property bool showCoreMods: false
+    readonly property bool hasUpdates: profileController && profileController.hasModUpdates
 
     // Background click handler to deselect / defocus search input
     MouseArea {
@@ -148,7 +150,7 @@ Item {
                         border.width: 1
                         Text {
                             id: verPillText
-                            text: "Installiert: " + ((root.currentInspectedMod && root.currentInspectedMod.version) ? root.currentInspectedMod.version : "Latest")
+                            text: (root.currentInspectedMod && window.integratedMods && window.integratedMods.indexOf(root.currentInspectedMod.slug) !== -1 ? "Integriert: " : "Installiert: ") + ((root.currentInspectedMod && root.currentInspectedMod.version) ? root.currentInspectedMod.version : "Latest")
                             font.family: EzTheme.mcFontFamily; font.pixelSize: 10; font.bold: true
                             color: EzTheme.cyan; anchors.centerIn: parent
                         }
@@ -314,7 +316,7 @@ Item {
 
                     Repeater {
                         model: [
-                            { id: "release", label: "Release (Standard)" },
+                            { id: "release", label: "Release" },
                             { id: "beta",    label: "Beta" },
                             { id: "all",     label: "Alle" }
                         ]
@@ -692,6 +694,46 @@ Item {
                     }
                 }
             }
+
+            Item { Layout.fillWidth: true }
+
+            // Toggle for Core Mods (only visible in "all" or "enabled"/"disabled" views)
+            RowLayout {
+                spacing: 8
+                visible: root.filterStatus !== "performance"
+                
+                EzButton {
+                    text: "Alle updaten"
+                    primary: true
+                    mcFont: true
+                    visible: root.hasUpdates
+                    Layout.preferredHeight: 28
+                    Layout.preferredWidth: 112
+                    onClicked: profileController.updateAllMods()
+                }
+
+                Text { text: "Integrierte ausblenden"; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: EzTheme.textMuted }
+                
+                Rectangle {
+                    width: 34; height: 18; radius: 9
+                    color: !root.showCoreMods ? EzTheme.accent : EzTheme.surface3
+                    border.color: !root.showCoreMods ? EzTheme.accentLight : EzTheme.border
+                    border.width: 1
+                    
+                    Rectangle {
+                        width: 14; height: 14; radius: 7
+                        color: "#000000"
+                        anchors.verticalCenter: parent.verticalCenter
+                        x: !root.showCoreMods ? parent.width - width - 2 : 2
+                        Behavior on x { NumberAnimation { duration: 150 } }
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.showCoreMods = !root.showCoreMods
+                    }
+                }
+            }
         }
 
         // ─── Column headers ───
@@ -806,9 +848,8 @@ Item {
 
                 readonly property bool isFabricApi: model.slug === "fabric-api" || model.name === "Fabric API"
                 readonly property bool isPerformanceMod: {
-                    var pMods = ["sodium", "lithium", "ferrite-core", "ferritecore", "c2me-fabric", "c2me", "krypton", "moreculling", "entityculling", "immediatelyfast", "cloth-config", "fabric-language-kotlin", "yacl", "dynamic-fps", "modmenu", "zoomify", "sodium-extra", "reeses-sodium-options"]
                     var s = (model.slug || model.projectId || "").toLowerCase()
-                    return pMods.indexOf(s) >= 0 || (model.name && (model.name.indexOf("Performance") >= 0 || model.name.indexOf("Sodium") >= 0 || model.name.indexOf("Lithium") >= 0))
+                    return window.integratedMods && window.integratedMods.indexOf(s) !== -1
                 }
                 readonly property bool matchesSearch: modSearch.text === "" ||
                     (model.name && model.name.toLowerCase().indexOf(modSearch.text.toLowerCase()) !== -1) ||
@@ -817,8 +858,13 @@ Item {
                     (root.filterStatus === "performance" && modItem.isPerformanceMod) ||
                     (root.filterStatus === "enabled" && model.enabled) ||
                     (root.filterStatus === "disabled" && !model.enabled)
+                readonly property string modUpdateVersion: {
+                    var updates = profileController ? profileController.modUpdates : ({})
+                    return updates[model.projectId || model.slug || model.name] || ""
+                }
+                readonly property bool updateAvailable: modUpdateVersion !== ""
 
-                visible: matchesSearch && matchesStatus
+                visible: matchesSearch && matchesStatus && (!modItem.isPerformanceMod || root.showCoreMods || root.filterStatus === "performance")
                 height: visible ? 52 : 0
 
                 color: (modItem.isFabricApi || model.enabled)
@@ -994,7 +1040,7 @@ Item {
                                             spacing: 3
                                             Text { text: "⚡"; font.pixelSize: 8 }
                                             Text {
-                                                text: "PERFORMANCE"
+                                                text: "INTEGRIERT"
                                                 font.family: EzTheme.mcFontFamily; font.pixelSize: 8; font.bold: true
                                                 color: "#4ADE80"
                                             }
@@ -1044,6 +1090,16 @@ Item {
                     }
 
                     // Delete / Uninstall Action (Hidden for Fabric API)
+                    EzButton {
+                        text: "Update " + modItem.modUpdateVersion
+                        mcFont: true
+                        primary: true
+                        visible: !modItem.isFabricApi && modItem.updateAvailable
+                        Layout.preferredWidth: 64
+                        Layout.preferredHeight: 28
+                        onClicked: profileController.updateModVersion(model.slug || model.projectId || model.name, "Latest")
+                    }
+
                     Rectangle {
                         Layout.preferredWidth: 28
                         Layout.preferredHeight: 28

@@ -37,7 +37,7 @@ class ModrinthController(QObject):
         self._total_hits: int = 0
         self._selected: dict = {}
         self._versions: list[dict] = []
-        self._version_type_filter: str = "release"  # Release is standard filter!
+        self._version_type_filter: str = "all"
         self._loading: bool = False
         self._query: str = ""
         self._project_type: str = "mod"  # "mod", "shader", "resourcepack"
@@ -46,9 +46,16 @@ class ModrinthController(QObject):
         self._sort: str = "relevance"
         self._offset: int = 0
         self._game_versions: list[str] = [
-            "All", "26.2", "26.1", "1.21.8", "1.21.7", "1.21.6", "1.21.5",
-            "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21", "1.20.6",
-            "1.20.4", "1.20.1", "1.19.4", "1.18.2", "1.16.5"
+            "All", "26.2", "26.1", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5",
+            "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21"
+        ]
+
+        self._available_loaders = ["All", "Fabric", "Forge", "Quilt", "NeoForge"]
+        self._available_categories = ["Featured", "All", "optimization", "utility", "library", "magic", "technology"]
+        
+        self._available_mc_versions = [
+            "All", "26.2", "26.1", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5",
+            "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21"
         ]
 
         # Connect internal thread signals to main thread slots

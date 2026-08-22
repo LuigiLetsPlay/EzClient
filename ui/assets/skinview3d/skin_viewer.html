@@ -46,6 +46,7 @@
   let currentAnim = null;
   let isAutoRotating = false;
   let pendingSkin = null;
+  let idleLookTime = 0;
 
   function init() {
     const canvas = document.getElementById("skin_canvas");
@@ -78,6 +79,7 @@
 
     // Subtle idle animation
     setAnimation("idle", 0.7);
+    startIdleLook();
 
     if (pendingSkin) {
       setSkin(pendingSkin.url, pendingSkin.model);
@@ -91,6 +93,14 @@
         skinViewer.setSize(container.clientWidth, container.clientHeight);
       }
     });
+
+    canvas.addEventListener("pointerdown", handleInteractionStart, true);
+    canvas.addEventListener("pointermove", handleInteractionMove, true);
+    canvas.addEventListener("pointerup", handleInteractionEnd, true);
+    canvas.addEventListener("pointercancel", handleInteractionEnd, true);
+    canvas.addEventListener("pointerout", (e) => {
+      if (isDragging) handleInteractionEnd();
+    }, true);
   }
 
   function setSkin(textureUrl, modelType) {
@@ -146,6 +156,10 @@
     }
   }
 
+  let resumeAutoRotateTimeout = null;
+  let isDragging = false;
+  let dragDist = 0;
+
   function setAutoRotate(enabled, speed) {
     if (!skinViewer) return;
     isAutoRotating = !!enabled;
@@ -153,9 +167,53 @@
     skinViewer.autoRotateSpeed = speed || 1.0;
   }
 
+  function handleInteractionStart() {
+    isDragging = false;
+    dragDist = 0;
+    if (resumeAutoRotateTimeout) {
+      clearTimeout(resumeAutoRotateTimeout);
+      resumeAutoRotateTimeout = null;
+    }
+    if (skinViewer && isAutoRotating) {
+      skinViewer.autoRotate = false;
+    }
+  }
+
+  function handleInteractionMove(e) {
+    isDragging = true;
+    dragDist += Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0);
+  }
+
+  function handleInteractionEnd() {
+    if (skinViewer && isAutoRotating) {
+      resumeAutoRotateTimeout = setTimeout(() => {
+        skinViewer.autoRotate = true;
+      }, 3000);
+    }
+    if (dragDist < 5) {
+      window.location.href = "ezclient://openskinmodal";
+    }
+  }
+
   function rotateY(deg) {
     if (!skinViewer) return;
     skinViewer.playerObject.rotation.y = (deg * Math.PI) / 180;
+  }
+
+  function startIdleLook() {
+    function animateLook() {
+      if (skinViewer && skinViewer.playerObject && skinViewer.playerObject.skin) {
+        idleLookTime += 0.012;
+        const skin = skinViewer.playerObject.skin;
+        if (skin.head) {
+          // Relaxed gaze: slightly down/right with small, organic idle movement.
+          skin.head.rotation.x = 0.12 + Math.sin(idleLookTime * 0.73) * 0.035;
+          skin.head.rotation.y = -0.20 + Math.sin(idleLookTime * 0.51) * 0.075;
+        }
+      }
+      requestAnimationFrame(animateLook);
+    }
+    requestAnimationFrame(animateLook);
   }
 
   function resetView() {

@@ -17,7 +17,8 @@ QtObject {
     readonly property var translations: ({
         "de": {
             // Navigation
-            "nav_home": "Home",
+"nav_home": "Home",
+"nav_cape": "Capes",
             "nav_profiles": "Profile",
             "nav_installed_mods": "Installierte Mods",
             "nav_modrinth": "Entdecken",

@@ -10,6 +10,19 @@ import java.nio.ByteBuffer;
 import java.nio.file.*;
 import java.util.*;
 
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.KeyMapping;
+import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.resources.Identifier;
+import app.ezclient.gui.ConfigManager;
+import app.ezclient.gui.EzClientScreen;
+import app.ezclient.gui.EzHubScreen;
+import app.ezclient.gui.HudRenderer;
+import app.ezclient.gui.ModuleManager;
+
 /**
  * EzClient Core Mod
  * - Dynamic Window Title ("EzClient") & Custom Window Icon
@@ -17,10 +30,21 @@ import java.util.*;
  * - First-Launch Performance & PvP Optimization (Fast Graphics, 8 Chunks, No Shadows/Clouds, Biome Blend 0, Unlimited FPS)
  */
 public class EzClientMod implements ClientModInitializer {
-    public static final String CLIENT_TITLE = "EzClient";
-    public static final String CLIENT_VERSION = "1.0.0";
+public static final String CLIENT_VERSION = "1.5.1";
+public static final String CLIENT_TITLE = "EzClient 1.5.1";
     private static volatile boolean running = true;
     private static Path ezClientDataDir = null;
+
+    private static KeyMapping guiKey;
+    private static KeyMapping zoomKey;
+    private static boolean isZooming = false;
+    private static final KeyMapping.Category KEY_CATEGORY = KeyMapping.Category.register(
+            Identifier.fromNamespaceAndPath("ezclient", "general")
+    );
+
+    public static boolean isZooming() {
+        return isZooming;
+    }
 
     public static Path getEzClientDataDir() {
         if (ezClientDataDir == null) {
@@ -60,6 +84,38 @@ public class EzClientMod implements ClientModInitializer {
         log("EzClient Core Mod v" + CLIENT_VERSION + " initializing...");
         log("AppData Data Directory: " + dataDir.toAbsolutePath());
         log("========================================");
+
+        ConfigManager.load();
+
+        guiKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                "key.ezclient.gui",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_RIGHT_SHIFT,
+                KEY_CATEGORY
+        ));
+
+        zoomKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                "key.ezclient.zoom",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_C,
+                KEY_CATEGORY
+        ));
+
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (guiKey.consumeClick()) {
+                if (!(client.gui.screen() instanceof EzHubScreen)) {
+                    client.gui.setScreen(new EzHubScreen(client.gui.screen()));
+                }
+            }
+            isZooming = zoomKey.isDown();
+            client.getWindow().setTitle(CLIENT_TITLE);
+        });
+
+        HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("ezclient", "performance_hud"), (graphics, tickDelta) -> {
+            Minecraft client = Minecraft.getInstance();
+            if (client.player == null) return;
+            for (var hud : ModuleManager.getInstance().getHudModules()) HudRenderer.draw(graphics, hud, false);
+        });
 
         // 1. Sync & update persistent client config in .ezclient/config/client_settings.json
         syncGlobalClientConfig();
@@ -223,25 +279,17 @@ public class EzClientMod implements ClientModInitializer {
      */
     private void startWindowDaemon() {
         Thread thread = new Thread(() -> {
-            try {
-                // Allow Minecraft to complete GLFW initialization first
-                Thread.sleep(3000);
-            } catch (InterruptedException ignored) {
-                return;
-            }
-
             long lastWindow = 0L;
-            int attempts = 0;
-            boolean iconApplied = false;
+            int tickCounter = 0;
 
-            while (running && attempts < 1000) {
+            while (running) {
                 try {
-                    Thread.sleep(500);
-                    attempts++;
+                    Thread.sleep(50);
+                    tickCounter++;
 
                     long window = 0L;
                     try {
-                        Class<?> mcClass = Class.forName("net.minecraft.client.MinecraftClient");
+                        Class<?> mcClass = Class.forName("net.minecraft.client.Minecraft");
                         Object instance = mcClass.getMethod("getInstance").invoke(null);
                         if (instance != null) {
                             for (java.lang.reflect.Method m : mcClass.getMethods()) {
@@ -268,14 +316,13 @@ public class EzClientMod implements ClientModInitializer {
                         continue;
                     }
 
-                    // Enforce clean "EzClient" title
+                    // Enforce clean "EzClient" title every 50ms to override Minecraft's updates
                     GLFW.glfwSetWindowTitle(window, CLIENT_TITLE);
 
-                    // Apply custom icon once window is available
-                    if (!iconApplied || window != lastWindow) {
+                    // Re-apply custom icon every 2 seconds (40 ticks) to ensure it overwrites the grass block
+                    if (window != lastWindow || tickCounter % 40 == 0) {
                         lastWindow = window;
                         applyWindowIcon(window);
-                        iconApplied = true;
                     }
                 } catch (InterruptedException e) {
                     break;
@@ -293,46 +340,39 @@ public class EzClientMod implements ClientModInitializer {
      */
     private void applyWindowIcon(long window) {
         try {
-            // Create a 16x16 and 32x32 procedurally generated EzClient icon in RGBA format
-            int[] sizes = {16, 32};
-            GLFWImage.Buffer imageBuffer = GLFWImage.malloc(sizes.length);
-
-            for (int s = 0; s < sizes.length; s++) {
-                int size = sizes[s];
-                ByteBuffer pixels = MemoryUtil.memAlloc(size * size * 4);
-
-                for (int y = 0; y < size; y++) {
-                    for (int x = 0; x < size; x++) {
-                        // Rounded background rectangle with vibrant emerald green (#24D677)
-                        boolean isEdge = (x == 0 || x == size - 1 || y == 0 || y == size - 1);
-                        boolean isCorner = (x <= 1 && y <= 1) || (x >= size - 2 && y <= 1) ||
-                                           (x <= 1 && y >= size - 2) || (x >= size - 2 && y >= size - 2);
-
-                        if (isCorner) {
-                            pixels.put((byte) 0).put((byte) 0).put((byte) 0).put((byte) 0);
-                        } else {
-                            // Emerald Green #24D677
-                            pixels.put((byte) 0x24); // R
-                            pixels.put((byte) 0xD6); // G
-                            pixels.put((byte) 0x77); // B
-                            pixels.put((byte) 0xFF); // A
-                        }
-                    }
-                }
-                pixels.flip();
-
-                imageBuffer.position(s);
-                imageBuffer.width(size);
-                imageBuffer.height(size);
-                imageBuffer.pixels(pixels);
+            java.io.InputStream is = EzClientMod.class.getResourceAsStream("/assets/ezclient/icon.png");
+            if (is == null) {
+                System.out.println("[EzClient] Could not find /assets/ezclient/icon.png in jar!");
+                return;
             }
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(is);
+            is.close();
+
+            int width = img.getWidth();
+            int height = img.getHeight();
+            int[] pixelsRaw = img.getRGB(0, 0, width, height, null, 0, width);
+            ByteBuffer pixels = MemoryUtil.memAlloc(width * height * 4);
+
+            for (int i = 0; i < pixelsRaw.length; i++) {
+                int pixel = pixelsRaw[i];
+                pixels.put((byte) ((pixel >> 16) & 0xFF)); // R
+                pixels.put((byte) ((pixel >> 8) & 0xFF));  // G
+                pixels.put((byte) (pixel & 0xFF));         // B
+                pixels.put((byte) ((pixel >> 24) & 0xFF)); // A
+            }
+            pixels.flip();
+
+            GLFWImage.Buffer imageBuffer = GLFWImage.malloc(1);
             imageBuffer.position(0);
+            imageBuffer.width(width);
+            imageBuffer.height(height);
+            imageBuffer.pixels(pixels);
 
             GLFW.glfwSetWindowIcon(window, imageBuffer);
             imageBuffer.free();
-            System.out.println("[EzClient] Custom EzClient window icon applied to GLFW window!");
+            MemoryUtil.memFree(pixels);
+            System.out.println("[EzClient] Custom EzClient window icon loaded from assets!");
         } catch (Throwable t) {
-            // Fallback gracefully if native icon allocation differs
             System.out.println("[EzClient] Note: Native icon set fallback handled: " + t.getMessage());
         }
     }
@@ -351,7 +391,7 @@ public class EzClientMod implements ClientModInitializer {
                     // Use reflection to safely detect and dismiss AccessibilityOnboardingScreen or Narrator
                     // without hard version binding
                     try {
-                        Class<?> mcClass = Class.forName("net.minecraft.client.MinecraftClient");
+                        Class<?> mcClass = Class.forName("net.minecraft.client.Minecraft");
                         Object instance = mcClass.getMethod("getInstance").invoke(null);
                         if (instance != null) {
                             // Check current screen
@@ -371,7 +411,7 @@ public class EzClientMod implements ClientModInitializer {
                                         System.out.println("[EzClient] Suppressing " + screenName + " -> Navigating to TitleScreen...");
                                         
                                         // Set screen to TitleScreen or null to bypass
-                                        Class<?> titleScreenClass = Class.forName("net.minecraft.client.gui.screen.TitleScreen");
+                                        Class<?> titleScreenClass = Class.forName("net.minecraft.client.gui.screens.TitleScreen");
                                         Object titleScreen = titleScreenClass.getConstructor().newInstance();
                                         
                                         for (java.lang.reflect.Method m : mcClass.getMethods()) {

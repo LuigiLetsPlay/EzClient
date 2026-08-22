@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 import QtQuick.Controls 2.15
+import QtMultimedia
 import "components"
 
 Item {
@@ -17,6 +18,11 @@ Item {
     readonly property string accountUser: typeof accountController !== "undefined" && accountController ? accountController.username : "Player"
     readonly property string bodyUrl: typeof accountController !== "undefined" && accountController ? accountController.bodyUrl : ""
     readonly property string skinTextureUrl: typeof accountController !== "undefined" && accountController ? accountController.skinTextureUrl : ""
+    readonly property string capeTextureUrl: typeof accountController !== "undefined" && accountController ? accountController.capeTextureUrl : ""
+    readonly property bool hasBackgroundVideo: {
+        var p = typeof profileController !== "undefined" && profileController ? profileController.customBackgroundImage : ""
+        return /\.(mp4|webm|mov)$/i.test(p)
+    }
 
     function formatImageUrl(path) {
         if (!path) return "assets/hero_bg.jpg";
@@ -32,6 +38,7 @@ Item {
     Image {
         id: bgHero
         anchors.fill: parent
+        visible: !root.hasBackgroundVideo
         source: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage) 
                 ? root.formatImageUrl(profileController.customBackgroundImage) 
                 : "assets/hero_bg.jpg"
@@ -42,6 +49,26 @@ Item {
                  ? profileController.customBackgroundOpacity 
                  : 0.35
         Behavior on opacity { NumberAnimation { duration: 300 } }
+    }
+
+    MediaPlayer {
+        id: backgroundClipPlayer
+        source: root.hasBackgroundVideo && profileController ? root.formatImageUrl(profileController.customBackgroundImage) : ""
+        loops: MediaPlayer.Infinite
+        autoPlay: root.hasBackgroundVideo
+        audioOutput: backgroundClipAudio
+        videoOutput: backgroundClipOutput
+    }
+    AudioOutput {
+        id: backgroundClipAudio
+        muted: true
+    }
+    VideoOutput {
+        id: backgroundClipOutput
+        anchors.fill: parent
+        visible: root.hasBackgroundVideo
+        fillMode: VideoOutput.PreserveAspectCrop
+        opacity: profileController ? profileController.customBackgroundOpacity : 0.35
     }
 
     // Cinematic Vignette Overlay
@@ -73,6 +100,7 @@ Item {
     // ─────────────────────────────────────────────────────────
     Repeater {
         model: 12
+        visible: false
         Rectangle {
             property real startX: Math.random() * root.width
             property real startY: Math.random() * root.height
@@ -98,39 +126,125 @@ Item {
         }
     }
 
-    // Ambient radial glow behind center
-    Rectangle {
-        anchors.centerIn: parent
-        anchors.verticalCenterOffset: -30
-        width: 400
-        height: 400
-        radius: 200
-        color: "transparent"
+
+
+    // Independent character layer. It never participates in the controls'
+    // layout calculation, so resizing buttons or fonts cannot move the skin.
+    Item {
+        id: independentSkinStage
+        z: 2
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: -24
+        width: Math.min(820, Math.max(480, root.width * 0.82))
+        height: Math.max(540, root.height + 36)
+
+        Skin3DView {
+            id: centeredHomeSkin3D
+            anchors.fill: parent
+            skinSource: root.skinTextureUrl
+            capeSource: root.capeTextureUrl
+            animation: "idle"
+            autoRotate: false
+            initialRotateX: 0
+            initialRotateY: -14
+            onSkinClicked: {
+                if (typeof window !== "undefined" && window.openSkinModal) window.openSkinModal()
+                else if (typeof globalSkinModal !== "undefined" && globalSkinModal) globalSkinModal.open()
+            }
+        }
+
+        // Occasional small, natural-looking variation instead of a perfectly
+        // static menu character. The viewer only uses built-in animations.
+        Timer {
+            id: characterIdleTimer
+            interval: 9000 + Math.random() * 16000
+            running: true
+            repeat: true
+            onTriggered: {
+                if (Math.random() < 0.5) {
+                    centeredHomeSkin3D.setAnim("walk", 0.18)
+                } else {
+                    centeredHomeSkin3D.setRotateY(-28 + Math.random() * 28)
+                }
+                characterIdleReset.restart()
+            }
+        }
+        Timer {
+            id: characterIdleReset
+            interval: 1700
+            onTriggered: {
+                centeredHomeSkin3D.setAnim("idle", 0.7)
+                centeredHomeSkin3D.setRotateY(-14)
+            }
+        }
 
         Rectangle {
-            anchors.centerIn: parent
-            width: 280
-            height: 280
-            radius: 140
-            color: EzTheme.accent
-            opacity: 0.08
-            SequentialAnimation on opacity {
-                loops: Animation.Infinite
-                NumberAnimation { to: 0.16; duration: 3000; easing.type: Easing.InOutSine }
-                NumberAnimation { to: 0.08; duration: 3000; easing.type: Easing.InOutSine }
+            z: 4
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            anchors.topMargin: Math.max(14, parent.height * 0.045)
+            height: 21
+            width: independentNameRow.implicitWidth + 14
+            radius: 3
+            color: "#D90B0E12"
+            border.color: "#553B4652"
+            RowLayout {
+                id: independentNameRow
+                anchors.centerIn: parent
+                spacing: 5
+                Image {
+                    source: "assets/logo.svg"
+                    Layout.preferredWidth: 8
+                    Layout.preferredHeight: 8
+                    sourceSize.width: 8
+                    sourceSize.height: 8
+                    fillMode: Image.PreserveAspectFit
+                    clip: true
+                }
+                Text {
+                    text: root.accountUser
+                    font.family: EzTheme.mcFontFamily
+                    font.pixelSize: 11
+                    color: EzTheme.text
+                }
+            }
+        }
+
+        Rectangle {
+            z: 7
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.topMargin: 12
+            width: 92
+            height: 24
+            radius: 4
+            color: independentCapeMouse.containsMouse ? EzTheme.surfaceActive : "#D911151B"
+            border.color: independentCapeMouse.containsMouse ? EzTheme.accent : EzTheme.border
+            Text { anchors.centerIn: parent; text: "CAPE ÄNDERN"; font.family: EzTheme.mcFontFamily; font.pixelSize: 8; color: EzTheme.text }
+            MouseArea {
+                id: independentCapeMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    if (typeof window !== "undefined" && window.openSkinModal) window.openSkinModal()
+                    else if (typeof globalSkinModal !== "undefined" && globalSkinModal) globalSkinModal.open()
+                }
             }
         }
     }
 
-    // ─────────────────────────────────────────────────────────
-    // 2. MAIN CENTER HERO CONTENT
-    // ─────────────────────────────────────────────────────────
+    // Controls are a separate overlay in front of the character's legs.
     ColumnLayout {
-        anchors.centerIn: parent
+        z: 10
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: Math.round(parent.height / 2 + 72)
         spacing: 0
 
         // ── Welcome Text ──
         Text {
+            visible: false
             Layout.alignment: Qt.AlignHCenter
             text: EzI18n.t("home_welcome", "Willkommen zurück") + ","
             font.family: EzTheme.fontFamily
@@ -138,129 +252,119 @@ Item {
             color: EzTheme.textSecondary
             opacity: 0.8
         }
-        Text {
-            Layout.alignment: Qt.AlignHCenter
-            text: root.accountUser
-            font.family: EzTheme.mcFontFamily
-            font.pixelSize: 22
-            font.bold: true
-            color: EzTheme.text
-        }
-
-        Item { height: 10 }
+        Item { height: 4 }
 
         // ── Real Authentic 3D Minecraft Character ──
         Item {
             id: skinContainer
+            visible: false
+            Layout.preferredWidth: 0
+            Layout.preferredHeight: 0
             Layout.alignment: Qt.AlignHCenter
-            width: 250
-            height: 270
+            width: Math.min(500, Math.max(280, root.width - 100))
+            height: Math.min(430, Math.max(280, root.height - 250))
 
-            // Ambient Shadow under player feet
+            // In-launcher nametag, matching the EzClient identity used in game.
             Rectangle {
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 10
+                z: 4
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: 130
-                height: 16
-                radius: 8
-                color: "#000000"
-                opacity: 0.55
-            }
-
-            // Real 3D Minecraft Skin Model
-            Skin3DView {
-                id: homeSkin3D
-                anchors.fill: parent
-                skinSource: root.skinTextureUrl
-                animation: "idle"
-                autoRotate: false
-            }
-
-            // Floating 3D Hint & Quick Skin Actions
-            RowLayout {
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: -6
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 6
-                opacity: (skinHoverArea.containsMouse || skinCustomPill.containsMouse) ? 1.0 : 0.6
-                Behavior on opacity { NumberAnimation { duration: 200 } }
-
-                Rectangle {
-                    id: skinCustomPill
-                    height: 22
-                    width: skinPillContent.implicitWidth + 14
-                    radius: 11
-                    color: skinPillMouse.containsMouse ? EzTheme.surfaceActive : "#161B24CC"
-                    border.color: skinPillMouse.containsMouse ? EzTheme.accent : EzTheme.border
-                    border.width: 1
-
-                    RowLayout {
-                        id: skinPillContent
-                        anchors.centerIn: parent
-                        spacing: 4
-                        Text { text: "👕"; font.pixelSize: 10 }
-                        Text {
-                            text: EzI18n.t("home_skin_edit", "Skin anpassen")
-                            font.family: EzTheme.fontFamily
-                            font.pixelSize: 10
-                            font.bold: true
-                            color: skinPillMouse.containsMouse ? EzTheme.accentLight : EzTheme.textSecondary
-                        }
+                anchors.top: parent.top
+                anchors.topMargin: 8
+                height: 21
+                width: homeNameRow.implicitWidth + 14
+                radius: 3
+                color: "#D90B0E12"
+                border.color: "#553B4652"
+                RowLayout {
+                    id: homeNameRow
+                    anchors.centerIn: parent
+                    spacing: 5
+                    Image {
+                        source: "assets/logo.svg"
+                        Layout.preferredWidth: 8
+                        Layout.preferredHeight: 8
+                        sourceSize.width: 8
+                        sourceSize.height: 8
+                        fillMode: Image.PreserveAspectFit
+                        clip: true
                     }
-
-                    MouseArea {
-                        id: skinPillMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (typeof window !== "undefined" && window.openSkinModal) {
-                                window.openSkinModal()
-                            } else if (typeof globalSkinModal !== "undefined" && globalSkinModal) {
-                                globalSkinModal.open()
-                            }
-                        }
-                    }
-                }
-
-                Rectangle {
-                    height: 22
-                    width: 22
-                    radius: 11
-                    color: resetRotMouse.containsMouse ? EzTheme.surfaceActive : "#161B24CC"
-                    border.color: resetRotMouse.containsMouse ? EzTheme.accent : EzTheme.border
-                    border.width: 1
                     Text {
-                        anchors.centerIn: parent
-                        text: "🔄"
-                        font.pixelSize: 10
-                    }
-                    MouseArea {
-                        id: resetRotMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: homeSkin3D.resetView()
+                        text: root.accountUser
+                        font.family: EzTheme.mcFontFamily
+                        font.pixelSize: 11
+                        color: EzTheme.text
                     }
                 }
             }
 
-            MouseArea {
-                id: skinHoverArea
-                anchors.fill: parent
-                hoverEnabled: true
-                acceptedButtons: Qt.NoButton // let mouse events pass to WebEngine for 3D rotation
+            // Direct cosmetics entry: no need to search through settings.
+            Rectangle {
+                z: 7
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.topMargin: 8
+                width: 92
+                height: 24
+                radius: 4
+                color: capeHomeMouse.containsMouse ? EzTheme.surfaceActive : "#D911151B"
+                border.color: capeHomeMouse.containsMouse ? EzTheme.accent : EzTheme.border
+                Text {
+                    anchors.centerIn: parent
+                    text: "CAPE ÄNDERN"
+                    font.family: EzTheme.mcFontFamily
+                    font.pixelSize: 8
+                    color: EzTheme.text
+                }
+                MouseArea {
+                    id: capeHomeMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (typeof window !== "undefined" && window.openSkinModal) window.openSkinModal()
+                        else if (typeof globalSkinModal !== "undefined" && globalSkinModal) globalSkinModal.open()
+                    }
+                }
             }
+
+            // Real 3D Minecraft Skin Model Container
+            Item {
+                anchors.fill: parent
+                anchors.topMargin: 18
+                // Keep Qt WebEngine untransformed. Scaling a WebEngine surface can
+                // detach its GPU layer and place it in the bottom-right corner.
+
+                Skin3DView {
+                    id: homeSkin3D
+                    anchors.fill: parent
+                    skinSource: root.skinTextureUrl
+                    capeSource: root.capeTextureUrl
+                    animation: "idle"
+                    autoRotate: false
+                    autoRotateSpeed: 0
+                    initialRotateX: 0
+                    initialRotateY: -10
+                    
+                    onSkinClicked: {
+                        if (typeof window !== "undefined" && window.openSkinModal) {
+                            window.openSkinModal()
+                        } else if (typeof globalSkinModal !== "undefined" && globalSkinModal) {
+                            globalSkinModal.open()
+                        }
+                    }
+                }
+            }
+
         }
 
-        Item { height: 14 }
+        Item { Layout.preferredHeight: 0 }
 
         // ── Active Profile Pill ──
         Rectangle {
             Layout.alignment: Qt.AlignHCenter
-            height: 32
-            width: profPillRow.implicitWidth + 28
+            Layout.topMargin: 0
+            Layout.preferredHeight: 32
+            Layout.preferredWidth: Math.min(root.width - 32, profPillRow.implicitWidth + 28)
             radius: 16
             color: profPillMouse.containsMouse ? "#1A2520" : "#111B17"
             border.color: profPillMouse.containsMouse ? EzTheme.accentLight : EzTheme.borderLight
@@ -276,22 +380,14 @@ Item {
                 anchors.centerIn: parent
                 spacing: 8
 
-                Rectangle {
-                    width: 7; height: 7; radius: 3.5
-                    color: EzTheme.accent
-                    SequentialAnimation on opacity {
-                        loops: Animation.Infinite
-                        NumberAnimation { to: 0.3; duration: 600; easing.type: Easing.InOutSine }
-                        NumberAnimation { to: 1.0; duration: 600; easing.type: Easing.InOutSine }
-                    }
-                }
-
                 Text {
                     text: (root.hasProfile ? root.activeName : EzI18n.t("home_default_profile", "Standard Profil")) + "  ·  " + root.activeLoader + " " + root.activeVersion + "  ·  " + root.activeModsCount + " Mods"
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 11
                     font.bold: true
                     color: EzTheme.text
+                    elide: Text.ElideRight
+                    Layout.maximumWidth: Math.max(140, root.width - 70)
                 }
             }
 
@@ -308,14 +404,15 @@ Item {
             }
         }
 
-        Item { height: 20 }
+        Item { Layout.preferredHeight: 20 }
 
         // ── GIANT EPIC PLAY BUTTON ──
         Rectangle {
             id: launchBtn
+            z: 6
             Layout.alignment: Qt.AlignHCenter
-            width: 340
-            height: 62
+            Layout.preferredWidth: Math.min(340, root.width - 32)
+            Layout.preferredHeight: 62
             radius: EzTheme.radius
 
             scale: launchMouse.pressed ? 0.95 : (launchMouse.containsMouse ? 1.04 : 1.0)
@@ -405,14 +502,14 @@ Item {
             }
         }
 
-        Item { height: 14 }
+        Item { Layout.preferredHeight: 14 }
 
         // ── AUTH STATUS BADGE ──
         Rectangle {
             id: launchModePill
             Layout.alignment: Qt.AlignHCenter
-            height: 26
-            width: modeRow.implicitWidth + 22
+            Layout.preferredHeight: 26
+            Layout.preferredWidth: Math.min(root.width - 32, modeRow.implicitWidth + 22)
             radius: 13
             color: modeMouse.containsMouse ? "#1A261F" : "#111C15"
             border.color: EzTheme.accentGlow

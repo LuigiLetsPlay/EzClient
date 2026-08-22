@@ -10,4 +10,6 @@ ModsPage 1.0 ModsPage.qml
 HomePage 1.0 HomePage.qml
 SettingsPage 1.0 SettingsPage.qml
 ModrinthPage 1.0 ModrinthPage.qml
+CapePage 1.0 CapePage.qml
+CapeEditor 1.0 CapeEditor.qml
 OnboardingPage 1.0 OnboardingPage.qml

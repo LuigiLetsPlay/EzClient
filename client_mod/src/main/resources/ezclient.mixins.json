@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "app.ezclient.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixinextras": {
+    "minVersion": "0.5.4"
+  },
+  "mixins": [],
+  "client": [
+    "TitleScreenMixin",
+    "PauseScreenMixin",
+    "GameRendererMixin",
+    "MouseMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

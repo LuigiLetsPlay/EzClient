@@ -177,7 +177,7 @@ Item {
                             color: EzTheme.text
                         }
                         Text {
-                            text: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage) ? "Eigenes Bild aktiv · " + Math.round((profileController.customBackgroundOpacity || 0.6) * 100) + "% Deckkraft" : "Standard Minecraft Artwork aktiv"
+                            text: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage) ? "Eigenes Bild oder Clip aktiv · " + Math.round((profileController.customBackgroundOpacity || 0.6) * 100) + "% Deckkraft" : "Standard Minecraft Artwork aktiv"
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 10
                             color: EzTheme.textMuted
@@ -206,6 +206,81 @@ Item {
                             onClicked: {
                                 if (profileController) profileController.setCustomBackgroundImage("")
                             }
+                        }
+                    }
+                }
+            }
+
+            Item { height: 18 }
+
+            // ─── FONT & TYPOGRAPHY ───
+            Text { text: EzI18n.currentLanguage === "en" ? "FONT & TYPOGRAPHY" : "SCHRIFTART & TYPOGRAFIE"; font.family: EzTheme.mcFontFamily; font.pixelSize: 11; color: EzTheme.textSecondary }
+            Item { height: 8 }
+
+            EzSurface {
+                Layout.fillWidth: true
+                implicitHeight: 76
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 14
+                    spacing: 14
+
+                    Rectangle {
+                        width: 44; height: 44; radius: 8
+                        color: EzTheme.surface3
+                        border.color: EzTheme.border
+                        border.width: 1
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Aa"
+                            font.family: EzTheme.mcFontFamily
+                            font.pixelSize: 18
+                            color: EzTheme.text
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 2
+                        Text {
+                            text: EzI18n.currentLanguage === "en" ? "App Font Style" : "Launcher Schriftart"
+                            font.family: EzTheme.mcFontFamily
+                            font.pixelSize: 13
+                            font.bold: true
+                            color: EzTheme.text
+                        }
+                        Text {
+                            text: EzI18n.currentLanguage === "en" ? "Choose between Minecraft, Standard or Mixed" : "Wähle zwischen Minecraft, Standard oder Gemischt"
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 10
+                            color: EzTheme.textMuted
+                        }
+                    }
+
+                    RowLayout {
+                        spacing: 8
+                        Layout.alignment: Qt.AlignVCenter
+
+                        property string activeFontMode: typeof profileController !== "undefined" && profileController ? profileController.appFontMode : "mixed"
+
+                        EzButton {
+                            text: "Minecraft"
+                            implicitHeight: 32
+                            primary: parent.activeFontMode === "minecraft"
+                            onClicked: if (profileController) profileController.setAppFontMode("minecraft")
+                        }
+                        EzButton {
+                            text: "Gemischt"
+                            implicitHeight: 32
+                            primary: parent.activeFontMode === "mixed"
+                            onClicked: if (profileController) profileController.setAppFontMode("mixed")
+                        }
+                        EzButton {
+                            text: "Standard"
+                            implicitHeight: 32
+                            primary: parent.activeFontMode === "standard"
+                            onClicked: if (profileController) profileController.setAppFontMode("standard")
                         }
                     }
                 }

@@ -75,20 +75,19 @@ Rectangle {
                 }
             }
 
-            Rectangle { width: 1; height: 22; color: EzTheme.border; opacity: 0.5 }
+            Rectangle { visible: root.width >= 900; width: 1; height: 22; color: EzTheme.border; opacity: 0.5 }
 
             // Active Profile Quick-Switcher Dropdown Pill
             Rectangle {
                 id: profilePill
+                visible: root.width >= 900
+                z: 30
                 height: 34
                 width: Math.min(200, Math.max(120, pillNameText.implicitWidth + 44))
                 radius: 17
-                color: profMouse.containsMouse || profPopup.opened ? EzTheme.surface3 : EzTheme.surface2
-                border.color: profPopup.opened ? EzTheme.accent : (profMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)
-                border.width: 1
+                color: profPopup.opened ? EzTheme.surface3 : (profMouse.containsMouse ? EzTheme.surfaceHover : EzTheme.surface2)
 
                 Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
-                Behavior on border.color { ColorAnimation { duration: EzTheme.animNormal } }
 
                 RowLayout {
                     id: profilePillRow
@@ -135,6 +134,7 @@ Rectangle {
                 MouseArea {
                     id: profMouse
                     anchors.fill: parent
+                    z: 50
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: profPopup.opened ? profPopup.close() : profPopup.open()
@@ -268,6 +268,7 @@ Rectangle {
     Item {
         id: centerSection
         anchors.centerIn: parent
+        visible: root.width >= 900
         implicitWidth: navTabsRow.implicitWidth
         implicitHeight: navTabsRow.implicitHeight
 
@@ -282,22 +283,20 @@ Rectangle {
                     { id: "profiles",       labelKey: "nav_profiles",       fallback: "Profile",          icon: "box.svg" },
                     { id: "installed_mods", labelKey: "nav_installed_mods", fallback: "Installierte Mods", icon: "mods.svg" },
                     { id: "mods",           labelKey: "nav_discover",       fallback: "Entdecken",        icon: "compass.svg" },
+                    { id: "cape",           labelKey: "nav_cape",           fallback: "Capes",             icon: "logo.svg" },
                     { id: "settings",       labelKey: "nav_settings",       fallback: "Einstellungen",    icon: "settings.svg" }
                 ]
 
                 Rectangle {
                     id: tabItem
-                    width: root.width < 1180 ? (tabRowInner.implicitWidth + 14) : (tabRowInner.implicitWidth + 26)
+                    width: root.width < 1200 ? 42 : (tabRowInner.implicitWidth + 26)
                     height: 36
                     radius: 8
                     color: root.isTabActive(modelData.id)
                            ? EzTheme.surfaceActive
-                           : (tabMouse.containsMouse ? EzTheme.surface2 : "transparent")
-                    border.color: root.isTabActive(modelData.id) ? "#254832" : "transparent"
-                    border.width: 1
+                           : (tabMouse.containsMouse ? EzTheme.surfaceHover : "transparent")
 
                     Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
-                    Behavior on border.color { ColorAnimation { duration: EzTheme.animNormal } }
 
                     RowLayout {
                         id: tabRowInner
@@ -313,6 +312,7 @@ Rectangle {
                         }
 
                         Text {
+                            visible: root.width >= 1200
                             text: EzI18n.t(modelData.labelKey, modelData.fallback)
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 12
@@ -383,15 +383,13 @@ Rectangle {
             // Player Avatar & Username
             Rectangle {
                 id: accPill
+                z: 30
                 height: 34
                 width: Math.min(180, accRow.implicitWidth + 24)
                 radius: 17
-                color: accMouse.containsMouse || accPopup.opened ? EzTheme.surface3 : EzTheme.surface2
-                border.color: accPopup.opened ? EzTheme.accent : (accMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)
-                border.width: 1
+                color: accPopup.opened ? EzTheme.surface3 : (accMouse.containsMouse ? EzTheme.surfaceHover : EzTheme.surface2)
 
                 Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
-                Behavior on border.color { ColorAnimation { duration: EzTheme.animNormal } }
 
                 RowLayout {
                     id: accRow
@@ -439,6 +437,7 @@ Rectangle {
                     }
 
                     Text {
+                        visible: root.width >= 1100
                         text: root.accountUser
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 12
@@ -456,6 +455,7 @@ Rectangle {
                 MouseArea {
                     id: accMouse
                     anchors.fill: parent
+                    z: 50
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: accPopup.opened ? accPopup.close() : accPopup.open()

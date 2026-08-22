@@ -8,12 +8,26 @@ Item {
     property var choices: []
     property int currentIndex: 0
     property alias placeholder: placeholderText.text
+    property bool formatEzClientSupported: false
     signal choiceChanged
 
     height: 40
     implicitHeight: 40
 
-    readonly property string currentText: (choices && choices.length > currentIndex && choices[currentIndex]) ? choices[currentIndex] : ""
+    function isEzClientSupported(version) {
+        if (!version) return false
+        var supported = ["26.2", "26.1"]
+        return supported.indexOf(version) !== -1
+    }
+
+    function formatText(val) {
+        if (dd.formatEzClientSupported && dd.isEzClientSupported(val)) {
+            return val + " ⭐"
+        }
+        return val
+    }
+
+    readonly property string currentText: (choices && choices.length > currentIndex && choices[currentIndex]) ? formatText(choices[currentIndex]) : ""
 
     Rectangle {
         id: ddBox
@@ -132,13 +146,20 @@ Item {
                     spacing: 6
 
                     Text {
-                        text: modelData
+                        id: optionText
+                        text: dd.formatText(modelData)
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 12
                         font.bold: index === dd.currentIndex
                         color: index === dd.currentIndex ? EzTheme.accentLight : (optMouse.containsMouse ? EzTheme.text : EzTheme.textSecondary)
                         Layout.fillWidth: true
                         Behavior on color { ColorAnimation { duration: 90 } }
+                        
+                        ToolTip {
+                            visible: optMouse.containsMouse && dd.formatEzClientSupported && dd.isEzClientSupported(modelData)
+                            text: "EzClient verfügbar für diese Version"
+                            delay: 200
+                        }
                     }
 
                     Rectangle {

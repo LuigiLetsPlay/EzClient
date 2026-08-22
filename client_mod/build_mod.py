@@ -1,7 +1,6 @@
 import os
 import sys
 import shutil
-import tempfile
 import subprocess
 from pathlib import Path
 
@@ -12,64 +11,42 @@ def build_ezclient_jar() -> Path:
     assets_out.mkdir(parents=True, exist_ok=True)
     out_jar = assets_out / "EzClient.jar"
 
-    print("[EzClient Builder] Building EzClient.jar...")
+    print("[EzClient Builder] Building EzClient.jar using Gradle...")
 
-    # Find classpath jars
-    mc_libs = Path(os.path.expandvars(r"%APPDATA%\.minecraft\libraries"))
-    cp_jars = []
-    if mc_libs.exists():
-        for p in mc_libs.rglob("*.jar"):
-            if any(k in p.name.lower() for k in ["fabric-loader", "lwjgl-3.3", "lwjgl-3.4", "lwjgl-glfw", "sponge-mixin"]):
-                cp_jars.append(str(p))
+    gradle_wrapper = client_mod_dir / ("gradlew.bat" if os.name == "nt" else "gradlew")
+    res = subprocess.run([str(gradle_wrapper), "build"], cwd=str(client_mod_dir), capture_output=True, text=True)
+    
+    if res.returncode != 0:
+        print(f"[EzClient Builder] Gradle build failed:\n{res.stdout}\n{res.stderr}")
+        raise RuntimeError("Gradle compilation failed")
 
-    cp_str = os.pathsep.join(cp_jars)
+    # The Lite module is declared by the repository root settings file, so it
+    # must be invoked from there rather than from client_mod's standalone build.
+    lite_res = subprocess.run([str(gradle_wrapper), ":client_mod_lite:build"], cwd=str(project_root), capture_output=True, text=True)
+    if lite_res.returncode != 0:
+        print(f"[EzClient Builder] Lite build failed:\n{lite_res.stdout}\n{lite_res.stderr}")
+        raise RuntimeError("Lite mod compilation failed")
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_path = Path(tmp_dir)
-        classes_dir = tmp_path / "classes"
-        classes_dir.mkdir(parents=True, exist_ok=True)
+    # Minecraft 26.2 ships unobfuscated names. Loom's normal production JAR is
+    # therefore the directly loadable artifact; source JARs are excluded.
+    libs_dir = client_mod_dir / "build" / "libs"
+    main_jars = sorted(
+        jar for jar in libs_dir.glob("EzClient-*.jar")
+        if not jar.name.endswith("-sources.jar")
+    )
+    
+    if not main_jars:
+        raise FileNotFoundError(f"No built jar found in {libs_dir}")
+        
+    # Select the newest build; lexicographic ordering can otherwise embed an
+    # older release (for example 1.5.0 before 1.5.1).
+    main_jar = max(main_jars, key=lambda jar: jar.stat().st_mtime)
+    shutil.copy2(main_jar, out_jar)
 
-        java_src = client_mod_dir / "src" / "app" / "ezclient" / "EzClientMod.java"
-        if not java_src.exists():
-            raise FileNotFoundError(f"Source file not found: {java_src}")
-
-        # Compile Java
-        cmd = [
-            "javac",
-            "--release", "17",
-            "-encoding", "UTF-8",
-            "-cp", cp_str,
-            "-d", str(classes_dir),
-            str(java_src)
-        ]
-        print(f"[EzClient Builder] Running javac...")
-        res = subprocess.run(cmd, capture_output=True, text=True)
-        if res.returncode != 0:
-            print(f"[EzClient Builder] Javac failed: {res.stderr}")
-            raise RuntimeError(f"Javac compilation failed: {res.stderr}")
-
-        # Copy fabric.mod.json
-        fabric_json = client_mod_dir / "fabric.mod.json"
-        shutil.copy2(fabric_json, classes_dir / "fabric.mod.json")
-
-        # Copy assets/ezclient/icon.png
-        mod_assets = classes_dir / "assets" / "ezclient"
-        mod_assets.mkdir(parents=True, exist_ok=True)
-        logo_src = project_root / "ui" / "assets" / "logo.png"
-        if logo_src.exists():
-            shutil.copy2(logo_src, mod_assets / "icon.png")
-
-        # Package jar using jar tool or zipfile
-        import zipfile
-        if out_jar.exists():
-            out_jar.unlink()
-
-        with zipfile.ZipFile(out_jar, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for root, dirs, files in os.walk(classes_dir):
-                for f in files:
-                    full_p = Path(root) / f
-                    arc_name = full_p.relative_to(classes_dir).as_posix()
-                    zf.write(full_p, arc_name)
+    lite_dir = project_root / "client_mod_lite" / "build" / "libs"
+    lite_jars = sorted(jar for jar in lite_dir.glob("EzClient-Lite-*.jar") if not jar.name.endswith("-sources.jar"))
+    if lite_jars:
+        shutil.copy2(max(lite_jars, key=lambda jar: jar.stat().st_mtime), assets_out / "EzClient-Lite.jar")
 
     print(f"[EzClient Builder] Successfully created: {out_jar} ({out_jar.stat().st_size} bytes)")
     return out_jar

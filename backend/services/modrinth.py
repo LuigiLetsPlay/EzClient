@@ -6,12 +6,11 @@ from typing import Any
 from backend.models.types import ProfileData, ModData
 
 MODRINTH_API = "https://api.modrinth.com/v2"
-USER_AGENT = "EzClient/1.3.0 (desktop launcher)"
+USER_AGENT = "EzClient/1.5.1 (desktop launcher)"
 
 FALLBACK_VERSIONS = [
-    "26.2", "26.1", "1.21.8", "1.21.7", "1.21.6", "1.21.5",
-    "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21",
-    "1.20.6", "1.20.4", "1.20.1", "1.19.4", "1.18.2", "1.16.5"
+    "26.2", "26.1", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5",
+    "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21"
 ]
 
 def get_json(url: str, timeout: int = 8) -> Any:
@@ -114,4 +113,3 @@ class ModrinthService:
         except Exception as e:
             print(f"[Modrinth] Error resolving dependencies for {project_id_or_slug}: {e}")
             return []
-

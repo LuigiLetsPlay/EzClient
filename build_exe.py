@@ -10,12 +10,11 @@ def build_exe():
     print("       Building EzClient Standalone Windows .exe  ")
     print("==================================================")
 
-    # 1. Ensure EzClient.jar is up to date
-    jar_path = root / "backend" / "assets" / "EzClient.jar"
-    if not jar_path.exists() or jar_path.stat().st_size < 1000:
-        print("[Build] Compiling EzClient.jar first...")
-        build_mod_script = root / "client_mod" / "build_mod.py"
-        subprocess.run([sys.executable, str(build_mod_script)], check=True)
+    # 1. Always rebuild the embedded mod. Merely checking whether the file
+    # exists can silently package an older Minecraft-targeted JAR.
+    print("[Build] Compiling EzClient.jar first...")
+    build_mod_script = root / "client_mod" / "build_mod.py"
+    subprocess.run([sys.executable, str(build_mod_script)], check=True)
 
     # 2. Prepare PyInstaller command
     icon_path = root / "ui" / "assets" / "icon.ico"
@@ -34,6 +33,7 @@ def build_exe():
         "PySide6.QtWebEngineQuick",
         "PySide6.QtWebEngineCore",
         "PySide6.QtWebChannel",
+        "PySide6.QtMultimedia",
         "PySide6.QtOpenGL",
         "PySide6.QtOpenGLWidgets",
         "backend.models.types",

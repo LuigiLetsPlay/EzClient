@@ -13,6 +13,7 @@ Item {
 
     property string previewFilePath: ""
     property string previewTextureUrl: ""
+    property string previewCapeUrl: ""
     property string previewName: "Steve"
     property string skinVariant: "classic"
     property string currentAnim: "idle"
@@ -24,6 +25,7 @@ Item {
         if (accountController) {
             previewFilePath = accountController.activeSkinPath || ""
             previewTextureUrl = accountController.skinTextureUrl || ""
+            previewCapeUrl = accountController.capeTextureUrl || ""
             previewName = accountController.activeSkinName || "Aktiver Skin"
         } else {
             previewFilePath = ""
@@ -33,8 +35,8 @@ Item {
         isApplied = true
         statusMsg = ""
         isError = false
-        skinNameInput.text = ""
-        saveSkinNameInput.text = ""
+        usernameInput.text = ""
+        saveNameInput.text = ""
         skinModal.opacity = 1.0
         if (modalSkin3D) {
             modalSkin3D.resetView()
@@ -55,8 +57,8 @@ Item {
         function onSkinFetched(path, preview) {
             skinModal.previewFilePath = path
             var baseName = ""
-            if (skinNameInput.text.trim() !== "") {
-                baseName = skinNameInput.text.trim()
+            if (usernameInput.text.trim() !== "") {
+                baseName = usernameInput.text.trim()
             } else if (path) {
                 var segs = path.replace(/\\/g, "/").split("/")
                 baseName = segs[segs.length - 1].replace(".png", "")
@@ -76,7 +78,6 @@ Item {
         }
     }
 
-    // Modal background overlay
     MouseArea {
         anchors.fill: parent
         onClicked: skinModal.close()
@@ -84,422 +85,335 @@ Item {
 
     Rectangle {
         anchors.centerIn: parent
-        width: Math.min(860, parent.width - 32)
-        height: Math.min(660, parent.height - 24)
+        width: Math.min(840, parent.width - 32)
+        height: Math.min(640, parent.height - 24)
         radius: 16
         color: "#12141C"
         border.color: EzTheme.borderLight
         border.width: 1
+        clip: true
 
         MouseArea {
             anchors.fill: parent
-            onClicked: {} // consume clicks inside modal
+            onClicked: {} // consume
         }
 
-        ColumnLayout {
+        // Close button
+        Rectangle {
+            z: 10
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.margins: 16
+            width: 32; height: 32; radius: 16
+            color: closeMouse.containsMouse ? "#2A2D3A" : "#1A1D27"
+            Text {
+                anchors.centerIn: parent
+                text: "✕"
+                color: "#A0A8B8"
+                font.pixelSize: 14
+            }
+            MouseArea {
+                id: closeMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: skinModal.close()
+            }
+        }
+
+        RowLayout {
             anchors.fill: parent
-            anchors.margins: 18
-            spacing: 12
+            spacing: 0
 
-            // ── Header ──
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 12
-
-                Rectangle {
-                    width: 38; height: 38; radius: 19
-                    color: EzTheme.surface2
-                    border.color: EzTheme.border
-                    border.width: 1
-                    Text { text: "👕"; font.pixelSize: 18; anchors.centerIn: parent }
-                }
+            // ════ LEFT COLUMN: 3D PREVIEW ════
+            Rectangle {
+                Layout.preferredWidth: 320
+                Layout.fillHeight: true
+                color: "#0A0B10"
 
                 ColumnLayout {
-                    spacing: 2
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 16
+
                     Text {
-                        text: "Minecraft Skin-Studio"
+                        Layout.alignment: Qt.AlignHCenter
+                        text: "Skin Vorschau"
                         font.family: EzTheme.fontFamily
-                        font.pixelSize: 16
+                        font.pixelSize: 18
                         font.bold: true
                         color: EzTheme.text
                     }
-                    Text {
-                        text: "3D-Vorschau ansehen, Modell anpassen & Skin für deinen Account auswählen"
-                        font.family: EzTheme.fontFamily
-                        font.pixelSize: 11
-                        color: EzTheme.textMuted
-                    }
-                }
 
-                Item { Layout.fillWidth: true }
-
-                // State Badge: Preview vs. Applied
-                Rectangle {
-                    height: 26
-                    width: stateBadgeText.implicitWidth + 24
-                    radius: 13
-                    color: skinModal.isApplied ? "#122E1F" : "#302610"
-                    border.color: skinModal.isApplied ? "#22C96E" : "#E5A93C"
-                    border.width: 1
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 5
-                        Text {
-                            text: skinModal.isApplied ? "🟢" : "🟡"
-                            font.pixelSize: 9
-                        }
-                        Text {
-                            id: stateBadgeText
-                            text: skinModal.isApplied ? ("Aktiv: " + skinModal.previewName) : ("Vorschau: " + skinModal.previewName)
-                            font.family: EzTheme.fontFamily
-                            font.pixelSize: 10
-                            font.bold: true
-                            color: skinModal.isApplied ? "#80EEAA" : "#F5D075"
-                            elide: Text.ElideRight
-                        }
-                    }
-                }
-
-                Rectangle {
-                    width: 28; height: 28; radius: 14
-                    color: closeMouse.containsMouse ? EzTheme.surface3 : "transparent"
-                    Text { text: "✕"; font.pixelSize: 13; color: EzTheme.textSecondary; anchors.centerIn: parent }
-                    MouseArea {
-                        id: closeMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: skinModal.close()
-                    }
-                }
-            }
-
-            // ── Main Body Split: Left 3D Stage | Right Controls ──
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                spacing: 16
-
-                // ════ LEFT COLUMN: 3D Stage & Pose Controls ════
-                ColumnLayout {
-                    Layout.preferredWidth: 320
-                    Layout.maximumWidth: 340
-                    Layout.minimumWidth: 300
-                    Layout.fillWidth: false
-                    Layout.fillHeight: true
-                    spacing: 8
-
-                    // 3D Canvas Box
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        Layout.minimumHeight: 240
-                        radius: 12
-                        color: "#0A0C12"
-                        border.color: skinModal.isApplied ? "#1E2A22" : (skinModal.previewTextureUrl ? EzTheme.accent : EzTheme.border)
-                        border.width: 1
-                        clip: true
+                        color: "transparent"
 
                         Skin3DView {
                             id: modalSkin3D
                             anchors.fill: parent
-                            anchors.margins: 2
-                            skinSource: skinModal.previewTextureUrl ? skinModal.previewTextureUrl : (accountController ? accountController.skinTextureUrl : "")
-                            skinVariant: skinModal.skinVariant
+                            skinSource: skinModal.previewTextureUrl
+                            capeSource: skinModal.previewCapeUrl
                             animation: skinModal.currentAnim
                             autoRotate: false
                         }
 
-                        // Top-left Mode Indicator
+                        // Badge
                         Rectangle {
                             anchors.top: parent.top
                             anchors.left: parent.left
-                            anchors.margins: 8
-                            height: 20
-                            width: modeBadgeText.implicitWidth + 12
-                            radius: 10
-                            color: skinModal.isApplied ? "#CC11291C" : "#CC2B210E"
+                            anchors.margins: 10
+                            height: 22
+                            width: badgeTxt.implicitWidth + 16
+                            radius: 11
+                            color: skinModal.isApplied ? "#22C96E20" : "#E5A93C20"
                             border.color: skinModal.isApplied ? "#22C96E" : "#E5A93C"
                             border.width: 1
                             Text {
-                                id: modeBadgeText
+                                id: badgeTxt
                                 anchors.centerIn: parent
-                                text: skinModal.isApplied ? "✓ Aktiv" : "👁️ Vorschau"
-                                font.family: EzTheme.fontFamily
-                                font.pixelSize: 9
-                                font.bold: true
-                                color: skinModal.isApplied ? "#80EEAA" : "#F5D075"
-                            }
-                        }
-
-                        // Bottom Mouse Interaction Hint
-                        Rectangle {
-                            anchors.bottom: parent.bottom
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            height: 22
-                            color: "#D80A0C12"
-                            Text {
-                                anchors.centerIn: parent
-                                text: "🖱️ Klicken & Ziehen zum 3D-Drehen"
-                                font.family: EzTheme.fontFamily
-                                font.pixelSize: 9
-                                font.bold: true
-                                color: EzTheme.accentLight
-                            }
-                        }
-                    }
-
-                    // 3D Angle Quick Presets
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 4
-
-                        Rectangle {
-                            Layout.fillWidth: true; height: 26; radius: 5
-                            color: rotLMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
-                            border.color: EzTheme.border; border.width: 1
-                            Text { text: "↺ -90°"; font.pixelSize: 9; color: EzTheme.text; anchors.centerIn: parent }
-                            MouseArea {
-                                id: rotLMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                onClicked: modalSkin3D.setRotateY(-90)
-                            }
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true; height: 26; radius: 5
-                            color: rotRstMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
-                            border.color: EzTheme.border; border.width: 1
-                            Text { text: "0° Front"; font.pixelSize: 9; color: EzTheme.textSecondary; anchors.centerIn: parent }
-                            MouseArea {
-                                id: rotRstMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                onClicked: modalSkin3D.resetView()
-                            }
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true; height: 26; radius: 5
-                            color: rotRMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
-                            border.color: EzTheme.border; border.width: 1
-                            Text { text: "↻ +90°"; font.pixelSize: 9; color: EzTheme.text; anchors.centerIn: parent }
-                            MouseArea {
-                                id: rotRMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                onClicked: modalSkin3D.setRotateY(90)
-                            }
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true; height: 26; radius: 5
-                            color: rotBackMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
-                            border.color: EzTheme.border; border.width: 1
-                            Text { text: "180° Rück"; font.pixelSize: 9; color: EzTheme.textSecondary; anchors.centerIn: parent }
-                            MouseArea {
-                                id: rotBackMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                onClicked: modalSkin3D.setRotateY(180)
-                            }
-                        }
-                    }
-
-                    // Arm Model Variant Switcher
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 6
-
-                        Rectangle {
-                            Layout.fillWidth: true; height: 28; radius: 6
-                            color: skinModal.skinVariant === "classic" ? EzTheme.surfaceActive : (cMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2)
-                            border.color: skinModal.skinVariant === "classic" ? EzTheme.accent : EzTheme.border
-                            border.width: 1
-                            Text {
-                                text: "Classic (4px)"
+                                text: skinModal.isApplied ? "Aktiv" : "Vorschau"
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 10
-                                font.bold: skinModal.skinVariant === "classic"
-                                color: skinModal.skinVariant === "classic" ? "#FFFFFF" : EzTheme.textMuted
-                                anchors.centerIn: parent
-                            }
-                            MouseArea {
-                                id: cMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                onClicked: skinModal.skinVariant = "classic"
-                            }
-                        }
-
-                        Rectangle {
-                            Layout.fillWidth: true; height: 28; radius: 6
-                            color: skinModal.skinVariant === "slim" ? EzTheme.surfaceActive : (sMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2)
-                            border.color: skinModal.skinVariant === "slim" ? EzTheme.accent : EzTheme.border
-                            border.width: 1
-                            Text {
-                                text: "Slim (3px)"
-                                font.family: EzTheme.fontFamily
-                                font.pixelSize: 10
-                                font.bold: skinModal.skinVariant === "slim"
-                                color: skinModal.skinVariant === "slim" ? "#FFFFFF" : EzTheme.textMuted
-                                anchors.centerIn: parent
-                            }
-                            MouseArea {
-                                id: sMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                onClicked: skinModal.skinVariant = "slim"
+                                font.bold: true
+                                color: skinModal.isApplied ? "#80EEAA" : "#F5D685"
                             }
                         }
                     }
 
-                    // 3D Animation Switcher
+                    // Variant & Animation Controls
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: 4
+                        spacing: 10
 
-                        Repeater {
-                            model: [
-                                { label: "🧍 Idle", id: "idle" },
-                                { label: "🚶 Walk", id: "walk" },
-                                { label: "🏃 Run", id: "run" },
-                                { label: "👋 Wave", id: "wave" }
-                            ]
-                            Rectangle {
-                                Layout.fillWidth: true; height: 26; radius: 5
-                                color: skinModal.currentAnim === modelData.id ? EzTheme.surfaceActive : (animMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2)
-                                border.color: skinModal.currentAnim === modelData.id ? EzTheme.accent : EzTheme.border
-                                border.width: 1
-                                Text {
-                                    text: modelData.label
-                                    font.family: EzTheme.fontFamily
-                                    font.pixelSize: 9
-                                    font.bold: skinModal.currentAnim === modelData.id
-                                    color: skinModal.currentAnim === modelData.id ? "#FFFFFF" : EzTheme.textMuted
-                                    anchors.centerIn: parent
+                        // Variant
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 36
+                            radius: 8
+                            color: "#161B24"
+                            border.color: EzTheme.border
+                            border.width: 1
+                            RowLayout {
+                                anchors.fill: parent; anchors.margins: 4
+                                Rectangle {
+                                    Layout.fillWidth: true; Layout.fillHeight: true; radius: 6
+                                    color: skinModal.skinVariant === "classic" ? EzTheme.accent : "transparent"
+                                    Text { anchors.centerIn: parent; text: "Classic"; font.pixelSize: 11; font.bold: true; color: skinModal.skinVariant === "classic" ? "#000" : EzTheme.textSecondary }
+                                    MouseArea { anchors.fill: parent; onClicked: skinModal.skinVariant = "classic" }
                                 }
-                                MouseArea {
-                                    id: animMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        skinModal.currentAnim = modelData.id
-                                        modalSkin3D.setAnim(modelData.id)
-                                    }
+                                Rectangle {
+                                    Layout.fillWidth: true; Layout.fillHeight: true; radius: 6
+                                    color: skinModal.skinVariant === "slim" ? EzTheme.accent : "transparent"
+                                    Text { anchors.centerIn: parent; text: "Slim"; font.pixelSize: 11; font.bold: true; color: skinModal.skinVariant === "slim" ? "#000" : EzTheme.textSecondary }
+                                    MouseArea { anchors.fill: parent; onClicked: skinModal.skinVariant = "slim" }
+                                }
+                            }
+                        }
+
+                        // Anim
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 36
+                            radius: 8
+                            color: "#161B24"
+                            border.color: EzTheme.border
+                            border.width: 1
+                            RowLayout {
+                                anchors.fill: parent; anchors.margins: 4
+                                Rectangle {
+                                    Layout.fillWidth: true; Layout.fillHeight: true; radius: 6
+                                    color: skinModal.currentAnim === "idle" ? EzTheme.surfaceActive : "transparent"
+                                    Text { anchors.centerIn: parent; text: "🧍"; font.pixelSize: 14 }
+                                    MouseArea { anchors.fill: parent; onClicked: { skinModal.currentAnim = "idle"; modalSkin3D.setAnim("idle") } }
+                                }
+                                Rectangle {
+                                    Layout.fillWidth: true; Layout.fillHeight: true; radius: 6
+                                    color: skinModal.currentAnim === "walk" ? EzTheme.surfaceActive : "transparent"
+                                    Text { anchors.centerIn: parent; text: "🚶"; font.pixelSize: 14 }
+                                    MouseArea { anchors.fill: parent; onClicked: { skinModal.currentAnim = "walk"; modalSkin3D.setAnim("walk") } }
+                                }
+                                Rectangle {
+                                    Layout.fillWidth: true; Layout.fillHeight: true; radius: 6
+                                    color: skinModal.currentAnim === "run" ? EzTheme.surfaceActive : "transparent"
+                                    Text { anchors.centerIn: parent; text: "🏃"; font.pixelSize: 14 }
+                                    MouseArea { anchors.fill: parent; onClicked: { skinModal.currentAnim = "run"; modalSkin3D.setAnim("run") } }
                                 }
                             }
                         }
                     }
                 }
+            }
 
-                // ════ RIGHT COLUMN: Controls, Action, Save & Library ════
+            Rectangle {
+                Layout.preferredWidth: 1
+                Layout.fillHeight: true
+                color: EzTheme.borderLight
+            }
+
+            // ════ RIGHT COLUMN: ACTIONS & LIBRARY ════
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                contentWidth: availableWidth
+                clip: true
+
                 ColumnLayout {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    spacing: 10
+                    width: parent.width
+                    spacing: 24
+                    anchors.margins: 24
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
 
-                    // ── Card 1: Neuen Skin laden (Username oder Datei) ──
+                    // Header
+                    ColumnLayout {
+                        spacing: 4
+                        Text {
+                            text: "Skin Verwaltung"
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 22
+                            font.bold: true
+                            color: EzTheme.text
+                        }
+                        Text {
+                            text: "Wähle einen neuen Skin oder speichere deinen aktuellen."
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 13
+                            color: EzTheme.textSecondary
+                        }
+                    }
+
+                    // Status Message
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 90
-                        radius: 10
-                        color: "#0F121A"
+                        height: statusTxt.implicitHeight + 16
+                        radius: 8
+                        color: skinModal.isError ? "#3A1B1B" : "#1B3A24"
+                        border.color: skinModal.isError ? "#FF4444" : "#22C96E"
+                        border.width: 1
+                        visible: skinModal.statusMsg !== ""
+                        Text {
+                            id: statusTxt
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            text: skinModal.statusMsg
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 12
+                            color: skinModal.isError ? "#FF8888" : "#80EEAA"
+                            wrapMode: Text.WordWrap
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
+
+                    // ── LOAD SKIN ──
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 120
+                        radius: 12
+                        color: "#161B24"
                         border.color: EzTheme.border
                         border.width: 1
 
                         ColumnLayout {
                             anchors.fill: parent
-                            anchors.margins: 10
-                            spacing: 6
+                            anchors.margins: 16
+                            spacing: 12
 
                             Text {
-                                text: "Skin auswählen & in 3D-Vorschau laden:"
+                                text: "1. Skin in Vorschau laden"
                                 font.family: EzTheme.fontFamily
-                                font.pixelSize: 11
+                                font.pixelSize: 14
                                 font.bold: true
-                                color: EzTheme.textSecondary
+                                color: EzTheme.text
                             }
 
-                            // Option A: Username input
                             RowLayout {
                                 Layout.fillWidth: true
-                                spacing: 6
+                                spacing: 12
 
+                                // Username Input
                                 Rectangle {
                                     Layout.fillWidth: true
-                                    height: 30
-                                    radius: 6
+                                    height: 36
+                                    radius: 8
                                     color: "#0A0C12"
-                                    border.color: skinNameInput.activeFocus ? EzTheme.accent : EzTheme.border
+                                    border.color: usernameInput.activeFocus ? EzTheme.accent : EzTheme.border
                                     border.width: 1
-
                                     RowLayout {
-                                        anchors.fill: parent
-                                        anchors.margins: 4
-                                        spacing: 6
-
-                                        Text { text: "🔍"; font.pixelSize: 10; Layout.leftMargin: 4 }
-
+                                        anchors.fill: parent; anchors.margins: 4; spacing: 8
                                         TextField {
-                                            id: skinNameInput
+                                            id: usernameInput
                                             Layout.fillWidth: true
-                                            placeholderText: "Spielernamen eingeben (z. B. Jektross)..."
+                                            placeholderText: "Minecraft Name..."
                                             placeholderTextColor: "#646E82"
-                                            color: "#FFFFFF"
-                                            font.family: EzTheme.fontFamily
-                                            font.pixelSize: 11
-                                            background: Rectangle { color: "transparent" }
+                                            color: "#FFF"
+                                            font.pixelSize: 12
+                                            background: Item {}
                                             onAccepted: fetchBtnMouse.clicked(null)
                                         }
-                                    }
-                                }
-
-                                Rectangle {
-                                    width: 105; height: 30; radius: 6
-                                    color: fetchBtnMouse.containsMouse ? "#2EE080" : "#22C96E"
-                                    RowLayout {
-                                        anchors.centerIn: parent
-                                        spacing: 4
-                                        Text { text: "👁️"; font.pixelSize: 10 }
-                                        Text { text: "Vorschau"; font.family: EzTheme.fontFamily; font.pixelSize: 11; font.bold: true; color: "#000000" }
-                                    }
-                                    MouseArea {
-                                        id: fetchBtnMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            var u = skinNameInput.text.trim()
-                                            if (accountController && u !== "") {
-                                                skinModal.previewName = u
-                                                accountController.fetchSkinByUsername(u)
+                                        Rectangle {
+                                            width: 70; height: 28; radius: 6
+                                            color: fetchBtnMouse.containsMouse ? EzTheme.surfaceActive : EzTheme.surface3
+                                            Text { anchors.centerIn: parent; text: "Suchen"; color: EzTheme.text; font.pixelSize: 11; font.bold: true }
+                                            MouseArea {
+                                                id: fetchBtnMouse
+                                                anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    if (accountController && usernameInput.text.trim() !== "") {
+                                                        accountController.fetchSkinByUsername(usernameInput.text.trim())
+                                                    }
+                                                }
                                             }
                                         }
                                     }
                                 }
-                            }
 
-                            // Option B: File Picker Button
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: 26
-                                radius: 6
-                                color: pickFileMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
-                                border.color: EzTheme.border
-                                border.width: 1
+                                Text { text: "ODER"; font.pixelSize: 11; color: EzTheme.textSecondary; font.bold: true }
 
-                                RowLayout {
-                                    anchors.centerIn: parent
-                                    spacing: 6
-                                    Text { text: "📁"; font.pixelSize: 11 }
-                                    Text {
-                                        text: "Eigene Skin-Datei (.png) als Vorschau laden…"
-                                        font.family: EzTheme.fontFamily
-                                        font.pixelSize: 10
-                                        color: EzTheme.text
+                                // Upload Button
+                                Rectangle {
+                                    width: 120; height: 36; radius: 8
+                                    color: uploadBtnMouse.containsMouse ? EzTheme.surfaceActive : EzTheme.surface3
+                                    border.color: EzTheme.border
+                                    border.width: 1
+                                    Text { anchors.centerIn: parent; text: "Bild hochladen"; color: EzTheme.text; font.pixelSize: 12; font.bold: true }
+                                    MouseArea {
+                                        id: uploadBtnMouse
+                                        anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            if (accountController) {
+                                                var p = accountController.pickSkinFile()
+                                                if (p) {
+                                                    skinModal.previewFilePath = p
+                                                    var parts = p.replace(/\\/g, "/").split("/")
+                                                    skinModal.previewName = parts[parts.length - 1].replace(".png", "")
+                                                    skinModal.previewTextureUrl = accountController.getSkinTextureUrl(p)
+                                                    skinModal.isApplied = false
+                                                    if (modalSkin3D) modalSkin3D.updateSkin()
+                                                }
+                                            }
+                                        }
                                     }
                                 }
-                                MouseArea {
-                                    id: pickFileMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        if (accountController) {
-                                            var p = accountController.pickSkinFile()
-                                            if (p) {
-                                                skinModal.previewFilePath = p
-                                                var parts = p.replace(/\\/g, "/").split("/")
-                                                skinModal.previewName = parts[parts.length - 1].replace(".png", "")
-                                                skinModal.previewTextureUrl = accountController.getSkinTextureUrl(p)
-                                                skinModal.isApplied = false
-                                                if (modalSkin3D) modalSkin3D.updateSkin()
+
+                                Rectangle {
+                                    width: 120; height: 36; radius: 8
+                                    color: capeBtnMouse.containsMouse ? EzTheme.surfaceActive : EzTheme.surface3
+                                    border.color: EzTheme.border
+                                    border.width: 1
+                                    Text { anchors.centerIn: parent; text: "Cape hochladen"; color: EzTheme.text; font.pixelSize: 12; font.bold: true }
+                                    MouseArea {
+                                        id: capeBtnMouse
+                                        anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            if (accountController) {
+                                                var cape = accountController.pickCapeFile()
+                                                if (cape) {
+                                                    skinModal.previewCapeUrl = cape
+                                                    if (modalSkin3D) modalSkin3D.updateCape()
+                                                }
                                             }
                                         }
                                     }
@@ -508,74 +422,53 @@ Item {
                         }
                     }
 
-                    // ── Card 2: Vorschau-Status & "Skin anwenden" (HERZSTÜCK) ──
+                    // ── APPLY SKIN ──
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 74
-                        radius: 10
+                        height: 70
+                        radius: 12
                         color: skinModal.isApplied ? "#101D16" : "#1B1710"
                         border.color: skinModal.isApplied ? "#208048" : "#E5A93C"
                         border.width: 1
 
-                        ColumnLayout {
+                        RowLayout {
                             anchors.fill: parent
-                            anchors.margins: 8
-                            spacing: 5
+                            anchors.margins: 16
+                            spacing: 16
 
-                            RowLayout {
+                            ColumnLayout {
                                 Layout.fillWidth: true
-                                spacing: 6
+                                spacing: 2
                                 Text {
-                                    text: skinModal.isApplied ? "✓" : "👁️"
-                                    font.pixelSize: 11
-                                    color: skinModal.isApplied ? "#80EEAA" : "#F5D075"
+                                    text: "2. Skin anwenden"
+                                    font.family: EzTheme.fontFamily
+                                    font.pixelSize: 14
+                                    font.bold: true
+                                    color: EzTheme.text
                                 }
                                 Text {
-                                    text: skinModal.isApplied ?
-                                          ("Skin '" + skinModal.previewName + "' ist aktiv ausgewählt.") :
-                                          ("Vorschau aktiv für '" + skinModal.previewName + "'. Noch nicht ausgewählt!")
-                                    font.family: EzTheme.fontFamily
-                                    font.pixelSize: 10
-                                    font.bold: true
-                                    color: skinModal.isApplied ? "#80EEAA" : "#F5D075"
-                                    elide: Text.ElideRight
-                                    Layout.fillWidth: true
+                                    text: skinModal.isApplied ? "Dieser Skin ist bereits aktiv." : "Diesen Skin jetzt für deinen Account übernehmen."
+                                    font.pixelSize: 11
+                                    color: EzTheme.textSecondary
                                 }
                             }
 
-                            // Prominent Apply Button
                             Rectangle {
-                                Layout.fillWidth: true
-                                height: 32
-                                radius: 6
-                                color: skinModal.isApplied ?
-                                       "#1E2A22" :
-                                       (applyBtnMouse.containsMouse ? "#2EE080" : "#22C96E")
+                                width: 140; height: 38; radius: 8
+                                color: skinModal.isApplied ? "#1E2A22" : (applyBtnMouse.containsMouse ? "#2EE080" : "#22C96E")
                                 border.color: skinModal.isApplied ? "#2A3D30" : "#22C96E"
                                 border.width: 1
-
-                                RowLayout {
+                                Text {
                                     anchors.centerIn: parent
-                                    spacing: 6
-                                    Text {
-                                        text: skinModal.isApplied ? "✓" : "✨"
-                                        font.pixelSize: 12
-                                    }
-                                    Text {
-                                        text: skinModal.isApplied ? "Skin ist bereits ausgewählt" : "Skin auswählen & anwenden"
-                                        font.family: EzTheme.fontFamily
-                                        font.pixelSize: 11
-                                        font.bold: true
-                                        color: skinModal.isApplied ? "#80EEAA" : "#000000"
-                                    }
+                                    text: skinModal.isApplied ? "Aktiv" : "Auswählen"
+                                    color: skinModal.isApplied ? "#80EEAA" : "#000"
+                                    font.pixelSize: 13
+                                    font.bold: true
                                 }
-
                                 MouseArea {
                                     id: applyBtnMouse
-                                    anchors.fill: parent
-                                    enabled: !skinModal.isApplied && (skinModal.previewFilePath !== "" || skinModal.previewName !== "")
-                                    hoverEnabled: true
-                                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    anchors.fill: parent; hoverEnabled: !skinModal.isApplied; cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    enabled: !skinModal.isApplied
                                     onClicked: {
                                         if (accountController) {
                                             var target = skinModal.previewFilePath || skinModal.previewName
@@ -588,96 +481,76 @@ Item {
                         }
                     }
 
-                    // ── Card 3: In Bibliothek speichern (Nur nach Anwenden aktiv!) ──
+                    // ── SAVE SKIN ──
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 64
-                        radius: 10
-                        color: "#0F121A"
-                        border.color: skinModal.isApplied ? (saveSkinNameInput.activeFocus ? EzTheme.accent : EzTheme.border) : "#1E2028"
+                        height: 90
+                        radius: 12
+                        color: "#161B24"
+                        border.color: EzTheme.border
                         border.width: 1
-                        opacity: skinModal.isApplied ? 1.0 : 0.6
+                        opacity: skinModal.isApplied ? 1.0 : 0.4 // Disabled state visual
 
                         ColumnLayout {
                             anchors.fill: parent
-                            anchors.margins: 7
-                            spacing: 4
+                            anchors.margins: 16
+                            spacing: 8
 
                             RowLayout {
                                 Layout.fillWidth: true
-                                spacing: 4
                                 Text {
-                                    text: skinModal.isApplied ? "💾" : "🔒"
-                                    font.pixelSize: 10
-                                }
-                                Text {
-                                    text: skinModal.isApplied ?
-                                          "Aktiven Skin in eigener Bibliothek speichern:" :
-                                          "Skin vor dem Speichern zuerst auswählen & anwenden."
+                                    Layout.fillWidth: true
+                                    text: "3. In Bibliothek speichern (Nur für aktiven Skin)"
                                     font.family: EzTheme.fontFamily
-                                    font.pixelSize: 10
-                                    font.bold: skinModal.isApplied
-                                    color: skinModal.isApplied ? EzTheme.textSecondary : EzTheme.textMuted
+                                    font.pixelSize: 14
+                                    font.bold: true
+                                    color: EzTheme.text
                                 }
                             }
 
                             RowLayout {
                                 Layout.fillWidth: true
-                                spacing: 6
+                                spacing: 12
 
                                 Rectangle {
                                     Layout.fillWidth: true
-                                    height: 28
-                                    radius: 6
+                                    height: 36
+                                    radius: 8
                                     color: "#0A0C12"
-                                    border.color: skinModal.isApplied ? (saveSkinNameInput.activeFocus ? EzTheme.accent : EzTheme.border) : "#1A1C24"
+                                    border.color: EzTheme.border
                                     border.width: 1
-
                                     TextField {
-                                        id: saveSkinNameInput
-                                        anchors.fill: parent
-                                        anchors.margins: 3
+                                        id: saveNameInput
+                                        anchors.fill: parent; anchors.margins: 4
+                                        placeholderText: "Name für die Bibliothek..."
+                                        placeholderTextColor: "#646E82"
+                                        color: "#FFF"
+                                        font.pixelSize: 12
+                                        background: Item {}
                                         enabled: skinModal.isApplied
-                                        placeholderText: skinModal.isApplied ? "Name für Bibliothek (z. B. Mein PvP Skin)..." : "Zuerst Skin anwenden..."
-                                        placeholderTextColor: "#5A6273"
-                                        color: skinModal.isApplied ? "#FFFFFF" : "#5A6273"
-                                        font.family: EzTheme.fontFamily
-                                        font.pixelSize: 11
-                                        background: Rectangle { color: "transparent" }
-                                        onAccepted: saveSkinBtnMouse.clicked(null)
                                     }
                                 }
 
                                 Rectangle {
-                                    width: 100; height: 28; radius: 6
-                                    color: !skinModal.isApplied ? "#181A22" : (saveSkinBtnMouse.containsMouse ? EzTheme.surfaceActive : EzTheme.surface2)
-                                    border.color: skinModal.isApplied ? EzTheme.accent : "#222530"
+                                    width: 120; height: 36; radius: 8
+                                    color: skinModal.isApplied && saveBtnMouse.containsMouse ? EzTheme.surfaceActive : EzTheme.surface3
+                                    border.color: EzTheme.border
                                     border.width: 1
-
-                                    RowLayout {
+                                    Text {
                                         anchors.centerIn: parent
-                                        spacing: 4
-                                        Text { text: "💾"; font.pixelSize: 9; opacity: skinModal.isApplied ? 1.0 : 0.4 }
-                                        Text {
-                                            text: "Speichern"
-                                            font.family: EzTheme.fontFamily
-                                            font.pixelSize: 11
-                                            font.bold: true
-                                            color: skinModal.isApplied ? EzTheme.accentLight : "#555A6B"
-                                        }
+                                        text: "Speichern"
+                                        color: skinModal.isApplied ? EzTheme.text : EzTheme.textSecondary
+                                        font.pixelSize: 12
+                                        font.bold: true
                                     }
-
                                     MouseArea {
-                                        id: saveSkinBtnMouse
-                                        anchors.fill: parent
+                                        id: saveBtnMouse
+                                        anchors.fill: parent; hoverEnabled: skinModal.isApplied; cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                                         enabled: skinModal.isApplied
-                                        hoverEnabled: true
-                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                                         onClicked: {
-                                            if (accountController && skinModal.isApplied) {
-                                                var n = saveSkinNameInput.text.trim() || skinModal.previewName || "Mein Skin"
-                                                accountController.saveCurrentSkin(n, skinModal.previewFilePath)
-                                                saveSkinNameInput.text = ""
+                                            if (accountController) {
+                                                accountController.saveCurrentSkin(saveNameInput.text, "")
+                                                saveNameInput.text = ""
                                             }
                                         }
                                     }
@@ -686,254 +559,109 @@ Item {
                         }
                     }
 
-                    // ── Card 4: Meine Skin-Bibliothek (Klick = VORSCHAU!) ──
-                    Rectangle {
+                    // ── LIBRARY ──
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        Layout.minimumHeight: 90
-                        radius: 10
-                        color: "#0F121A"
-                        border.color: EzTheme.border
-                        border.width: 1
+                        spacing: 12
+                        
+                        Text {
+                            text: "Meine Skin-Bibliothek"
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 16
+                            font.bold: true
+                            color: EzTheme.text
+                            Layout.topMargin: 8
+                        }
 
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 8
-                            spacing: 6
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Text {
-                                    text: "📚 Meine Skin-Bibliothek (" + ((typeof accountController !== "undefined" && accountController && accountController.savedSkins) ? accountController.savedSkins.length : 0) + "):"
-                                    font.family: EzTheme.fontFamily
-                                    font.pixelSize: 10
-                                    font.bold: true
-                                    color: EzTheme.textSecondary
-                                }
-                                Item { Layout.fillWidth: true }
-                                Text {
-                                    text: "💡 Klick zeigt 3D-Vorschau"
-                                    font.family: EzTheme.fontFamily
-                                    font.pixelSize: 9
-                                    color: EzTheme.textMuted
-                                }
-                            }
-
-                            // Saved Skins List
-                            ScrollView {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                contentWidth: savedRow.implicitWidth
+                        GridView {
+                            id: libraryGrid
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: Math.max(120, Math.ceil(count / 4) * 110)
+                            cellWidth: (parent.width - 36) / 4
+                            cellHeight: 110
+                            clip: true
+                            interactive: false
+                            model: (typeof accountController !== "undefined" && accountController) ? accountController.savedSkins : []
+                            
+                            delegate: Rectangle {
+                                width: libraryGrid.cellWidth - 12
+                                height: libraryGrid.cellHeight - 12
+                                radius: 8
+                                color: libItemMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
+                                border.color: libItemMouse.containsMouse ? EzTheme.accent : EzTheme.border
+                                border.width: 1
                                 clip: true
 
-                                Row {
-                                    id: savedRow
-                                    spacing: 8
-                                    anchors.verticalCenter: parent.verticalCenter
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    spacing: 0
 
-                                    Repeater {
-                                        model: (typeof accountController !== "undefined" && accountController) ? accountController.savedSkins : []
-                                        Rectangle {
-                                            width: 155; height: 44; radius: 8
-                                            color: savedMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
-                                            border.color: (skinModal.previewFilePath === modelData.path || skinModal.previewName === modelData.name) ? EzTheme.accent : EzTheme.border
-                                            border.width: (skinModal.previewFilePath === modelData.path || skinModal.previewName === modelData.name) ? 2 : 1
-
-                                            RowLayout {
-                                                anchors.fill: parent
-                                                anchors.margins: 4
-                                                spacing: 6
-
-                                                Image {
-                                                    source: modelData.previewUrl ? modelData.previewUrl : ("https://mc-heads.net/avatar/" + (modelData.name || "Steve") + "/32")
-                                                    Layout.preferredWidth: 28
-                                                    Layout.preferredHeight: 28
-                                                    fillMode: Image.PreserveAspectFit
-                                                }
-
-                                                ColumnLayout {
-                                                    Layout.fillWidth: true
-                                                    spacing: 1
-                                                    Text {
-                                                        text: modelData.name || "Skin"
-                                                        font.family: EzTheme.fontFamily
-                                                        font.pixelSize: 10
-                                                        font.bold: true
-                                                        color: EzTheme.text
-                                                        elide: Text.ElideRight
-                                                        Layout.fillWidth: true
-                                                    }
-                                                    Text {
-                                                        text: "Vorschau laden"
-                                                        font.family: EzTheme.fontFamily
-                                                        font.pixelSize: 8
-                                                        color: EzTheme.accentLight
-                                                    }
-                                                }
-
-                                                Rectangle {
-                                                    width: 20; height: 20; radius: 10
-                                                    color: delMouse.containsMouse ? "#4A181C" : "transparent"
-                                                    Text {
-                                                        text: "✕"
-                                                        font.pixelSize: 10
-                                                        color: EzTheme.textMuted
-                                                        anchors.centerIn: parent
-                                                    }
-                                                    MouseArea {
-                                                        id: delMouse
-                                                        anchors.fill: parent
-                                                        hoverEnabled: true
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: {
-                                                            if (accountController) {
-                                                                accountController.deleteSavedSkin(modelData.id || modelData.name)
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-
-                                            MouseArea {
-                                                id: savedMouse
-                                                anchors.fill: parent
-                                                anchors.rightMargin: 24
-                                                hoverEnabled: true
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: {
-                                                    // IMMER NUR VORSCHAU LADEN - NICHT DIREKT ANWENDEN!
-                                                    skinModal.previewName = modelData.name || "Gespeicherter Skin"
-                                                    if (modelData.path) {
-                                                        skinModal.previewFilePath = modelData.path
-                                                        if (accountController) {
-                                                            skinModal.previewTextureUrl = accountController.getSkinTextureUrl(modelData.path)
-                                                        }
-                                                        skinModal.isApplied = (accountController && accountController.activeSkinPath === modelData.path)
-                                                        if (modalSkin3D) modalSkin3D.updateSkin()
-                                                        skinModal.statusMsg = "Vorschau von '" + skinModal.previewName + "' geladen. Klicke auf 'Skin auswählen & anwenden'."
-                                                        skinModal.isError = false
-                                                    } else if (modelData.name) {
-                                                        skinNameInput.text = modelData.name
-                                                        if (accountController) {
-                                                            accountController.fetchSkinByUsername(modelData.name)
-                                                        }
-                                                    }
-                                                }
-                                            }
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        color: "#0A0B10"
+                                        Image {
+                                            anchors.centerIn: parent
+                                            width: parent.width * 0.8
+                                            height: width
+                                            source: modelData.previewUrl
+                                            fillMode: Image.PreserveAspectFit
+                                            smooth: false
+                                            cache: false
                                         }
                                     }
 
-                                    // Empty state
-                                    Text {
-                                        visible: !(typeof accountController !== "undefined" && accountController && accountController.savedSkins && accountController.savedSkins.length > 0)
-                                        text: "Noch keine Skins in der Bibliothek gespeichert."
-                                        font.family: EzTheme.fontFamily
-                                        font.pixelSize: 10
-                                        color: EzTheme.textMuted
-                                        anchors.verticalCenter: parent.verticalCenter
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        height: 24
+                                        color: "#161B24"
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: modelData.name
+                                            font.pixelSize: 10
+                                            font.bold: true
+                                            color: EzTheme.text
+                                            elide: Text.ElideRight
+                                            width: parent.width - 8
+                                            horizontalAlignment: Text.AlignHCenter
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    anchors.top: parent.top; anchors.right: parent.right; anchors.margins: 4
+                                    width: 20; height: 20; radius: 4; color: "#AA2222"
+                                    opacity: libDelMouse.containsMouse ? 1.0 : 0.0
+                                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                                    Text { anchors.centerIn: parent; text: "✕"; color: "#FFF"; font.pixelSize: 10 }
+                                    MouseArea {
+                                        id: libDelMouse
+                                        anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            if (accountController) accountController.deleteSavedSkin(modelData.id)
+                                        }
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: libItemMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (accountController) {
+                                            skinModal.previewFilePath = modelData.path
+                                            skinModal.previewName = modelData.name
+                                            skinModal.previewTextureUrl = modelData.path ? accountController.getSkinTextureUrl(modelData.path) : modelData.previewUrl
+                                            skinModal.isApplied = false
+                                            if (modalSkin3D) modalSkin3D.updateSkin()
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
-            }
-
-            // ── Status Message Banner ──
-            Rectangle {
-                Layout.fillWidth: true
-                height: 28
-                radius: 6
-                visible: skinModal.statusMsg !== ""
-                color: skinModal.isError ? "#301014" : "#102C1E"
-                border.color: skinModal.isError ? "#802028" : "#208048"
-                border.width: 1
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: 4
-                    spacing: 6
-                    Text { text: skinModal.isError ? "⚠️" : "✓"; font.pixelSize: 10 }
-                    Text {
-                        text: skinModal.statusMsg
-                        font.family: EzTheme.fontFamily
-                        font.pixelSize: 10
-                        color: skinModal.isError ? "#FFA0A8" : "#80EEAA"
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                    }
-                }
-            }
-
-            // ── Footer Action Row ──
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 10
-
-                Rectangle {
-                    height: 32
-                    Layout.preferredWidth: 140
-                    radius: 6
-                    color: resetMouse.containsMouse ? "#2A1A1E" : "#181418"
-                    border.color: EzTheme.border
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 5
-                        Text { text: "🔄"; font.pixelSize: 10 }
-                        Text {
-                            text: "Standard (Steve)"
-                            font.family: EzTheme.fontFamily
-                            font.pixelSize: 11
-                            color: EzTheme.textMuted
-                        }
-                    }
-
-                    MouseArea {
-                        id: resetMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (accountController) {
-                                accountController.resetSkin()
-                                skinModal.previewFilePath = ""
-                                skinModal.previewTextureUrl = Qt.resolvedUrl("../assets/skins/steve.png").toString()
-                                skinModal.previewName = "Steve"
-                                skinModal.isApplied = true
-                                if (modalSkin3D) modalSkin3D.updateSkin()
-                            }
-                        }
-                    }
-                }
-
-                Item { Layout.fillWidth: true }
-
-                Rectangle {
-                    height: 32
-                    Layout.preferredWidth: 100
-                    radius: 6
-                    color: closeBtnMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
-                    border.color: EzTheme.border
-                    border.width: 1
-
-                    Text {
-                        text: "Schließen"
-                        font.family: EzTheme.fontFamily
-                        font.pixelSize: 11
-                        font.bold: true
-                        color: EzTheme.textSecondary
-                        anchors.centerIn: parent
-                    }
-
-                    MouseArea {
-                        id: closeBtnMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: skinModal.close()
-                    }
+                    Item { Layout.preferredHeight: 20 }
                 }
             }
         }

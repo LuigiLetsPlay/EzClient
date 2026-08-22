@@ -5,6 +5,7 @@ from typing import Any
 import urllib.request
 import urllib.parse
 import json
+import time
 
 MOJANG_SKIN_URL = "https://api.minecraftservices.com/minecraft/profile/skins"
 

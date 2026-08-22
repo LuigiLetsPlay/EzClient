@@ -37,7 +37,7 @@ except ImportError:
 
 
 APP_NAME = "EzClient"
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.5.1"
 MINECRAFT_INSTALLER_URL = "https://launcher.mojang.com/download/MinecraftInstaller.msi"
 FABRIC_META_URL = "https://meta.fabricmc.net/v2/versions/installer"
 FABRIC_FALLBACK_URL = (
@@ -79,9 +79,8 @@ WARNING = "#F59E0B"         # Warning / Beta
 WARNING_DARK = "#78350F"
 
 FALLBACK_VERSIONS = [
-    "26.2", "26.1", "1.21.8", "1.21.7", "1.21.6", "1.21.5",
-    "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21",
-    "1.20.6", "1.20.4", "1.20.1", "1.19.4", "1.18.2", "1.16.5"
+    "26.2", "26.1", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5",
+    "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21"
 ]
 
 RECOMMENDED_MODS = [

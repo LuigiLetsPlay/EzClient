@@ -13,7 +13,7 @@ Item {
     readonly property var selMod: (typeof modrinthController !== "undefined" && modrinthController && modrinthController.selectedMod) ? modrinthController.selectedMod : ({})
     readonly property var curResults: (typeof modrinthController !== "undefined" && modrinthController && modrinthController.results) ? modrinthController.results : []
     readonly property var curVersions: (typeof modrinthController !== "undefined" && modrinthController && modrinthController.filteredVersions) ? modrinthController.filteredVersions : []
-    readonly property string curVersionFilter: (typeof modrinthController !== "undefined" && modrinthController) ? modrinthController.versionTypeFilter : "release"
+    readonly property string curVersionFilter: (typeof modrinthController !== "undefined" && modrinthController) ? modrinthController.versionTypeFilter : "all"
     readonly property bool curLoading: (typeof modrinthController !== "undefined" && modrinthController) ? modrinthController.loading : false
     readonly property int curTotalHits: (typeof modrinthController !== "undefined" && modrinthController) ? modrinthController.totalHits : 0
     readonly property string selectedProjectId: root.selMod ? (root.selMod.project_id || root.selMod.id || root.selMod.slug || "") : ""
@@ -63,6 +63,8 @@ Item {
         }
     }
 
+    property var pendingInstalls: []
+
     Connections {
         target: (typeof profileController !== "undefined") ? profileController : null
         function onActiveProfileChanged() {
@@ -73,6 +75,21 @@ Item {
                 if (root.isInitialized) {
                     modrinthController.search()
                 }
+            }
+        }
+        function onModInstallStarted(modId) {
+            var arr = root.pendingInstalls.slice()
+            if (arr.indexOf(modId) === -1) {
+                arr.push(modId)
+                root.pendingInstalls = arr
+            }
+        }
+        function onModInstallFinished(modId) {
+            var arr = root.pendingInstalls.slice()
+            var idx = arr.indexOf(modId)
+            if (idx !== -1) {
+                arr.splice(idx, 1)
+                root.pendingInstalls = arr
             }
         }
     }
@@ -456,10 +473,12 @@ Item {
                                 }
                                 return false
                             }
+                            readonly property bool isPending: {
+                                var s = modelData.slug || modelData.project_id || modelData.id || ""
+                                return root.pendingInstalls.indexOf(s) !== -1
+                            }
 
-                            color: isSel ? EzTheme.surface3 : (rowMouse.containsMouse ? EzTheme.surface2 : "transparent")
-                            border.color: isSel ? EzTheme.accent : "transparent"
-                            border.width: 1
+                            color: isSel ? EzTheme.surfaceActive : (rowMouse.containsMouse ? EzTheme.surfaceHover : "transparent")
 
                             Behavior on color { ColorAnimation { duration: 100 } }
 
@@ -545,7 +564,7 @@ Item {
 
                                             Text {
                                                 id: instText
-                                                text: "✓ " + EzI18n.t("modrinth_installed", "Installiert")
+                                                text: "✓ " + (window.integratedMods && window.integratedMods.indexOf(modelData.slug) !== -1 ? "Integriert" : EzI18n.t("modrinth_installed", "Installiert"))
                                                 font.family: EzTheme.mcFontFamily
                                                 font.pixelSize: 9
                                                 font.bold: true
@@ -578,8 +597,8 @@ Item {
                                     Layout.preferredWidth: 96
                                     Layout.preferredHeight: 30
                                     radius: 6
-                                    color: resultItem.isInstalled ? "#14281E" : (cInstMouse.containsMouse ? EzTheme.accentHover : EzTheme.accent)
-                                    border.color: resultItem.isInstalled ? EzTheme.accent : "transparent"
+                                    color: resultItem.isPending ? "#808080" : (resultItem.isInstalled ? "#14281E" : (cInstMouse.containsMouse ? EzTheme.accentHover : EzTheme.accent))
+                                    border.color: resultItem.isInstalled && !resultItem.isPending ? EzTheme.accent : "transparent"
                                     border.width: 1
                                     z: 10
 
@@ -587,18 +606,18 @@ Item {
                                         anchors.centerIn: parent
                                         spacing: 4
                                         Text {
-                                            text: resultItem.isInstalled ? "✓" : "+"
+                                            text: resultItem.isPending ? "..." : (resultItem.isInstalled ? "✓" : "+")
                                             font.family: EzTheme.fontFamily
                                             font.pixelSize: 11
                                             font.bold: true
-                                            color: resultItem.isInstalled ? EzTheme.accentLight : "#000000"
+                                            color: (resultItem.isInstalled || resultItem.isPending) ? EzTheme.accentLight : "#000000"
                                         }
                                         Text {
-                                            text: resultItem.isInstalled ? "Installiert" : "Installieren"
+                                            text: resultItem.isPending ? "Lädt..." : (resultItem.isInstalled ? (window.integratedMods && window.integratedMods.indexOf(modelData.slug) !== -1 ? "Integriert" : "Installiert") : "Installieren")
                                             font.family: EzTheme.mcFontFamily
                                             font.pixelSize: 10
                                             font.bold: true
-                                            color: resultItem.isInstalled ? EzTheme.accentLight : "#000000"
+                                            color: (resultItem.isInstalled || resultItem.isPending) ? EzTheme.accentLight : "#000000"
                                         }
                                     }
 
@@ -607,7 +626,7 @@ Item {
                                         anchors.fill: parent
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
-                                        enabled: !resultItem.isInstalled
+                                        enabled: !resultItem.isInstalled && !resultItem.isPending
                                         onClicked: {
                                             root.triggerInstall(modelData)
                                         }
@@ -760,15 +779,15 @@ Item {
 
                         // ── Install / Uninstall Banner ──
                         Rectangle {
+                            id: installBanner
                             Layout.fillWidth: true
                             Layout.preferredHeight: 52
-                            color: EzTheme.surface
-                            border.color: EzTheme.border
-                            border.width: 1
+                            color: EzTheme.surface2
 
                             readonly property bool isInstalled: {
-                                if (root.selMod && root.selMod.is_installed) return true
-                                if (typeof profileController !== "undefined" && profileController && profileController.isModInstalled && root.selMod) {
+                                if (typeof profileController === "undefined" || !profileController) return false;
+                                var dummy = profileController.installedMods; // trigger UI reactivity when installed mods change
+                                if (root.selMod) {
                                     return profileController.isModInstalled(
                                         root.selMod.project_id || root.selMod.id || "",
                                         root.selMod.slug || "",
@@ -786,25 +805,14 @@ Item {
                                 spacing: 8
 
                                 EzButton {
-                                    text: parent.parent.isInstalled ? EzI18n.t("modrinth_installed", "Installiert") : EzI18n.t("modrinth_install", "Installieren")
-                                    primary: !parent.parent.isInstalled
+                                    text: installBanner.isInstalled ? (window.integratedMods && window.integratedMods.indexOf(root.selMod ? root.selMod.slug : "") !== -1 ? "Integriert" : EzI18n.t("modrinth_installed", "Installiert")) : EzI18n.t("modrinth_install", "Installieren")
+                                    primary: !installBanner.isInstalled
                                     mcFont: true
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 34
                                     onClicked: {
                                         var mod = root.selMod
-                                        var bestVer = null
-                                        if (root.curVersions && root.curVersions.length > 0) {
-                                            for (var i = 0; i < root.curVersions.length; i++) {
-                                                if (root.curVersions[i].version_type === "release") {
-                                                    bestVer = root.curVersions[i]
-                                                    break
-                                                }
-                                            }
-                                            if (!bestVer) {
-                                                bestVer = root.curVersions[0]
-                                            }
-                                        }
+                                        var bestVer = root.curVersions && root.curVersions.length > 0 ? root.curVersions[0] : null
                                         var latestVer = bestVer ? (bestVer.version_number || "Latest") : "Latest"
                                         var file = (bestVer && bestVer.files && bestVer.files.length > 0) ? bestVer.files[0].filename : (mod.slug + ".jar")
                                         var src = mod.source || (modrinthController ? modrinthController.source : "modrinth")
@@ -826,7 +834,7 @@ Item {
                                 EzButton {
                                     iconSource: "trash.svg"
                                     danger: true
-                                    visible: parent.parent.isInstalled && !root.isCoreMod
+                                    visible: installBanner.isInstalled && !root.isCoreMod
                                     Layout.preferredWidth: 34
                                     Layout.preferredHeight: 34
                                     onClicked: {
@@ -850,7 +858,7 @@ Item {
                                     color: EzTheme.surface3
                                     border.color: EzTheme.accentDark
                                     border.width: 1
-                                    visible: parent.parent.isInstalled && root.isCoreMod
+                                    visible: installBanner.isInstalled && root.isCoreMod
 
                                     Text {
                                         id: coreBadgeText
@@ -1082,9 +1090,32 @@ Item {
                                 model: root.curVersions
 
                                 Rectangle {
+                                    id: versionItem
                                     Layout.fillWidth: true
                                     height: 48
                                     color: verMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
+
+                                    // These states belong to the version delegate, so the
+                                    // button can reliably access them through versionItem.
+                                    // Defining them in the RowLayout left them out of the
+                                    // button's QML scope and caused the ReferenceErrors.
+                                    property bool isThisVerInstalled: {
+                                        if (!profileController) return false;
+                                        var dummy = profileController.installedMods; // trigger re-eval
+                                        var selSlug = root.selMod ? (root.selMod.project_id || root.selMod.slug || "") : "";
+                                        var verNum = modelData.version_number || "";
+                                        return profileController.hasModVersion(selSlug, verNum);
+                                    }
+                                    property bool isProjectInstalled: {
+                                        if (!profileController) return false;
+                                        var dummy = profileController.installedMods;
+                                        var selSlug = root.selMod ? (root.selMod.project_id || root.selMod.slug || "") : "";
+                                        return profileController.isModInstalled(selSlug, root.selMod ? (root.selMod.title || "") : "");
+                                    }
+                                    property bool isPending: {
+                                        var s = root.selMod ? (root.selMod.project_id || root.selMod.slug || root.selMod.id || "") : ""
+                                        return root.pendingInstalls.indexOf(s) !== -1
+                                    }
 
                                     RowLayout {
                                         anchors.fill: parent
@@ -1127,11 +1158,15 @@ Item {
                                         }
 
                                         EzButton {
-                                            text: EzI18n.t("modrinth_install", "Installieren")
-                                            primary: true
+                                            visible: true
+                                            opacity: 1.0
+                                            text: versionItem.isPending ? "Lädt..." : (versionItem.isThisVerInstalled ? EzI18n.t("modrinth_installed", "Installiert") : (versionItem.isProjectInstalled ? "Wechseln" : EzI18n.t("modrinth_install", "Installieren")))
+                                            primary: !versionItem.isThisVerInstalled && !versionItem.isPending
                                             mcFont: true
                                             Layout.preferredHeight: 26
-                                            Layout.preferredWidth: 84
+                                            Layout.preferredWidth: 125
+                                            Layout.minimumWidth: 125
+                                            enabled: !versionItem.isThisVerInstalled && !versionItem.isPending
                                             onClicked: {
                                                 var mod = root.selMod
                                                 var file = (modelData.files && modelData.files.length > 0) ? modelData.files[0].filename : (mod.slug + ".jar")

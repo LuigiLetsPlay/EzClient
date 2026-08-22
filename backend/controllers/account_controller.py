@@ -2,8 +2,11 @@ import re
 import time
 import threading
 import urllib.parse
+import urllib.request
 import webbrowser
+import shutil
 from pathlib import Path
+from backend.services import cape_community
 from PySide6.QtCore import QObject, Signal, Slot, Property, QUrl, Qt
 from PySide6.QtWidgets import QDialog, QVBoxLayout
 
@@ -17,6 +20,7 @@ from backend.services.msa_auth import (
 
 
 from backend.services.skin_service import upload_skin_file, reset_skin_to_default
+from backend.models.types import DATA_DIR
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QFileDialog
 
 
@@ -61,6 +65,8 @@ class AccountController(QObject):
     loginStatusChanged = Signal(str, bool)
     loginSuccess = Signal(str)
     skinUploadStatusChanged = Signal(str, bool)
+    capeCommunityChanged = Signal()
+    capeCommunityStatusChanged = Signal(str, bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -77,6 +83,8 @@ class AccountController(QObject):
         self._active_custom_path = ""
         self._active_custom_body = ""
         self._active_custom_avatar = ""
+        self._community_capes: list[dict] = []
+        self._cape_community_status = "Lade Community-Capes …"
 
         try:
             from backend.services.skin_service import get_active_skin
@@ -90,6 +98,7 @@ class AccountController(QObject):
             pass
 
         self._load_account()
+        self.refreshCapeCommunity()
 
     def _load_account(self, force_refresh: bool = False) -> None:
         """Read active session from .minecraft or stored cache."""
@@ -161,7 +170,7 @@ class AccountController(QObject):
 
         # 4. Fallback online Mojang head avatar by username / skin version
         if self._username:
-            return f"https://mc-heads.net/avatar/{self._username}/64?t={self._skin_version}"
+            return f"https://minotar.net/helm/{self._username}/64.png"
         return ""
 
     @Property(str, notify=accountChanged)
@@ -169,7 +178,7 @@ class AccountController(QObject):
         if self._active_custom_body:
             return self._active_custom_body
         if self._username:
-            return f"https://mc-heads.net/bust/{self._username}/160?t={self._skin_version}"
+            return f"https://minotar.net/armor/bust/{self._username}/160.png"
         return ""
 
     @Property(str, notify=accountChanged)
@@ -177,7 +186,7 @@ class AccountController(QObject):
         if self._active_custom_body:
             return self._active_custom_body
         if self._username:
-            return f"https://mc-heads.net/body/{self._username}/360?t={self._skin_version}"
+            return f"https://minotar.net/armor/body/{self._username}/360.png"
         return ""
 
     @Property(str, notify=accountChanged)
@@ -219,6 +228,143 @@ class AccountController(QObject):
             return f"https://minotar.net/skin/{self._username}"
 
         return ""
+
+    @Property(str, notify=accountChanged)
+    def capeTextureUrl(self) -> str:
+        """Persistent local EzClient cape used by the launcher preview."""
+        import base64
+        cape = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
+        if not cape.exists():
+            return ""
+
+    @Property("QVariantList", notify=capeCommunityChanged)
+    def communityCapes(self) -> list[dict]:
+        return self._community_capes
+
+    @Property(str, notify=capeCommunityChanged)
+    def capeCommunityStatus(self) -> str:
+        return self._cape_community_status
+
+    @Slot()
+    def refreshCapeCommunity(self) -> None:
+        self._cape_community_status = "Lade Community-Capes …"
+        self.capeCommunityChanged.emit()
+
+        def worker() -> None:
+            try:
+                capes = cape_community.list_capes()
+                for cape in capes:
+                    cape["imageUrl"] = cape_community.cape_image_url(cape)
+                self._community_capes = capes
+                self._cape_community_status = f"{len(capes)} Community-Capes"
+                self.capeCommunityStatusChanged.emit(self._cape_community_status, False)
+            except Exception:
+                self._community_capes = []
+                self._cape_community_status = "Community-Server nicht erreichbar"
+                self.capeCommunityStatusChanged.emit(
+                    "Cape-Community ist gerade nicht erreichbar. Bitte später erneut versuchen.", True
+                )
+            finally:
+                self.capeCommunityChanged.emit()
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    @Slot(str, result=bool)
+    def activateCommunityCape(self, image_url: str) -> bool:
+        """Download a chosen community cape and make it the local active cape."""
+        try:
+            request = urllib.request.Request(image_url, headers={"User-Agent": "EzClient/1.5.1"})
+            with urllib.request.urlopen(request, timeout=15) as response:
+                raw = response.read(512 * 1024 + 1)
+            if not cape_community.is_safe_cape_png(raw):
+                raise ValueError("Ungültiges Cape-Bild")
+            target = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(raw)
+            self.accountChanged.emit()
+            self.capeCommunityStatusChanged.emit("Cape aktiviert.", False)
+            return True
+        except Exception as exc:
+            self.capeCommunityStatusChanged.emit(f"Cape konnte nicht aktiviert werden: {exc}", True)
+            return False
+
+    @Slot(str, result=bool)
+    def publishCape(self, title: str) -> bool:
+        cape = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
+        if not cape.exists():
+            self.capeCommunityStatusChanged.emit("Wähle zuerst ein Cape als PNG aus.", True)
+            return False
+
+        def worker() -> None:
+            try:
+                cape_community.upload_cape(cape, self.username, self.uuid, title.strip())
+                self.capeCommunityStatusChanged.emit("Cape wurde in der Community veröffentlicht.", False)
+                self.refreshCapeCommunity()
+            except Exception as exc:
+                self.capeCommunityStatusChanged.emit(f"Upload fehlgeschlagen: {exc}", True)
+
+        threading.Thread(target=worker, daemon=True).start()
+        return True
+
+    @Slot(str, str, result=bool)
+    def reportCape(self, cape_id: str, reason: str) -> bool:
+        if not cape_id or not reason.strip():
+            return False
+        def worker() -> None:
+            try:
+                cape_community.report_cape(cape_id, reason.strip(), self.username)
+                self.capeCommunityStatusChanged.emit("Danke, die Meldung wurde an das Team gesendet.", False)
+            except Exception as exc:
+                self.capeCommunityStatusChanged.emit(f"Meldung fehlgeschlagen: {exc}", True)
+        threading.Thread(target=worker, daemon=True).start()
+        return True
+        try:
+            return f"data:image/png;base64,{base64.b64encode(cape.read_bytes()).decode('ascii')}"
+        except Exception:
+            return ""
+
+    @Slot(result=str)
+    def pickCapeFile(self) -> str:
+        file_path, _ = QFileDialog.getOpenFileName(
+            None, "EzClient Cape (.png) auswählen", "", "PNG Cape (*.png);;Alle Dateien (*.*)"
+        )
+        if not file_path:
+            return ""
+        try:
+            if not cape_community.is_safe_cape_png(Path(file_path).read_bytes()):
+                self.skinUploadStatusChanged.emit("Ungültiges Cape: erlaubt sind nur geprüfte PNG-Capes bis 256×128.", True)
+                return ""
+        except OSError:
+            self.skinUploadStatusChanged.emit("Cape-Datei konnte nicht gelesen werden.", True)
+            return ""
+        cape_dir = Path(DATA_DIR) / "cosmetics"
+        cape_dir.mkdir(parents=True, exist_ok=True)
+        target = cape_dir / "active_cape.png"
+        shutil.copy2(file_path, target)
+        self.accountChanged.emit()
+        self.skinUploadStatusChanged.emit("Cape gespeichert und in der Vorschau aktiviert.", False)
+        return self.capeTextureUrl
+
+    @Slot(str, result=bool)
+    def saveCapeDataUrl(self, data_url: str) -> bool:
+        """Persist a Cape Editor canvas only after the same strict PNG validation."""
+        try:
+            import base64
+            prefix = "data:image/png;base64,"
+            if not data_url.startswith(prefix):
+                raise ValueError("Ungültiges Cape-Format")
+            raw = base64.b64decode(data_url[len(prefix):], validate=True)
+            if not cape_community.is_safe_cape_png(raw):
+                raise ValueError("Das Editor-Cape entspricht nicht dem sicheren Cape-Format")
+            target = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(raw)
+            self.accountChanged.emit()
+            self.skinUploadStatusChanged.emit("Cape aus dem Editor gespeichert.", False)
+            return True
+        except (ValueError, OSError) as exc:
+            self.skinUploadStatusChanged.emit(f"Cape konnte nicht gespeichert werden: {exc}", True)
+            return False
 
     @Slot(str, result=str)
     def getSkinTextureUrl(self, path_or_username: str) -> str:
@@ -301,6 +447,15 @@ class AccountController(QObject):
                     self._is_online = session.is_online
                     self._account_type = "Microsoft Account (Online Verifiziert)"
                     self._is_logging_in = False
+                    
+                    if session.skin_url:
+                        from backend.services.skin_service import get_skins_dir
+                        import urllib.request
+                        user_png = get_skins_dir() / f"{session.username}.png"
+                        try:
+                            urllib.request.urlretrieve(session.skin_url, str(user_png))
+                        except Exception as e:
+                            print(f"[AccountController] Could not download skin texture: {e}")
                     self._login_status = f"Erfolgreich eingeloggt als {session.username}!"
                     self.loginStatusChanged.emit(self._login_status, False)
                     self.accountChanged.emit()
@@ -345,9 +500,10 @@ class AccountController(QObject):
     def saveCurrentSkin(self, name: str, path: str = "") -> None:
         """Saves a custom skin with a custom name to the persistent library."""
         target_path = path or self._active_custom_path
-        target_name = (name or "").strip() or self._active_custom_name or "Mein Skin"
+        target_name = (name or "").strip() or self._active_custom_name or self._username or "Mein Skin"
+        avatar_to_save = self._active_custom_avatar or self.avatarUrl
         from backend.services.skin_service import save_skin_to_library
-        save_skin_to_library(target_name, target_path, self._active_custom_avatar)
+        save_skin_to_library(target_name, target_path, avatar_to_save)
         self.savedSkinsChanged.emit()
         self.skinUploadStatusChanged.emit(f"Skin '{target_name}' in Bibliothek gespeichert!", False)
 
