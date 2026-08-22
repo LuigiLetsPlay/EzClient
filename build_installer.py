@@ -1,4 +1,4 @@
-"""Build the standalone EzClient 1.5.1 Windows setup executable."""
+"""Build the standalone EzClient 1.5.2 Windows setup executable."""
 import subprocess
 import sys
 from pathlib import Path

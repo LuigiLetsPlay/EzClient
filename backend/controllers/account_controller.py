@@ -273,7 +273,7 @@ class AccountController(QObject):
     def activateCommunityCape(self, image_url: str) -> bool:
         """Download a chosen community cape and make it the local active cape."""
         try:
-            request = urllib.request.Request(image_url, headers={"User-Agent": "EzClient/1.5.1"})
+            request = urllib.request.Request(image_url, headers={"User-Agent": "EzClient/1.5.2"})
             with urllib.request.urlopen(request, timeout=15) as response:
                 raw = response.read(512 * 1024 + 1)
             if not cape_community.is_safe_cape_png(raw):

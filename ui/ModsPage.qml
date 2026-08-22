@@ -847,6 +847,7 @@ Item {
                 radius: 6
 
                 readonly property bool isFabricApi: model.slug === "fabric-api" || model.name === "Fabric API"
+                readonly property bool isEzClient: (model.slug || "").toLowerCase() === "ezclient" || (model.name || "").toLowerCase() === "ezclient"
                 readonly property bool isPerformanceMod: {
                     var s = (model.slug || model.projectId || "").toLowerCase()
                     return window.integratedMods && window.integratedMods.indexOf(s) !== -1
@@ -1091,10 +1092,20 @@ Item {
 
                     // Delete / Uninstall Action (Hidden for Fabric API)
                     EzButton {
+                        text: "EzClient Update"
+                        mcFont: true
+                        primary: true
+                        visible: modItem.isEzClient
+                        Layout.preferredWidth: 92
+                        Layout.preferredHeight: 28
+                        onClicked: profileController.updateEzClient()
+                    }
+
+                    EzButton {
                         text: "Update " + modItem.modUpdateVersion
                         mcFont: true
                         primary: true
-                        visible: !modItem.isFabricApi && modItem.updateAvailable
+                        visible: !modItem.isFabricApi && !modItem.isEzClient && modItem.updateAvailable
                         Layout.preferredWidth: 64
                         Layout.preferredHeight: 28
                         onClicked: profileController.updateModVersion(model.slug || model.projectId || model.name, "Latest")

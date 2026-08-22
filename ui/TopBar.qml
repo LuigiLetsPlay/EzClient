@@ -445,11 +445,6 @@ Rectangle {
                         color: EzTheme.text
                     }
 
-                    // Status dot
-                    Rectangle {
-                        width: 7; height: 7; radius: 3.5
-                        color: (typeof accountController !== "undefined" && accountController && accountController.isOnline) ? EzTheme.accent : EzTheme.textMuted
-                    }
                 }
 
                 MouseArea {

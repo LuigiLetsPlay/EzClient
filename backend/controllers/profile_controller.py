@@ -5,6 +5,7 @@ from pathlib import Path
 from dataclasses import asdict
 import threading
 import time
+import shutil
 from PySide6.QtCore import QObject, Signal, Slot, Property
 from backend.models.types import ProfileData, ModData, DATA_DIR
 from backend.services.store import ProfileStore
@@ -176,6 +177,19 @@ class ProfileController(QObject):
         self._store.save()
         self.settingsChanged.emit()
         self.settingSaved.emit("Schriftart gespeichert")
+
+    @Property(str, notify=settingsChanged)
+    def themeColor(self) -> str:
+        return str(self._store.settings.get("theme_color", "purple"))
+
+    @Slot(str)
+    def setThemeColor(self, color: str) -> None:
+        if color not in {"purple", "blue", "rose", "orange"}:
+            return
+        self._store.settings["theme_color"] = color
+        self._store.save()
+        self.settingsChanged.emit()
+        self.settingSaved.emit("Theme-Farbe gespeichert")
 
     @Property(str, notify=settingsChanged)
     def customBackgroundImage(self) -> str:
@@ -797,6 +811,28 @@ class ProfileController(QObject):
             self.settingSaved.emit(f"{len(mods)} Mods aktualisiert")
 
         threading.Thread(target=_update_all_task, daemon=True).start()
+
+    @Slot()
+    def updateEzClient(self) -> None:
+        """Refresh the bundled EzClient JAR in every launcher profile that uses it."""
+        def worker() -> None:
+            root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
+            updated = 0
+            for profile in self._store.profiles:
+                for mod in profile.mods:
+                    if (mod.slug or "").lower() not in ("ezclient", "ezclient-core") and "ezclient" not in (mod.filename or "").lower():
+                        continue
+                    source_name = "EzClient-Lite.jar" if "lite" in (mod.filename or "").lower() else "EzClient.jar"
+                    source = root / "backend" / "assets" / source_name
+                    if source.is_file():
+                        profile.mods_path.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(source, profile.mods_path / (mod.filename or source_name))
+                        mod.version = "1.5.3"
+                        updated += 1
+            self._store.save()
+            self._syncNeeded.emit()
+            self.settingSaved.emit(f"EzClient in {updated} Profil(en) aktualisiert")
+        threading.Thread(target=worker, daemon=True).start()
 
     @Slot(str, result=bool)
     @Slot(str, str, result=bool)

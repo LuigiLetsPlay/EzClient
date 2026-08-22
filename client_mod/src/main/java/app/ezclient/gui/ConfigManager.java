@@ -57,6 +57,10 @@ public class ConfigManager {
                         if (h.has("suffix")) hud.setSuffix(h.get("suffix").getAsString());
                         if (h.has("rainbow")) hud.setRainbow(h.get("rainbow").getAsBoolean());
                         if (h.has("background")) hud.setBackground(h.get("background").getAsBoolean());
+                        if (h.has("textColor")) hud.setTextColor(h.get("textColor").getAsInt());
+                        if (h.has("backgroundColor")) hud.setBackgroundColor(h.get("backgroundColor").getAsInt());
+                        if (h.has("borderColor")) hud.setBorderColor(h.get("borderColor").getAsInt());
+                        if (h.has("border")) hud.setBorder(h.get("border").getAsBoolean());
                     }
                 }
             }
@@ -86,6 +90,8 @@ public class ConfigManager {
                 h.addProperty("scale", hud.getScale());
                 h.addProperty("prefix", hud.getPrefix()); h.addProperty("suffix", hud.getSuffix());
                 h.addProperty("rainbow", hud.isRainbow()); h.addProperty("background", hud.hasBackground());
+                h.addProperty("textColor", hud.getTextColor()); h.addProperty("backgroundColor", hud.getBackgroundColor());
+                h.addProperty("borderColor", hud.getBorderColor()); h.addProperty("border", hud.hasBorder());
                 json.add("hud" + hud.getName(), h);
             }
 

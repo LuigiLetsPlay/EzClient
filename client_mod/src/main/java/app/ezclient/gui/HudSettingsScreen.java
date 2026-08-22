@@ -19,13 +19,16 @@ public final class HudSettingsScreen extends Screen {
         addRenderableWidget(new EzButton(x+16,y+128,78,20,Component.literal(module.isEnabled()?"Enabled":"Disabled"),module.isEnabled(),b->{module.toggle();rebuildWidgets();}));
         addRenderableWidget(new EzButton(x+104,y+128,78,20,Component.literal(module.isRainbow()?"Rainbow ON":"Rainbow OFF"),module.isRainbow(),b->{module.setRainbow(!module.isRainbow());rebuildWidgets();}));
         addRenderableWidget(new EzButton(x+192,y+128,82,20,Component.literal(module.hasBackground()?"Background":"No background"),module.hasBackground(),b->{module.setBackground(!module.hasBackground());rebuildWidgets();}));
-        addRenderableWidget(new EzButton(x+196,y+166,78,19,Component.literal("Back"),false,b->onClose()));
+        addRenderableWidget(new EzButton(x+16,y+152,78,20,Component.literal(module.hasBorder()?"Border ON":"Border OFF"),module.hasBorder(),b->{module.setBorder(!module.hasBorder());rebuildWidgets();}));
+        addRenderableWidget(new EzButton(x+104,y+152,78,20,Component.literal("Purple"),true,b->{module.setTextColor(0xFFC4B5FD);module.setBorderColor(0xFFA78BFA);rebuildWidgets();}));
+        addRenderableWidget(new EzButton(x+192,y+152,82,20,Component.literal("White"),false,b->{module.setTextColor(0xFFFFFFFF);module.setBorderColor(0xFF35414D);rebuildWidgets();}));
+        addRenderableWidget(new EzButton(x+196,y+190,78,19,Component.literal("Back"),false,b->onClose()));
     }
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mx,int my,float d){
-        g.fill(x,y,x+290,y+200,0xF2111419); g.outline(x,y,290,200,0xFF35414D);
+        g.fill(x,y,x+290,y+224,0xF2111419); g.outline(x,y,290,224,0xFF35414D);
         g.text(font,module.getName()+" HUD",x+14,y+14,0xFF43DD8C);
         g.text(font,"Text before",x+16,y+44,0xFF89939E); g.text(font,"Text after",x+16,y+72,0xFF89939E);
-        g.text(font,"Preview: "+module.displayText(minecraft),x+16,y+172,0xFFE8EDF1);
+        g.text(font,"Preview: "+module.displayText(minecraft),x+16,y+204,0xFFE8EDF1);
         super.extractRenderState(g,mx,my,d);
     }
     @Override public boolean isPauseScreen(){return false;}

@@ -13,6 +13,11 @@ public class ModuleManager {
     private final ClockModule clockModule;
     private final SpeedModule speedModule;
     private final FullbrightModule fullbrightModule;
+    private final ServerInfoModule serverInfoModule;
+    private final ArmorStatusModule armorStatusModule;
+    private final KeystrokesModule keystrokesModule;
+    private final PotionEffectsModule potionEffectsModule;
+    private final PerformanceModule performanceModule;
 
     private ModuleManager() {
         this.modules = new ArrayList<>();
@@ -25,6 +30,11 @@ public class ModuleManager {
         this.clockModule = new ClockModule();
         this.speedModule = new SpeedModule();
         this.fullbrightModule = new FullbrightModule();
+        this.serverInfoModule = new ServerInfoModule();
+        this.armorStatusModule = new ArmorStatusModule();
+        this.keystrokesModule = new KeystrokesModule();
+        this.potionEffectsModule = new PotionEffectsModule();
+        this.performanceModule = new PerformanceModule();
         this.modules.add(this.zoomModule);
         this.modules.add(this.fpsModule);
         this.modules.add(this.pingModule);
@@ -32,6 +42,11 @@ public class ModuleManager {
         this.modules.add(this.clockModule);
         this.modules.add(this.speedModule);
         this.modules.add(this.fullbrightModule);
+        this.modules.add(this.serverInfoModule);
+        this.modules.add(this.armorStatusModule);
+        this.modules.add(this.keystrokesModule);
+        this.modules.add(this.potionEffectsModule);
+        this.modules.add(this.performanceModule);
         
     }
 

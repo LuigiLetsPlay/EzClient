@@ -148,10 +148,8 @@ Item {
             autoRotate: false
             initialRotateX: 0
             initialRotateY: -14
-            onSkinClicked: {
-                if (typeof window !== "undefined" && window.openSkinModal) window.openSkinModal()
-                else if (typeof globalSkinModal !== "undefined" && globalSkinModal) globalSkinModal.open()
-            }
+            // The large stage is deliberately not clickable: it used to steal
+            // clicks from Home controls far outside the visible player model.
         }
 
         // Occasional small, natural-looking variation instead of a perfectly
@@ -183,9 +181,9 @@ Item {
             z: 4
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
-            anchors.topMargin: Math.max(14, parent.height * 0.045)
-            height: 21
-            width: independentNameRow.implicitWidth + 14
+            anchors.topMargin: Math.max(64, parent.height * 0.12)
+            height: 26
+            width: independentNameRow.implicitWidth + 20
             radius: 3
             color: "#D90B0E12"
             border.color: "#553B4652"
@@ -205,34 +203,12 @@ Item {
                 Text {
                     text: root.accountUser
                     font.family: EzTheme.mcFontFamily
-                    font.pixelSize: 11
+                    font.pixelSize: 13
                     color: EzTheme.text
                 }
             }
         }
 
-        Rectangle {
-            z: 7
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.topMargin: 12
-            width: 92
-            height: 24
-            radius: 4
-            color: independentCapeMouse.containsMouse ? EzTheme.surfaceActive : "#D911151B"
-            border.color: independentCapeMouse.containsMouse ? EzTheme.accent : EzTheme.border
-            Text { anchors.centerIn: parent; text: "CAPE ÄNDERN"; font.family: EzTheme.mcFontFamily; font.pixelSize: 8; color: EzTheme.text }
-            MouseArea {
-                id: independentCapeMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    if (typeof window !== "undefined" && window.openSkinModal) window.openSkinModal()
-                    else if (typeof globalSkinModal !== "undefined" && globalSkinModal) globalSkinModal.open()
-                }
-            }
-        }
     }
 
     // Controls are a separate overlay in front of the character's legs.
@@ -293,36 +269,6 @@ Item {
                         font.family: EzTheme.mcFontFamily
                         font.pixelSize: 11
                         color: EzTheme.text
-                    }
-                }
-            }
-
-            // Direct cosmetics entry: no need to search through settings.
-            Rectangle {
-                z: 7
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.topMargin: 8
-                width: 92
-                height: 24
-                radius: 4
-                color: capeHomeMouse.containsMouse ? EzTheme.surfaceActive : "#D911151B"
-                border.color: capeHomeMouse.containsMouse ? EzTheme.accent : EzTheme.border
-                Text {
-                    anchors.centerIn: parent
-                    text: "CAPE ÄNDERN"
-                    font.family: EzTheme.mcFontFamily
-                    font.pixelSize: 8
-                    color: EzTheme.text
-                }
-                MouseArea {
-                    id: capeHomeMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        if (typeof window !== "undefined" && window.openSkinModal) window.openSkinModal()
-                        else if (typeof globalSkinModal !== "undefined" && globalSkinModal) globalSkinModal.open()
                     }
                 }
             }

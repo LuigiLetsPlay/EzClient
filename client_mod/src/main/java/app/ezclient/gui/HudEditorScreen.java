@@ -5,7 +5,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
-/** Live HUD canvas: drag elements, wheel-resize, right-click for all style options. */
+/** Live HUD canvas with window-like corner resize, guides and scale snapping. */
 public final class HudEditorScreen extends Screen {
     private final Screen parent;
     private HudModule selected;
@@ -34,14 +34,20 @@ public final class HudEditorScreen extends Screen {
     private boolean hitsResizeHandle(HudModule h, double mx, double my) {
         int w = (int)((font.width(h.displayText(minecraft)) + 8) * h.getScale());
         int he = (int)(13 * h.getScale());
-        return mx >= h.getX() + w - 5 && my >= h.getY() + he - 5 && mx <= h.getX() + w + 3 && my <= h.getY() + he + 3;
+        return mx >= h.getX() + w - 8 && my >= h.getY() + he - 8 && mx <= h.getX() + w + 5 && my <= h.getY() + he + 5;
+    }
+    private HudModule resizeTarget(double mx, double my) {
+        for (HudModule h : ModuleManager.getInstance().getHudModules())
+            if (h.isEnabled() && hitsResizeHandle(h, mx, my)) return h;
+        return null;
     }
     @Override public boolean mouseClicked(MouseButtonEvent e, boolean doubleClick) {
-        HudModule hit = hit(e.x(), e.y());
+        HudModule handle = e.button() == 0 ? resizeTarget(e.x(), e.y()) : null;
+        HudModule hit = handle != null ? handle : hit(e.x(), e.y());
         if (hit != null) {
             selected = hit; offsetX = e.x() - hit.getX(); offsetY = e.y() - hit.getY();
             if (e.button() == 1) minecraft.gui.setScreen(new HudSettingsScreen(this, hit));
-            if (e.button() == 0 && hitsResizeHandle(hit, e.x(), e.y())) {
+            if (handle != null) {
                 resizing = true; resizeStartScale = hit.getScale(); resizeStartX = e.x(); resizeStartY = e.y();
             }
             return true;
@@ -112,12 +118,13 @@ public final class HudEditorScreen extends Screen {
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float d) {
         g.fill(0, 0, width, 21, 0xB0111419);
         g.text(font, "HUD EDITOR", 7, 7, 0xFF43DD8C);
-        g.text(font, "Drag = move  |  Wheel = size  |  Right click = customize", 75, 7, 0xFFE8EDF1);
+        g.text(font, "Drag = move  |  corner = resize + snap  |  Wheel = size  |  Right click = customize", 75, 7, 0xFFE8EDF1);
         for (HudModule h : ModuleManager.getInstance().getHudModules()) if (h.isEnabled()) HudRenderer.draw(g, h, true);
         if (selected != null) {
             int sw = (int)((font.width(selected.displayText(minecraft)) + 8) * selected.getScale());
             int sh = (int)(13 * selected.getScale());
-            g.fill(selected.getX() + sw - 4, selected.getY() + sh - 4, selected.getX() + sw, selected.getY() + sh, 0xFFC4B5FD);
+            g.outline(selected.getX() - 2, selected.getY() - 2, sw + 4, sh + 4, 0xFFC4B5FD);
+            g.fill(selected.getX() + sw - 7, selected.getY() + sh - 7, selected.getX() + sw + 1, selected.getY() + sh + 1, 0xFFC4B5FD);
         }
         if (guideX >= 0) g.fill(guideX, 21, guideX + 1, height - 31, 0xFFFF3B3B);
         if (guideY >= 0) g.fill(0, guideY, width, guideY + 1, 0xFFFF3B3B);

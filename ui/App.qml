@@ -42,6 +42,10 @@ ApplicationWindow {
         property: "fontMode"
         value: typeof profileController !== "undefined" && profileController ? profileController.appFontMode : "mixed"
     }
+    Binding { target: EzTheme; property: "accent"; value: !profileController ? "#A78BFA" : ({ purple: "#A78BFA", blue: "#60A5FA", rose: "#FB7185", orange: "#FB923C" }[profileController.themeColor] || "#A78BFA") }
+    Binding { target: EzTheme; property: "accentHover"; value: !profileController ? "#B9A4FF" : ({ purple: "#B9A4FF", blue: "#93C5FD", rose: "#FDA4AF", orange: "#FDBA74" }[profileController.themeColor] || "#B9A4FF") }
+    Binding { target: EzTheme; property: "accentDark"; value: !profileController ? "#33235E" : ({ purple: "#33235E", blue: "#1E3A8A", rose: "#881337", orange: "#7C2D12" }[profileController.themeColor] || "#33235E") }
+    Binding { target: EzTheme; property: "accentLight"; value: !profileController ? "#C4B5FD" : ({ purple: "#C4B5FD", blue: "#BFDBFE", rose: "#FECDD3", orange: "#FED7AA" }[profileController.themeColor] || "#C4B5FD") }
 
     ColumnLayout {
         anchors.fill: parent

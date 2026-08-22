@@ -30,10 +30,10 @@ QtObject {
     readonly property color textSubtle:    "#353548"
 
     // ── ACCENT — vivid EzClient green ────────────────────────────
-    readonly property color accent:      "#A78BFA"
-    readonly property color accentHover: "#B9A4FF"
-    readonly property color accentDark:  "#33235E"
-    readonly property color accentLight: "#C4B5FD"
+    property color accent:      "#A78BFA"
+    property color accentHover: "#B9A4FF"
+    property color accentDark:  "#33235E"
+    property color accentLight: "#C4B5FD"
     readonly property color accentGlow:  "#A78BFA25"
     readonly property color accentSoft:  "#A78BFA12"
 

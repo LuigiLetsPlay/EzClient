@@ -136,6 +136,29 @@ Item {
 
             Item { height: 10 }
 
+            EzSurface {
+                Layout.fillWidth: true
+                implicitHeight: 76
+                RowLayout {
+                    anchors.fill: parent; anchors.margins: 14; spacing: 14
+                    ColumnLayout {
+                        Layout.fillWidth: true; spacing: 2
+                        Text { text: "Theme-Farbe"; font.family: EzTheme.mcFontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
+                        Text { text: "Akzentfarbe für Buttons, Auswahl und Hervorhebungen"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
+                    }
+                    Repeater {
+                        model: [{ id: "purple", color: "#A78BFA" }, { id: "blue", color: "#60A5FA" }, { id: "rose", color: "#FB7185" }, { id: "orange", color: "#FB923C" }]
+                        delegate: Rectangle {
+                            width: 30; height: 30; radius: 15; color: modelData.color
+                            border.color: profileController.themeColor === modelData.id ? EzTheme.text : "transparent"; border.width: 2
+                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: profileController.setThemeColor(modelData.id) }
+                        }
+                    }
+                }
+            }
+
+            Item { height: 10 }
+
             // Custom Background Setting Card
             EzSurface {
                 Layout.fillWidth: true
