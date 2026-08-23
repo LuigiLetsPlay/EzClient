@@ -17,8 +17,8 @@ import java.util.*;
  * - Does NOT include Zoom or MainMenu branding because it avoids Mixins and Minecraft class dependencies.
  */
 public class EzClientLiteMod implements ClientModInitializer {
-public static final String CLIENT_VERSION = "1.6.5";
-public static final String CLIENT_TITLE = "EzClient 1.6.5 (Lite)";
+public static final String CLIENT_VERSION = "1.6.6";
+public static final String CLIENT_TITLE = "EzClient 1.6.6 (Lite)";
     private static volatile boolean running = true;
     private static Path ezClientDataDir = null;
 
