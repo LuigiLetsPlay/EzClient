@@ -46,3 +46,4 @@ $RECYCLE.BIN/
 client_mod/bin/
 client_mod/*.class
 client_mod/**/*.class
+server/
