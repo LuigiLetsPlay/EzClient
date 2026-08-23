@@ -166,12 +166,15 @@ Item {
                         source: root.selectedSource
                     }
 
-                    // Darken everything outside the crop window.
+                    // Cape-proportioned crop frame (10x16 like the real cape).
+                    // Drag it to move; drag the handle to resize (aspect kept).
                     Rectangle {
+                        id: cropFrame
                         x: cropImage.x + root.cropX * cropImage.paintedWidth
                         y: cropImage.y + root.cropY * cropImage.paintedHeight
-                        width: Math.max(20, root.cropW * cropImage.paintedWidth)
-                        height: Math.max(20, root.cropH * cropImage.paintedHeight)
+                        width: Math.min(cropImage.paintedWidth, height * 0.625)
+                        height: Math.min(cropImage.paintedHeight * 0.9,
+                                         Math.max(40, cropImage.paintedHeight * 0.9))
                         color: "transparent"
                         border.color: EzTheme.accent
                         border.width: 2
@@ -180,22 +183,24 @@ Item {
                             id: cropMove
                             anchors.fill: parent
                             cursorShape: Qt.SizeAllCursor
-                            property point startMouse
-                            property rect startRect
-                            onPressed: function(mouse) {
-                                startMouse = Qt.point(mouse.x, mouse.y)
-                                startRect = Qt.rect(parent.x, parent.y, parent.width, parent.height)
-                            }
-                            onPositionChanged: function(mouse) {
-                                if (!pressed) return
-                                var dx = mouse.x - startMouse.x
-                                var dy = mouse.y - startMouse.y
-                                var nx = Math.min(cropImage.x + cropImage.paintedWidth - parent.width, Math.max(cropImage.x, startRect.x + dx))
-                                var ny = Math.min(cropImage.y + cropImage.paintedHeight - parent.height, Math.max(cropImage.y, startRect.y + dy))
-                                parent.x = nx; parent.y = ny
-                                root.cropX = (parent.x - cropImage.x) / cropImage.paintedWidth
-                                root.cropY = (parent.y - cropImage.y) / cropImage.paintedHeight
-                            }
+                            drag.target: cropFrame
+                            drag.minimumX: cropImage.x
+                            drag.maximumX: cropImage.x + Math.max(0, cropImage.paintedWidth - cropFrame.width)
+                            drag.minimumY: cropImage.y
+                            drag.maximumY: cropImage.y + Math.max(0, cropImage.paintedHeight - cropFrame.height)
+                        }
+
+                        onXChanged: syncCrop()
+                        onYChanged: syncCrop()
+                        onWidthChanged: syncCrop()
+                        onHeightChanged: syncCrop()
+
+                        function syncCrop() {
+                            if (cropImage.paintedWidth <= 0 || cropImage.paintedHeight <= 0) return
+                            root.cropX = (cropFrame.x - cropImage.x) / cropImage.paintedWidth
+                            root.cropY = (cropFrame.y - cropImage.y) / cropImage.paintedHeight
+                            root.cropW = Math.min(1, cropFrame.width / cropImage.paintedWidth)
+                            root.cropH = Math.min(1, cropFrame.height / cropImage.paintedHeight)
                         }
 
                         Rectangle {
@@ -214,12 +219,10 @@ Item {
                                     if (!pressed) return
                                     var absX = mapToItem(cropStage, mouse.x, mouse.y).x
                                     var absY = mapToItem(cropStage, mouse.x, mouse.y).y
-                                    var maxX = cropImage.x + cropImage.paintedWidth - parent.parent.x
-                                    var maxY = cropImage.y + cropImage.paintedHeight - parent.parent.y
-                                    parent.parent.width = Math.max(20, Math.min(maxX, absX - parent.parent.x))
-                                    parent.parent.height = Math.max(20, Math.min(maxY, absY - parent.parent.y))
-                                    root.cropW = parent.parent.width / cropImage.paintedWidth
-                                    root.cropH = parent.parent.height / cropImage.paintedHeight
+                                    var maxH = cropImage.y + cropImage.paintedHeight - cropFrame.y
+                                    var newH = Math.max(40, Math.min(maxH, absY - cropFrame.y))
+                                    cropFrame.height = newH
+                                    cropFrame.width = newH * 0.625
                                 }
                             }
                         }

@@ -75,14 +75,16 @@ Rectangle {
                 }
             }
 
-            Rectangle { visible: root.width >= 1150; width: 1; height: 22; color: EzTheme.border; opacity: 0.5 }
+            Rectangle { visible: root.width >= 1250; width: 1; height: 22; color: EzTheme.border; opacity: 0.5 }
 
             // Active Profile Quick-Switcher Dropdown Pill
             Rectangle {
                 id: profilePill
                 // Below 1150px the centered navigation would collide with the
                 // pill, so the pill steps aside first (icon-only launcher UI).
-                visible: root.width >= 1150
+                // Below 1250px the centered navigation would collide with the
+                // pill, so the pill steps aside first (icon-only launcher UI).
+                visible: root.width >= 1250
                 z: 30
                 height: 34
                 width: Math.min(200, Math.max(120, pillNameText.implicitWidth + 44))
@@ -285,13 +287,13 @@ Rectangle {
                     { id: "profiles",       labelKey: "nav_profiles",       fallback: "Profile",          icon: "box.svg" },
                     { id: "installed_mods", labelKey: "nav_installed_mods", fallback: "Installierte Mods", icon: "mods.svg" },
                     { id: "mods",           labelKey: "nav_discover",       fallback: "Entdecken",        icon: "compass.svg" },
-                    { id: "cape",           labelKey: "nav_cape",           fallback: "Capes",             icon: "logo.svg", beta: true },
+                    { id: "cape",           labelKey: "nav_cape",           fallback: "Capes",             icon: "logo.svg" },
                     { id: "settings",       labelKey: "nav_settings",       fallback: "Einstellungen",    icon: "settings.svg" }
                 ]
 
                 Rectangle {
                     id: tabItem
-                    width: root.width < 1200 ? 42 : (tabRowInner.implicitWidth + 26)
+                    width: root.width < 1300 ? 42 : (tabRowInner.implicitWidth + 26)
                     height: 36
                     radius: 8
                     color: root.isTabActive(modelData.id)
@@ -303,7 +305,7 @@ Rectangle {
                     RowLayout {
                         id: tabRowInner
                         anchors.centerIn: parent
-                        spacing: root.width < 1180 ? 5 : 7
+                        spacing: root.width < 1300 ? 5 : 7
 
                         Image {
                             source: "icons/" + modelData.icon
@@ -314,7 +316,8 @@ Rectangle {
                         }
 
                         Text {
-                            visible: root.width >= 1200
+                            // Labels disappear early while shrinking; icons stay.
+                            visible: root.width >= 1300
                             text: EzI18n.t(modelData.labelKey, modelData.fallback)
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 12
@@ -324,14 +327,7 @@ Rectangle {
                                    : (tabMouse.containsMouse ? EzTheme.text : EzTheme.textSecondary)
                             Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
                         }
-                        Rectangle {
-                            visible: root.width >= 1200 && modelData.beta === true
-                            Layout.preferredWidth: betaText.implicitWidth + 8
-                            Layout.preferredHeight: 16
-                            radius: 5; color: "#5B3B9A"; border.color: EzTheme.accentLight
-                            Text { id: betaText; anchors.centerIn: parent; text: "BETA"; font.pixelSize: 8; font.bold: true; color: "#FFFFFF" }
                         }
-                    }
 
                     MouseArea {
                         id: tabMouse
@@ -391,7 +387,7 @@ Rectangle {
     RowLayout {
         id: rightSection
         anchors.right: winControls.left
-        anchors.rightMargin: 32
+        anchors.rightMargin: 48
         anchors.verticalCenter: parent.verticalCenter
         spacing: 10
 
