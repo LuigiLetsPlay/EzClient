@@ -2,6 +2,7 @@ package app.ezclient.gui;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import com.mojang.blaze3d.platform.cursor.CursorType;
@@ -133,6 +134,26 @@ public final class HudEditorScreen extends Screen {
             selected.setScale(scale); return true;
         }
         return super.mouseScrolled(mx, my, horizontal, vertical);
+    }
+    @Override public boolean keyPressed(KeyEvent event) {
+        if (selected != null) {
+            int step = (event.modifiers() & GLFW.GLFW_MOD_SHIFT) != 0 ? 10 : 1;
+            int moveX = 0, moveY = 0;
+            if (event.key() == GLFW.GLFW_KEY_LEFT) moveX = -step;
+            else if (event.key() == GLFW.GLFW_KEY_RIGHT) moveX = step;
+            else if (event.key() == GLFW.GLFW_KEY_UP) moveY = -step;
+            else if (event.key() == GLFW.GLFW_KEY_DOWN) moveY = step;
+            else return super.keyPressed(event);
+
+            int moduleWidth = (int)((font.width(selected.displayText(minecraft)) + 8) * selected.getScale());
+            int moduleHeight = (int)(13 * selected.getScale());
+            int nextX = Math.max(0, Math.min(width - moduleWidth, selected.getX() + moveX));
+            int nextY = Math.max(22, Math.min(height - 32 - moduleHeight, selected.getY() + moveY));
+            selected.setPosition(nextX, nextY);
+            ConfigManager.save();
+            return true;
+        }
+        return super.keyPressed(event);
     }
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float d) {
         if (!dragging) {
