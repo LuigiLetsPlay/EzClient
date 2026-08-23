@@ -25,7 +25,7 @@ Item {
         if (accountController) {
             previewFilePath = accountController.activeSkinPath || ""
             previewTextureUrl = accountController.skinTextureUrl || ""
-            previewCapeUrl = accountController.capeTextureUrl || ""
+            previewCapeUrl = accountController.capePreviewTextureUrl || ""
             previewName = accountController.activeSkinName || "Aktiver Skin"
         } else {
             previewFilePath = ""
@@ -411,7 +411,7 @@ Item {
                                             if (accountController) {
                                                 var cape = accountController.pickCapeFile()
                                                 if (cape) {
-                                                    skinModal.previewCapeUrl = cape
+                                                    skinModal.previewCapeUrl = accountController.capePreviewTextureUrl || cape
                                                     if (modalSkin3D) modalSkin3D.updateCape()
                                                 }
                                             }

@@ -67,6 +67,37 @@ def _bake_editor_cape(image: QImage) -> QImage:
     return result
 
 
+def _write_hd_cape_preview(image: QImage, editor: bool = False) -> bool:
+    """Write a high-resolution preview texture for the launcher's 3D viewer.
+
+    Minecraft only samples the small vanilla cape UV rectangle. The preview can
+    use a proportionally larger atlas, so SkinView3D receives many more texels
+    for exactly the same visible face without changing the game file.
+    """
+    rgba = image.convertToFormat(QImage.Format_RGBA8888)
+    if not editor and abs((rgba.width() / max(1, rgba.height())) - 2.0) < 0.02:
+        preview = rgba
+    else:
+        portrait = rgba.transformed(QTransform().rotate(90), Qt.SmoothTransformation)
+        portrait = portrait.scaled(320, 512, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        preview = QImage(1280, 640, QImage.Format_RGBA8888)
+        preview.fill(Qt.transparent)
+        painter = QPainter(preview)
+        painter.drawImage(20, 20, portrait)
+        painter.end()
+    encoded = QByteArray()
+    buffer = QBuffer(encoded)
+    if not buffer.open(QIODevice.WriteOnly) or not preview.save(buffer, "PNG"):
+        return False
+    target = Path(DATA_DIR) / "cosmetics" / "active_cape_preview.png"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        target.write_bytes(_strip_png_metadata(bytes(encoded)))
+    except OSError:
+        return False
+    return True
+
+
 class MicrosoftLoginDialog(QDialog):
     """Native Microsoft Login Dialog with embedded WebEngine."""
     codeReceived = Signal(str)
@@ -284,6 +315,18 @@ class AccountController(QObject):
         except OSError:
             return ""
 
+    @Property(str, notify=accountChanged)
+    def capePreviewTextureUrl(self) -> str:
+        """High-resolution local cape used only by the launcher's 3D preview."""
+        import base64
+        cape = Path(DATA_DIR) / "cosmetics" / "active_cape_preview.png"
+        if not cape.exists():
+            return self.capeTextureUrl
+        try:
+            return f"data:image/png;base64,{base64.b64encode(cape.read_bytes()).decode('ascii')}"
+        except OSError:
+            return ""
+
     @Property("QVariantList", notify=capeCommunityChanged)
     def communityCapes(self) -> list[dict]:
         return self._community_capes
@@ -329,6 +372,9 @@ class AccountController(QObject):
             target = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(raw)
+            community_image = QImage()
+            if community_image.loadFromData(raw, "PNG"):
+                _write_hd_cape_preview(community_image, editor=False)
             self.accountChanged.emit()
             self.capeCommunityStatusChanged.emit("Cape aktiviert.", False)
             return True
@@ -387,6 +433,7 @@ class AccountController(QObject):
         raw = Path(file_path).read_bytes()
         if cape_community.is_safe_cape_png(raw):
             shutil.copy2(file_path, target)
+            _write_hd_cape_preview(QImage(file_path), editor=False)
         else:
             # Ordinary PNGs are treated as portrait artwork and baked into the
             # visible vanilla cape face instead of being stretched across the
@@ -399,6 +446,7 @@ class AccountController(QObject):
                 self.skinUploadStatusChanged.emit("Das PNG kann nicht als Cape verarbeitet werden.", True)
                 return ""
             cape = _bake_editor_cape(image.convertToFormat(QImage.Format_RGBA8888))
+            _write_hd_cape_preview(image.convertToFormat(QImage.Format_RGBA8888), editor=True)
             if not cape.save(str(target), "PNG"):
                 self.skinUploadStatusChanged.emit("Cape konnte nicht gespeichert werden.", True)
                 return ""
@@ -443,6 +491,7 @@ class AccountController(QObject):
         try:
             cape = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
             cape.unlink(missing_ok=True)
+            (Path(DATA_DIR) / "cosmetics" / "active_cape_preview.png").unlink(missing_ok=True)
             self.accountChanged.emit()
             self.skinUploadStatusChanged.emit("EzClient-Cape entfernt – Mojang-Cape wird wieder verwendet.", False)
             return True
@@ -481,6 +530,7 @@ class AccountController(QObject):
                 raise ValueError("Das Editor-Bild konnte nicht gelesen werden")
             rgba = image.convertToFormat(QImage.Format_RGBA8888)
             normalized = _bake_editor_cape(rgba)
+            _write_hd_cape_preview(rgba, editor=True)
             encoded = QByteArray()
             buffer = QBuffer(encoded)
             if not buffer.open(QIODevice.WriteOnly) or not normalized.save(buffer, "PNG"):

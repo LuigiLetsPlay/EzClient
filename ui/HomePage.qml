@@ -18,7 +18,7 @@ Item {
     readonly property string accountUser: typeof accountController !== "undefined" && accountController ? accountController.username : "Player"
     readonly property string bodyUrl: typeof accountController !== "undefined" && accountController ? accountController.bodyUrl : ""
     readonly property string skinTextureUrl: typeof accountController !== "undefined" && accountController ? accountController.skinTextureUrl : ""
-    readonly property string capeTextureUrl: typeof accountController !== "undefined" && accountController ? accountController.capeTextureUrl : ""
+    readonly property string capeTextureUrl: typeof accountController !== "undefined" && accountController ? accountController.capePreviewTextureUrl : ""
     readonly property bool hasBackgroundVideo: {
         var p = typeof profileController !== "undefined" && profileController ? profileController.customBackgroundImage : ""
         return /\.(mp4|webm|mov)$/i.test(p)

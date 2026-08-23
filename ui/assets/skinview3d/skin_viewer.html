@@ -70,6 +70,21 @@
       skinViewer.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     }
 
+    // High-resolution community capes stay sharp in the visible 10x16 face.
+    // SkinView3D defaults to nearest filtering for the classic pixel look; use
+    // linear filtering/anisotropy only for the cape texture.
+    const originalRecreateCapeTexture = skinViewer.recreateCapeTexture.bind(skinViewer);
+    skinViewer.recreateCapeTexture = function() {
+      originalRecreateCapeTexture();
+      const texture = skinViewer.capeTexture;
+      if (texture) {
+        texture.magFilter = 1006; // THREE.LinearFilter
+        texture.minFilter = 1006;
+        texture.anisotropy = skinViewer.renderer.capabilities.getMaxAnisotropy();
+        texture.needsUpdate = true;
+      }
+    };
+
     // Controls
     skinViewer.controls.enableRotate = true;
     skinViewer.controls.enableZoom = true;
