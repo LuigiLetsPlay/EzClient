@@ -5,13 +5,13 @@ pragma Singleton
 QtObject {
     // ── BACKGROUNDS ──────────────────────────────────────────────
     readonly property color bg:           "#0A0A0F"
-    readonly property color titlebarBg:   "#08080D"
-    readonly property color sidebarBg:    "#0E0E15"
+    property color titlebarBg:            "#07130D"
+    property color sidebarBg:             "#0A1710"
     readonly property color surface:      "#12121B"
     readonly property color surface2:     "#181823"
     readonly property color surface3:     "#1F1F2C"
     readonly property color surfaceHover: "#252534"
-    readonly property color surfaceActive:"#21183A"
+    property color surfaceActive:         "#123323"
     readonly property color overlay:      "#00000088"
 
     // ── GLASSMORPHISM ────────────────────────────────────────────
@@ -21,7 +21,7 @@ QtObject {
     // ── BORDERS ──────────────────────────────────────────────────
     readonly property color border:       "#1A1A28"
     readonly property color borderLight:  "#28283A"
-    readonly property color borderAccent: "#A78BFA30"
+    property color borderAccent:          "#22C55E30"
 
     // ── TEXT ─────────────────────────────────────────────────────
     readonly property color text:          "#F0F0F5"
@@ -30,16 +30,16 @@ QtObject {
     readonly property color textSubtle:    "#353548"
 
     // ── ACCENT — vivid EzClient green ────────────────────────────
-    property color accent:      "#A78BFA"
-    property color accentHover: "#B9A4FF"
-    property color accentDark:  "#33235E"
-    property color accentLight: "#C4B5FD"
-    readonly property color accentGlow:  "#A78BFA25"
-    readonly property color accentSoft:  "#A78BFA12"
+    property color accent:      "#22C55E"
+    property color accentHover: "#4ADE80"
+    property color accentDark:  "#14532D"
+    property color accentLight: "#86EFAC"
+    property color accentGlow:  "#22C55E25"
+    property color accentSoft:  "#22C55E12"
 
     // ── GRADIENTS (start / end) ──────────────────────────────────
-    readonly property color gradStart:   "#A78BFA"
-    readonly property color gradEnd:     "#7C5CE0"
+    property color gradStart:             "#22C55E"
+    property color gradEnd:               "#16A34A"
 
     // ── SEMANTIC ──────────────────────────────────────────────────
     readonly property color cyan:    "#38BDF8"

@@ -400,16 +400,6 @@ Rectangle {
                     Item {
                         width: 26; height: 26
 
-                        // Online glow ring
-                        Rectangle {
-                            anchors.fill: parent
-                            anchors.margins: -2
-                            radius: 15
-                            color: "transparent"
-                            border.color: (typeof accountController !== "undefined" && accountController && accountController.isOnline) ? EzTheme.accentGlow : "transparent"
-                            border.width: 2
-                        }
-
                         Rectangle {
                             anchors.fill: parent
                             radius: 13

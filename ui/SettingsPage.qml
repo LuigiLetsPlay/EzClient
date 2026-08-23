@@ -147,7 +147,7 @@ Item {
                         Text { text: "Akzentfarbe für Buttons, Auswahl und Hervorhebungen"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
                     }
                     Repeater {
-                        model: [{ id: "purple", color: "#A78BFA" }, { id: "blue", color: "#60A5FA" }, { id: "rose", color: "#FB7185" }, { id: "orange", color: "#FB923C" }]
+                        model: [{ id: "green", color: "#22C55E" }, { id: "purple", color: "#A78BFA" }, { id: "blue", color: "#60A5FA" }, { id: "rose", color: "#FB7185" }, { id: "orange", color: "#FB923C" }]
                         delegate: Rectangle {
                             width: 30; height: 30; radius: 15; color: modelData.color
                             border.color: profileController.themeColor === modelData.id ? EzTheme.text : "transparent"; border.width: 2
@@ -217,6 +217,15 @@ Item {
                             primary: true
                             implicitHeight: 32
                             onClicked: bgModal.open()
+                        }
+
+                        EzButton {
+                            text: "Video auswählen…"
+                            mcFont: true
+                            implicitHeight: 32
+                            onClicked: {
+                                if (profileController) profileController.pickBackgroundClip()
+                            }
                         }
 
                         EzButton {

@@ -180,11 +180,11 @@ class ProfileController(QObject):
 
     @Property(str, notify=settingsChanged)
     def themeColor(self) -> str:
-        return str(self._store.settings.get("theme_color", "purple"))
+        return str(self._store.settings.get("theme_color", "green"))
 
     @Slot(str)
     def setThemeColor(self, color: str) -> None:
-        if color not in {"purple", "blue", "rose", "orange"}:
+        if color not in {"green", "purple", "blue", "rose", "orange"}:
             return
         self._store.settings["theme_color"] = color
         self._store.save()
@@ -229,6 +229,18 @@ class ProfileController(QObject):
             "Hintergrundbild oder Clip auswählen",
             "",
             "Bilder und Clips (*.png *.jpg *.jpeg *.webp *.mp4 *.webm *.mov);;Alle Dateien (*.*)"
+        )
+        if file_path:
+            self.setCustomBackgroundImage(file_path)
+            return file_path
+        return ""
+
+    @Slot(result=str)
+    def pickBackgroundClip(self) -> str:
+        """Choose a supported local video for the Home background."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            None, "Hintergrund-Clip auswählen", "",
+            "Videos (*.mp4 *.webm *.mov);;Alle Dateien (*.*)"
         )
         if file_path:
             self.setCustomBackgroundImage(file_path)
@@ -300,6 +312,8 @@ class ProfileController(QObject):
             for mod in mods:
                 key = mod.project_id or mod.slug or mod.name
                 if not key or (mod.slug or "").lower() in ("ezclient", "fabric-api"):
+                    continue
+                if str(mod.version or "").strip().lower() == "latest":
                     continue
                 try:
                     versions = []
@@ -628,13 +642,17 @@ class ProfileController(QObject):
                (m.slug and m.slug.lower() == mid) or \
                (m.name and m.name.lower() == name_clean) or \
                (clean_fn and m.filename and m.filename.lower() == clean_fn):
-                m.version = version or m.version
+                # Store "Latest" so the background sync fetches the newest
+                # compatible build instead of merely re-enabling an old JAR.
+                m.version = "Latest"
                 m.enabled = True
                 self._store.save()
                 self._sync_models()
                 self.profilesChanged.emit()
                 self.activeProfileChanged.emit()
-                self.settingSaved.emit(f"Mod aktualisiert: {m.name}")
+                self._mod_updates.pop(m.project_id or m.slug or m.name, None)
+                self.modUpdatesChanged.emit()
+                self.settingSaved.emit(f"Mod wird auf die neueste Version aktualisiert: {m.name}")
                 p_ref = self._active_profile
                 threading.Thread(target=lambda: sync_profile_mods(p_ref), daemon=True).start()
                 return
@@ -644,7 +662,7 @@ class ProfileController(QObject):
             slug=mod_id,
             name=name,
             version_id="",
-            version=version or "Latest",
+            version="Latest",
             filename=filename or f"{mod_id}.jar",
             enabled=True,
             essential=False,
@@ -766,8 +784,10 @@ class ProfileController(QObject):
             if (m.project_id and m.project_id.lower() == mid) or \
                (m.slug and m.slug.lower() == mid) or \
                (m.name and m.name.lower() == mid):
-                m.version = new_version or "Latest"
+                m.version = "Latest"
                 self._store.save()
+                self._mod_updates.pop(m.project_id or m.slug or m.name, None)
+                self.modUpdatesChanged.emit()
                 
                 def _update_task():
                     p_ref = self._active_profile
@@ -780,7 +800,7 @@ class ProfileController(QObject):
                     sync_profile_mods(p_ref)
                     self._store.save()
                     self._syncNeeded.emit()
-                    self.settingSaved.emit(f"Version geändert: {m.name} ({new_version})")
+                    self.settingSaved.emit(f"Aktualisiert: {m.name} ({m.version})")
 
                 threading.Thread(target=_update_task, daemon=True).start()
                 return
@@ -790,12 +810,17 @@ class ProfileController(QObject):
         """Replace every non-core mod with the newest compatible build."""
         if not self._active_profile:
             return
-        mods = [m for m in self._active_profile.mods if (m.slug or "").lower() not in ("ezclient", "fabric-api")]
+        update_keys = set(self._mod_updates)
+        mods = [m for m in self._active_profile.mods
+                if (m.project_id or m.slug or m.name) in update_keys
+                and (m.slug or "").lower() not in ("ezclient", "fabric-api")]
         if not mods:
             return
         for mod in mods:
             mod.version = "Latest"
         self._store.save()
+        self._mod_updates = {}
+        self.modUpdatesChanged.emit()
 
         def _update_all_task():
             for mod in mods:
@@ -808,7 +833,7 @@ class ProfileController(QObject):
             sync_profile_mods(self._active_profile)
             self._store.save()
             self._syncNeeded.emit()
-            self.settingSaved.emit(f"{len(mods)} Mods aktualisiert")
+            self.settingSaved.emit(f"{len(mods)} Mods auf die neuesten Versionen aktualisiert")
 
         threading.Thread(target=_update_all_task, daemon=True).start()
 
@@ -827,7 +852,7 @@ class ProfileController(QObject):
                     if source.is_file():
                         profile.mods_path.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(source, profile.mods_path / (mod.filename or source_name))
-                        mod.version = "1.5.4"
+                        mod.version = "1.5.5"
                         updated += 1
             self._store.save()
             self._syncNeeded.emit()

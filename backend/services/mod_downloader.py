@@ -10,12 +10,12 @@ from backend.services.modrinth import ModrinthService, USER_AGENT
 MODS_CACHE_DIR = CACHE_DIR / "mods"
 MODS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-def download_file(url: str, dest_path: Path) -> bool:
+def download_file(url: str, dest_path: Path, use_cache: bool = True) -> bool:
     """Download a file with caching."""
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     cache_file = MODS_CACHE_DIR / dest_path.name
     
-    if cache_file.exists() and cache_file.stat().st_size > 1024:
+    if use_cache and cache_file.exists() and cache_file.stat().st_size > 1024:
         try:
             shutil.copy2(cache_file, dest_path)
             return True
@@ -27,7 +27,8 @@ def download_file(url: str, dest_path: Path) -> bool:
         with urllib.request.urlopen(req, timeout=30) as resp:
             content = resp.read()
             # Save to cache
-            cache_file.write_bytes(content)
+            if use_cache:
+                cache_file.write_bytes(content)
             # Save to destination
             dest_path.write_bytes(content)
         return True
@@ -106,7 +107,7 @@ def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = No
 
         # Check cache
         cached = MODS_CACHE_DIR / base_name
-        if cached.exists() and cached.stat().st_size > 1024:
+        if requested_version.lower() != "latest" and cached.exists() and cached.stat().st_size > 1024:
             try:
                 shutil.copy2(cached, target_jar)
                 active_filenames.add(target_jar.name)
@@ -147,7 +148,7 @@ def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = No
                 if primary and primary.get("url"):
                     real_filename = primary.get("filename", base_name)
                     dest = mods_dir / real_filename
-                    if download_file(primary["url"], dest):
+                    if download_file(primary["url"], dest, use_cache=requested_version.lower() != "latest"):
                         m.filename = real_filename
                         m.version = best_ver.get("version_number", m.version)
                         active_filenames.add(real_filename)

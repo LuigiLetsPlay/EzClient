@@ -24,9 +24,7 @@ Button {
         radius: EzTheme.radiusSm
         color: {
             if (!control.enabled) return EzTheme.surface2
-            if (control.primary) {
-                return control.down ? "#18A858" : (control.hovered ? "#2EE080" : EzTheme.accent)
-            }
+            if (control.primary) return control.down ? EzTheme.accentDark : (control.hovered ? EzTheme.accentHover : EzTheme.accent)
             if (control.danger) {
                 return control.down ? "#3A0D15" : (control.hovered ? "#4C0519" : EzTheme.surface2)
             }
@@ -46,18 +44,6 @@ Button {
         Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
         Behavior on border.color { ColorAnimation { duration: EzTheme.animNormal } }
 
-        // Subtle inner glow for primary buttons
-        Rectangle {
-            anchors.fill: parent
-            radius: parent.radius
-            visible: control.primary && control.enabled
-            gradient: Gradient {
-                orientation: Gradient.Vertical
-                GradientStop { position: 0.0; color: "#ffffff18" }
-                GradientStop { position: 0.5; color: "transparent" }
-                GradientStop { position: 1.0; color: "#00000020" }
-            }
-        }
     }
 
     // Windows Cursor Hand Feedback

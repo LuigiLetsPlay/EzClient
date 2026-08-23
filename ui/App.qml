@@ -42,10 +42,17 @@ ApplicationWindow {
         property: "fontMode"
         value: typeof profileController !== "undefined" && profileController ? profileController.appFontMode : "mixed"
     }
-    Binding { target: EzTheme; property: "accent"; value: !profileController ? "#A78BFA" : ({ purple: "#A78BFA", blue: "#60A5FA", rose: "#FB7185", orange: "#FB923C" }[profileController.themeColor] || "#A78BFA") }
-    Binding { target: EzTheme; property: "accentHover"; value: !profileController ? "#B9A4FF" : ({ purple: "#B9A4FF", blue: "#93C5FD", rose: "#FDA4AF", orange: "#FDBA74" }[profileController.themeColor] || "#B9A4FF") }
-    Binding { target: EzTheme; property: "accentDark"; value: !profileController ? "#33235E" : ({ purple: "#33235E", blue: "#1E3A8A", rose: "#881337", orange: "#7C2D12" }[profileController.themeColor] || "#33235E") }
-    Binding { target: EzTheme; property: "accentLight"; value: !profileController ? "#C4B5FD" : ({ purple: "#C4B5FD", blue: "#BFDBFE", rose: "#FECDD3", orange: "#FED7AA" }[profileController.themeColor] || "#C4B5FD") }
+    readonly property string selectedTheme: !profileController ? "green" : profileController.themeColor
+    Binding { target: EzTheme; property: "accent"; value: ({ green: "#22C55E", purple: "#A78BFA", blue: "#60A5FA", rose: "#FB7185", orange: "#FB923C" }[selectedTheme] || "#22C55E") }
+    Binding { target: EzTheme; property: "accentHover"; value: ({ green: "#4ADE80", purple: "#B9A4FF", blue: "#93C5FD", rose: "#FDA4AF", orange: "#FDBA74" }[selectedTheme] || "#4ADE80") }
+    Binding { target: EzTheme; property: "accentDark"; value: ({ green: "#14532D", purple: "#33235E", blue: "#1E3A8A", rose: "#881337", orange: "#7C2D12" }[selectedTheme] || "#14532D") }
+    Binding { target: EzTheme; property: "accentLight"; value: ({ green: "#86EFAC", purple: "#C4B5FD", blue: "#BFDBFE", rose: "#FECDD3", orange: "#FED7AA" }[selectedTheme] || "#86EFAC") }
+    Binding { target: EzTheme; property: "titlebarBg"; value: ({ green: "#07130D", purple: "#100C1F", blue: "#091425", rose: "#210B15", orange: "#211108" }[selectedTheme] || "#07130D") }
+    Binding { target: EzTheme; property: "sidebarBg"; value: ({ green: "#0A1710", purple: "#120E20", blue: "#0C1726", rose: "#1C0C14", orange: "#1C1009" }[selectedTheme] || "#0A1710") }
+    Binding { target: EzTheme; property: "surfaceActive"; value: ({ green: "#123323", purple: "#21183A", blue: "#122B4B", rose: "#3A1724", orange: "#3A210F" }[selectedTheme] || "#123323") }
+    Binding { target: EzTheme; property: "borderAccent"; value: EzTheme.accent + "30" }
+    Binding { target: EzTheme; property: "accentGlow"; value: EzTheme.accent + "25" }
+    Binding { target: EzTheme; property: "accentSoft"; value: EzTheme.accent + "12" }
 
     ColumnLayout {
         anchors.fill: parent

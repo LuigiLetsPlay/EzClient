@@ -352,17 +352,7 @@ Item {
             scale: launchMouse.pressed ? 0.95 : (launchMouse.containsMouse ? 1.04 : 1.0)
             Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
-            gradient: Gradient {
-                orientation: Gradient.Vertical
-                GradientStop {
-                    position: 0.0
-                    color: root.isLaunching ? "#F59E0B" : (launchMouse.containsMouse ? "#36FFa0" : "#2EE080")
-                }
-                GradientStop {
-                    position: 1.0
-                    color: root.isLaunching ? "#D97706" : (launchMouse.containsMouse ? "#22C96E" : "#18A858")
-                }
-            }
+            color: root.isLaunching ? EzTheme.warning : (launchMouse.containsMouse ? EzTheme.accentHover : EzTheme.accent)
 
             border.color: root.isLaunching ? "#FDE68A" : (launchMouse.containsMouse ? "#5AEEA0" : "#22C96E50")
             border.width: 2
@@ -379,17 +369,6 @@ Item {
                 Behavior on opacity { NumberAnimation { duration: EzTheme.animNormal } }
             }
 
-            // Inner highlight
-            Rectangle {
-                anchors.fill: parent
-                radius: parent.radius
-                gradient: Gradient {
-                    orientation: Gradient.Vertical
-                    GradientStop { position: 0.0; color: "#ffffff20" }
-                    GradientStop { position: 0.3; color: "transparent" }
-                    GradientStop { position: 1.0; color: "#00000015" }
-                }
-            }
 
             RowLayout {
                 anchors.centerIn: parent

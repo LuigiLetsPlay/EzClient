@@ -826,7 +826,7 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            spacing: 4
+            spacing: 0
             visible: profileController && profileController.activeModsCount > 0
             model: profileController ? profileController.modModel : null
 
@@ -866,7 +866,7 @@ Item {
                 readonly property bool updateAvailable: modUpdateVersion !== ""
 
                 visible: matchesSearch && matchesStatus && (!modItem.isPerformanceMod || root.showCoreMods || root.filterStatus === "performance")
-                height: visible ? 52 : 0
+                height: visible ? 56 : 0
 
                 color: (modItem.isFabricApi || model.enabled)
                        ? (rowMouse.containsMouse ? EzTheme.surface2 : EzTheme.surface)
