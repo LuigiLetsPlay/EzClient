@@ -34,6 +34,8 @@ Rectangle {
         return root.currentRoute === tabId
     }
 
+}
+
     // Draggable background
     MouseArea {
         anchors.fill: parent
@@ -344,10 +346,52 @@ Rectangle {
     }
 
     // ── RIGHT: Account Pill + Window Controls ──
+    // Window controls stay pinned to the edge; everything else flows to their left,
+    // so the account pill can never sit on top of the minimize/maximize buttons.
+    Row {
+        id: winControls
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 0
+
+                // Minimize
+                Rectangle {
+                    width: 46; height: root.height
+                    color: minMouse.containsMouse ? EzTheme.surface3 : "transparent"
+                    Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
+                    Text { text: "─"; font.family: EzTheme.fontFamily; font.pixelSize: 12; color: minMouse.containsMouse ? EzTheme.text : EzTheme.textMuted; anchors.centerIn: parent; Behavior on color { ColorAnimation { duration: EzTheme.animFast } } }
+                    MouseArea { id: minMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor; onClicked: if (root.windowRef) root.windowRef.showMinimized() }
+                }
+
+                // Maximize
+                Rectangle {
+                    width: 46; height: root.height
+                    color: maxMouse.containsMouse ? EzTheme.surface3 : "transparent"
+                    Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
+                    Text { text: "□"; font.family: EzTheme.fontFamily; font.pixelSize: 12; color: maxMouse.containsMouse ? EzTheme.text : EzTheme.textMuted; anchors.centerIn: parent; Behavior on color { ColorAnimation { duration: EzTheme.animFast } } }
+                    MouseArea {
+                        id: maxMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor
+                        onClicked: {
+                            if (!root.windowRef) return
+                            root.windowRef.visibility === Window.Maximized ? root.windowRef.showNormal() : root.windowRef.showMaximized()
+                        }
+                    }
+                }
+
+                // Close
+                Rectangle {
+                    width: 48; height: root.height
+                    color: closeMouse.containsMouse ? "#C42B1C" : "transparent"
+                    Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
+                    Text { text: "✕"; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: closeMouse.containsMouse ? "#ffffff" : EzTheme.textMuted; anchors.centerIn: parent; Behavior on color { ColorAnimation { duration: EzTheme.animFast } } }
+                    MouseArea { id: closeMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor; onClicked: if (root.windowRef) root.windowRef.close() }
+                }
+            }
+
     RowLayout {
         id: rightSection
-        anchors.right: parent.right
-        anchors.rightMargin: 0
+        anchors.right: winControls.left
+        anchors.rightMargin: 6
         anchors.verticalCenter: parent.verticalCenter
         spacing: 10
 
@@ -355,7 +399,7 @@ Rectangle {
             Rectangle {
                 id: updateBadge
                 height: 28
-                visible: typeof updateController !== "undefined" && updateController && updateController.updateAvailable
+                visible: root.width >= 1050 && typeof updateController !== "undefined" && updateController && updateController.updateAvailable
                 width: updateBadgeRow.implicitWidth + 18
                 radius: 14
                 color: updateMouse.containsMouse ? "#1c3829" : "#13281c"
@@ -388,11 +432,13 @@ Rectangle {
             }
 
             // Player Avatar & Username
-            Rectangle {
-                id: accPill
-                z: 30
-                height: 34
-                width: Math.min(180, accRow.implicitWidth + 24)
+                Rectangle {
+                    id: accPill
+                    z: 30
+                    height: 34
+                    // The pill always wraps its real content. The username itself
+                    // elides, so name/avatar can never paint outside the gray pill.
+                    width: root.width >= 1100 ? Math.min(180, accRow.implicitWidth + 24) : 42
                 radius: 17
                 color: accPopup.opened ? EzTheme.surface3 : (accMouse.containsMouse ? EzTheme.surfaceHover : EzTheme.surface2)
 
@@ -440,6 +486,8 @@ Rectangle {
                         font.pixelSize: 12
                         font.bold: true
                         color: EzTheme.text
+                        elide: Text.ElideRight
+                        Layout.maximumWidth: root.width >= 1300 ? 140 : 80
                     }
 
                 }
@@ -656,42 +704,4 @@ Rectangle {
                 }
             }
 
-            // ── Window Controls (macOS-inspired circles) ──
-            Row {
-                spacing: 0
-
-                // Minimize
-                Rectangle {
-                    width: 46; height: root.height
-                    color: minMouse.containsMouse ? EzTheme.surface3 : "transparent"
-                    Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
-                    Text { text: "─"; font.family: EzTheme.fontFamily; font.pixelSize: 12; color: minMouse.containsMouse ? EzTheme.text : EzTheme.textMuted; anchors.centerIn: parent; Behavior on color { ColorAnimation { duration: EzTheme.animFast } } }
-                    MouseArea { id: minMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor; onClicked: if (root.windowRef) root.windowRef.showMinimized() }
-                }
-
-                // Maximize
-                Rectangle {
-                    width: 46; height: root.height
-                    color: maxMouse.containsMouse ? EzTheme.surface3 : "transparent"
-                    Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
-                    Text { text: "□"; font.family: EzTheme.fontFamily; font.pixelSize: 12; color: maxMouse.containsMouse ? EzTheme.text : EzTheme.textMuted; anchors.centerIn: parent; Behavior on color { ColorAnimation { duration: EzTheme.animFast } } }
-                    MouseArea {
-                        id: maxMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor
-                        onClicked: {
-                            if (!root.windowRef) return
-                            root.windowRef.visibility === Window.Maximized ? root.windowRef.showNormal() : root.windowRef.showMaximized()
-                        }
-                    }
-                }
-
-                // Close
-                Rectangle {
-                    width: 48; height: root.height
-                    color: closeMouse.containsMouse ? "#C42B1C" : "transparent"
-                    Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
-                    Text { text: "✕"; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: closeMouse.containsMouse ? "#ffffff" : EzTheme.textMuted; anchors.centerIn: parent; Behavior on color { ColorAnimation { duration: EzTheme.animFast } } }
-                    MouseArea { id: closeMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor; onClicked: if (root.windowRef) root.windowRef.close() }
-                }
-            }
-        }
     }
