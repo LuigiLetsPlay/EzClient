@@ -521,10 +521,23 @@ class AccountController(QObject):
             image = QImage(source)
             if image.isNull() or image.width() < 1 or image.height() < 1 or image.width() > 4096 or image.height() > 4096:
                 raise ValueError("Das Bild kann nicht verarbeitet werden.")
-            mode = "Stretch" if fit_mode == "Stretch" else "Cover"
+            mode_part, _, crop_part = fit_mode.partition("|")
+            mode = "Stretch" if mode_part == "Stretch" else "Cover"
             # Rotate the selected picture 90 degrees left once, up front.
             # Every later step receives exactly this rotated image unchanged.
             rgba = image.convertToFormat(QImage.Format_RGBA8888)
+            if crop_part:
+                try:
+                    cx, cy, cw, ch = (max(0.0, min(1.0, float(v))) for v in crop_part.split(","))
+                    x = round(cx * rgba.width())
+                    y = round(cy * rgba.height())
+                    w = max(1, min(rgba.width() - x, round(cw * rgba.width())))
+                    h = max(1, min(rgba.height() - y, round(ch * rgba.height())))
+                    cropped = rgba.copy(x, y, w, h)
+                    if not cropped.isNull():
+                        rgba = cropped
+                except ValueError:
+                    pass
             cape = _bake_editor_cape(rgba, mode)
             if not _write_hd_cape_preview(rgba, editor=True, fit_mode=mode):
                 raise ValueError("Die Cape-Vorschau konnte nicht erzeugt werden.")

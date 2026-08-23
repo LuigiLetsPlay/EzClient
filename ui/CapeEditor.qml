@@ -9,17 +9,24 @@ Item {
     property string selectedSource: ""
     property string pendingPreview: ""
     property string fitMode: "Cover"
+    // Normalized crop window over the selected picture (0..1).
+    property real cropX: 0
+    property real cropY: 0
+    property real cropW: 1
+    property real cropH: 1
 
     function chooseImage() {
         var url = accountController.pickCapeImage()
         if (!url) return
         root.selectedSource = url
+        root.cropX = 0; root.cropY = 0; root.cropW = 1; root.cropH = 1
         root.prepare()
     }
 
     function prepare() {
         if (!root.selectedSource) return
-        root.pendingPreview = accountController.prepareCapeImage(root.selectedSource, root.fitMode)
+        var crop = root.cropX.toFixed(4) + "," + root.cropY.toFixed(4) + "," + root.cropW.toFixed(4) + "," + root.cropH.toFixed(4)
+        root.pendingPreview = accountController.prepareCapeImage(root.selectedSource, root.fitMode + "|" + crop)
     }
 
     function discard() {
@@ -132,6 +139,105 @@ Item {
                             Text { anchors.centerIn: parent; text: item.label; color: EzTheme.text; font.pixelSize: 13 }
                         }
                     }
+                }
+
+                Text { text: "Zuschneiden"; color: EzTheme.text; font.bold: true; font.pixelSize: 15; visible: root.selectedSource !== "" }
+
+                // Interactive crop editor. Drag inside the frame to move it,
+                // drag the corner handle to resize. The cape is made from the
+                // framed region only.
+                Rectangle {
+                    id: cropStage
+                    visible: root.selectedSource !== ""
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 300
+                    radius: 10
+                    color: "#171126"
+                    border.color: EzTheme.border
+                    clip: true
+
+                    Image {
+                        id: cropImage
+                        anchors.centerIn: parent
+                        width: parent.width
+                        height: parent.height
+                        fillMode: Image.PreserveAspectFit
+                        asynchronous: true
+                        source: root.selectedSource
+                    }
+
+                    // Darken everything outside the crop window.
+                    Rectangle {
+                        x: cropImage.x + root.cropX * cropImage.paintedWidth
+                        y: cropImage.y + root.cropY * cropImage.paintedHeight
+                        width: Math.max(20, root.cropW * cropImage.paintedWidth)
+                        height: Math.max(20, root.cropH * cropImage.paintedHeight)
+                        color: "transparent"
+                        border.color: EzTheme.accent
+                        border.width: 2
+
+                        MouseArea {
+                            id: cropMove
+                            anchors.fill: parent
+                            cursorShape: Qt.SizeAllCursor
+                            property point startMouse
+                            property rect startRect
+                            onPressed: function(mouse) {
+                                startMouse = Qt.point(mouse.x, mouse.y)
+                                startRect = Qt.rect(parent.x, parent.y, parent.width, parent.height)
+                            }
+                            onPositionChanged: function(mouse) {
+                                if (!pressed) return
+                                var dx = mouse.x - startMouse.x
+                                var dy = mouse.y - startMouse.y
+                                var nx = Math.min(cropImage.x + cropImage.paintedWidth - parent.width, Math.max(cropImage.x, startRect.x + dx))
+                                var ny = Math.min(cropImage.y + cropImage.paintedHeight - parent.height, Math.max(cropImage.y, startRect.y + dy))
+                                parent.x = nx; parent.y = ny
+                                root.cropX = (parent.x - cropImage.x) / cropImage.paintedWidth
+                                root.cropY = (parent.y - cropImage.y) / cropImage.paintedHeight
+                            }
+                        }
+
+                        Rectangle {
+                            id: resizeHandle
+                            width: 16; height: 16
+                            radius: 8
+                            color: EzTheme.accent
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.margins: -8
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.SizeFDiagCursor
+                                onPositionChanged: function(mouse) {
+                                    if (!pressed) return
+                                    var absX = mapToItem(cropStage, mouse.x, mouse.y).x
+                                    var absY = mapToItem(cropStage, mouse.x, mouse.y).y
+                                    var maxX = cropImage.x + cropImage.paintedWidth - parent.parent.x
+                                    var maxY = cropImage.y + cropImage.paintedHeight - parent.parent.y
+                                    parent.parent.width = Math.max(20, Math.min(maxX, absX - parent.parent.x))
+                                    parent.parent.height = Math.max(20, Math.min(maxY, absY - parent.parent.y))
+                                    root.cropW = parent.parent.width / cropImage.paintedWidth
+                                    root.cropH = parent.parent.height / cropImage.paintedHeight
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        visible: cropImage.status === Image.Loading
+                        anchors.centerIn: parent
+                        text: "Bild lädt…"
+                        color: EzTheme.textSecondary
+                    }
+                }
+
+                RowLayout {
+                    visible: root.selectedSource !== ""
+                    spacing: 10
+                    EzButton { text: "Zuschnitt anwenden"; onClicked: root.prepare() }
+                    EzButton { text: "Alles auswählen"; onClicked: { root.cropX = 0; root.cropY = 0; root.cropW = 1; root.cropH = 1 } }
                 }
 
                 Text {
