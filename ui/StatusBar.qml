@@ -35,7 +35,7 @@ Rectangle {
         Item { Layout.fillWidth: true }
 
         Text {
-            text: "EzClient v" + (typeof updateController !== "undefined" && updateController ? updateController.currentVersion : "1.5.5")
+            text: "EzClient v" + (typeof updateController !== "undefined" && updateController ? updateController.currentVersion : "1.5.6")
             font.family: EzTheme.fontFamily
             font.pixelSize: 9
             color: EzTheme.textSubtle

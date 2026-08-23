@@ -37,7 +37,7 @@ except ImportError:
 
 
 APP_NAME = "EzClient"
-APP_VERSION = "1.5.5"
+APP_VERSION = "1.5.6"
 MINECRAFT_INSTALLER_URL = "https://launcher.mojang.com/download/MinecraftInstaller.msi"
 FABRIC_META_URL = "https://meta.fabricmc.net/v2/versions/installer"
 FABRIC_FALLBACK_URL = (
@@ -404,7 +404,7 @@ def launch_launcher(info: LauncherInfo) -> None:
         command = ["open", str(info.path)] if sys.platform == "darwin" else [str(info.path)]
         subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     elif sys.platform.startswith("win"):
-        os.startfile("minecraft://")  # type: ignore[attr-defined]
+        raise RuntimeError("Minecraft Launcher nicht gefunden. Bitte installiere den offiziellen Minecraft Launcher oder nutze den Direktstart mit Java.")
     else:
         raise RuntimeError("Der offizielle Minecraft Launcher konnte nicht gestartet werden.")
 

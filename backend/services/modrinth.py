@@ -1,4 +1,5 @@
 import json
+import json
 import urllib.parse
 import urllib.request
 import re
@@ -6,7 +7,21 @@ from typing import Any
 from backend.models.types import ProfileData, ModData
 
 MODRINTH_API = "https://api.modrinth.com/v2"
-USER_AGENT = "EzClient/1.5.5 (desktop launcher)"
+USER_AGENT = "EzClient/1.5.6 (desktop launcher)"
+
+
+def select_preferred_version(versions: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Choose the newest stable build, with beta as the safe fallback.
+
+    The Modrinth API can place alpha builds before releases. Selecting the
+    first item blindly mixes experimental Sodium builds with stable Iris builds
+    and produces Fabric's incompatibility screen.
+    """
+    for version_type in ("release", "beta"):
+        match = next((item for item in versions if str(item.get("version_type", "")).lower() == version_type), None)
+        if match:
+            return match
+    return versions[0] if versions else None
 
 FALLBACK_VERSIONS = [
     "26.2", "26.1", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5",
@@ -92,7 +107,9 @@ class ModrinthService:
             if not versions:
                 return []
 
-            best_ver = next((v for v in versions if v.get("version_type") == "release"), versions[0])
+            best_ver = select_preferred_version(versions)
+            if not best_ver:
+                return []
             deps = best_ver.get("dependencies", [])
             required_pids = [d.get("project_id") for d in deps if d.get("dependency_type") == "required" and d.get("project_id")]
             if not required_pids:

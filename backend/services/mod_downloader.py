@@ -1,14 +1,25 @@
 import os
+import os
 import sys
 import shutil
+import threading
 import urllib.request
 from pathlib import Path
 from typing import Callable, Any
 from backend.models.types import ProfileData, ModData, CACHE_DIR, DATA_DIR
-from backend.services.modrinth import ModrinthService, USER_AGENT
+from backend.services.modrinth import ModrinthService, USER_AGENT, select_preferred_version
 
 MODS_CACHE_DIR = CACHE_DIR / "mods"
 MODS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+_PROFILE_SYNC_GUARD = threading.Lock()
+_PROFILE_SYNC_LOCKS: dict[str, threading.Lock] = {}
+
+
+def _profile_sync_lock(profile: ProfileData) -> threading.Lock:
+    """Return one lock per profile so background actions never race on JARs."""
+    key = str(profile.path.resolve())
+    with _PROFILE_SYNC_GUARD:
+        return _PROFILE_SYNC_LOCKS.setdefault(key, threading.Lock())
 
 def download_file(url: str, dest_path: Path, use_cache: bool = True) -> bool:
     """Download a file with caching."""
@@ -22,21 +33,24 @@ def download_file(url: str, dest_path: Path, use_cache: bool = True) -> bool:
         except Exception:
             pass
 
+    temporary = dest_path.with_suffix(dest_path.suffix + ".part")
     try:
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            content = resp.read()
-            # Save to cache
-            if use_cache:
-                cache_file.write_bytes(content)
-            # Save to destination
-            dest_path.write_bytes(content)
+        with urllib.request.urlopen(req, timeout=30) as resp, temporary.open("wb") as output:
+            while chunk := resp.read(1024 * 256):
+                output.write(chunk)
+        # An atomic replace prevents Minecraft and other queued actions from
+        # ever seeing a half-downloaded JAR.
+        os.replace(temporary, dest_path)
+        if use_cache:
+            shutil.copy2(dest_path, cache_file)
         return True
     except Exception as e:
+        temporary.unlink(missing_ok=True)
         print(f"[ModDownloader] Failed to download {url}: {e}")
         return False
 
-def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = None, status_callback: Callable[[str], None] | None = None) -> None:
+def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = None, status_callback: Callable[[str], None] | None = None) -> None:
     """Synchronize all enabled mod jar files into profile.mods_path including all required dependencies."""
     if not profile:
         return
@@ -142,7 +156,9 @@ def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = No
                     None,
                 )
                 if best_ver is None:
-                    best_ver = versions[0]
+                    best_ver = select_preferred_version(versions)
+                if best_ver is None:
+                    continue
                 files = best_ver.get("files", [])
                 primary = next((f for f in files if f.get("primary")), files[0] if files else None)
                 if primary and primary.get("url"):
@@ -180,7 +196,9 @@ def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = No
             if not versions:
                 continue
 
-            best_ver = versions[0]
+            best_ver = select_preferred_version(versions)
+            if best_ver is None:
+                continue
             files = best_ver.get("files", [])
             primary = next((f for f in files if f.get("primary")), files[0] if files else None)
             if primary and primary.get("url"):
@@ -212,3 +230,16 @@ def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = No
                     pass
     except Exception:
         pass
+
+
+def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = None, status_callback: Callable[[str], None] | None = None) -> None:
+    """Thread-safe synchronisation entry point used by install/update/delete.
+
+    Each UI action already starts a worker.  Serialising work per profile
+    avoids overlapping scans, duplicated downloads, and file-lock retries that
+    previously made the launcher appear frozen during rapid clicks.
+    """
+    if not profile:
+        return
+    with _profile_sync_lock(profile):
+        _sync_profile_mods(profile, service=service, status_callback=status_callback)

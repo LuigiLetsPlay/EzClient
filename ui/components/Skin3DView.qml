@@ -13,6 +13,9 @@ Item {
     property real autoRotateSpeed: 1.0
     property real initialRotateX: 0
     property real initialRotateY: 0
+    // Home uses its own small click target. Leaving the WebEngine interactive
+    // there would make the invisible rotation area cover the whole stage.
+    property bool interactive: true
     property bool isLoaded: false
 
     readonly property string htmlUrl: Qt.resolvedUrl("../assets/skinview3d/skin_viewer.html").toString()
@@ -69,6 +72,7 @@ Item {
         id: webEngine
         anchors.fill: parent
         backgroundColor: "transparent"
+        enabled: skin3dRoot.interactive
         url: skin3dRoot.htmlUrl
 
         onNavigationRequested: function(request) {

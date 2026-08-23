@@ -1,10 +1,12 @@
 import os
+import os
 import sys
 import subprocess
 import shutil
 import tempfile
 from pathlib import Path
 from typing import Callable, Any
+from urllib.request import urlopen
 from backend.models.types import ProfileData, now_iso
 from backend.services.store import read_json, write_json
 
@@ -85,12 +87,68 @@ def patch_launcher_profile(profile: ProfileData) -> None:
     if store_file.exists():
         patch_profile_file(store_file, profile, version_id)
 
-def launch_minecraft_official() -> None:
+def _launcher_installer_path() -> Path:
+    """Stable cache location for the official launcher bootstrapper."""
+    return Path(tempfile.gettempdir()) / "EzClient" / "MinecraftInstaller.msi"
+
+
+def _download_official_launcher(status_callback: Callable[[str], None] | None = None) -> Path:
+    """Download the official launcher MSI without ever invoking ``minecraft:``.
+
+    ``minecraft:`` makes Windows show an unrelated Store protocol dialog when
+    the launcher is missing.  Keeping the first-install flow here also means a
+    fresh PC behaves predictably from EzClient's Play button.
+    """
+    installer = _launcher_installer_path()
+    if installer.exists() and installer.stat().st_size > 1_000_000:
+        return installer
+
+    installer.parent.mkdir(parents=True, exist_ok=True)
+    temporary = installer.with_suffix(".download")
+    if status_callback:
+        status_callback("Offizieller Minecraft Launcher wird vorbereitet…")
+    try:
+        with urlopen(MINECRAFT_INSTALLER_URL, timeout=30) as response, temporary.open("wb") as output:
+            while chunk := response.read(1024 * 256):
+                output.write(chunk)
+        if temporary.stat().st_size <= 1_000_000:
+            raise RuntimeError("Die Installationsdatei ist unvollständig.")
+        temporary.replace(installer)
+        return installer
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def launch_minecraft_official(status_callback: Callable[[str], None] | None = None) -> bool:
+    """Start the official launcher, or bootstrap it on a fresh Windows PC.
+
+    Returns ``True`` when the launcher was started immediately and ``False``
+    when its background installation has just been started.
+    """
     installed, path, is_store = detect_launcher()
     if path and path.exists():
         cmd = ["open", str(path)] if sys.platform == "darwin" else [str(path)]
         subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+    if is_store and sys.platform.startswith("win"):
+        # Launch the installed Store package directly.  This does not rely on
+        # the minecraft: protocol and therefore cannot trigger the Store popup.
+        subprocess.Popen(
+            ["explorer.exe", "shell:AppsFolder\\Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return True
     elif sys.platform.startswith("win"):
-        os.startfile("minecraft://")
+        installer = _download_official_launcher(status_callback)
+        if status_callback:
+            status_callback("Minecraft Launcher wird im Hintergrund installiert…")
+        subprocess.Popen(
+            ["msiexec.exe", "/i", str(installer), "/quiet", "/norestart"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return False
     else:
         raise RuntimeError("Official Minecraft launcher not found.")

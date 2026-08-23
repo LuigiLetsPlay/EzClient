@@ -144,36 +144,27 @@ Item {
             anchors.fill: parent
             skinSource: root.skinTextureUrl
             capeSource: root.capeTextureUrl
-            animation: "idle"
+            animation: "none"
             autoRotate: false
+            interactive: false
             initialRotateX: 0
             initialRotateY: -14
-            // The large stage is deliberately not clickable: it used to steal
-            // clicks from Home controls far outside the visible player model.
         }
 
-        // Occasional small, natural-looking variation instead of a perfectly
-        // static menu character. The viewer only uses built-in animations.
-        Timer {
-            id: characterIdleTimer
-            interval: 9000 + Math.random() * 16000
-            running: true
-            repeat: true
-            onTriggered: {
-                if (Math.random() < 0.5) {
-                    centeredHomeSkin3D.setAnim("walk", 0.18)
-                } else {
-                    centeredHomeSkin3D.setRotateY(-28 + Math.random() * 28)
-                }
-                characterIdleReset.restart()
-            }
-        }
-        Timer {
-            id: characterIdleReset
-            interval: 1700
-            onTriggered: {
-                centeredHomeSkin3D.setAnim("idle", 0.7)
-                centeredHomeSkin3D.setRotateY(-14)
+        // A compact hitbox follows the visible player, rather than the whole
+        // WebEngine stage. Clicking it opens the Skin modal; it does not
+        // capture the surrounding Home controls.
+        MouseArea {
+            id: homeSkinClickTarget
+            z: 5
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: Math.max(86, parent.height * 0.18)
+            width: Math.min(176, parent.width * 0.26)
+            height: Math.min(340, parent.height * 0.62)
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+                if (typeof window !== "undefined" && window.openSkinModal) window.openSkinModal()
             }
         }
 

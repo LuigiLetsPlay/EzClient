@@ -77,9 +77,9 @@
     skinViewer.controls.maxDistance = 120;
     skinViewer.controls.minDistance = 30;
 
-    // Subtle idle animation
-    setAnimation("idle", 0.7);
-    startIdleLook();
+    // Home controls the pose explicitly.  Do not run random/idle movement in
+    // the launcher preview; a static character is predictable and clickable.
+    setAnimation("none");
 
     if (pendingSkin) {
       setSkin(pendingSkin.url, pendingSkin.model);
@@ -198,22 +198,6 @@
   function rotateY(deg) {
     if (!skinViewer) return;
     skinViewer.playerObject.rotation.y = (deg * Math.PI) / 180;
-  }
-
-  function startIdleLook() {
-    function animateLook() {
-      if (skinViewer && skinViewer.playerObject && skinViewer.playerObject.skin) {
-        idleLookTime += 0.012;
-        const skin = skinViewer.playerObject.skin;
-        if (skin.head) {
-          // Relaxed gaze: slightly down/right with small, organic idle movement.
-          skin.head.rotation.x = 0.12 + Math.sin(idleLookTime * 0.73) * 0.035;
-          skin.head.rotation.y = -0.20 + Math.sin(idleLookTime * 0.51) * 0.075;
-        }
-      }
-      requestAnimationFrame(animateLook);
-    }
-    requestAnimationFrame(animateLook);
   }
 
   function resetView() {

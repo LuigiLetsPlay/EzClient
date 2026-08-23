@@ -6,8 +6,9 @@ from dataclasses import asdict
 import threading
 import time
 import shutil
+import filecmp
 from PySide6.QtCore import QObject, Signal, Slot, Property
-from backend.models.types import ProfileData, ModData, DATA_DIR
+from backend.models.types import ProfileData, ModData, DATA_DIR, APP_VERSION
 from backend.services.store import ProfileStore
 from backend.models.profile_model import ProfileModel
 from backend.models.mod_model import ModModel
@@ -51,8 +52,43 @@ class ProfileController(QObject):
         self._syncNeeded.connect(self._sync_models)
         self._modUpdatesDone.connect(self._set_mod_updates)
         self._sync_models()
+        # A launcher update carries the matching EzClient mod. Refresh it in
+        # every profile on startup, before any game can be launched.
+        threading.Thread(target=self._auto_update_ezclient_mods, daemon=True).start()
         if self._active_profile:
             threading.Thread(target=lambda: sync_profile_mods(self._active_profile), daemon=True).start()
+
+    def _bundled_ezclient_asset(self, filename: str) -> Path:
+        root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
+        return root / "backend" / "assets" / filename
+
+    def _auto_update_ezclient_mods(self) -> None:
+        """Keep the bundled EzClient JAR identical in every existing profile."""
+        changed = False
+        for profile in self._store.profiles:
+            for mod in profile.mods:
+                is_core = ((mod.slug or "").lower() in ("ezclient", "ezclient-core")
+                           or "ezclient" in (mod.filename or "").lower())
+                if not is_core:
+                    continue
+                source_name = "EzClient-Lite.jar" if "lite" in (mod.filename or "").lower() else "EzClient.jar"
+                source = self._bundled_ezclient_asset(source_name)
+                destination = profile.mods_path / (mod.filename or source_name)
+                if not source.is_file():
+                    continue
+                try:
+                    needs_copy = (not destination.exists() or not filecmp.cmp(source, destination, shallow=False))
+                    if needs_copy:
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(source, destination)
+                    if needs_copy or mod.version != APP_VERSION:
+                        mod.version = APP_VERSION
+                        changed = True
+                except OSError as exc:
+                    print(f"[ProfileController] EzClient auto-update skipped for {profile.name}: {exc}")
+        if changed:
+            self._store.save()
+            self._syncNeeded.emit()
 
     @Property(QObject, constant=True)
     def liveLogService(self) -> QObject:
@@ -304,7 +340,7 @@ class ProfileController(QObject):
         mods = list(profile.mods)
 
         def _check_task():
-            from backend.services.modrinth import ModrinthService
+            from backend.services.modrinth import ModrinthService, select_preferred_version
             from backend.services.curseforge import CurseForgeService
             modrinth = ModrinthService()
             curseforge = CurseForgeService()
@@ -322,7 +358,8 @@ class ProfileController(QObject):
                     if not versions:
                         versions = modrinth.get_project_versions(key, mc_version=profile.minecraft_version, loader=profile.loader)
                     if versions:
-                        newest = str(versions[0].get("version_number", ""))
+                        preferred = select_preferred_version(versions)
+                        newest = str((preferred or {}).get("version_number", ""))
                         if newest and newest != str(mod.version or ""):
                             updates[key] = newest
                 except Exception as exc:
@@ -490,7 +527,7 @@ class ProfileController(QObject):
     def createAndOnboard(self, name: str, version: str, loader: str, preset: str, excluded_slugs: list = []) -> None:
         """Creates a profile and runs live mod downloads in background thread with progress feedback."""
         from backend.services.mod_downloader import download_file, sync_profile_mods
-        from backend.services.modrinth import ModrinthService
+        from backend.services.modrinth import ModrinthService, select_preferred_version
 
         def worker():
             import shutil
@@ -555,7 +592,9 @@ class ProfileController(QObject):
                     if not vers:
                         vers = svc.get_project_versions(m.slug or m.project_id)
                     if vers:
-                        best = next((v for v in vers if v.get("version_type") == "release"), vers[0])
+                        best = select_preferred_version(vers)
+                        if not best:
+                            continue
                         files = best.get("files", [])
                         primary = next((f for f in files if f.get("primary")), files[0] if files else None)
                         if primary and primary.get("url"):
@@ -602,6 +641,20 @@ class ProfileController(QObject):
         self._store.toggle_mod(self._active_profile.id, mod_id)
         self._sync_models()
         self.activeProfileChanged.emit()
+        # Renaming/enabling JARs is disk work. Keep the toggle immediate and
+        # reconcile files asynchronously so the QML scene never stalls.
+        profile_ref = self._active_profile
+        threading.Thread(
+            target=lambda: self._sync_mods_after_change(profile_ref), daemon=True
+        ).start()
+
+    def _sync_mods_after_change(self, profile: ProfileData) -> None:
+        try:
+            sync_profile_mods(profile)
+            self._store.save()
+            self._syncNeeded.emit()
+        except Exception as exc:
+            print(f"[ProfileController] Background mod sync error: {exc}")
 
     @Slot(str, result=list)
     def getModDependencies(self, mod_id: str) -> list:
@@ -841,18 +894,17 @@ class ProfileController(QObject):
     def updateEzClient(self) -> None:
         """Refresh the bundled EzClient JAR in every launcher profile that uses it."""
         def worker() -> None:
-            root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
             updated = 0
             for profile in self._store.profiles:
                 for mod in profile.mods:
                     if (mod.slug or "").lower() not in ("ezclient", "ezclient-core") and "ezclient" not in (mod.filename or "").lower():
                         continue
                     source_name = "EzClient-Lite.jar" if "lite" in (mod.filename or "").lower() else "EzClient.jar"
-                    source = root / "backend" / "assets" / source_name
+                    source = self._bundled_ezclient_asset(source_name)
                     if source.is_file():
                         profile.mods_path.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(source, profile.mods_path / (mod.filename or source_name))
-                        mod.version = "1.5.5"
+                        mod.version = APP_VERSION
                         updated += 1
             self._store.save()
             self._syncNeeded.emit()
@@ -982,7 +1034,29 @@ class ProfileController(QObject):
                 # 3. Fallback: Official Minecraft Launcher with Autokill
                 self.launchStatusChanged.emit("Minecraft Launcher wird gestartet…", False)
                 patch_launcher_profile(self._active_profile)
-                launch_minecraft_official()
+                launcher_started = launch_minecraft_official(
+                    status_callback=lambda s: self.launchStatusChanged.emit(s, False)
+                )
+                if not launcher_started:
+                    # The MSI is intentionally silent.  Wait briefly and then
+                    # open the newly installed launcher automatically instead
+                    # of presenting Windows' minecraft:-protocol dialog.
+                    self.launchStatusChanged.emit("Warte auf die Launcher-Installation…", False)
+                    for _ in range(90):
+                        time.sleep(2)
+                        installed, _, _ = detect_launcher()
+                        if installed:
+                            self.launchStatusChanged.emit("Minecraft Launcher wird gestartet…", False)
+                            launch_minecraft_official()
+                            launcher_started = True
+                            break
+                    if not launcher_started:
+                        self._is_launching = False
+                        self.launchStatusChanged.emit(
+                            "Die Launcher-Installation läuft noch im Hintergrund. EzClient danach erneut starten.",
+                            False,
+                        )
+                        return
 
                 if self.minimizeToTray:
                     self.hideToTrayRequested.emit()
