@@ -75,12 +75,14 @@ Rectangle {
                 }
             }
 
-            Rectangle { visible: root.width >= 900; width: 1; height: 22; color: EzTheme.border; opacity: 0.5 }
+            Rectangle { visible: root.width >= 1150; width: 1; height: 22; color: EzTheme.border; opacity: 0.5 }
 
             // Active Profile Quick-Switcher Dropdown Pill
             Rectangle {
                 id: profilePill
-                visible: root.width >= 900
+                // Below 1150px the centered navigation would collide with the
+                // pill, so the pill steps aside first (icon-only launcher UI).
+                visible: root.width >= 1150
                 z: 30
                 height: 34
                 width: Math.min(200, Math.max(120, pillNameText.implicitWidth + 44))
@@ -267,14 +269,8 @@ Rectangle {
     // ── CENTER: Navigation Tabs with Sliding Indicator ──
     Item {
         id: centerSection
-        // Keep a dynamic gap: never slide over the profile pill on the left
-        // and never under the account pill / window controls on the right.
-        y: parent.height / 2 - height / 2
-        x: Math.max(leftSection.right + 20,
-                    Math.min(parent.width / 2 - width / 2,
-                             winControls.x - rightSection.width - 44 - width))
-        readonly property bool fits: (winControls.x - rightSection.width - 44 - width) >= (leftSection.right + 20)
-        visible: root.width >= 900 && fits
+        anchors.centerIn: parent
+        visible: root.width >= 900
         implicitWidth: navTabsRow.implicitWidth
         implicitHeight: navTabsRow.implicitHeight
 
