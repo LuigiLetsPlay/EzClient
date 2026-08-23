@@ -163,25 +163,68 @@ def download_update_file(download_url: str, target_filename: str, progress_callb
     return None
 
 
-def run_installer_and_exit(installer_path: Path) -> None:
+def _update_install_dir() -> Path:
+    """Return the real EzClient installation directory.
+
+    A portable launcher may be started straight from ``Downloads``.  Updating
+    into that temporary directory makes the update look as if it did nothing,
+    so prefer the registered installation and otherwise use the normal per-user
+    application folder.
     """
-    Spawns installer process in update mode and terminates current launcher instance cleanly.
+    default_dir = Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Programs" / "EzClient"
+    if sys.platform != "win32":
+        return default_dir
+
+    try:
+        import winreg
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\EzClient"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            registered_dir, _ = winreg.QueryValueEx(key, "InstallLocation")
+        registered = Path(str(registered_dir))
+        if (registered / "EzClient.exe").is_file():
+            return registered
+    except Exception:
+        pass
+
+    current_exe = Path(sys.executable)
+    expected_dir = default_dir.resolve()
+    try:
+        if getattr(sys, "frozen", False) and current_exe.parent.resolve() == expected_dir:
+            return current_exe.parent
+    except OSError:
+        pass
+    return default_dir
+
+
+def run_installer_and_exit(installer_path: Path) -> bool:
+    """
+    Spawns the installer in update mode.
+
+    The caller closes the Qt event loop after this function succeeds.  Keeping
+    shutdown outside this helper makes a failed process launch visible to the
+    user instead of silently killing the launcher.
     """
     try:
-        current_exe = Path(sys.executable)
-        if getattr(sys, "frozen", False):
-            install_dir = current_exe.parent
-        else:
-            install_dir = Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Programs" / "EzClient"
+        installer_path = Path(installer_path)
+        if not installer_path.is_file():
+            raise FileNotFoundError(f"Update-Datei nicht gefunden: {installer_path}")
+        with installer_path.open("rb") as executable:
+            if executable.read(2) != b"MZ":
+                raise RuntimeError("Die heruntergeladene Update-Datei ist keine Windows-Anwendung.")
+
+        install_dir = _update_install_dir()
 
         args = [str(installer_path), "--update", f"--dir={install_dir}"]
         creationflags = 0
         if sys.platform == "win32":
             creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-        subprocess.Popen(args, creationflags=creationflags, close_fds=True)
-
-        # Force exit immediately so Windows releases file locks on EzClient.exe
-        import os
-        os._exit(0)
+        subprocess.Popen(
+            args,
+            cwd=str(installer_path.parent),
+            creationflags=creationflags,
+            close_fds=True,
+        )
+        return True
     except Exception as e:
         print(f"[Updater] Error launching installer: {e}")
+        return False

@@ -3,7 +3,7 @@ import sys
 import threading
 import webbrowser
 from pathlib import Path
-from PySide6.QtCore import QObject, Signal, Slot, Property
+from PySide6.QtCore import QObject, Signal, Slot, Property, QCoreApplication, QTimer
 from backend.models.types import APP_VERSION, GITHUB_REPO
 from backend.services.updater import check_for_updates, download_update_file, run_installer_and_exit
 
@@ -178,7 +178,15 @@ class UpdateController(QObject):
     def installAndRestart(self) -> None:
         """Executes the downloaded installer/exe and quits."""
         if self._downloaded_file and self._downloaded_file.exists():
-            run_installer_and_exit(self._downloaded_file)
+            if run_installer_and_exit(self._downloaded_file):
+                self._status_message = "Installer wurde gestartet. EzClient wird geschlossen…"
+                self.updateStateChanged.emit()
+                # Let Qt dispatch the status update before releasing the EXE.
+                QTimer.singleShot(150, QCoreApplication.quit)
+            else:
+                self._status_message = "Installer konnte nicht gestartet werden. Bitte erneut herunterladen."
+                self._update_ready = False
+                self.updateStateChanged.emit()
         elif self._html_url:
             webbrowser.open(self._html_url)
 
