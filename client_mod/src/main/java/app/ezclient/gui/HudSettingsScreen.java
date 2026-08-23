@@ -25,8 +25,9 @@ public final class HudSettingsScreen extends Screen {
         addRenderableWidget(new EzButton(x+196,y+190,78,19,Component.literal("Back"),false,b->onClose()));
     }
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mx,int my,float d){
-        g.fill(x,y,x+290,y+224,0xF2111419); g.outline(x,y,290,224,0xFF35414D);
-        g.text(font,module.getName()+" HUD",x+14,y+14,0xFF43DD8C);
+        EzUi.panel(g,x,y,290,224);
+        EzUi.roundedRect(g,x+10,y+10,270,24,9,0xFF252B37);
+        g.text(font,module.getName()+" HUD",x+16,y+18,0xFFC4B5FD);
         g.text(font,"Text before",x+16,y+44,0xFF89939E); g.text(font,"Text after",x+16,y+72,0xFF89939E);
         g.text(font,"Preview: "+module.displayText(minecraft),x+16,y+204,0xFFE8EDF1);
         super.extractRenderState(g,mx,my,d);

@@ -13,6 +13,7 @@ public final class EzClientScreen extends Screen {
     private int panelY;
     private int panelWidth;
     private int panelHeight;
+    private int scrollRows;
 
     public EzClientScreen(Screen parent) {
         super(Component.literal("EzClient Modules"));
@@ -21,42 +22,49 @@ public final class EzClientScreen extends Screen {
 
     @Override
     protected void init() {
-        panelWidth = Math.min(680, width - 28);
-        panelHeight = Math.min(410, height - 28);
+        panelWidth = Math.min(560, width - 24);
+        panelHeight = Math.min(340, height - 24);
         panelX = (width - panelWidth) / 2;
         panelY = (height - panelHeight) / 2;
 
-        int sidebarX = panelX + 16;
-        int filterY = panelY + 80;
+        int filterX = panelX + 16;
+        int filterY = panelY + 68;
         for (String filter : FILTERS) {
             boolean selected = filter.equals(selectedFilter);
             addRenderableWidget(new EzButton(
-                    sidebarX, filterY, 88, 24, Component.literal(filter), selected,
+                    filterX, filterY, 46, 18, Component.literal(filter), selected,
                     ignored -> {
                         selectedFilter = filter;
+                        scrollRows = 0;
                         rebuildWidgets();
                     }
             ));
-            filterY += 30;
+            filterX += 50;
         }
 
         addRenderableWidget(new EzButton(
-                panelX + 16, panelY + panelHeight - 38, 88, 24,
+                panelX + panelWidth - 76, panelY + 22, 60, 20,
                 Component.literal("Close"), false, ignored -> onClose()
         ));
 
-        int contentX = panelX + 124;
-        int contentY = panelY + 76;
-        int contentWidth = panelWidth - 142;
-        int columns = Math.max(1, Math.min(3, contentWidth / 150));
-        int gap = 10;
+        int contentX = panelX + 16;
+        int contentY = panelY + 92;
+        int contentWidth = panelWidth - 32;
+        int columns = Math.max(1, Math.min(4, contentWidth / 115));
+        int gap = 8;
         int cardWidth = (contentWidth - (columns - 1) * gap) / columns;
-        int cardHeight = 58;
+        int cardHeight = 50;
+        int totalModules = 0;
+        for (Module module : ModuleManager.getInstance().getModules()) {
+            if (selectedFilter.equals("All") || module.getCategory().equals(selectedFilter)) totalModules++;
+        }
         int index = 0;
         for (Module module : ModuleManager.getInstance().getModules()) {
             if (!selectedFilter.equals("All") && !module.getCategory().equals(selectedFilter)) continue;
             int x = contentX + (index % columns) * (cardWidth + gap);
-            int y = contentY + (index / columns) * (cardHeight + gap);
+            int row = index / columns;
+            int y = contentY + (row - scrollRows) * (cardHeight + gap);
+            if (row < scrollRows) { index++; continue; }
             if (y + cardHeight > panelY + panelHeight - 18) break;
             if (module instanceof ZoomModule) addZoomModuleControls(x, y, cardWidth);
             else addToggleModuleControls(module, x, y, cardWidth);
@@ -66,11 +74,11 @@ public final class EzClientScreen extends Screen {
 
     private void addToggleModuleControls(Module module, int x, int y, int cardWidth) {
         if (module instanceof HudModule hud) {
-            addRenderableWidget(new EzButton(x + 12, y + 34, 66, 16, Component.literal("Configure"), false,
+            addRenderableWidget(new EzButton(x + 8, y + 29, 54, 14, Component.literal("Settings"), false,
                     ignored -> minecraft.gui.setScreen(new HudSettingsScreen(this, hud))));
         }
         addRenderableWidget(new EzButton(
-                x + cardWidth - 46, y + 10, 34, 18,
+                x + cardWidth - 40, y + 8, 30, 16,
                 Component.literal(module.isEnabled() ? "ON" : "OFF"), module.isEnabled(),
                 ignored -> { module.toggle(); rebuildWidgets(); }
         ));
@@ -79,12 +87,12 @@ public final class EzClientScreen extends Screen {
     private void addZoomModuleControls(int x, int y, int cardWidth) {
         ZoomModule zoom = ModuleManager.getInstance().getZoomModule();
         addRenderableWidget(new EzButton(
-                x + 12, y + 34, 66, 16, Component.literal("Configure"),
+                x + 8, y + 29, 54, 14, Component.literal("Settings"),
                 false,
                 ignored -> minecraft.gui.setScreen(new ZoomSettingsScreen(this))
         ));
         addRenderableWidget(new EzButton(
-                x + cardWidth - 46, y + 10, 34, 18,
+                x + cardWidth - 40, y + 8, 30, 16,
                 Component.literal(zoom.isEnabled() ? "ON" : "OFF"),
                 zoom.isEnabled(),
                 button -> {
@@ -103,25 +111,38 @@ public final class EzClientScreen extends Screen {
         graphics.centeredText(font, "EZ", panelX + 33, panelY + 31, 0xFFFFFFFF);
         graphics.text(font, "EzClient", panelX + 58, panelY + 21, 0xFFFFFFFF);
         graphics.text(font, "Modules  •  " + selectedFilter, panelX + 58, panelY + 37, 0xFFABB5C7);
-        graphics.text(font, "CATEGORIES", panelX + 17, panelY + 66, 0xFF8995AA);
-        graphics.text(font, "MODULES", panelX + 124, panelY + 66, 0xFF8995AA);
+        graphics.text(font, "FILTER", panelX + 17, panelY + 66, 0xFF8995AA);
+        graphics.text(font, "MODULES", panelX + 17, panelY + 88, 0xFF8995AA);
 
-        int contentX = panelX + 124;
-        int contentY = panelY + 76;
-        int contentWidth = panelWidth - 142;
-        int columns = Math.max(1, Math.min(3, contentWidth / 150));
-        int gap = 10;
+        int contentX = panelX + 16;
+        int contentY = panelY + 92;
+        int contentWidth = panelWidth - 32;
+        int columns = Math.max(1, Math.min(4, contentWidth / 115));
+        int gap = 8;
         int cardWidth = (contentWidth - (columns - 1) * gap) / columns;
+        int totalModules = 0;
+        for (Module module : ModuleManager.getInstance().getModules()) {
+            if (selectedFilter.equals("All") || module.getCategory().equals(selectedFilter)) totalModules++;
+        }
         int index = 0;
         for (Module module : ModuleManager.getInstance().getModules()) {
             if (!selectedFilter.equals("All") && !module.getCategory().equals(selectedFilter)) continue;
             int x = contentX + (index % columns) * (cardWidth + gap);
-            int y = contentY + (index / columns) * 68;
-            if (y + 58 > panelY + panelHeight - 18) break;
-            EzUi.card(graphics, x, y, cardWidth, 58, module.isEnabled());
-            graphics.text(font, module.getName(), x + 12, y + 12, 0xFFFFFFFF);
-            graphics.text(font, module.getCategory().toUpperCase(), x + 12, y + 24, 0xFF9EAABD);
+            int row = index / columns;
+            int y = contentY + (row - scrollRows) * 58;
+            if (row < scrollRows) { index++; continue; }
+            if (y + 50 > panelY + panelHeight - 18) break;
+            EzUi.card(graphics, x, y, cardWidth, 50, module.isEnabled());
+            graphics.text(font, module.getName(), x + 8, y + 10, 0xFFFFFFFF);
+            graphics.text(font, module.getCategory().toUpperCase(), x + 8, y + 21, 0xFF9EAABD);
             index++;
+        }
+
+        int totalRows = (totalModules + columns - 1) / columns;
+        int visibleRows = Math.max(1, (panelHeight - 108) / 58);
+        if (totalRows > visibleRows) {
+            graphics.text(font, "Scroll: " + (scrollRows + 1) + "/" + (totalRows - visibleRows + 1),
+                    panelX + panelWidth - 90, panelY + panelHeight - 14, 0xFF9EAABD);
         }
 
         if (selectedFilter.equals("All") && ModuleManager.getInstance().getModules().isEmpty()) {
@@ -134,5 +155,25 @@ public final class EzClientScreen extends Screen {
     @Override
     public void onClose() {
         minecraft.gui.setScreen(parent);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
+        int contentWidth = panelWidth - 32;
+        int columns = Math.max(1, Math.min(4, contentWidth / 115));
+        int count = 0;
+        for (Module module : ModuleManager.getInstance().getModules()) {
+            if (selectedFilter.equals("All") || module.getCategory().equals(selectedFilter)) count++;
+        }
+        int totalRows = (count + columns - 1) / columns;
+        int visibleRows = Math.max(1, (panelHeight - 108) / 58);
+        int maximum = Math.max(0, totalRows - visibleRows);
+        if (maximum > 0 && mouseX >= panelX && mouseX <= panelX + panelWidth
+                && mouseY >= panelY + 90 && mouseY <= panelY + panelHeight) {
+            scrollRows = Math.max(0, Math.min(maximum, scrollRows - (int) Math.signum(vertical)));
+            rebuildWidgets();
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontal, vertical);
     }
 }
