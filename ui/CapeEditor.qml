@@ -6,29 +6,45 @@ import "components"
 Item {
     id: root
     signal navigate(string route)
-    property string statusMessage: ""
-    property bool statusError: false
+    property string selectedSource: ""
+    property string pendingPreview: ""
+    property string fitMode: "Cover"
 
-    function importImage() {
-        var previewUrl = accountController.pickCapeFile()
-        if (previewUrl) {
-            root.statusMessage = "Bild übernommen. Upload läuft im Hintergrund…"
-            root.statusError = false
-            accountController.publishCape("EzClient Cape")
+    function chooseImage() {
+        var url = accountController.pickCapeImage()
+        if (!url) return
+        root.selectedSource = url
+        root.prepare()
+    }
+
+    function prepare() {
+        if (!root.selectedSource) return
+        root.pendingPreview = accountController.prepareCapeImage(root.selectedSource, root.fitMode)
+    }
+
+    function discard() {
+        accountController.cancelPendingCape()
+        root.selectedSource = ""
+        root.pendingPreview = ""
+    }
+
+    function confirm() {
+        if (root.pendingPreview && accountController.confirmPendingCape()) {
+            root.selectedSource = ""
+            root.pendingPreview = ""
         }
     }
 
     Connections {
         target: accountController
         function onSkinUploadStatusChanged(message, isError) {
-            root.statusMessage = message
-            root.statusError = isError
+            statusText.text = message
+            statusText.color = isError ? "#FCA5A5" : "#86EFAC"
         }
         function onCapeCommunityStatusChanged(message, isError) {
-            if (message) {
-                root.statusMessage = message
-                root.statusError = isError
-            }
+            if (!message) return
+            statusText.text = message
+            statusText.color = isError ? "#FCA5A5" : "#86EFAC"
         }
     }
 
@@ -36,8 +52,8 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 40
-        spacing: 24
+        anchors.margins: 36
+        spacing: 20
 
         RowLayout {
             Layout.fillWidth: true
@@ -52,69 +68,102 @@ Item {
             EzButton { text: "Zurück"; onClicked: root.navigate("cape") }
         }
 
-        Rectangle {
-            Layout.alignment: Qt.AlignHCenter
-            Layout.preferredWidth: Math.min(520, parent.width)
-            Layout.preferredHeight: Math.min(620, parent.height - 180)
-            radius: 12
-            color: "#171126"
-            border.color: pickArea.containsMouse ? EzTheme.accentLight : EzTheme.border
-            border.width: 2
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 32
 
-            MouseArea {
-                id: pickArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.importImage()
+            // Cape-shaped live preview of the formatted pending image.
+            Rectangle {
+                Layout.preferredWidth: Math.min(280, parent.width * 0.38)
+                Layout.preferredHeight: width * 1.6
+                radius: 10
+                color: "#171126"
+                border.color: EzTheme.border
+                clip: true
+
+                Item {
+                    id: capeCrop
+                    anchors.fill: parent
+                    anchors.margins: 14
+
+                    // The pending atlas is 1280x640; its visible cape face is
+                    // 200x320 at position 20,20. Show exactly that region.
+                    Image {
+                        source: root.pendingPreview
+                        visible: root.pendingPreview !== ""
+                        asynchronous: true
+                        fillMode: Image.Stretch
+                        width: capeCrop.width * 6.4
+                        height: capeCrop.height * 2.0
+                        x: -capeCrop.width * 0.1
+                        y: -capeCrop.height * 0.0625
+                    }
+
+                    ColumnLayout {
+                        visible: root.pendingPreview === ""
+                        anchors.centerIn: parent
+                        spacing: 12
+                        Text { text: "Noch kein Bild"; color: EzTheme.textSecondary; font.pixelSize: 15; Layout.alignment: Qt.AlignHCenter }
+                    }
+                }
             }
 
             ColumnLayout {
-                anchors.centerIn: parent
-                spacing: 18
-                width: parent.width - 64
+                Layout.fillWidth: true
+                Layout.maximumWidth: 520
+                spacing: 16
+
+                EzButton { text: "📁 Bild auswählen"; onClicked: root.chooseImage() }
+
+                Text { text: "Skalierung"; color: EzTheme.text; font.bold: true; font.pixelSize: 15 }
+
+                RowLayout {
+                    spacing: 10
+                    Repeater {
+                        model: [{ id: "Cover", label: "Ausfüllen" }, { id: "Stretch", label: "Strecken" }]
+                        delegate: Rectangle {
+                            property var item: modelData
+                            width: 130; height: 40; radius: 8
+                            color: root.fitMode === item.id ? EzTheme.surfaceActive : EzTheme.surface2
+                            border.color: root.fitMode === item.id ? EzTheme.accent : EzTheme.border
+
+                            MouseArea { anchors.fill: parent; onClicked: { root.fitMode = item.id; root.prepare() } }
+                            Text { anchors.centerIn: parent; text: item.label; color: EzTheme.text; font.pixelSize: 13 }
+                        }
+                    }
+                }
 
                 Text {
-                    text: "🖼️"
-                    font.pixelSize: 54
-                    Layout.alignment: Qt.AlignHCenter
-                }
-                Text {
-                    text: "Bild auswählen"
-                    font.family: EzTheme.mcFontFamily
-                    font.pixelSize: 20
-                    font.bold: true
-                    color: EzTheme.text
-                    Layout.alignment: Qt.AlignHCenter
-                }
-                Text {
-                    text: "PNG, JPG, JPEG oder WEBP\nDas Bild wird automatisch als Cape formatiert."
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap
+                    text: "Das Bild wird erst nach „Bestätigen“ aktiviert und hochgeladen."
                     color: EzTheme.textSecondary
-                    font.pixelSize: 13
-                    Layout.alignment: Qt.AlignHCenter
+                    wrapMode: Text.WordWrap
                     Layout.fillWidth: true
+                    font.pixelSize: 13
                 }
-            }
-        }
 
-        Rectangle {
-            visible: root.statusMessage !== ""
-            Layout.fillWidth: true
-            Layout.preferredHeight: statusText.implicitHeight + 18
-            radius: 8
-            color: root.statusError ? "#3A1724" : "#153126"
-            border.color: root.statusError ? "#EF4444" : "#22C55E"
+                RowLayout {
+                    spacing: 12
+                    EzButton {
+                        text: "Bestätigen & hochladen"
+                        enabled: root.pendingPreview !== ""
+                        onClicked: root.confirm()
+                    }
+                    EzButton {
+                        text: "Verwerfen"
+                        enabled: root.pendingPreview !== ""
+                        onClicked: root.discard()
+                    }
+                }
 
-            Text {
-                id: statusText
-                anchors.fill: parent
-                anchors.margins: 9
-                text: root.statusMessage
-                color: EzTheme.text
-                wrapMode: Text.WordWrap
-                font.pixelSize: 12
+                Text {
+                    id: statusText
+                    text: ""
+                    color: EzTheme.textSecondary
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                    font.pixelSize: 12
+                }
             }
         }
     }

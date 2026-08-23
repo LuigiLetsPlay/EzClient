@@ -49,7 +49,7 @@ def _strip_png_metadata(raw: bytes) -> bytes:
         return raw
 
 
-def _bake_editor_cape(image: QImage) -> QImage:
+def _bake_editor_cape(image: QImage, fit_mode: str = "Cover") -> QImage:
     """Convert the portrait editor canvas to a vanilla cape texture.
 
     The editor shows the complete artwork rotated as the visible back face.
@@ -58,7 +58,8 @@ def _bake_editor_cape(image: QImage) -> QImage:
     the 3D launcher preview and the in-game renderer should display.
     """
     portrait = image.transformed(QTransform().rotate(90), Qt.FastTransformation)
-    scaled = portrait.scaled(10, 16, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+    aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
+    scaled = portrait.scaled(10, 16, aspect, Qt.SmoothTransformation)
     left = max(0, (scaled.width() - 10) // 2)
     top = max(0, (scaled.height() - 16) // 2)
     visible = scaled.copy(left, top, 10, 16)
@@ -70,7 +71,7 @@ def _bake_editor_cape(image: QImage) -> QImage:
     return result
 
 
-def _write_hd_cape_preview(image: QImage, editor: bool = False) -> bool:
+def _write_hd_cape_preview(image: QImage, editor: bool = False, fit_mode: str = "Cover") -> bool:
     """Write a high-resolution preview texture for the launcher's 3D viewer.
 
     Minecraft only samples the small vanilla cape UV rectangle. The preview can
@@ -84,7 +85,8 @@ def _write_hd_cape_preview(image: QImage, editor: bool = False) -> bool:
         portrait = rgba.transformed(QTransform().rotate(90), Qt.SmoothTransformation)
         # A 1280x640 cape atlas has a texture scale of 20x. Its vanilla
         # 10x16 visible face therefore occupies 200x320 pixels.
-        scaled = portrait.scaled(200, 320, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+        aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
+        scaled = portrait.scaled(200, 320, aspect, Qt.SmoothTransformation)
         left = max(0, (scaled.width() - 200) // 2)
         top = max(0, (scaled.height() - 320) // 2)
         portrait = scaled.copy(left, top, 200, 320)
@@ -448,6 +450,70 @@ class AccountController(QObject):
         self.accountChanged.emit()
         self.skinUploadStatusChanged.emit("Cape gespeichert und in der Vorschau aktiviert.", False)
         return self.capePreviewTextureUrl
+
+    @Slot(result=str)
+    def pickCapeImage(self) -> str:
+        """Choose an image only; the caller previews it before publishing."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            None, "Cape-Bild auswählen", "", "Bilder (*.png *.jpg *.jpeg *.webp);;Alle Dateien (*)"
+        )
+        return QUrl.fromLocalFile(file_path).toString() if file_path else ""
+
+    @Slot(str, str, result=str)
+    def prepareCapeImage(self, source_url: str, fit_mode: str) -> str:
+        """Format a selected image into pending game/preview files."""
+        try:
+            source = source_url
+            if source.startswith("file:///"):
+                source = QUrl(source).toLocalFile()
+            image = QImage(source)
+            if image.isNull() or image.width() < 1 or image.height() < 1 or image.width() > 4096 or image.height() > 4096:
+                raise ValueError("Das Bild kann nicht verarbeitet werden.")
+            mode = "Stretch" if fit_mode == "Stretch" else "Cover"
+            rgba = image.convertToFormat(QImage.Format_RGBA8888)
+            cape = _bake_editor_cape(rgba, mode)
+            if not _write_hd_cape_preview(rgba, editor=True, fit_mode=mode):
+                raise ValueError("Die Cape-Vorschau konnte nicht erzeugt werden.")
+
+            cosmetics = Path(DATA_DIR) / "cosmetics"
+            cosmetics.mkdir(parents=True, exist_ok=True)
+            encoded = QByteArray()
+            buffer = QBuffer(encoded)
+            if not buffer.open(QIODevice.WriteOnly) or not cape.save(buffer, "PNG"):
+                raise ValueError("Das Cape konnte nicht formatiert werden.")
+            (cosmetics / "pending_cape.png").write_bytes(_strip_png_metadata(bytes(encoded)))
+            # Keep the currently equipped cape untouched until the user confirms.
+            (cosmetics / "active_cape_preview.png").replace(cosmetics / "pending_cape_preview.png")
+            self.skinUploadStatusChanged.emit("Vorschau bereit. Du kannst jetzt hochladen.", False)
+            import base64
+            preview_raw = (cosmetics / "pending_cape_preview.png").read_bytes()
+            return "data:image/png;base64," + base64.b64encode(preview_raw).decode("ascii")
+        except (ValueError, OSError) as exc:
+            self.skinUploadStatusChanged.emit(str(exc), True)
+            return ""
+
+    @Slot()
+    def cancelPendingCape(self) -> None:
+        cosmetics = Path(DATA_DIR) / "cosmetics"
+        (cosmetics / "pending_cape.png").unlink(missing_ok=True)
+        (cosmetics / "pending_cape_preview.png").unlink(missing_ok=True)
+        self.skinUploadStatusChanged.emit("Auswahl verworfen.", False)
+
+    @Slot(result=bool)
+    def confirmPendingCape(self) -> bool:
+        """Promote the previewed image and publish it to the community."""
+        cosmetics = Path(DATA_DIR) / "cosmetics"
+        pending = cosmetics / "pending_cape.png"
+        target = cosmetics / "active_cape.png"
+        if not pending.is_file():
+            self.skinUploadStatusChanged.emit("Kein neues Cape ausgewählt.", True)
+            return False
+        pending.replace(target)
+        pending_preview = cosmetics / "pending_cape_preview.png"
+        if pending_preview.exists():
+            pending_preview.replace(cosmetics / "active_cape_preview.png")
+        self.accountChanged.emit()
+        return self.publishCape("EzClient Cape")
 
     @Slot(result=bool)
     def resetCustomCape(self) -> bool:
