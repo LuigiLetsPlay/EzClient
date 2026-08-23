@@ -144,7 +144,7 @@ Item {
             anchors.fill: parent
             skinSource: root.skinTextureUrl
             capeSource: root.capeTextureUrl
-            animation: "none"
+            animation: "idle"
             autoRotate: false
             interactive: true
             initialRotateX: 0
