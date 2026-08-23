@@ -149,6 +149,17 @@ class LiveLogService(QObject):
 
         self.logAppended.emit(raw_line, level, time_str, clean_msg)
 
+    def append_system_message(self, message: str, level: str = "INFO") -> None:
+        """Expose launcher/bootstrap progress in the same log window."""
+        timestamp = time.strftime("%H:%M:%S")
+        raw = f"[{timestamp}] [EzClient/{level}]: {message}"
+        self._lines_buffer.append({
+            "raw": raw, "level": level, "time": timestamp, "message": message
+        })
+        if len(self._lines_buffer) > 6000:
+            self._lines_buffer = self._lines_buffer[-5000:]
+        self.logAppended.emit(raw, level, timestamp, message)
+
     def _stats_worker(self) -> None:
         p_obj = None
         if psutil and self._current_pid:

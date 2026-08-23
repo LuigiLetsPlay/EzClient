@@ -13,6 +13,7 @@ from backend.services.store import read_json, write_json
 MINECRAFT_INSTALLER_URL = "https://launcher.mojang.com/download/MinecraftInstaller.msi"
 FABRIC_META_URL = "https://meta.fabricmc.net/v2/versions/installer"
 FABRIC_FALLBACK_URL = "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"
+_launcher_install_process: subprocess.Popen | None = None
 
 def minecraft_dir() -> Path:
     if sys.platform.startswith("win") and os.environ.get("APPDATA"):
@@ -120,6 +121,11 @@ def _download_official_launcher(status_callback: Callable[[str], None] | None = 
         raise
 
 
+def launcher_install_exit_code() -> int | None:
+    """Return the background MSI exit code once it has finished."""
+    return _launcher_install_process.poll() if _launcher_install_process else None
+
+
 def launch_minecraft_official(status_callback: Callable[[str], None] | None = None) -> bool:
     """Start the official launcher, or bootstrap it on a fresh Windows PC.
 
@@ -141,11 +147,14 @@ def launch_minecraft_official(status_callback: Callable[[str], None] | None = No
         )
         return True
     elif sys.platform.startswith("win"):
+        global _launcher_install_process
         installer = _download_official_launcher(status_callback)
         if status_callback:
-            status_callback("Minecraft Launcher wird im Hintergrund installiert…")
-        subprocess.Popen(
-            ["msiexec.exe", "/i", str(installer), "/quiet", "/norestart"],
+            status_callback("Minecraft Launcher wird einmalig installiert…")
+        # Passive keeps the installer non-interactive while still showing a
+        # small progress window. /quiet hid failed first installs completely.
+        _launcher_install_process = subprocess.Popen(
+            ["msiexec.exe", "/i", str(installer), "/passive", "/norestart"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )

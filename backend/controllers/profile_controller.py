@@ -12,7 +12,7 @@ from backend.models.types import ProfileData, ModData, DATA_DIR, APP_VERSION
 from backend.services.store import ProfileStore
 from backend.models.profile_model import ProfileModel
 from backend.models.mod_model import ModModel
-from backend.services.minecraft import detect_launcher, launch_minecraft_official, patch_launcher_profile, java_path
+from backend.services.minecraft import detect_launcher, launch_minecraft_official, launcher_install_exit_code, patch_launcher_profile, java_path
 from backend.services.mod_downloader import sync_profile_mods
 from backend.services.process_watcher import MinecraftWatcher
 from backend.services.direct_launch import launch_minecraft_direct
@@ -37,7 +37,7 @@ class ProfileController(QObject):
     modInstallFinished = Signal(str)
     modUpdatesChanged = Signal()
     _syncNeeded = Signal()
-    _modUpdatesDone = Signal(dict)
+    _modUpdatesDone = Signal(int, dict)
 
     def __init__(self, store: ProfileStore, profile_model: ProfileModel, mod_model: ModModel, parent=None):
         super().__init__(parent)
@@ -49,14 +49,34 @@ class ProfileController(QObject):
         self._installed_registry = InstalledModRegistry()
         self._is_launching: bool = False
         self._mod_updates: dict[str, str] = {}
+        self._update_check_token: int = 0
+        self._skip_next_registry_scan: bool = False
         self._syncNeeded.connect(self._sync_models)
         self._modUpdatesDone.connect(self._set_mod_updates)
-        self._sync_models()
+        # Show the launcher immediately. Reading every JAR (often hundreds of
+        # MB) is deferred to a worker instead of blocking the splash screen.
+        self._profile_model.set_profiles(self._store.profiles)
+        self._mod_model.set_mods(self._active_profile.mods if self._active_profile else [])
+        self.profilesChanged.emit()
+        self.activeProfileChanged.emit()
+        if self._active_profile:
+            threading.Thread(target=self._warm_registry_after_startup, daemon=True).start()
         # A launcher update carries the matching EzClient mod. Refresh it in
         # every profile on startup, before any game can be launched.
         threading.Thread(target=self._auto_update_ezclient_mods, daemon=True).start()
         if self._active_profile:
             threading.Thread(target=lambda: sync_profile_mods(self._active_profile), daemon=True).start()
+
+    def _warm_registry_after_startup(self) -> None:
+        profile = self._active_profile
+        if not profile:
+            return
+        try:
+            self._installed_registry.scan_directory(profile.mods_path, profile.mods)
+            self._skip_next_registry_scan = True
+            self._syncNeeded.emit()
+        except Exception as exc:
+            print(f"[ProfileController] Startup registry scan error: {exc}")
 
     def _bundled_ezclient_asset(self, filename: str) -> Path:
         root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
@@ -288,7 +308,10 @@ class ProfileController(QObject):
         self._profile_model.set_profiles(self._store.profiles)
         if self._active_profile:
             try:
-                self._installed_registry.scan_directory(self._active_profile.mods_path, self._active_profile.mods)
+                if self._skip_next_registry_scan:
+                    self._skip_next_registry_scan = False
+                else:
+                    self._installed_registry.scan_directory(self._active_profile.mods_path, self._active_profile.mods)
                 
                 # Update descriptions and authors from the scanned JAR metadata
                 # so we don't rely on translated/custom descriptions saved in profile.json
@@ -338,6 +361,8 @@ class ProfileController(QObject):
             return
         profile = self._active_profile
         mods = list(profile.mods)
+        self._update_check_token += 1
+        token = self._update_check_token
 
         def _check_task():
             from backend.services.modrinth import ModrinthService, select_preferred_version
@@ -364,12 +389,17 @@ class ProfileController(QObject):
                             updates[key] = newest
                 except Exception as exc:
                     print(f"[ProfileController] Update check skipped for {key}: {exc}")
-            self._modUpdatesDone.emit(updates)
+            self._modUpdatesDone.emit(token, updates)
 
         threading.Thread(target=_check_task, daemon=True).start()
 
-    @Slot(dict)
-    def _set_mod_updates(self, updates: dict) -> None:
+    @Slot(int, dict)
+    def _set_mod_updates(self, token: int, updates: dict) -> None:
+        # Several model refreshes may trigger checks while onboarding is still
+        # downloading. Ignore stale responses so old data cannot create a row
+        # full of phantom Update buttons.
+        if token != self._update_check_token:
+            return
         self._mod_updates = dict(updates)
         self.modUpdatesChanged.emit()
 
@@ -599,8 +629,10 @@ class ProfileController(QObject):
                         primary = next((f for f in files if f.get("primary")), files[0] if files else None)
                         if primary and primary.get("url"):
                             dest = profile.mods_path / primary.get("filename", f"{m.slug}.jar")
-                            download_file(primary["url"], dest)
-                            m.filename = primary.get("filename", m.filename)
+                            if download_file(primary["url"], dest):
+                                m.filename = primary.get("filename", m.filename)
+                                m.version = best.get("version_number", m.version)
+                                m.version_id = best.get("id", m.version_id)
                 except Exception as e:
                     print(f"[Onboarding Download] Error for {m.name}: {e}")
 
@@ -1034,16 +1066,26 @@ class ProfileController(QObject):
                 # 3. Fallback: Official Minecraft Launcher with Autokill
                 self.launchStatusChanged.emit("Minecraft Launcher wird gestartet…", False)
                 patch_launcher_profile(self._active_profile)
+                def launcher_status(message: str, error: bool = False) -> None:
+                    self.launchStatusChanged.emit(message, error)
+                    self._live_log_service.append_system_message(message, "ERROR" if error else "INFO")
+
                 launcher_started = launch_minecraft_official(
-                    status_callback=lambda s: self.launchStatusChanged.emit(s, False)
+                    status_callback=launcher_status
                 )
                 if not launcher_started:
                     # The MSI is intentionally silent.  Wait briefly and then
                     # open the newly installed launcher automatically instead
                     # of presenting Windows' minecraft:-protocol dialog.
                     self.launchStatusChanged.emit("Warte auf die Launcher-Installation…", False)
+                    self._live_log_service.append_system_message("Warte auf die Launcher-Installation…")
                     for _ in range(90):
                         time.sleep(2)
+                        exit_code = launcher_install_exit_code()
+                        if exit_code is not None and exit_code != 0:
+                            raise RuntimeError(
+                                f"Die Minecraft-Launcher-Installation ist fehlgeschlagen (MSI-Code {exit_code})."
+                            )
                         installed, _, _ = detect_launcher()
                         if installed:
                             self.launchStatusChanged.emit("Minecraft Launcher wird gestartet…", False)
@@ -1053,7 +1095,7 @@ class ProfileController(QObject):
                     if not launcher_started:
                         self._is_launching = False
                         self.launchStatusChanged.emit(
-                            "Die Launcher-Installation läuft noch im Hintergrund. EzClient danach erneut starten.",
+                            "Die Launcher-Installation benötigt noch Zeit. Bitte nach Abschluss erneut auf Starten drücken.",
                             False,
                         )
                         return

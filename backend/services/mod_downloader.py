@@ -94,10 +94,9 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
         
         if is_ezclient:
             candidates = [
-                DATA_DIR / "assets" / target_filename,
                 Path(sys._MEIPASS) / "backend" / "assets" / target_filename if hasattr(sys, "_MEIPASS") else None,
-                Path(sys._MEIPASS) / "assets" / target_filename if hasattr(sys, "_MEIPASS") else None,
                 Path(__file__).resolve().parent.parent / "assets" / target_filename,
+                Path(sys._MEIPASS) / "assets" / target_filename if hasattr(sys, "_MEIPASS") else None,
                 Path(__file__).resolve().parent / "backend" / "assets" / target_filename,
                 Path(sys.executable).parent / "backend" / "assets" / target_filename,
                 Path.cwd() / "backend" / "assets" / target_filename,
