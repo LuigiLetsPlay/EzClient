@@ -281,6 +281,10 @@ Rectangle {
         visible: root.width >= 900
         implicitWidth: navTabsRow.implicitWidth
         implicitHeight: navTabsRow.implicitHeight
+        // Explicit size so anchors.centerIn aligns the real hitbox with the
+        // visible tiles instead of centering a zero-sized item's edge.
+        width: implicitWidth
+        height: implicitHeight
 
         Row {
             id: navTabsRow
