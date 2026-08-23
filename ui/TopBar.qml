@@ -267,8 +267,14 @@ Rectangle {
     // ── CENTER: Navigation Tabs with Sliding Indicator ──
     Item {
         id: centerSection
-        anchors.centerIn: parent
-        visible: root.width >= 900
+        // Keep a dynamic gap: never slide over the profile pill on the left
+        // and never under the account pill / window controls on the right.
+        y: parent.height / 2 - height / 2
+        x: Math.max(leftSection.right + 20,
+                    Math.min(parent.width / 2 - width / 2,
+                             winControls.x - rightSection.width - 44 - width))
+        readonly property bool fits: (winControls.x - rightSection.width - 44 - width) >= (leftSection.right + 20)
+        visible: root.width >= 900 && fits
         implicitWidth: navTabsRow.implicitWidth
         implicitHeight: navTabsRow.implicitHeight
 
@@ -389,7 +395,7 @@ Rectangle {
     RowLayout {
         id: rightSection
         anchors.right: winControls.left
-        anchors.rightMargin: 6
+        anchors.rightMargin: 16
         anchors.verticalCenter: parent.verticalCenter
         spacing: 10
 
