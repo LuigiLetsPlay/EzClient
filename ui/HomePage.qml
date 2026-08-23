@@ -141,13 +141,7 @@ Item {
 
         Skin3DView {
             id: centeredHomeSkin3D
-            // Compact stage: the interactive (rotatable) area is exactly the
-            // player region, so it can never swallow clicks from Home controls.
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.top
-            anchors.topMargin: 40
-            width: Math.min(300, parent.width * 0.6)
-            height: Math.min(430, parent.height * 0.72)
+            anchors.fill: parent
             skinSource: root.skinTextureUrl
             capeSource: root.capeTextureUrl
             animation: "idle"
