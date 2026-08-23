@@ -7,7 +7,7 @@ Item {
     id: root
     signal navigate(string route)
     property string reportedCapeId: ""
-    property string activeCommunityCapeUrl: ""
+    readonly property string activeCommunityCapeUrl: typeof accountController !== "undefined" && accountController ? accountController.activeCommunityCapeUrl : ""
     property string previewCapeUrl: ""
     property string previewCapeTitle: ""
     readonly property var capes: typeof accountController !== "undefined" && accountController ? accountController.communityCapes : []

@@ -57,7 +57,7 @@ def _bake_editor_cape(image: QImage, fit_mode: str = "Cover") -> QImage:
     all other vanilla UV faces remain transparent.  This is the same image that
     the 3D launcher preview and the in-game renderer should display.
     """
-    portrait = image.transformed(QTransform().rotate(90), Qt.FastTransformation)
+    portrait = image.transformed(QTransform().rotate(-90), Qt.FastTransformation)
     aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
     scaled = portrait.scaled(10, 16, aspect, Qt.SmoothTransformation)
     left = max(0, (scaled.width() - 10) // 2)
@@ -82,7 +82,7 @@ def _write_hd_cape_preview(image: QImage, editor: bool = False, fit_mode: str = 
     if not editor and abs((rgba.width() / max(1, rgba.height())) - 2.0) < 0.02:
         preview = rgba
     else:
-        portrait = rgba.transformed(QTransform().rotate(90), Qt.SmoothTransformation)
+        portrait = rgba.transformed(QTransform().rotate(-90), Qt.SmoothTransformation)
         # A 1280x640 cape atlas has a texture scale of 20x. Its vanilla
         # 10x16 visible face therefore occupies 200x320 pixels.
         aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
@@ -116,7 +116,7 @@ def _write_hd_upload_atlas(image: QImage, fit_mode: str = "Cover") -> bool:
     face receives 160x256 pixels instead of only 10x16.
     """
     portrait = image.convertToFormat(QImage.Format_RGBA8888).transformed(
-        QTransform().rotate(90), Qt.SmoothTransformation
+        QTransform().rotate(-90), Qt.SmoothTransformation
     )
     aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
     scaled = portrait.scaled(160, 256, aspect, Qt.SmoothTransformation)
@@ -202,6 +202,13 @@ class AccountController(QObject):
         self._active_custom_avatar = ""
         self._community_capes: list[dict] = []
         self._cape_community_status = "Lade Community-Capes …"
+        self._active_community_cape_url = ""
+        try:
+            marker = Path(DATA_DIR) / "cosmetics" / "active_community_cape.txt"
+            if marker.is_file():
+                self._active_community_cape_url = marker.read_text(encoding="utf-8").strip()
+        except OSError:
+            pass
 
         try:
             from backend.services.skin_service import get_active_skin
@@ -378,6 +385,10 @@ class AccountController(QObject):
     def capeCommunityStatus(self) -> str:
         return self._cape_community_status
 
+    @Property(str, notify=capeCommunityChanged)
+    def activeCommunityCapeUrl(self) -> str:
+        return self._active_community_cape_url
+
     @Slot()
     def refreshCapeCommunity(self) -> None:
         self._cape_community_status = "Lade Community-Capes …"
@@ -415,10 +426,13 @@ class AccountController(QObject):
             target = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(raw)
+            (target.parent / "active_community_cape.txt").write_text(image_url, encoding="utf-8")
+            self._active_community_cape_url = image_url
             community_image = QImage()
             if community_image.loadFromData(raw, "PNG"):
                 _write_hd_cape_preview(community_image, editor=False)
             self.accountChanged.emit()
+            self.capeCommunityChanged.emit()
             self.capeCommunityStatusChanged.emit("Cape aktiviert.", False)
             return True
         except Exception as exc:
