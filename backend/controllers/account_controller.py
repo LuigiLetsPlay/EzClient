@@ -79,7 +79,9 @@ def _write_hd_cape_preview(image: QImage, editor: bool = False) -> bool:
         preview = rgba
     else:
         portrait = rgba.transformed(QTransform().rotate(90), Qt.SmoothTransformation)
-        portrait = portrait.scaled(320, 512, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        # A 1280x640 cape atlas has a texture scale of 20x. Its vanilla
+        # 10x16 visible face therefore occupies 200x320 pixels.
+        portrait = portrait.scaled(200, 320, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
         preview = QImage(1280, 640, QImage.Format_RGBA8888)
         preview.fill(Qt.transparent)
         painter = QPainter(preview)
