@@ -83,11 +83,20 @@ public final class CommunityCapeManager {
     private static void install(UUID id, byte[] bytes) throws Exception {
         NativeImage image = NativeImage.read(new ByteArrayInputStream(bytes));
         if (image.getWidth() > 1024 || image.getHeight() > 512) { image.close(); return; }
-        // The launcher stores a normal vanilla cape texture whose visible back
-        // face contains the portrait artwork. Preserve every UV coordinate and
-        // only normalize older/larger source images to the expected atlas size.
-        NativeImage capeTexture = bakeCapeTexture(image);
-        image.close();
+        // Cape UVs are normalized against a 64x32 reference grid, so any
+        // 2:1 community atlas (up to 1024x512) renders in full HD without
+        // changing a single coordinate. Only irregular legacy images need
+        // to be squeezed into the vanilla-sized atlas.
+        int w = image.getWidth();
+        int h = image.getHeight();
+        NativeImage capeTexture;
+        if (w == h * 2 && (w & (w - 1)) == 0 && w >= 64) {
+            capeTexture = image;
+        } else {
+            capeTexture = bakeCapeTexture(image);
+            image.close();
+        }
+        makeVisibleFaceOpaque(capeTexture);
         Minecraft.getInstance().execute(() -> {
             Identifier texture = Identifier.fromNamespaceAndPath("ezclient", "cape/" + id.toString().replace("-", ""));
             Minecraft.getInstance().getTextureManager().register(texture, new DynamicTexture(() -> "ezclient-cape", capeTexture));
@@ -109,5 +118,20 @@ public final class CommunityCapeManager {
             }
         }
         return result;
+    }
+
+    /** The portrait face must be fully opaque; otherwise players can see through the cape. */
+    private static void makeVisibleFaceOpaque(NativeImage texture) {
+        int scale = Math.max(1, texture.getWidth() / 64);
+        int x0 = 1 * scale;
+        int y0 = 1 * scale;
+        int x1 = 11 * scale;
+        int y1 = 17 * scale;
+        for (int y = y0; y < y1 && y < texture.getHeight(); y++) {
+            for (int x = x0; x < x1 && x < texture.getWidth(); x++) {
+                int color = texture.getPixel(x, y);
+                texture.setPixel(x, y, color | 0xFF000000);
+            }
+        }
     }
 }
