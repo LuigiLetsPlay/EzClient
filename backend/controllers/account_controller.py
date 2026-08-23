@@ -9,7 +9,7 @@ import struct
 from pathlib import Path
 from backend.services import cape_community
 from PySide6.QtCore import QObject, Signal, Slot, Property, QUrl, Qt, QByteArray, QBuffer, QIODevice
-from PySide6.QtGui import QImage
+from PySide6.QtGui import QImage, QPainter, QTransform
 from PySide6.QtWidgets import QDialog, QVBoxLayout
 
 from backend.services.msa_auth import (
@@ -47,6 +47,24 @@ def _strip_png_metadata(raw: bytes) -> bytes:
         return b"".join(clean)
     except (IndexError, struct.error):
         return raw
+
+
+def _bake_editor_cape(image: QImage) -> QImage:
+    """Convert the portrait editor canvas to a vanilla cape texture.
+
+    The editor shows the complete artwork rotated as the visible back face.
+    Bake exactly that portrait into Minecraft's 10x16 visible cape rectangle;
+    all other vanilla UV faces remain transparent.  This is the same image that
+    the 3D launcher preview and the in-game renderer should display.
+    """
+    portrait = image.transformed(QTransform().rotate(90), Qt.FastTransformation)
+    visible = portrait.scaled(10, 16, Qt.IgnoreAspectRatio, Qt.FastTransformation)
+    result = QImage(64, 32, QImage.Format_RGBA8888)
+    result.fill(Qt.transparent)
+    painter = QPainter(result)
+    painter.drawImage(1, 1, visible)
+    painter.end()
+    return result
 
 
 class MicrosoftLoginDialog(QDialog):
@@ -370,8 +388,9 @@ class AccountController(QObject):
         if cape_community.is_safe_cape_png(raw):
             shutil.copy2(file_path, target)
         else:
-            # Ordinary PNGs are allowed as editor input, but are decoded and
-            # rewritten as a tightly bounded 64x32 RGBA cape before use.
+            # Ordinary PNGs are treated as portrait artwork and baked into the
+            # visible vanilla cape face instead of being stretched across the
+            # whole (mostly unused) texture atlas.
             if not raw.startswith(b"\x89PNG\r\n\x1a\n") or len(raw) > 2 * 1024 * 1024:
                 self.skinUploadStatusChanged.emit("Ungültiges Bild: bitte eine PNG-Datei bis 2 MB auswählen.", True)
                 return ""
@@ -379,9 +398,7 @@ class AccountController(QObject):
             if image.isNull() or image.width() < 1 or image.height() < 1 or image.width() > 2048 or image.height() > 2048:
                 self.skinUploadStatusChanged.emit("Das PNG kann nicht als Cape verarbeitet werden.", True)
                 return ""
-            cape = image.convertToFormat(QImage.Format_RGBA8888).scaled(
-                256, 128, Qt.IgnoreAspectRatio, Qt.SmoothTransformation
-            )
+            cape = _bake_editor_cape(image.convertToFormat(QImage.Format_RGBA8888))
             if not cape.save(str(target), "PNG"):
                 self.skinUploadStatusChanged.emit("Cape konnte nicht gespeichert werden.", True)
                 return ""
@@ -462,9 +479,8 @@ class AccountController(QObject):
             image = QImage()
             if not image.loadFromData(raw, "PNG") or image.isNull():
                 raise ValueError("Das Editor-Bild konnte nicht gelesen werden")
-            normalized = image.convertToFormat(QImage.Format_RGBA8888).scaled(
-                256, 128, Qt.IgnoreAspectRatio, Qt.SmoothTransformation
-            )
+            rgba = image.convertToFormat(QImage.Format_RGBA8888)
+            normalized = _bake_editor_cape(rgba)
             encoded = QByteArray()
             buffer = QBuffer(encoded)
             if not buffer.open(QIODevice.WriteOnly) or not normalized.save(buffer, "PNG"):

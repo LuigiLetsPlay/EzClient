@@ -83,10 +83,9 @@ public final class CommunityCapeManager {
     private static void install(UUID id, byte[] bytes) throws Exception {
         NativeImage image = NativeImage.read(new ByteArrayInputStream(bytes));
         if (image.getWidth() > 1024 || image.getHeight() > 512) { image.close(); return; }
-        // The editor/community image is a portrait design.  Vanilla's cape model,
-        // however, samples only two 10x16 UV rectangles from a 64x64 texture.
-        // Bake the full design into those rectangles here, so the image people see
-        // in the launcher is the same image they see on the player's back.
+        // The launcher stores a normal vanilla cape texture whose visible back
+        // face contains the portrait artwork. Preserve every UV coordinate and
+        // only normalize older/larger source images to the expected atlas size.
         NativeImage capeTexture = bakeCapeTexture(image);
         image.close();
         Minecraft.getInstance().execute(() -> {
@@ -97,22 +96,16 @@ public final class CommunityCapeManager {
         });
     }
 
-    /** Converts the launcher design to Minecraft's 10x16 cape faces. */
+    /** Normalizes the launcher/community texture to Minecraft's cape atlas. */
     private static NativeImage bakeCapeTexture(NativeImage design) {
         NativeImage result = new NativeImage(64, 64, true);
         int designWidth = design.getWidth();
         int designHeight = design.getHeight();
-        for (int y = 0; y < 16; y++) {
-            for (int x = 0; x < 10; x++) {
-                // Launcher preview rotates the landscape editor clockwise into a
-                // portrait cape. Use exactly that transformation for the UV face.
-                int sourceX = Math.min(designWidth - 1, y * designWidth / 16);
-                int sourceY = Math.max(0, designHeight - 1 - (x * designHeight / 10));
-                int pixel = design.getPixel(sourceX, sourceY);
-                // North and south are the two broad cape faces. Mirror the reverse
-                // side to keep the artwork readable from either side of the player.
-                result.setPixel(1 + x, 1 + y, pixel);
-                result.setPixel(12 + (9 - x), 1 + y, pixel);
+        for (int y = 0; y < 32; y++) {
+            for (int x = 0; x < 64; x++) {
+                int sourceX = Math.min(designWidth - 1, x * designWidth / 64);
+                int sourceY = Math.min(designHeight - 1, y * designHeight / 32);
+                result.setPixel(x, y, design.getPixel(sourceX, sourceY));
             }
         }
         return result;
