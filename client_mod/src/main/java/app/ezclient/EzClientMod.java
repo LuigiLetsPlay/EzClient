@@ -30,8 +30,8 @@ import app.ezclient.gui.ModuleManager;
  * - First-Launch Performance & PvP Optimization (Fast Graphics, 8 Chunks, No Shadows/Clouds, Biome Blend 0, Unlimited FPS)
  */
 public class EzClientMod implements ClientModInitializer {
-public static final String CLIENT_VERSION = "1.6.2";
-public static final String CLIENT_TITLE = "EzClient 1.6.2";
+public static final String CLIENT_VERSION = "1.6.3";
+public static final String CLIENT_TITLE = "EzClient 1.6.3";
     private static volatile boolean running = true;
     private static Path ezClientDataDir = null;
 

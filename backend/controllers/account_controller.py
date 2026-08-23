@@ -5,9 +5,11 @@ import urllib.parse
 import urllib.request
 import webbrowser
 import shutil
+import struct
 from pathlib import Path
 from backend.services import cape_community
 from PySide6.QtCore import QObject, Signal, Slot, Property, QUrl, Qt
+from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QDialog, QVBoxLayout
 
 from backend.services.msa_auth import (
@@ -22,6 +24,29 @@ from backend.services.msa_auth import (
 from backend.services.skin_service import upload_skin_file, reset_skin_to_default
 from backend.models.types import DATA_DIR
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QFileDialog
+
+
+def _strip_png_metadata(raw: bytes) -> bytes:
+    """Keep only the strict PNG chunks accepted by the cape API."""
+    if not raw.startswith(cape_community.PNG_SIGNATURE):
+        return raw
+    try:
+        pos = len(cape_community.PNG_SIGNATURE)
+        clean = [cape_community.PNG_SIGNATURE]
+        while pos < len(raw):
+            size = struct.unpack(">I", raw[pos:pos + 4])[0]
+            end = pos + 12 + size
+            if end > len(raw):
+                return raw
+            kind = raw[pos + 4:pos + 8]
+            if kind in (b"IHDR", b"IDAT", b"IEND"):
+                clean.append(raw[pos:end])
+            pos = end
+            if kind == b"IEND":
+                break
+        return b"".join(clean)
+    except (IndexError, struct.error):
+        return raw
 
 
 class MicrosoftLoginDialog(QDialog):
@@ -236,6 +261,10 @@ class AccountController(QObject):
         cape = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
         if not cape.exists():
             return ""
+        try:
+            return f"data:image/png;base64,{base64.b64encode(cape.read_bytes()).decode('ascii')}"
+        except OSError:
+            return ""
 
     @Property("QVariantList", notify=capeCommunityChanged)
     def communityCapes(self) -> list[dict]:
@@ -319,10 +348,6 @@ class AccountController(QObject):
                 self.capeCommunityStatusChanged.emit(f"Meldung fehlgeschlagen: {exc}", True)
         threading.Thread(target=worker, daemon=True).start()
         return True
-        try:
-            return f"data:image/png;base64,{base64.b64encode(cape.read_bytes()).decode('ascii')}"
-        except Exception:
-            return ""
 
     @Slot(result=str)
     def pickCapeFile(self) -> str:
@@ -332,7 +357,7 @@ class AccountController(QObject):
         if not file_path:
             return ""
         try:
-            if not cape_community.is_safe_cape_png(Path(file_path).read_bytes()):
+            if not Path(file_path).read_bytes().startswith(cape_community.PNG_SIGNATURE):
                 self.skinUploadStatusChanged.emit("Ungültiges Cape: erlaubt sind nur geprüfte PNG-Capes bis 256×128.", True)
                 return ""
         except OSError:
@@ -341,7 +366,30 @@ class AccountController(QObject):
         cape_dir = Path(DATA_DIR) / "cosmetics"
         cape_dir.mkdir(parents=True, exist_ok=True)
         target = cape_dir / "active_cape.png"
-        shutil.copy2(file_path, target)
+        raw = Path(file_path).read_bytes()
+        if cape_community.is_safe_cape_png(raw):
+            shutil.copy2(file_path, target)
+        else:
+            # Ordinary PNGs are allowed as editor input, but are decoded and
+            # rewritten as a tightly bounded 64x32 RGBA cape before use.
+            if not raw.startswith(b"\x89PNG\r\n\x1a\n") or len(raw) > 2 * 1024 * 1024:
+                self.skinUploadStatusChanged.emit("Ungültiges Bild: bitte eine PNG-Datei bis 2 MB auswählen.", True)
+                return ""
+            image = QImage(file_path)
+            if image.isNull() or image.width() < 1 or image.height() < 1 or image.width() > 2048 or image.height() > 2048:
+                self.skinUploadStatusChanged.emit("Das PNG kann nicht als Cape verarbeitet werden.", True)
+                return ""
+            cape = image.convertToFormat(QImage.Format_RGBA8888).scaled(
+                64, 32, Qt.IgnoreAspectRatio, Qt.SmoothTransformation
+            )
+            if not cape.save(str(target), "PNG"):
+                self.skinUploadStatusChanged.emit("Cape konnte nicht gespeichert werden.", True)
+                return ""
+            target.write_bytes(_strip_png_metadata(target.read_bytes()))
+            if not cape_community.is_safe_cape_png(target.read_bytes()):
+                target.unlink(missing_ok=True)
+                self.skinUploadStatusChanged.emit("Cape konnte nicht sicher gespeichert werden.", True)
+                return ""
         self.accountChanged.emit()
         self.skinUploadStatusChanged.emit("Cape gespeichert und in der Vorschau aktiviert.", False)
         return self.capeTextureUrl

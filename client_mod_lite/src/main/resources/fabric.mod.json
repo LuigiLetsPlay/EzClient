@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "ezclient",
-  "version": "1.6.2",
+  "version": "1.6.3",
 
   "name": "EzClient Core (Lite)",
   "description": "Cross-Version Lite Client Core (No Mixins)",

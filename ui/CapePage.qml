@@ -49,7 +49,13 @@ Item {
                     Text { text: "Das Cape erscheint im Home-Skin und wird beim Spielstart verwendet."; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: EzTheme.textSecondary; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                 }
                 EzButton { text: "Editor"; onClicked: root.navigate("cape_editor") }
-                EzButton { text: "PNG auswählen"; onClicked: accountController.pickCapeFile() }
+                EzButton {
+                    text: "PNG auswählen & bearbeiten"
+                    onClicked: {
+                        var capeUrl = accountController.pickCapeFile()
+                        if (capeUrl && capeUrl !== "") root.navigate("cape_editor")
+                    }
+                }
                 EzButton { text: "Veröffentlichen"; enabled: typeof accountController !== "undefined" && accountController.capeTextureUrl !== ""; onClicked: publishDialog.open() }
             }
         }

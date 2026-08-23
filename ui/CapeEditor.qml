@@ -23,7 +23,40 @@ Item {
         root.pixels = values
         editorCanvas.requestPaint()
     }
-    Component.onCompleted: resetCanvas()
+    function importActiveCape() {
+        if (importCape.status !== Image.Ready) return
+        var ctx = editorCanvas.getContext("2d")
+        ctx.clearRect(0, 0, 64, 32)
+        ctx.drawImage(importCape, 0, 0, 64, 32)
+        var imageData = ctx.getImageData(0, 0, 64, 32).data
+        var values = []
+        for (var i = 0; i < 64 * 32; i++) {
+            var offset = i * 4
+            if (imageData[offset + 3] === 0) values.push("")
+            else values.push("#" + imageData[offset].toString(16).padStart(2, "0")
+                              + imageData[offset + 1].toString(16).padStart(2, "0")
+                              + imageData[offset + 2].toString(16).padStart(2, "0"))
+        }
+        root.pixels = values
+        editorCanvas.requestPaint()
+    }
+    function loadActiveCape() {
+        if (typeof accountController === "undefined" || !accountController || accountController.capeTextureUrl === "") {
+            root.resetCanvas()
+            return
+        }
+        importCape.source = accountController.capeTextureUrl
+        if (importCape.status === Image.Ready) root.importActiveCape()
+    }
+    Component.onCompleted: loadActiveCape()
+    onVisibleChanged: if (visible) loadActiveCape()
+
+    Image {
+        id: importCape
+        visible: false
+        asynchronous: false
+        onStatusChanged: if (status === Image.Ready) root.importActiveCape()
+    }
 
     Rectangle { anchors.fill: parent; color: EzTheme.bg }
     ColumnLayout {

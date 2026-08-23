@@ -14,7 +14,7 @@ ASSET_BASE = "https://resources.download.minecraft.net"
 
 
 def _json(url: str) -> dict:
-    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/1.6.2"})
+    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/1.6.3"})
     with urllib.request.urlopen(request, timeout=30) as response:
         return json.loads(response.read().decode("utf-8"))
 
@@ -26,7 +26,7 @@ def _download(url: str, target: Path, sha1: str = "") -> bool:
             return False
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_suffix(target.suffix + ".part")
-    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/1.6.2"})
+    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/1.6.3"})
     with urllib.request.urlopen(request, timeout=60) as response, temporary.open("wb") as output:
         while chunk := response.read(1024 * 256):
             output.write(chunk)
