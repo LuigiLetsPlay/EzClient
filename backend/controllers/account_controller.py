@@ -487,7 +487,7 @@ class AccountController(QObject):
             self.skinUploadStatusChanged.emit("Das Bild kann nicht als Cape verarbeitet werden.", True)
             return ""
         rgba = image.convertToFormat(QImage.Format_RGBA8888).transformed(
-            QTransform().rotate(90), Qt.SmoothTransformation
+            QTransform().rotate(-45), Qt.SmoothTransformation
         )
         cape = _bake_editor_cape(rgba)
         _write_hd_cape_preview(rgba, editor=True)
@@ -527,7 +527,7 @@ class AccountController(QObject):
             # Rotate the selected picture 90 degrees left once, up front.
             # Every later step receives exactly this rotated image unchanged.
             rgba = image.convertToFormat(QImage.Format_RGBA8888).transformed(
-                QTransform().rotate(90), Qt.SmoothTransformation
+                QTransform().rotate(-45), Qt.SmoothTransformation
             )
             cape = _bake_editor_cape(rgba, mode)
             if not _write_hd_cape_preview(rgba, editor=True, fit_mode=mode):
