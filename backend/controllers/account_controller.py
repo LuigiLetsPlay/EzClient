@@ -108,6 +108,39 @@ def _write_hd_cape_preview(image: QImage, editor: bool = False, fit_mode: str = 
     return True
 
 
+def _write_hd_upload_atlas(image: QImage, fit_mode: str = "Cover") -> bool:
+    """Write a sharp 1024x512 atlas for the community upload.
+
+    The server accepts this size and stores it unchanged.  It uses the same
+    normalized vanilla cape UVs as the 64x32 game texture, so the visible back
+    face receives 160x256 pixels instead of only 10x16.
+    """
+    portrait = image.convertToFormat(QImage.Format_RGBA8888).transformed(
+        QTransform().rotate(90), Qt.SmoothTransformation
+    )
+    aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
+    scaled = portrait.scaled(160, 256, aspect, Qt.SmoothTransformation)
+    left = max(0, (scaled.width() - 160) // 2)
+    top = max(0, (scaled.height() - 256) // 2)
+    visible = scaled.copy(left, top, 160, 256)
+    atlas = QImage(1024, 512, QImage.Format_RGBA8888)
+    atlas.fill(Qt.transparent)
+    painter = QPainter(atlas)
+    painter.drawImage(16, 16, visible)
+    painter.end()
+    encoded = QByteArray()
+    buffer = QBuffer(encoded)
+    if not buffer.open(QIODevice.WriteOnly) or not atlas.save(buffer, "PNG"):
+        return False
+    target = Path(DATA_DIR) / "cosmetics" / "pending_cape_upload.png"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        target.write_bytes(_strip_png_metadata(bytes(encoded)))
+    except OSError:
+        return False
+    return True
+
+
 class MicrosoftLoginDialog(QDialog):
     """Native Microsoft Login Dialog with embedded WebEngine."""
     codeReceived = Signal(str)
@@ -395,6 +428,13 @@ class AccountController(QObject):
     @Slot(str, result=bool)
     def publishCape(self, title: str) -> bool:
         cape = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
+        upload_atlas = Path(DATA_DIR) / "cosmetics" / "active_cape_upload.png"
+        if upload_atlas.is_file():
+            try:
+                if cape_community.is_safe_cape_png(upload_atlas.read_bytes()):
+                    cape = upload_atlas
+            except OSError:
+                pass
         if not cape.exists():
             self.capeCommunityStatusChanged.emit("Wähle zuerst ein Cape als PNG aus.", True)
             return False
@@ -474,6 +514,8 @@ class AccountController(QObject):
             cape = _bake_editor_cape(rgba, mode)
             if not _write_hd_cape_preview(rgba, editor=True, fit_mode=mode):
                 raise ValueError("Die Cape-Vorschau konnte nicht erzeugt werden.")
+            if not _write_hd_upload_atlas(rgba, mode):
+                raise ValueError("Das hochauflösende Cape konnte nicht erzeugt werden.")
 
             cosmetics = Path(DATA_DIR) / "cosmetics"
             cosmetics.mkdir(parents=True, exist_ok=True)
@@ -512,6 +554,9 @@ class AccountController(QObject):
         pending_preview = cosmetics / "pending_cape_preview.png"
         if pending_preview.exists():
             pending_preview.replace(cosmetics / "active_cape_preview.png")
+        pending_upload = cosmetics / "pending_cape_upload.png"
+        if pending_upload.exists():
+            pending_upload.replace(cosmetics / "active_cape_upload.png")
         self.accountChanged.emit()
         return self.publishCape("EzClient Cape")
 
