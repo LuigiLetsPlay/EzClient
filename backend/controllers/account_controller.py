@@ -58,7 +58,10 @@ def _bake_editor_cape(image: QImage) -> QImage:
     the 3D launcher preview and the in-game renderer should display.
     """
     portrait = image.transformed(QTransform().rotate(90), Qt.FastTransformation)
-    visible = portrait.scaled(10, 16, Qt.IgnoreAspectRatio, Qt.FastTransformation)
+    scaled = portrait.scaled(10, 16, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+    left = max(0, (scaled.width() - 10) // 2)
+    top = max(0, (scaled.height() - 16) // 2)
+    visible = scaled.copy(left, top, 10, 16)
     result = QImage(64, 32, QImage.Format_RGBA8888)
     result.fill(Qt.transparent)
     painter = QPainter(result)
@@ -81,7 +84,10 @@ def _write_hd_cape_preview(image: QImage, editor: bool = False) -> bool:
         portrait = rgba.transformed(QTransform().rotate(90), Qt.SmoothTransformation)
         # A 1280x640 cape atlas has a texture scale of 20x. Its vanilla
         # 10x16 visible face therefore occupies 200x320 pixels.
-        portrait = portrait.scaled(200, 320, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        scaled = portrait.scaled(200, 320, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+        left = max(0, (scaled.width() - 200) // 2)
+        top = max(0, (scaled.height() - 320) // 2)
+        portrait = scaled.copy(left, top, 200, 320)
         preview = QImage(1280, 640, QImage.Format_RGBA8888)
         preview.fill(Qt.transparent)
         painter = QPainter(preview)
@@ -418,74 +424,30 @@ class AccountController(QObject):
     @Slot(result=str)
     def pickCapeFile(self) -> str:
         file_path, _ = QFileDialog.getOpenFileName(
-            None, "EzClient Cape (.png) auswählen", "", "PNG Cape (*.png);;Alle Dateien (*.*)"
+            None, "Cape-Bild auswählen", "", "Bilder (*.png *.jpg *.jpeg *.webp);;Alle Dateien (*)"
         )
         if not file_path:
             return ""
-        try:
-            if not Path(file_path).read_bytes().startswith(cape_community.PNG_SIGNATURE):
-                self.skinUploadStatusChanged.emit("Ungültiges Cape: erlaubt sind nur geprüfte PNG-Capes bis 256×128.", True)
-                return ""
-        except OSError:
-            self.skinUploadStatusChanged.emit("Cape-Datei konnte nicht gelesen werden.", True)
+        image = QImage(file_path)
+        if image.isNull() or image.width() < 1 or image.height() < 1 or image.width() > 4096 or image.height() > 4096:
+            self.skinUploadStatusChanged.emit("Das Bild kann nicht als Cape verarbeitet werden.", True)
             return ""
-        cape_dir = Path(DATA_DIR) / "cosmetics"
-        cape_dir.mkdir(parents=True, exist_ok=True)
-        target = cape_dir / "active_cape.png"
-        raw = Path(file_path).read_bytes()
-        if cape_community.is_safe_cape_png(raw):
-            shutil.copy2(file_path, target)
-            _write_hd_cape_preview(QImage(file_path), editor=False)
-        else:
-            # Ordinary PNGs are treated as portrait artwork and baked into the
-            # visible vanilla cape face instead of being stretched across the
-            # whole (mostly unused) texture atlas.
-            if not raw.startswith(b"\x89PNG\r\n\x1a\n") or len(raw) > 2 * 1024 * 1024:
-                self.skinUploadStatusChanged.emit("Ungültiges Bild: bitte eine PNG-Datei bis 2 MB auswählen.", True)
-                return ""
-            image = QImage(file_path)
-            if image.isNull() or image.width() < 1 or image.height() < 1 or image.width() > 2048 or image.height() > 2048:
-                self.skinUploadStatusChanged.emit("Das PNG kann nicht als Cape verarbeitet werden.", True)
-                return ""
-            cape = _bake_editor_cape(image.convertToFormat(QImage.Format_RGBA8888))
-            _write_hd_cape_preview(image.convertToFormat(QImage.Format_RGBA8888), editor=True)
-            if not cape.save(str(target), "PNG"):
-                self.skinUploadStatusChanged.emit("Cape konnte nicht gespeichert werden.", True)
-                return ""
-            target.write_bytes(_strip_png_metadata(target.read_bytes()))
-            if not cape_community.is_safe_cape_png(target.read_bytes()):
-                target.unlink(missing_ok=True)
-                self.skinUploadStatusChanged.emit("Cape konnte nicht sicher gespeichert werden.", True)
-                return ""
+        rgba = image.convertToFormat(QImage.Format_RGBA8888)
+        cape = _bake_editor_cape(rgba)
+        _write_hd_cape_preview(rgba, editor=True)
+        target = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not cape.save(str(target), "PNG"):
+            self.skinUploadStatusChanged.emit("Cape konnte nicht gespeichert werden.", True)
+            return ""
+        target.write_bytes(_strip_png_metadata(target.read_bytes()))
+        if not cape_community.is_safe_cape_png(target.read_bytes()):
+            target.unlink(missing_ok=True)
+            self.skinUploadStatusChanged.emit("Cape konnte nicht sicher gespeichert werden.", True)
+            return ""
         self.accountChanged.emit()
         self.skinUploadStatusChanged.emit("Cape gespeichert und in der Vorschau aktiviert.", False)
-        return self.capeTextureUrl
-
-    @Slot(result=str)
-    def pickCapeLayerImage(self) -> str:
-        """Return a bounded PNG as a data URL for a non-destructive editor layer."""
-        file_path, _ = QFileDialog.getOpenFileName(None, "Bild-Ebene auswählen", "", "PNG Bild (*.png)")
-        if not file_path:
-            return ""
-        try:
-            raw = Path(file_path).read_bytes()
-            if not raw.startswith(cape_community.PNG_SIGNATURE) or len(raw) > 10 * 1024 * 1024:
-                raise ValueError("Bitte eine PNG-Datei bis 10 MB auswählen.")
-            image = QImage(file_path)
-            if image.isNull() or image.width() > 8192 or image.height() > 8192:
-                raise ValueError("Bild kann nicht verarbeitet werden.")
-            if image.width() > 1024 or image.height() > 1024:
-                image = image.scaled(1024, 1024, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                encoded = QByteArray()
-                buffer = QBuffer(encoded)
-                buffer.open(QIODevice.WriteOnly)
-                image.save(buffer, "PNG")
-                raw = bytes(encoded)
-            import base64
-            return "data:image/png;base64," + base64.b64encode(raw).decode("ascii")
-        except (OSError, ValueError) as exc:
-            self.skinUploadStatusChanged.emit(f"Bild-Ebene konnte nicht geladen werden: {exc}", True)
-            return ""
+        return self.capePreviewTextureUrl
 
     @Slot(result=bool)
     def resetCustomCape(self) -> bool:
