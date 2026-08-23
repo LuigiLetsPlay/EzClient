@@ -190,8 +190,7 @@ Item {
                     clip: true
                     contentWidth: availableWidth
 
-                    FastWheelHandler {}
-
+                    
                     Text {
                         width: parent.width
                         text: (modrinthController.selectedMod && modrinthController.selectedMod.description)

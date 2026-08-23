@@ -70,8 +70,7 @@ Item {
         ScrollView {
             Layout.fillWidth: true; Layout.fillHeight: true; clip: true
 
-            FastWheelHandler {}
-
+            
             GridView {
                 id: capeGrid
                 anchors.fill: parent

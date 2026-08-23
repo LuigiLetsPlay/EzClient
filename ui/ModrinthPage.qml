@@ -707,8 +707,7 @@ Item {
                     clip: true
                     contentWidth: availableWidth
 
-                    FastWheelHandler {}
-
+                    
                     ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
                     ScrollBar.vertical.policy: ScrollBar.AsNeeded
                     ScrollBar.vertical.visible: ScrollBar.vertical.size < 0.999

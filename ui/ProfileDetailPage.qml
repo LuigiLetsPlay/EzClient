@@ -216,8 +216,7 @@ Item {
             clip: true
             contentWidth: availableWidth
 
-            FastWheelHandler {}
-
+            
             ColumnLayout {
                 width: mainScrollView.availableWidth - 48
                 x: 24
