@@ -80,14 +80,13 @@ Rectangle {
             // Active Profile Quick-Switcher Dropdown Pill
             Rectangle {
                 id: profilePill
-                // Below 1150px the centered navigation would collide with the
-                // pill, so the pill steps aside first (icon-only launcher UI).
                 // Below 1250px the centered navigation would collide with the
-                // pill, so the pill steps aside first (icon-only launcher UI).
-                visible: root.width >= 1250
+                // pill, so it collapses to a compact dot icon (like Accounts).
+                readonly property bool compact: root.width < 1250
+                visible: root.width >= 900
                 z: 30
                 height: 34
-                width: Math.min(200, Math.max(120, pillNameText.implicitWidth + 44))
+                width: profilePill.compact ? 34 : Math.min(200, Math.max(120, pillNameText.implicitWidth + 44))
                 radius: 17
                 color: profPopup.opened ? EzTheme.surface3 : (profMouse.containsMouse ? EzTheme.surfaceHover : EzTheme.surface2)
 
@@ -116,6 +115,7 @@ Rectangle {
 
                     Text {
                         id: pillNameText
+                        visible: !profilePill.compact
                         text: root.hasProfile ? root.activeName : EzI18n.t("topbar_select_profile", "Profil wählen")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 12
@@ -126,6 +126,7 @@ Rectangle {
                     }
 
                     Text {
+                        visible: !profilePill.compact
                         text: "▾"
                         font.pixelSize: 9
                         color: profPopup.opened ? EzTheme.accent : EzTheme.textMuted
@@ -134,6 +135,10 @@ Rectangle {
                         Layout.alignment: Qt.AlignVCenter
                     }
                 }
+
+                ToolTip.visible: profMouse.containsMouse && profilePill.compact && !profPopup.opened
+                ToolTip.delay: 350
+                ToolTip.text: root.hasProfile ? root.activeName : EzI18n.t("topbar_select_profile", "Profil wählen")
 
                 MouseArea {
                     id: profMouse
@@ -336,6 +341,11 @@ Rectangle {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: root.navigate(modelData.id)
                     }
+
+                    // Icon-only mode: explain the icon on hover.
+                    ToolTip.visible: tabMouse.containsMouse && root.width < 1300
+                    ToolTip.delay: 350
+                    ToolTip.text: EzI18n.t(modelData.labelKey, modelData.fallback)
                 }
             }
         }
@@ -496,6 +506,10 @@ Rectangle {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: accPopup.opened ? accPopup.close() : accPopup.open()
                 }
+
+                ToolTip.visible: accMouse.containsMouse && root.width < 1100 && !accPopup.opened
+                ToolTip.delay: 350
+                ToolTip.text: "Konto · " + root.accountUser
 
                 // Account Management Popup
                 Popup {
