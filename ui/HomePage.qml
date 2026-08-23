@@ -146,26 +146,9 @@ Item {
             capeSource: root.capeTextureUrl
             animation: "none"
             autoRotate: false
-            interactive: false
+            interactive: true
             initialRotateX: 0
             initialRotateY: -14
-        }
-
-        // A compact hitbox follows the visible player, rather than the whole
-        // WebEngine stage. Clicking it opens the Skin modal; it does not
-        // capture the surrounding Home controls.
-        MouseArea {
-            id: homeSkinClickTarget
-            z: 5
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: Math.max(86, parent.height * 0.18)
-            width: Math.min(176, parent.width * 0.26)
-            height: Math.min(340, parent.height * 0.62)
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: {
-                if (typeof window !== "undefined" && window.openSkinModal) window.openSkinModal()
-            }
         }
 
         Rectangle {

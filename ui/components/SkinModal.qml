@@ -16,6 +16,8 @@ Item {
     property string previewCapeUrl: ""
     property string previewName: "Steve"
     property string skinVariant: "classic"
+    property string appliedVariant: "classic"
+    property bool previewLoaded: false
     property string currentAnim: "idle"
     property bool isApplied: true
     property string statusMsg: ""
@@ -33,6 +35,8 @@ Item {
             previewName = "Steve"
         }
         isApplied = true
+        appliedVariant = "classic"
+        previewLoaded = false
         statusMsg = ""
         isError = false
         usernameInput.text = ""
@@ -72,9 +76,20 @@ Item {
                 skinModal.previewTextureUrl = preview
             }
             skinModal.isApplied = false
+            skinModal.previewLoaded = true
             if (modalSkin3D) {
                 modalSkin3D.updateSkin()
             }
+        }
+    }
+
+    // Toggling Slim/Classic counts as a pending change: the Apply button must
+    // appear so nothing is synced until the user explicitly clicks it.
+    onSkinVariantChanged: {
+        if (previewLoaded) {
+            isApplied = false
+        } else {
+            isApplied = Qt.binding(function() { return skinVariant === appliedVariant })
         }
     }
 
@@ -475,6 +490,8 @@ Item {
                                             var target = skinModal.previewFilePath || skinModal.previewName
                                             accountController.applySkin(target, skinModal.skinVariant, skinModal.previewName)
                                             skinModal.isApplied = true
+                                            skinModal.appliedVariant = skinModal.skinVariant
+                                            skinModal.previewLoaded = false
                                         }
                                     }
                                 }

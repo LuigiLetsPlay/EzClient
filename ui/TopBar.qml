@@ -391,7 +391,7 @@ Rectangle {
     RowLayout {
         id: rightSection
         anchors.right: winControls.left
-        anchors.rightMargin: 16
+        anchors.rightMargin: 32
         anchors.verticalCenter: parent.verticalCenter
         spacing: 10
 
