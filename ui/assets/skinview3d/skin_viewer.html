@@ -85,6 +85,10 @@
       }
     };
 
+    // Keep the full character and cape visible. The previous default was much
+    // closer and made high-detail capes look cropped next to the Cape page.
+    skinViewer.zoom = 0.68;
+
     // Controls
     skinViewer.controls.enableRotate = true;
     skinViewer.controls.enableZoom = true;
@@ -218,6 +222,7 @@
   function resetView() {
     if (!skinViewer) return;
     skinViewer.controls.reset();
+    skinViewer.zoom = 0.68;
     skinViewer.camera.position.x = 0;
     skinViewer.camera.position.y = 0;
     skinViewer.camera.position.z = 65;
