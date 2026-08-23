@@ -57,7 +57,7 @@ def _bake_editor_cape(image: QImage, fit_mode: str = "Cover") -> QImage:
     all other vanilla UV faces remain transparent.  This is the same image that
     the 3D launcher preview and the in-game renderer should display.
     """
-    portrait = image.transformed(QTransform().rotate(90), Qt.FastTransformation)
+    portrait = image
     aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
     scaled = portrait.scaled(10, 16, aspect, Qt.SmoothTransformation)
     left = max(0, (scaled.width() - 10) // 2)
@@ -82,7 +82,7 @@ def _write_hd_cape_preview(image: QImage, editor: bool = False, fit_mode: str = 
     if not editor and abs((rgba.width() / max(1, rgba.height())) - 2.0) < 0.02:
         preview = rgba
     else:
-        portrait = rgba.transformed(QTransform().rotate(90), Qt.SmoothTransformation)
+        portrait = rgba
         # A 1280x640 cape atlas has a texture scale of 20x. Its vanilla
         # 10x16 visible face therefore occupies 200x320 pixels.
         aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
@@ -115,9 +115,7 @@ def _write_hd_upload_atlas(image: QImage, fit_mode: str = "Cover") -> bool:
     normalized vanilla cape UVs as the 64x32 game texture, so the visible back
     face receives 160x256 pixels instead of only 10x16.
     """
-    portrait = image.convertToFormat(QImage.Format_RGBA8888).transformed(
-        QTransform().rotate(90), Qt.SmoothTransformation
-    )
+    portrait = image.convertToFormat(QImage.Format_RGBA8888)
     aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
     scaled = portrait.scaled(160, 256, aspect, Qt.SmoothTransformation)
     left = max(0, (scaled.width() - 160) // 2)
@@ -488,7 +486,9 @@ class AccountController(QObject):
         if image.isNull() or image.width() < 1 or image.height() < 1 or image.width() > 4096 or image.height() > 4096:
             self.skinUploadStatusChanged.emit("Das Bild kann nicht als Cape verarbeitet werden.", True)
             return ""
-        rgba = image.convertToFormat(QImage.Format_RGBA8888)
+        rgba = image.convertToFormat(QImage.Format_RGBA8888).transformed(
+            QTransform().rotate(-90), Qt.SmoothTransformation
+        )
         cape = _bake_editor_cape(rgba)
         _write_hd_cape_preview(rgba, editor=True)
         target = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
@@ -524,7 +524,11 @@ class AccountController(QObject):
             if image.isNull() or image.width() < 1 or image.height() < 1 or image.width() > 4096 or image.height() > 4096:
                 raise ValueError("Das Bild kann nicht verarbeitet werden.")
             mode = "Stretch" if fit_mode == "Stretch" else "Cover"
-            rgba = image.convertToFormat(QImage.Format_RGBA8888)
+            # Rotate the selected picture 90 degrees left once, up front.
+            # Every later step receives exactly this rotated image unchanged.
+            rgba = image.convertToFormat(QImage.Format_RGBA8888).transformed(
+                QTransform().rotate(-90), Qt.SmoothTransformation
+            )
             cape = _bake_editor_cape(rgba, mode)
             if not _write_hd_cape_preview(rgba, editor=True, fit_mode=mode):
                 raise ValueError("Die Cape-Vorschau konnte nicht erzeugt werden.")
