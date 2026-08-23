@@ -6,7 +6,7 @@ from typing import Any
 from backend.models.types import ProfileData, ModData
 
 MODRINTH_API = "https://api.modrinth.com/v2"
-USER_AGENT = "EzClient/1.5.3 (desktop launcher)"
+USER_AGENT = "EzClient/1.5.4 (desktop launcher)"
 
 FALLBACK_VERSIONS = [
     "26.2", "26.1", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5",

@@ -827,7 +827,7 @@ class ProfileController(QObject):
                     if source.is_file():
                         profile.mods_path.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(source, profile.mods_path / (mod.filename or source_name))
-                        mod.version = "1.5.3"
+                        mod.version = "1.5.4"
                         updated += 1
             self._store.save()
             self._syncNeeded.emit()

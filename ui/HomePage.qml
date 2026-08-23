@@ -230,7 +230,9 @@ Item {
         }
         Item { height: 4 }
 
-        // ── Real Authentic 3D Minecraft Character ──
+        // ── Legacy character container ──
+        // Keep this disabled without constructing another Chromium WebEngine.
+        // The actual character is rendered once by centeredHomeSkin3D above.
         Item {
             id: skinContainer
             visible: false
@@ -280,24 +282,10 @@ Item {
                 // Keep Qt WebEngine untransformed. Scaling a WebEngine surface can
                 // detach its GPU layer and place it in the bottom-right corner.
 
-                Skin3DView {
+                Loader {
                     id: homeSkin3D
                     anchors.fill: parent
-                    skinSource: root.skinTextureUrl
-                    capeSource: root.capeTextureUrl
-                    animation: "idle"
-                    autoRotate: false
-                    autoRotateSpeed: 0
-                    initialRotateX: 0
-                    initialRotateY: -10
-                    
-                    onSkinClicked: {
-                        if (typeof window !== "undefined" && window.openSkinModal) {
-                            window.openSkinModal()
-                        } else if (typeof globalSkinModal !== "undefined" && globalSkinModal) {
-                            globalSkinModal.open()
-                        }
-                    }
+                    active: false
                 }
             }
 

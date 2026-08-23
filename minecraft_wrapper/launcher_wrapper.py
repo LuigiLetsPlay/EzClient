@@ -37,7 +37,7 @@ except ImportError:
 
 
 APP_NAME = "EzClient"
-APP_VERSION = "1.5.3"
+APP_VERSION = "1.5.4"
 MINECRAFT_INSTALLER_URL = "https://launcher.mojang.com/download/MinecraftInstaller.msi"
 FABRIC_META_URL = "https://meta.fabricmc.net/v2/versions/installer"
 FABRIC_FALLBACK_URL = (

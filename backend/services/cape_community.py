@@ -9,6 +9,7 @@ import urllib.request
 import struct
 import zlib
 from pathlib import Path
+from backend.models.types import APP_VERSION
 
 
 DEFAULT_API_URL = "http://5.175.192.90:18765/api"
@@ -51,7 +52,7 @@ def _base_url() -> str:
 
 def list_capes() -> list[dict]:
     request = urllib.request.Request(
-        f"{_base_url()}/capes", headers={"Accept": "application/json", "User-Agent": "EzClient/1.5.2"}
+        f"{_base_url()}/capes", headers={"Accept": "application/json", "User-Agent": f"EzClient/{APP_VERSION}"}
     )
     with urllib.request.urlopen(request, timeout=8) as response:
         payload = json.loads(response.read().decode("utf-8"))
@@ -88,7 +89,7 @@ def upload_cape(path: Path, owner: str, owner_uuid: str, title: str) -> dict:
         f"{_base_url()}/capes",
         data=b"".join(parts),
         method="POST",
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "Accept": "application/json", "User-Agent": "EzClient/1.5.2"},
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "Accept": "application/json", "User-Agent": f"EzClient/{APP_VERSION}"},
     )
     with urllib.request.urlopen(request, timeout=20) as response:
         payload = json.loads(response.read().decode("utf-8"))
@@ -107,7 +108,7 @@ def report_cape(cape_id: str, reason: str, reporter: str) -> None:
     data = json.dumps({"cape_id": cape_id, "reason": reason, "reporter": reporter}).encode("utf-8")
     request = urllib.request.Request(
         f"{_base_url()}/reports", data=data, method="POST",
-        headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "EzClient/1.5.2"},
+        headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": f"EzClient/{APP_VERSION}"},
     )
     with urllib.request.urlopen(request, timeout=10):
         pass

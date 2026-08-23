@@ -1,6 +1,7 @@
 package app.ezclient.gui;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 
 /** Durability summary for armor plus both held items. */
@@ -9,7 +10,8 @@ public final class ArmorStatusModule extends HudModule {
     @Override protected String value(Minecraft client) {
         if (client.player == null) return "-";
         int usable = 0, total = 0;
-        for (ItemStack stack : client.player.getArmorSlots()) {
+        for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
+            ItemStack stack = client.player.getItemBySlot(slot);
             if (!stack.isDamageableItem()) continue;
             usable += stack.getMaxDamage() - stack.getDamageValue(); total += stack.getMaxDamage();
         }
