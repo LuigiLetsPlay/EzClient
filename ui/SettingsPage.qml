@@ -17,6 +17,8 @@ Item {
         clip: true
         contentWidth: availableWidth
 
+        FastWheelHandler {}
+
         ColumnLayout {
             anchors.left: parent.left
             anchors.right: parent.right

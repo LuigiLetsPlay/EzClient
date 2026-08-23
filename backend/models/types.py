@@ -5,7 +5,7 @@ import os
 import sys
 
 APP_NAME = "EzClient"
-APP_VERSION = "1.6.6"
+APP_VERSION = "1.6.7"
 GITHUB_REPO = "LuigiLetsPlay/EzClient"
 
 def now_iso() -> str:

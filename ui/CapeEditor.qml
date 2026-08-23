@@ -390,6 +390,8 @@ Item {
                 clip: true
                 contentWidth: availableWidth
 
+                FastWheelHandler {}
+
                 ColumnLayout {
                 id: editorTools
                 width: parent.availableWidth
