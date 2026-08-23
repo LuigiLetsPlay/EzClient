@@ -17,7 +17,7 @@ abstract class AvatarRendererMixin {
     @Inject(method = "extractRenderState", at = @At("TAIL"))
     private void ezclient$addNameMark(Avatar player, AvatarRenderState state, float tickDelta, CallbackInfo ci) {
         if (state.nameTag == null || !CommunityPresence.isEzClientPlayer(player.getUUID())) return;
-        if (state.nameTag.getString().startsWith("◆ ")) return;
-        state.nameTag = Component.literal("◆ ").withStyle(ChatFormatting.LIGHT_PURPLE).append(state.nameTag);
+        if (state.nameTag.getString().startsWith("[EZ] ")) return;
+        state.nameTag = Component.literal("[EZ] ").withStyle(ChatFormatting.GREEN).append(state.nameTag);
     }
 }

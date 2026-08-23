@@ -17,7 +17,7 @@ abstract class PlayerTabOverlayMixin {
     private void ezclient$addTabMark(PlayerInfo info, CallbackInfoReturnable<Component> cir) {
         Component name = cir.getReturnValue();
         if (name == null || !CommunityPresence.isEzClientPlayer(info.getProfile().id())) return;
-        if (name.getString().startsWith("◆ ")) return;
-        cir.setReturnValue(Component.literal("◆ ").withStyle(ChatFormatting.LIGHT_PURPLE).append(name));
+        if (name.getString().startsWith("[EZ] ")) return;
+        cir.setReturnValue(Component.literal("[EZ] ").withStyle(ChatFormatting.GREEN).append(name));
     }
 }
