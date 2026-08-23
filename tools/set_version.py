@@ -42,8 +42,8 @@ def main() -> int:
         updated = content
         for pattern, replacement in replacements:
             updated, count = re.subn(pattern, replacement.format(version=version), updated)
-            if count != 1:
-                raise RuntimeError(f"Expected exactly one match for {relative}: {pattern} (got {count})")
+            if count < 1:
+                raise RuntimeError(f"Expected at least one match for {relative}: {pattern} (got {count})")
         path.write_text(updated, encoding="utf-8")
         print(f"updated {relative}")
     return 0

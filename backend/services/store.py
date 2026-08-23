@@ -27,12 +27,12 @@ def write_json(path: Path, value: Any) -> None:
 
 PERFORMANCE_MODS: list[ModData] = [
     ModData(
-        project_id="ezclient", slug="ezclient", name="EzClient Core", version_id="v-core", version="1.6.4",
+        project_id="ezclient", slug="ezclient", name="EzClient Core", version_id="v-core", version="1.6.5",
         filename="EzClient.jar", enabled=True, recommended=True, essential=True,
         icon_url="", author="EzClient Team", description="EzClient Core Mod – Fenstertitel 'EzClient', Icon, Narrator-Bypass & Auto-Optimierung."
     ),
     ModData(
-        project_id="fabric-api", slug="fabric-api", name="Fabric API", version_id="v1", version="0.115.0",
+        project_id="fabric-api", slug="fabric-api", name="Fabric API", version_id="v1", version="1.6.5",
         filename="fabric-api.jar", enabled=True, recommended=True, essential=True,
         icon_url="https://cdn.modrinth.com/data/P7dR8mSH/icon.png", author="FabricMC", description="Essenzielle Schnittstelle und Mod-Basis."
     ),
@@ -43,17 +43,17 @@ PERFORMANCE_MODS: list[ModData] = [
     ),
 
     ModData(
-        project_id="sodium", slug="sodium", name="Sodium", version_id="v2", version="0.6.13",
+        project_id="sodium", slug="sodium", name="Sodium", version_id="v2", version="1.6.5",
         filename="sodium-fabric.jar", enabled=True, recommended=True, essential=False,
         icon_url="https://cdn.modrinth.com/data/AANobbMI/295862f4724dc3f78df3447ad6072b2dcd3ef0c9_96.webp", author="CaffeineMC", description="Next-Gen Rendering Engine für maximale FPS."
     ),
     ModData(
-        project_id="lithium", slug="lithium", name="Lithium", version_id="v3", version="0.15.0",
+        project_id="lithium", slug="lithium", name="Lithium", version_id="v3", version="1.6.5",
         filename="lithium-fabric.jar", enabled=True, recommended=True, essential=False,
         icon_url="https://cdn.modrinth.com/data/gvQqBUqZ/bcc8686c13af0143adf4285d741256af824f70b7_96.webp", author="CaffeineMC", description="Physik-, CPU- und Chunk-Optimierung."
     ),
     ModData(
-        project_id="ferrite-core", slug="ferrite-core", name="FerriteCore", version_id="v4", version="7.0.2",
+        project_id="ferrite-core", slug="ferrite-core", name="FerriteCore", version_id="v4", version="1.6.5",
         filename="ferritecore.jar", enabled=True, recommended=True, essential=False,
         icon_url="https://cdn.modrinth.com/data/uXXizFIs/222a126f26f8f9ae1eb339f3b767677f18bff31f_96.webp", author="malte0811", description="Halbiert den Arbeitsspeicher-Verbrauch."
     ),
@@ -63,12 +63,12 @@ PERFORMANCE_MODS: list[ModData] = [
         icon_url="https://cdn.modrinth.com/data/NRjRiSSD/a279c19f9c3574339fa90f675aa8a94f8f6cff92_96.webp", author="fxmorin", description="Behebt Speicherlecks im Minecraft-Client für stabile Frameraten."
     ),
     ModData(
-        project_id="immediatelyfast", slug="immediatelyfast", name="ImmediatelyFast", version_id="v5", version="1.3.4",
+        project_id="immediatelyfast", slug="immediatelyfast", name="ImmediatelyFast", version_id="v5", version="1.6.5",
         filename="immediatelyfast.jar", enabled=True, recommended=True, essential=False,
         icon_url="https://cdn.modrinth.com/data/5ZwdcRci/e57b6b451425692ac17ad322d5e14bea686a383a_96.webp", author="RaphiMC", description="HUD und GUI Rendering-Beschleunigung."
     ),
     ModData(
-        project_id="entityculling", slug="entityculling", name="Entity Culling", version_id="v6", version="1.7.2",
+        project_id="entityculling", slug="entityculling", name="Entity Culling", version_id="v6", version="1.6.5",
         filename="entityculling.jar", enabled=True, recommended=True, essential=False,
         icon_url="https://cdn.modrinth.com/data/NNAgCjsB/7873452d6cede4daed12da3d7d8c193ab88b4fd6_96.webp", author="tr9zw", description="Überspringt das Rendern verdeckter Mobs."
     ),
@@ -91,7 +91,7 @@ PERFORMANCE_MODS: list[ModData] = [
 
 ESSENTIALS_MODS: list[ModData] = PERFORMANCE_MODS + [
     ModData(
-        project_id="essential", slug="essential", name="Essential Mod", version_id="v7", version="1.3.4",
+        project_id="essential", slug="essential", name="Essential Mod", version_id="v7", version="1.6.5",
         filename="essential.jar", enabled=True, recommended=False, essential=False,
         icon_url="https://cdn.modrinth.com/data/k2ZPuTBm/7f7ac7cf2a46d5f02e9644372c44b3095ad61ffb_96.webp", author="SparkUniverse", description="Welten hosten, Freunde, Chat, Kosmetik & Multi-World Support."
     ),
