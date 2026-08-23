@@ -34,8 +34,6 @@ Rectangle {
         return root.currentRoute === tabId
     }
 
-}
-
     // Draggable background
     MouseArea {
         anchors.fill: parent
@@ -704,4 +702,5 @@ Rectangle {
                 }
             }
 
+        }
     }
