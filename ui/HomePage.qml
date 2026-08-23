@@ -141,7 +141,13 @@ Item {
 
         Skin3DView {
             id: centeredHomeSkin3D
-            anchors.fill: parent
+            // Compact stage: the interactive (rotatable) area is exactly the
+            // player region, so it can never swallow clicks from Home controls.
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            anchors.topMargin: 40
+            width: Math.min(300, parent.width * 0.6)
+            height: Math.min(430, parent.height * 0.72)
             skinSource: root.skinTextureUrl
             capeSource: root.capeTextureUrl
             animation: "idle"
@@ -152,30 +158,6 @@ Item {
             onSkinClicked: {
                 if (typeof window !== "undefined" && window.openSkinModal) window.openSkinModal()
             }
-        }
-
-        // Block interaction everywhere except the compact player hitbox, so
-        // dragging rotates only near the skin and clicks outside do nothing.
-        MouseArea {
-            z: 5
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: Math.max(60, parent.height * 0.16)
-        }
-        MouseArea {
-            z: 5
-            anchors.left: parent.left
-            anchors.bottom: parent.bottom
-            width: Math.max(40, parent.width * 0.34)
-            height: parent.height - Math.max(60, parent.height * 0.16)
-        }
-        MouseArea {
-            z: 5
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            width: Math.max(40, parent.width * 0.34)
-            height: parent.height - Math.max(60, parent.height * 0.16)
         }
 
         Rectangle {
