@@ -107,7 +107,22 @@ public final class HudEditorScreen extends Screen {
                     }
                 }
             }
-            outerY: for (HudModule other : ModuleManager.getInstance().getHudModules()) {
+            boolean snappedSpacing = false;
+            int preferredGap = preferredVerticalGap();
+            if (preferredGap >= 0) {
+                for (HudModule other : ModuleManager.getInstance().getHudModules()) {
+                    if (other == selected || !other.isEnabled()) continue;
+                    int otherHeight = (int)(13 * other.getScale());
+                    int targetY = other.getY() + otherHeight + preferredGap;
+                    if (Math.abs(ny - targetY) <= SNAP_DISTANCE) {
+                        ny = targetY;
+                        guideY = targetY;
+                        snappedSpacing = true;
+                        break;
+                    }
+                }
+            }
+            if (!snappedSpacing) outerY: for (HudModule other : ModuleManager.getInstance().getHudModules()) {
                 if (other == selected || !other.isEnabled()) continue;
                 int oh = (int)(13 * other.getScale());
                 int[] otherY = {other.getY(), other.getY() + oh / 2, other.getY() + oh};
@@ -191,6 +206,21 @@ public final class HudEditorScreen extends Screen {
         double grid = Math.round(scale * 20.0) / 20.0;
         sizeSnapped = Math.abs(grid - scale) <= 0.026;
         return grid;
+    }
+    private int preferredVerticalGap() {
+        int bestGap = Integer.MAX_VALUE;
+        for (HudModule upper : ModuleManager.getInstance().getHudModules()) {
+            if (!upper.isEnabled()) continue;
+            int upperHeight = (int)(13 * upper.getScale());
+            for (HudModule lower : ModuleManager.getInstance().getHudModules()) {
+                if (upper == lower || !lower.isEnabled()) continue;
+                int gap = lower.getY() - (upper.getY() + upperHeight);
+                if (gap >= 0 && gap <= 32 && Math.abs(lower.getX() - upper.getX()) <= SNAP_DISTANCE) {
+                    bestGap = Math.min(bestGap, gap);
+                }
+            }
+        }
+        return bestGap == Integer.MAX_VALUE ? -1 : bestGap;
     }
     @Override public void mouseMoved(double mouseX, double mouseY) {
         HudModule target = resizeTarget(mouseX, mouseY);

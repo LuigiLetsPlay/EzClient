@@ -2,11 +2,14 @@ package app.ezclient.gui;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 /** Responsive module workspace with a modern glass-panel layout. */
 public final class EzClientScreen extends Screen {
     private static final String[] FILTERS = {"All", "HUD", "Utils", "Visual", "Render"};
+    private static final Identifier EZCLIENT_ICON = Identifier.fromNamespaceAndPath("ezclient", "title/icon");
     private final Screen parent;
     private String selectedFilter = "All";
     private int panelX;
@@ -107,12 +110,9 @@ public final class EzClientScreen extends Screen {
         extractTransparentBackground(graphics);
         EzUi.panel(graphics, panelX, panelY, panelWidth, panelHeight);
         EzUi.roundedRect(graphics, panelX + 10, panelY + 10, panelWidth - 20, 52, 12, 0xFF252B37);
-        EzUi.roundedRect(graphics, panelX + 18, panelY + 20, 30, 30, 15, 0xFF8B6CF6);
-        graphics.centeredText(font, "EZ", panelX + 33, panelY + 31, 0xFFFFFFFF);
+        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, EZCLIENT_ICON, panelX + 20, panelY + 21, 28, 28);
         graphics.text(font, "EzClient", panelX + 58, panelY + 21, 0xFFFFFFFF);
         graphics.text(font, "Modules  •  " + selectedFilter, panelX + 58, panelY + 37, 0xFFABB5C7);
-        graphics.text(font, "FILTER", panelX + 17, panelY + 66, 0xFF8995AA);
-        graphics.text(font, "MODULES", panelX + 17, panelY + 88, 0xFF8995AA);
 
         int contentX = panelX + 16;
         int contentY = panelY + 92;

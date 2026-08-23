@@ -17,7 +17,7 @@ public final class HudRenderer {
         if (module.hasBackground()) graphics.fill(0, 0, w, 13, module.getBackgroundColor());
         if (module.hasBorder()) graphics.outline(0, 0, w, 13, module.getBorderColor());
         if (editor) graphics.outline(0, 0, w, 13, module.isEnabled() ? 0xFF43DD8C : 0xFF777777);
-        graphics.text(client.font, text, 4, 3, module.color());
+        graphics.text(client.font, text, 4, 2, module.color());
         graphics.pose().popMatrix();
     }
 }
