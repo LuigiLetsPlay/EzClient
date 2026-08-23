@@ -4,7 +4,10 @@ import app.ezclient.cosmetics.CommunityPresence;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+import net.minecraft.resources.Identifier;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FontDescription;
+import net.minecraft.network.chat.Style;
 import net.minecraft.world.entity.Avatar;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -17,7 +20,8 @@ abstract class AvatarRendererMixin {
     @Inject(method = "extractRenderState", at = @At("TAIL"))
     private void ezclient$addNameMark(Avatar player, AvatarRenderState state, float tickDelta, CallbackInfo ci) {
         if (state.nameTag == null || !CommunityPresence.isEzClientPlayer(player.getUUID())) return;
-        if (state.nameTag.getString().startsWith("[EZ] ")) return;
-        state.nameTag = Component.literal("[EZ] ").withStyle(ChatFormatting.GREEN).append(state.nameTag);
+        if (state.nameTag.getString().startsWith("\uE000")) return;
+        Style iconFont = Style.EMPTY.withFont(new FontDescription.Resource(Identifier.fromNamespaceAndPath("ezclient", "default")));
+        state.nameTag = Component.literal("\uE000 ").withStyle(iconFont).append(state.nameTag);
     }
 }
