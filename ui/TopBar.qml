@@ -80,13 +80,14 @@ Rectangle {
             // Active Profile Quick-Switcher Dropdown Pill
             Rectangle {
                 id: profilePill
-                // Below 1250px the centered navigation would collide with the
-                // pill, so it collapses to a compact dot icon (like Accounts).
-                readonly property bool compact: root.width < 1250
+                // Same breakpoint as the navigation labels: as soon as those
+                // collapse to icons, this pill collapses to a dot icon too.
+                readonly property bool compact: root.width < 1300
                 visible: root.width >= 900
                 z: 30
                 height: 34
                 width: profilePill.compact ? 34 : Math.min(200, Math.max(120, pillNameText.implicitWidth + 44))
+                implicitWidth: width
                 radius: 17
                 color: profPopup.opened ? EzTheme.surface3 : (profMouse.containsMouse ? EzTheme.surfaceHover : EzTheme.surface2)
 
