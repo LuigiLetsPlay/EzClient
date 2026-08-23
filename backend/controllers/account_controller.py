@@ -486,9 +486,7 @@ class AccountController(QObject):
         if image.isNull() or image.width() < 1 or image.height() < 1 or image.width() > 4096 or image.height() > 4096:
             self.skinUploadStatusChanged.emit("Das Bild kann nicht als Cape verarbeitet werden.", True)
             return ""
-        rgba = image.convertToFormat(QImage.Format_RGBA8888).transformed(
-            QTransform().rotate(-45), Qt.SmoothTransformation
-        )
+        rgba = image.convertToFormat(QImage.Format_RGBA8888)
         cape = _bake_editor_cape(rgba)
         _write_hd_cape_preview(rgba, editor=True)
         target = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
@@ -526,9 +524,7 @@ class AccountController(QObject):
             mode = "Stretch" if fit_mode == "Stretch" else "Cover"
             # Rotate the selected picture 90 degrees left once, up front.
             # Every later step receives exactly this rotated image unchanged.
-            rgba = image.convertToFormat(QImage.Format_RGBA8888).transformed(
-                QTransform().rotate(-45), Qt.SmoothTransformation
-            )
+            rgba = image.convertToFormat(QImage.Format_RGBA8888)
             cape = _bake_editor_cape(rgba, mode)
             if not _write_hd_cape_preview(rgba, editor=True, fit_mode=mode):
                 raise ValueError("Die Cape-Vorschau konnte nicht erzeugt werden.")
