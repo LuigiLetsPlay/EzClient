@@ -7,7 +7,7 @@ from typing import Any
 from backend.models.types import ProfileData, ModData
 
 MODRINTH_API = "https://api.modrinth.com/v2"
-USER_AGENT = "EzClient/1.6.3 (desktop launcher)"
+USER_AGENT = "EzClient/1.6.4 (desktop launcher)"
 
 
 def select_preferred_version(versions: list[dict[str, Any]]) -> dict[str, Any] | None:

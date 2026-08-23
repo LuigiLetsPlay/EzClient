@@ -22,6 +22,8 @@ import app.ezclient.gui.EzClientScreen;
 import app.ezclient.gui.EzHubScreen;
 import app.ezclient.gui.HudRenderer;
 import app.ezclient.gui.ModuleManager;
+import app.ezclient.cosmetics.CommunityPresence;
+import app.ezclient.cosmetics.CommunityCapeManager;
 
 /**
  * EzClient Core Mod
@@ -30,8 +32,8 @@ import app.ezclient.gui.ModuleManager;
  * - First-Launch Performance & PvP Optimization (Fast Graphics, 8 Chunks, No Shadows/Clouds, Biome Blend 0, Unlimited FPS)
  */
 public class EzClientMod implements ClientModInitializer {
-public static final String CLIENT_VERSION = "1.6.3";
-public static final String CLIENT_TITLE = "EzClient 1.6.3";
+public static final String CLIENT_VERSION = "1.6.4";
+public static final String CLIENT_TITLE = "EzClient 1.6.4";
     private static volatile boolean running = true;
     private static Path ezClientDataDir = null;
 
@@ -109,6 +111,8 @@ public static final String CLIENT_TITLE = "EzClient 1.6.3";
             }
             isZooming = zoomKey.isDown();
             client.getWindow().setTitle(CLIENT_TITLE);
+            if (client.player != null && client.level != null) CommunityPresence.heartbeat(client.player.getUUID());
+            CommunityCapeManager.tick(client);
         });
 
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("ezclient", "performance_hud"), (graphics, tickDelta) -> {

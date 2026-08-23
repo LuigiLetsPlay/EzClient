@@ -14,16 +14,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {
     "backend/models/types.py": [(r'APP_VERSION = "[^"]+"', 'APP_VERSION = "{version}"')],
-    "backend/controllers/profile_controller.py": [(r'mod\.version = "\d+\.\d+\.\d+"', 'mod.version = "{version}"')],
     "backend/services/modrinth.py": [(r'EzClient/\d+\.\d+\.\d+', 'EzClient/{version}')],
+    "backend/services/game_bootstrap.py": [(r'EzClient/\d+\.\d+\.\d+', 'EzClient/{version}')],
     "installer/installer_gui.py": [(r'APP_VERSION = "[^"]+"', 'APP_VERSION = "{version}"')],
     "minecraft_wrapper/launcher_wrapper.py": [(r'APP_VERSION = "[^"]+"', 'APP_VERSION = "{version}"')],
     "client_mod/gradle.properties": [(r'mod_version=\d+\.\d+\.\d+', 'mod_version={version}')],
     "client_mod/src/main/resources/fabric.mod.json": [(r'"version": "\d+\.\d+\.\d+"', '"version": "{version}"')],
     "client_mod/src/main/java/app/ezclient/EzClientMod.java": [(r'"EzClient \d+\.\d+\.\d+"', '"EzClient {version}"'), (r'CLIENT_VERSION = "\d+\.\d+\.\d+"', 'CLIENT_VERSION = "{version}"')],
     "client_mod_lite/build.gradle": [(r"version = '\d+\.\d+\.\d+'", "version = '{version}'")],
+    "client_mod_lite/src/main/resources/fabric.mod.json": [(r'"version": "\d+\.\d+\.\d+"', '"version": "{version}"')],
     "client_mod_lite/src/main/java/app/ezclient/lite/EzClientLiteMod.java": [(r'"EzClient \d+\.\d+\.\d+ \(Lite\)"', '"EzClient {version} (Lite)"'), (r'CLIENT_VERSION = "\d+\.\d+\.\d+"', 'CLIENT_VERSION = "{version}"')],
     "backend/services/store.py": [(r'version="\d+\.\d+\.\d+"', 'version="{version}"')],
+    "build_release.py": [(r'EzClient \d+\.\d+\.\d+', 'EzClient {version}')],
+    "build_installer.py": [(r'EzClient \d+\.\d+\.\d+', 'EzClient {version}')],
+    "ui/StatusBar.qml": [(r': "\d+\.\d+\.\d+"', ': "{version}"')],
 }
 
 

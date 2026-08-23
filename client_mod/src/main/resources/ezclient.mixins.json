@@ -11,7 +11,11 @@
     "TitleScreenMixin",
     "PauseScreenMixin",
     "GameRendererMixin",
-    "MouseMixin"
+    "MouseMixin",
+    "AbstractClientPlayerCapeMixin",
+    "CapeLayerMixin",
+    "AvatarRendererMixin",
+    "PlayerTabOverlayMixin"
   ],
   "injectors": {
     "defaultRequire": 1

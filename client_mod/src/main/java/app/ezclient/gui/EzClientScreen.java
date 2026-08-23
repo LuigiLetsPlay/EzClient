@@ -30,28 +30,13 @@ public final class EzClientScreen extends Screen {
         panelX = (width - panelWidth) / 2;
         panelY = (height - panelHeight) / 2;
 
-        int filterX = panelX + 16;
-        int filterY = panelY + 68;
-        for (String filter : FILTERS) {
-            boolean selected = filter.equals(selectedFilter);
-            addRenderableWidget(new EzButton(
-                    filterX, filterY, 46, 18, Component.literal(filter), selected,
-                    ignored -> {
-                        selectedFilter = filter;
-                        scrollRows = 0;
-                        rebuildWidgets();
-                    }
-            ));
-            filterX += 50;
-        }
-
         addRenderableWidget(new EzButton(
                 panelX + panelWidth - 76, panelY + 22, 60, 20,
                 Component.literal("Close"), false, ignored -> onClose()
         ));
 
         int contentX = panelX + 16;
-        int contentY = panelY + 92;
+        int contentY = panelY + 72;
         int contentWidth = panelWidth - 32;
         int columns = Math.max(1, Math.min(4, contentWidth / 115));
         int gap = 8;
@@ -115,7 +100,7 @@ public final class EzClientScreen extends Screen {
         graphics.text(font, "Modules  •  " + selectedFilter, panelX + 58, panelY + 37, 0xFFABB5C7);
 
         int contentX = panelX + 16;
-        int contentY = panelY + 92;
+        int contentY = panelY + 72;
         int contentWidth = panelWidth - 32;
         int columns = Math.max(1, Math.min(4, contentWidth / 115));
         int gap = 8;
@@ -139,7 +124,7 @@ public final class EzClientScreen extends Screen {
         }
 
         int totalRows = (totalModules + columns - 1) / columns;
-        int visibleRows = Math.max(1, (panelHeight - 108) / 58);
+        int visibleRows = Math.max(1, (panelHeight - 88) / 58);
         if (totalRows > visibleRows) {
             graphics.text(font, "Scroll: " + (scrollRows + 1) + "/" + (totalRows - visibleRows + 1),
                     panelX + panelWidth - 90, panelY + panelHeight - 14, 0xFF9EAABD);
@@ -166,10 +151,10 @@ public final class EzClientScreen extends Screen {
             if (selectedFilter.equals("All") || module.getCategory().equals(selectedFilter)) count++;
         }
         int totalRows = (count + columns - 1) / columns;
-        int visibleRows = Math.max(1, (panelHeight - 108) / 58);
+        int visibleRows = Math.max(1, (panelHeight - 88) / 58);
         int maximum = Math.max(0, totalRows - visibleRows);
         if (maximum > 0 && mouseX >= panelX && mouseX <= panelX + panelWidth
-                && mouseY >= panelY + 90 && mouseY <= panelY + panelHeight) {
+                && mouseY >= panelY + 70 && mouseY <= panelY + panelHeight) {
             scrollRows = Math.max(0, Math.min(maximum, scrollRows - (int) Math.signum(vertical)));
             rebuildWidgets();
             return true;

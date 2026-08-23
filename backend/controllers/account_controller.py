@@ -8,7 +8,7 @@ import shutil
 import struct
 from pathlib import Path
 from backend.services import cape_community
-from PySide6.QtCore import QObject, Signal, Slot, Property, QUrl, Qt
+from PySide6.QtCore import QObject, Signal, Slot, Property, QUrl, Qt, QByteArray, QBuffer, QIODevice
 from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QDialog, QVBoxLayout
 
@@ -305,7 +305,7 @@ class AccountController(QObject):
             from backend.models.types import APP_VERSION
             request = urllib.request.Request(image_url, headers={"User-Agent": f"EzClient/{APP_VERSION}"})
             with urllib.request.urlopen(request, timeout=15) as response:
-                raw = response.read(512 * 1024 + 1)
+                raw = response.read(2 * 1024 * 1024 + 1)
             if not cape_community.is_safe_cape_png(raw):
                 raise ValueError("Ungültiges Cape-Bild")
             target = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
@@ -380,7 +380,7 @@ class AccountController(QObject):
                 self.skinUploadStatusChanged.emit("Das PNG kann nicht als Cape verarbeitet werden.", True)
                 return ""
             cape = image.convertToFormat(QImage.Format_RGBA8888).scaled(
-                64, 32, Qt.IgnoreAspectRatio, Qt.SmoothTransformation
+                256, 128, Qt.IgnoreAspectRatio, Qt.SmoothTransformation
             )
             if not cape.save(str(target), "PNG"):
                 self.skinUploadStatusChanged.emit("Cape konnte nicht gespeichert werden.", True)
@@ -394,6 +394,62 @@ class AccountController(QObject):
         self.skinUploadStatusChanged.emit("Cape gespeichert und in der Vorschau aktiviert.", False)
         return self.capeTextureUrl
 
+    @Slot(result=str)
+    def pickCapeLayerImage(self) -> str:
+        """Return a bounded PNG as a data URL for a non-destructive editor layer."""
+        file_path, _ = QFileDialog.getOpenFileName(None, "Bild-Ebene auswählen", "", "PNG Bild (*.png)")
+        if not file_path:
+            return ""
+        try:
+            raw = Path(file_path).read_bytes()
+            if not raw.startswith(cape_community.PNG_SIGNATURE) or len(raw) > 10 * 1024 * 1024:
+                raise ValueError("Bitte eine PNG-Datei bis 10 MB auswählen.")
+            image = QImage(file_path)
+            if image.isNull() or image.width() > 8192 or image.height() > 8192:
+                raise ValueError("Bild kann nicht verarbeitet werden.")
+            if image.width() > 1024 or image.height() > 1024:
+                image = image.scaled(1024, 1024, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                encoded = QByteArray()
+                buffer = QBuffer(encoded)
+                buffer.open(QIODevice.WriteOnly)
+                image.save(buffer, "PNG")
+                raw = bytes(encoded)
+            import base64
+            return "data:image/png;base64," + base64.b64encode(raw).decode("ascii")
+        except (OSError, ValueError) as exc:
+            self.skinUploadStatusChanged.emit(f"Bild-Ebene konnte nicht geladen werden: {exc}", True)
+            return ""
+
+    @Slot(result=bool)
+    def resetCustomCape(self) -> bool:
+        """Remove only EzClient's local override so Minecraft can use Mojang's cape."""
+        try:
+            cape = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
+            cape.unlink(missing_ok=True)
+            self.accountChanged.emit()
+            self.skinUploadStatusChanged.emit("EzClient-Cape entfernt – Mojang-Cape wird wieder verwendet.", False)
+            return True
+        except OSError as exc:
+            self.skinUploadStatusChanged.emit(f"Cape konnte nicht zurückgesetzt werden: {exc}", True)
+            return False
+
+    @Slot(result=bool)
+    def exportCapeFile(self) -> bool:
+        cape = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
+        if not cape.is_file():
+            self.skinUploadStatusChanged.emit("Kein aktives EzClient-Cape zum Exportieren vorhanden.", True)
+            return False
+        target, _ = QFileDialog.getSaveFileName(None, "Cape exportieren", "EzClient-Cape.png", "PNG Bild (*.png)")
+        if not target:
+            return False
+        try:
+            shutil.copy2(cape, target)
+            self.skinUploadStatusChanged.emit("Cape als PNG exportiert.", False)
+            return True
+        except OSError as exc:
+            self.skinUploadStatusChanged.emit(f"Cape-Export fehlgeschlagen: {exc}", True)
+            return False
+
     @Slot(str, result=bool)
     def saveCapeDataUrl(self, data_url: str) -> bool:
         """Persist a Cape Editor canvas only after the same strict PNG validation."""
@@ -403,11 +459,22 @@ class AccountController(QObject):
             if not data_url.startswith(prefix):
                 raise ValueError("Ungültiges Cape-Format")
             raw = base64.b64decode(data_url[len(prefix):], validate=True)
-            if not cape_community.is_safe_cape_png(raw):
-                raise ValueError("Das Editor-Cape entspricht nicht dem sicheren Cape-Format")
+            image = QImage()
+            if not image.loadFromData(raw, "PNG") or image.isNull():
+                raise ValueError("Das Editor-Bild konnte nicht gelesen werden")
+            normalized = image.convertToFormat(QImage.Format_RGBA8888).scaled(
+                256, 128, Qt.IgnoreAspectRatio, Qt.SmoothTransformation
+            )
+            encoded = QByteArray()
+            buffer = QBuffer(encoded)
+            if not buffer.open(QIODevice.WriteOnly) or not normalized.save(buffer, "PNG"):
+                raise ValueError("Das Cape konnte nicht als PNG kodiert werden")
+            clean = _strip_png_metadata(bytes(encoded))
+            if not cape_community.is_safe_cape_png(clean):
+                raise ValueError("Das normalisierte Cape entspricht nicht dem sicheren Format")
             target = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(raw)
+            target.write_bytes(clean)
             self.accountChanged.emit()
             self.skinUploadStatusChanged.emit("Cape aus dem Editor gespeichert.", False)
             return True

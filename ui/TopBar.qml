@@ -283,7 +283,7 @@ Rectangle {
                     { id: "profiles",       labelKey: "nav_profiles",       fallback: "Profile",          icon: "box.svg" },
                     { id: "installed_mods", labelKey: "nav_installed_mods", fallback: "Installierte Mods", icon: "mods.svg" },
                     { id: "mods",           labelKey: "nav_discover",       fallback: "Entdecken",        icon: "compass.svg" },
-                    { id: "cape",           labelKey: "nav_cape",           fallback: "Capes",             icon: "logo.svg" },
+                    { id: "cape",           labelKey: "nav_cape",           fallback: "Capes",             icon: "logo.svg", beta: true },
                     { id: "settings",       labelKey: "nav_settings",       fallback: "Einstellungen",    icon: "settings.svg" }
                 ]
 
@@ -321,6 +321,13 @@ Rectangle {
                                    ? EzTheme.accentLight
                                    : (tabMouse.containsMouse ? EzTheme.text : EzTheme.textSecondary)
                             Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
+                        }
+                        Rectangle {
+                            visible: root.width >= 1200 && modelData.beta === true
+                            Layout.preferredWidth: betaText.implicitWidth + 8
+                            Layout.preferredHeight: 16
+                            radius: 5; color: "#5B3B9A"; border.color: EzTheme.accentLight
+                            Text { id: betaText; anchors.centerIn: parent; text: "BETA"; font.pixelSize: 8; font.bold: true; color: "#FFFFFF" }
                         }
                     }
 

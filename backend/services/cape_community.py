@@ -18,7 +18,7 @@ PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 def is_safe_cape_png(raw: bytes) -> bool:
     """Mirror the server validation before QML ever receives a community image."""
-    if not raw.startswith(PNG_SIGNATURE) or len(raw) > 512 * 1024:
+    if not raw.startswith(PNG_SIGNATURE) or len(raw) > 2 * 1024 * 1024:
         return False
     pos, width, height, color_type = len(PNG_SIGNATURE), 0, 0, -1
     data_stream, ihdr, iend = bytearray(), False, False
@@ -26,14 +26,14 @@ def is_safe_cape_png(raw: bytes) -> bool:
         while pos < len(raw):
             if pos + 12 > len(raw): return False
             size = struct.unpack(">I", raw[pos:pos + 4])[0]
-            if size > 512 * 1024 or pos + 12 + size > len(raw): return False
+            if size > 2 * 1024 * 1024 or pos + 12 + size > len(raw): return False
             kind, data = raw[pos + 4:pos + 8], raw[pos + 8:pos + 8 + size]
             crc = struct.unpack(">I", raw[pos + 8 + size:pos + 12 + size])[0]
             if zlib.crc32(kind + data) & 0xffffffff != crc: return False
             pos += 12 + size
             if kind == b"IHDR" and not ihdr and size == 13:
                 width, height, depth, color_type, compression, filtering, interlace = struct.unpack(">IIBBBBB", data)
-                if (width, height) not in {(64, 32), (128, 64), (256, 128)} or depth != 8 or color_type not in (2, 6) or compression or filtering or interlace: return False
+                if (width, height) not in {(64, 32), (128, 64), (256, 128), (512, 256), (1024, 512)} or depth != 8 or color_type not in (2, 6) or compression or filtering or interlace: return False
                 ihdr = True
             elif kind == b"IDAT" and ihdr and not iend: data_stream.extend(data)
             elif kind == b"IEND" and size == 0: iend = True; break
@@ -65,7 +65,7 @@ def list_capes() -> list[dict]:
 def upload_cape(path: Path, owner: str, owner_uuid: str, title: str) -> dict:
     """Upload one PNG cape using a small multipart request."""
     image = path.read_bytes()
-    if len(image) > 512 * 1024:
+    if len(image) > 2 * 1024 * 1024:
         raise ValueError("Das Cape darf maximal 512 KB groß sein.")
     if not is_safe_cape_png(image):
         raise ValueError("Bitte wähle ein gültiges Cape-PNG (64×32, 128×64 oder 256×128).")
