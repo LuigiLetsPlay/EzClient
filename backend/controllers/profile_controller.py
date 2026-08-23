@@ -372,7 +372,12 @@ class ProfileController(QObject):
             updates: dict[str, str] = {}
             for mod in mods:
                 key = mod.project_id or mod.slug or mod.name
-                if not key or (mod.slug or "").lower() in ("ezclient", "fabric-api"):
+                is_ezclient_core = (
+                    (mod.slug or "").lower() in ("ezclient", "ezclient-core")
+                    or "ezclient" in (mod.filename or "").lower()
+                    or (mod.name or "").strip().lower() == "ezclient"
+                )
+                if not key or is_ezclient_core or (mod.slug or "").lower() == "fabric-api":
                     continue
                 if str(mod.version or "").strip().lower() == "latest":
                     continue
@@ -968,9 +973,15 @@ class ProfileController(QObject):
         self.launchStatusChanged.emit("Mods werden synchronisiert & geprüft…", False)
 
         def worker():
+            def launch_status(message: str, error: bool = False) -> None:
+                self.launchStatusChanged.emit(message, error)
+                self._live_log_service.append_system_message(
+                    message, "ERROR" if error else "INFO"
+                )
+
             try:
                 # 1. Sync all enabled mods to profile.mods_path
-                sync_profile_mods(self._active_profile, status_callback=lambda s: self.launchStatusChanged.emit(s, False))
+                sync_profile_mods(self._active_profile, status_callback=launch_status)
                 
                 # 2. Check if Direct Launch is preferred
                 proc = None
@@ -978,7 +989,7 @@ class ProfileController(QObject):
                     self.launchStatusChanged.emit("Direktstart wird vorbereitet (Token & Java)…", False)
                     proc = launch_minecraft_direct(
                         self._active_profile,
-                        status_callback=lambda s: self.launchStatusChanged.emit(s, False)
+                        status_callback=launch_status
                     )
 
                 if proc is not None:
@@ -1063,7 +1074,14 @@ class ProfileController(QObject):
                     self.launchStatusChanged.emit(f"Spiel beendet ({self._active_profile.name})", False)
                     return
 
-                # 3. Fallback: Official Minecraft Launcher with Autokill
+                # Direct mode is self-contained. Never fall back to installing
+                # or opening the official launcher if its preparation failed.
+                if self.preferDirectLaunch:
+                    self._is_launching = False
+                    launch_status("Direktstart konnte nicht vorbereitet werden. Bitte Microsoft-Anmeldung und Logs prüfen.", True)
+                    return
+
+                # 3. Legacy fallback: Official Minecraft Launcher with Autokill
                 self.launchStatusChanged.emit("Minecraft Launcher wird gestartet…", False)
                 patch_launcher_profile(self._active_profile)
                 def launcher_status(message: str, error: bool = False) -> None:

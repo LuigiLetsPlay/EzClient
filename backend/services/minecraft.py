@@ -16,6 +16,11 @@ FABRIC_FALLBACK_URL = "https://maven.fabricmc.net/net/fabricmc/fabric-installer/
 _launcher_install_process: subprocess.Popen | None = None
 
 def minecraft_dir() -> Path:
+    # Development/first-run test override. Keeping it opt-in protects an
+    # existing Minecraft installation while allowing a genuinely empty test.
+    override = os.environ.get("EZCLIENT_MINECRAFT_DIR", "").strip()
+    if override:
+        return Path(override).expanduser()
     if sys.platform.startswith("win") and os.environ.get("APPDATA"):
         return Path(os.environ["APPDATA"]) / ".minecraft"
     if sys.platform == "darwin":

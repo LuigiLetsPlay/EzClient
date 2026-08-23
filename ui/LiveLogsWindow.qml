@@ -33,6 +33,30 @@ Window {
         id: logListModel
     }
 
+    function loadBufferedLogs() {
+        logListModel.clear()
+        if (!liveLogService)
+            return
+        var entries = liveLogService.getBufferedLogs()
+        for (var i = 0; i < entries.length; ++i) {
+            var entry = entries[i]
+            logListModel.append({
+                "raw": entry.raw,
+                "level": entry.level,
+                "time": entry.time,
+                "msg": entry.message
+            })
+        }
+        if (autoScroll && !searchQuery)
+            Qt.callLater(function() { logListView.positionViewAtEnd() })
+    }
+
+    Component.onCompleted: loadBufferedLogs()
+    onVisibleChanged: {
+        if (visible)
+            loadBufferedLogs()
+    }
+
     Connections {
         target: liveLogsWindow.liveLogService
         function onLogAppended(raw, level, timeStr, msg) {

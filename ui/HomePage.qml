@@ -411,8 +411,9 @@ Item {
         // ── AUTH STATUS BADGE ──
         Rectangle {
             id: launchModePill
+            visible: false
             Layout.alignment: Qt.AlignHCenter
-            Layout.preferredHeight: 26
+            Layout.preferredHeight: 0
             Layout.preferredWidth: Math.min(root.width - 32, modeRow.implicitWidth + 22)
             radius: 13
             color: modeMouse.containsMouse ? "#1A261F" : "#111C15"

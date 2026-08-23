@@ -1090,17 +1090,6 @@ Item {
                         elide: Text.ElideRight
                     }
 
-                    // Delete / Uninstall Action (Hidden for Fabric API)
-                    EzButton {
-                        text: "EzClient Update"
-                        mcFont: true
-                        primary: true
-                        visible: modItem.isEzClient
-                        Layout.preferredWidth: 92
-                        Layout.preferredHeight: 28
-                        onClicked: profileController.updateEzClient()
-                    }
-
                     EzButton {
                         text: "Update " + modItem.modUpdateVersion
                         mcFont: true

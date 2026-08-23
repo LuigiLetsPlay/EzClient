@@ -172,7 +172,10 @@ def extract_natives(mc_dir: Path, libraries: list[dict[str, Any]], natives_dir: 
                 except Exception as e:
                     print(f"[DirectLaunch] Native extraction warning for {name}: {e}")
 
-def ensure_profile_defaults(profile_path: Path) -> None:
+def ensure_profile_defaults(
+    profile_path: Path,
+    status_callback: Optional[Callable[[str], None]] = None,
+) -> None:
     """Pre-configures options.txt and sodium-options.json to optimize PvP/Performance, skip narrator, disable tutorial, and set music to 10%."""
     from backend.services.store import preseed_optimized_profile_settings
     preseed_optimized_profile_settings(profile_path)
@@ -214,10 +217,14 @@ def ensure_profile_defaults(profile_path: Path) -> None:
             text = essential_config.read_text("utf-8")
             if 'discord_rpc = true' in text or 'discord_integration = true' in text or 'discordRpc = true' in text or 'discord' in text.lower():
                 import re
-                text = re.sub(r'discord(?i)[a-z_]*\s*=\s*true', 'discord_integration = false', text)
+                text = re.sub(r'(?i)discord[a-z_]*\s*=\s*true', 'discord_integration = false', text)
                 essential_config.write_text(text, "utf-8")
         except Exception as e:
-            print(f"[DirectLaunch] Failed to disable Essential RPC: {e}")
+            message = f"Essential RPC konnte nicht deaktiviert werden: {e}"
+            if status_callback:
+                status_callback(message)
+            else:
+                print(f"[DirectLaunch] {message}")
 
 def launch_minecraft_direct(
     profile: ProfileData,
@@ -234,13 +241,18 @@ def launch_minecraft_direct(
 
     # Configure optimal audio/accessibility defaults (10% music, skip narrator)
     try:
-        ensure_profile_defaults(profile.path)
+        ensure_profile_defaults(profile.path, notify)
     except Exception as e:
-        print(f"[DirectLaunch] Options configuration warning: {e}")
+        notify(f"Warnung beim Anwenden der Spieleinstellungen: {e}")
 
     mc = minecraft_dir()
-    if not mc.exists():
-        notify("Fehler: .minecraft Verzeichnis nicht gefunden.")
+    # Run the fast readiness check on every launch. It catches an incomplete
+    # asset cache even when the Minecraft client JAR already exists.
+    try:
+        from backend.services.game_bootstrap import ensure_game_ready
+        ensure_game_ready(profile, mc, notify)
+    except Exception as exc:
+        notify(f"Fehler beim Minecraft-Erststart: {exc}")
         return None
 
     # 0. Sync and verify all profile mods and dependencies
@@ -301,6 +313,9 @@ def launch_minecraft_direct(
     notify("Überprüfe Microsoft-Sitzung & Token…")
     session: MinecraftSession = get_minecraft_session()
     notify(f"Authentifiziert als {session.username} ({'Online' if session.is_online else 'Offline'})")
+    if not session.is_online:
+        notify("Microsoft-Anmeldung mit einer Minecraft-Java-Lizenz ist zum Starten erforderlich.")
+        return None
 
     # 4. Assemble JVM & Game Arguments
     java_bin = find_best_java(mc)

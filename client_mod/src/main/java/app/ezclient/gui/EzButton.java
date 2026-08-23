@@ -9,7 +9,7 @@ import net.minecraft.network.chat.Component;
 
 import java.util.function.Consumer;
 
-/** Compact square EzClient control with no vanilla widget texture. */
+/** Modern pill-shaped EzClient control with no vanilla widget texture. */
 final class EzButton extends AbstractButton {
     private final Consumer<EzButton> action;
     private final boolean accent;
@@ -27,19 +27,16 @@ final class EzButton extends AbstractButton {
 
     @Override
     protected void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
-        int background;
-        if (!active) background = 0xFF171A1F;
-        else if (isHoveredOrFocused()) background = accent ? 0xFF2FBF71 : 0xFF303741;
-        else background = accent ? 0xFF239A59 : 0xFF242A32;
-
-        graphics.fill(getX(), getY(), getRight(), getBottom(), background);
-        graphics.outline(getX(), getY(), getWidth(), getHeight(), active ? 0xFF3B4652 : 0xFF242930);
+        int background = !active ? 0xFF161A22
+                : accent ? (isHoveredOrFocused() ? 0xFFAF91FF : 0xFF8B6CF6)
+                : (isHoveredOrFocused() ? 0xFF323A4A : 0xFF242B37);
+        EzUi.roundedRect(graphics, getX(), getY(), getWidth(), getHeight(), Math.min(8, getHeight() / 2), background);
         graphics.centeredText(
                 Minecraft.getInstance().font,
                 getMessage(),
                 getX() + getWidth() / 2,
                 getY() + (getHeight() - 8) / 2,
-                active ? 0xFFF2F5F7 : 0xFF69717A
+                active ? (accent ? 0xFFFFFFFF : 0xFFE9EDF5) : 0xFF69717A
         );
     }
 

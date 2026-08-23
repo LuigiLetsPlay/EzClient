@@ -10,6 +10,18 @@ Item {
     property string createVersion: "26.2"
     property string createLoader: "Fabric"
     property string createPreset: "performance"
+    property bool loginBeforeCreate: false
+
+    Connections {
+        target: accountController
+        function onLoginSuccess(username) {
+            if (root.loginBeforeCreate) {
+                root.loginBeforeCreate = false
+                createDialog.opacity = 1.0
+                nameField.forceActiveFocus()
+            }
+        }
+    }
 
     // Background click handler to deselect / defocus search input
     MouseArea {
@@ -229,6 +241,11 @@ Item {
 
     function createBtnAction() {
         if (nameField.text.trim() !== "") {
+            if (!accountController || !accountController.isOnline) {
+                root.loginBeforeCreate = true
+                accountController.openLoginDialog()
+                return
+            }
             profileController.createProfile(nameField.text.trim(), root.createVersion, root.createLoader, root.createPreset)
             createDialog.opacity = 0.0
             nameField.text = ""
@@ -272,8 +289,13 @@ Item {
                 Layout.preferredHeight: 36
                 Layout.preferredWidth: 110
                 onClicked: {
-                    createDialog.opacity = 1.0
-                    nameField.forceActiveFocus()
+                    if (!accountController || !accountController.isOnline) {
+                        root.loginBeforeCreate = true
+                        accountController.openLoginDialog()
+                    } else {
+                        createDialog.opacity = 1.0
+                        nameField.forceActiveFocus()
+                    }
                 }
             }
         }

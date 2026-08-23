@@ -160,6 +160,11 @@ class LiveLogService(QObject):
             self._lines_buffer = self._lines_buffer[-5000:]
         self.logAppended.emit(raw, level, timestamp, message)
 
+    @Slot(result="QVariantList")
+    def getBufferedLogs(self) -> list[dict[str, str]]:
+        """Snapshot retained launcher progress for a log window opened later."""
+        return [dict(item) for item in self._lines_buffer]
+
     def _stats_worker(self) -> None:
         p_obj = None
         if psutil and self._current_pid:
