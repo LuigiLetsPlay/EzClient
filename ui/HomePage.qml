@@ -146,10 +146,37 @@ Item {
             capeSource: root.capeTextureUrl
             animation: "idle"
             autoRotate: false
-            interactive: true
+            interactive: false
             initialRotateX: 0
             initialRotateY: -14
             onSkinClicked: {
+                if (typeof window !== "undefined" && window.openSkinModal) window.openSkinModal()
+            }
+        }
+
+        // Compact custom hitbox: drag rotates the skin, a plain click opens
+        // the skin modal. Everything outside stays clickable as usual.
+        MouseArea {
+            id: skinHitbox
+            z: 5
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: Math.max(90, parent.height * 0.20)
+            width: Math.min(200, parent.width * 0.28)
+            height: Math.min(330, parent.height * 0.55)
+            hoverEnabled: true
+            cursorShape: containsMouse ? Qt.PointingHandCursor : Qt.ArrowCursor
+            property real lastX: 0
+            property real angle: -14
+            onPressed: function(mouse) { lastX = mouse.x }
+            onPositionChanged: function(mouse) {
+                if (!pressed) return
+                var dx = mouse.x - lastX
+                lastX = mouse.x
+                if (dx === 0) return
+                angle += dx * 0.8
+                centeredHomeSkin3D.setRotateY(angle)
+            }
+            onClicked: {
                 if (typeof window !== "undefined" && window.openSkinModal) window.openSkinModal()
             }
         }
