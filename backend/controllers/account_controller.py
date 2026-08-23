@@ -57,7 +57,7 @@ def _bake_editor_cape(image: QImage, fit_mode: str = "Cover") -> QImage:
     all other vanilla UV faces remain transparent.  This is the same image that
     the 3D launcher preview and the in-game renderer should display.
     """
-    portrait = image.transformed(QTransform().rotate(-90), Qt.FastTransformation)
+    portrait = image.transformed(QTransform().rotate(90), Qt.FastTransformation)
     aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
     scaled = portrait.scaled(10, 16, aspect, Qt.SmoothTransformation)
     left = max(0, (scaled.width() - 10) // 2)
@@ -82,7 +82,7 @@ def _write_hd_cape_preview(image: QImage, editor: bool = False, fit_mode: str = 
     if not editor and abs((rgba.width() / max(1, rgba.height())) - 2.0) < 0.02:
         preview = rgba
     else:
-        portrait = rgba.transformed(QTransform().rotate(-90), Qt.SmoothTransformation)
+        portrait = rgba.transformed(QTransform().rotate(90), Qt.SmoothTransformation)
         # A 1280x640 cape atlas has a texture scale of 20x. Its vanilla
         # 10x16 visible face therefore occupies 200x320 pixels.
         aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
@@ -116,7 +116,7 @@ def _write_hd_upload_atlas(image: QImage, fit_mode: str = "Cover") -> bool:
     face receives 160x256 pixels instead of only 10x16.
     """
     portrait = image.convertToFormat(QImage.Format_RGBA8888).transformed(
-        QTransform().rotate(-90), Qt.SmoothTransformation
+        QTransform().rotate(90), Qt.SmoothTransformation
     )
     aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
     scaled = portrait.scaled(160, 256, aspect, Qt.SmoothTransformation)
