@@ -20,7 +20,24 @@ def maven_to_path(name: str) -> str:
     group_path = group.replace(".", "/")
     return f"{group_path}/{artifact}/{version}/{artifact}-{version}{classifier}.jar"
 
-def find_best_java(mc_dir: Path) -> str:
+def _java_major(java_path: str) -> int | None:
+    try:
+        result = subprocess.run(
+            [java_path, "-XshowSettings:properties", "-version"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        for line in (result.stdout + result.stderr).splitlines():
+            if line.strip().startswith("java.version"):
+                return int(line.split("=", 1)[1].strip().split(".", 1)[0])
+    except (OSError, subprocess.SubprocessError, ValueError):
+        pass
+    return None
+
+
+def find_best_java(mc_dir: Path, required_major: int = 0) -> str:
     """Finds best Java executable (checks Mojang runtime, Java 21/25, system PATH)."""
     candidates = []
 
@@ -54,10 +71,19 @@ def find_best_java(mc_dir: Path) -> str:
             for jw in jdk_dir.rglob("javaw.exe" if sys.platform.startswith("win") else "java"):
                 candidates.append(str(jw))
 
-    # Test candidate executability
     for c in candidates:
         if Path(c).exists():
+            if required_major and _java_major(c) != required_major:
+                continue
             return c
+
+    if required_major:
+        try:
+            from backend.services.java_runtime import install_required_java
+            installed = install_required_java(mc_dir, required_major, lambda message: print(f"[DirectLaunch] {message}"))
+            return str(installed)
+        except Exception as exc:
+            print(f"[DirectLaunch] Java-Auto-Installation fehlgeschlagen: {exc}")
 
     return "javaw" if sys.platform.startswith("win") else "java"
 
@@ -274,6 +300,9 @@ def launch_minecraft_direct(
         return None
 
     inherits = fabric_data.get("inheritsFrom", profile.minecraft_version) if fabric_data else profile.minecraft_version
+    required_java_major = int(vanilla_data.get("javaVersion", {}).get("majorVersion") or 0)
+    if not required_java_major and inherits.startswith(("26.1", "26.2")):
+        required_java_major = 25
     client_jar = mc / f"versions/{inherits}/{inherits}.jar"
     if not client_jar.exists():
         notify(f"Fehler: Minecraft Basis-JAR fehlt ({inherits}.jar). Bitte einmalig im Launcher starten.")
@@ -318,7 +347,16 @@ def launch_minecraft_direct(
         return None
 
     # 4. Assemble JVM & Game Arguments
-    java_bin = find_best_java(mc)
+    if required_java_major >= 25:
+        notify(f"Prüfe und installiere Java {required_java_major}, falls erforderlich…")
+        try:
+            from backend.services.java_runtime import install_required_java
+            java_bin = str(install_required_java(mc, required_java_major, notify))
+        except Exception as exc:
+            notify(f"Fehler bei der automatischen Java-Installation: {exc}")
+            return None
+    else:
+        java_bin = find_best_java(mc)
     ram = getattr(profile, "ram_mb", 4096) or 4096
     sep = ";" if sys.platform.startswith("win") else ":"
     classpath_str = sep.join(str(p) for p in cp_jars)
