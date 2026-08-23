@@ -27,6 +27,5 @@ final class EzUi {
 
     static void card(GuiGraphicsExtractor g, int x, int y, int width, int height, boolean active) {
         roundedRect(g, x, y, width, height, 11, active ? 0xFF252B38 : 0xE0151921);
-        roundedRect(g, x, y, width, 1, 11, active ? 0xFF9D7BFF : 0xFF30394A);
     }
 }
