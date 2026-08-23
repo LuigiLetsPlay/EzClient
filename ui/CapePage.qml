@@ -87,12 +87,10 @@ Item {
                             anchors.fill: parent; anchors.margins: 12; spacing: 8
                             Rectangle {
                                 Layout.preferredWidth: 72; Layout.fillHeight: true; Layout.alignment: Qt.AlignHCenter; radius: 9; color: EzTheme.surface3; clip: true
-                                Image {
-                                    anchors.centerIn: parent
-                                    width: parent.height - 14; height: parent.width - 14
-                                    source: modelData.imageUrl || ""
-                                    fillMode: Image.Stretch
-                                    rotation: 90; transformOrigin: Item.Center; asynchronous: true
+                                CapeTextureImage {
+                                    anchors.fill: parent
+                                    anchors.margins: 7
+                                    capeSource: modelData.imageUrl || ""
                                 }
                                 MouseArea {
                                     anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
@@ -142,10 +140,10 @@ Item {
         background: Rectangle { radius: 16; color: EzTheme.surface2; border.color: EzTheme.border }
         contentItem: Rectangle {
             color: EzTheme.surface3; radius: 12; clip: true
-            Image {
-                anchors.centerIn: parent
-                width: parent.height - 24; height: parent.width - 24
-                source: root.previewCapeUrl; fillMode: Image.Stretch; rotation: 90; transformOrigin: Item.Center
+            CapeTextureImage {
+                anchors.fill: parent
+                anchors.margins: 12
+                capeSource: root.previewCapeUrl
             }
         }
     }
