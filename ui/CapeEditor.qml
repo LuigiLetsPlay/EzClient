@@ -29,6 +29,13 @@ Item {
         root.pendingPreview = accountController.prepareCapeImage(root.selectedSource, root.fitMode + "|" + crop)
     }
 
+    Timer {
+        id: liveCropTimer
+        interval: 200
+        repeat: false
+        onTriggered: if (root.fitMode === "Crop" && root.selectedSource !== "") root.prepare()
+    }
+
     function discard() {
         accountController.cancelPendingCape()
         root.selectedSource = ""
@@ -128,14 +135,18 @@ Item {
                 RowLayout {
                     spacing: 10
                     Repeater {
-                        model: [{ id: "Cover", label: "Ausfüllen" }, { id: "Stretch", label: "Strecken" }]
+                        model: [{ id: "Cover", label: "Ausfüllen" }, { id: "Stretch", label: "Strecken" }, { id: "Crop", label: "Zuschneiden" }]
                         delegate: Rectangle {
                             property var item: modelData
-                            width: 130; height: 40; radius: 8
+                            width: 110; height: 40; radius: 8
                             color: root.fitMode === item.id ? EzTheme.surfaceActive : EzTheme.surface2
                             border.color: root.fitMode === item.id ? EzTheme.accent : EzTheme.border
 
-                            MouseArea { anchors.fill: parent; onClicked: { root.fitMode = item.id; root.prepare() } }
+                            MouseArea {
+                                anchors.fill: parent
+                                enabled: item.id !== "Crop" || root.selectedSource !== ""
+                                onClicked: { root.fitMode = item.id; root.prepare() }
+                            }
                             Text { anchors.centerIn: parent; text: item.label; color: EzTheme.text; font.pixelSize: 13 }
                         }
                     }
@@ -201,6 +212,7 @@ Item {
                             root.cropY = (cropFrame.y - cropImage.y) / cropImage.paintedHeight
                             root.cropW = Math.min(1, cropFrame.width / cropImage.paintedWidth)
                             root.cropH = Math.min(1, cropFrame.height / cropImage.paintedHeight)
+                            liveCropTimer.restart()
                         }
 
                         Rectangle {

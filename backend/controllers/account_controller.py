@@ -538,6 +538,9 @@ class AccountController(QObject):
                         rgba = cropped
                 except ValueError:
                     pass
+            if mode == "Crop":
+                # "Zuschneiden": the selected region fills the cape face as-is.
+                mode = "Stretch"
             cape = _bake_editor_cape(rgba, mode)
             if not _write_hd_cape_preview(rgba, editor=True, fit_mode=mode):
                 raise ValueError("Die Cape-Vorschau konnte nicht erzeugt werden.")
