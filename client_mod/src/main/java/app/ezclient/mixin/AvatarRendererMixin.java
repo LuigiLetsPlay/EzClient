@@ -45,28 +45,36 @@ abstract class AvatarRendererMixin {
         if (state == null || state.nameTag == null) return;
         if (!Boolean.TRUE.equals(EZ_IDS.get(state.id))) return;
 
-        Font font = Minecraft.getInstance().font;
-        float nameWidth = font.width(state.nameTag);
-        float iconSize = 8.0F;
-        float gap = 2.5F;
+        // The logo must never break player rendering (skins/names). If anything
+        // goes wrong while drawing it, silently skip this frame's icon.
+        try {
+            Font font = Minecraft.getInstance().font;
+            float nameWidth = font.width(state.nameTag);
+            float iconSize = 8.0F;
+            float gap = 2.5F;
 
-        pose.pushPose();
-        // Name tags are centered; move to the left edge of the text and up a
-        // little so the icon sits on the same baseline.
-        pose.translate(-(nameWidth / 2.0F + gap + iconSize), -6.5F, 0.04F);
+            pose.pushPose();
+            // Name tags are centered; move to the left edge of the text and up
+            // a little so the icon sits on the same baseline.
+            pose.translate(-(nameWidth / 2.0F + gap + iconSize), -6.5F, 0.04F);
 
-        collector.submitCustomGeometry(pose, RenderTypes.text(ICON), (poseStackPose, vertexConsumer) -> {
-            Matrix4f matrix = poseStackPose.pose();
-            vertexConsumer.addVertex(matrix, 0, iconSize, 0).setColor(255, 255, 255, 255)
-                    .setUv(0F, 1F).setUv2(240, 240).setNormal(poseStackPose, 0F, 0F, 1F);
-            vertexConsumer.addVertex(matrix, iconSize, iconSize, 0).setColor(255, 255, 255, 255)
-                    .setUv(1F, 1F).setUv2(240, 240).setNormal(poseStackPose, 0F, 0F, 1F);
-            vertexConsumer.addVertex(matrix, iconSize, 0, 0).setColor(255, 255, 255, 255)
-                    .setUv(1F, 0F).setUv2(240, 240).setNormal(poseStackPose, 0F, 0F, 1F);
-            vertexConsumer.addVertex(matrix, 0, 0, 0).setColor(255, 255, 255, 255)
-                    .setUv(0F, 0F).setUv2(240, 240).setNormal(poseStackPose, 0F, 0F, 1F);
-        });
+            collector.submitCustomGeometry(pose, RenderTypes.text(ICON), (poseStackPose, vertexConsumer) -> {
+                try {
+                    Matrix4f matrix = poseStackPose.pose();
+                    vertexConsumer.addVertex(matrix, 0, iconSize, 0).setColor(255, 255, 255, 255)
+                            .setUv(0F, 1F).setUv2(240, 240).setNormal(poseStackPose, 0F, 0F, 1F);
+                    vertexConsumer.addVertex(matrix, iconSize, iconSize, 0).setColor(255, 255, 255, 255)
+                            .setUv(1F, 1F).setUv2(240, 240).setNormal(poseStackPose, 0F, 0F, 1F);
+                    vertexConsumer.addVertex(matrix, iconSize, 0, 0).setColor(255, 255, 255, 255)
+                            .setUv(1F, 0F).setUv2(240, 240).setNormal(poseStackPose, 0F, 0F, 1F);
+                    vertexConsumer.addVertex(matrix, 0, 0, 0).setColor(255, 255, 255, 255)
+                            .setUv(0F, 0F).setUv2(240, 240).setNormal(poseStackPose, 0F, 0F, 1F);
+                } catch (Throwable ignored) { }
+            });
 
-        pose.popPose();
+            pose.popPose();
+        } catch (Throwable ignored) {
+            try { pose.popPose(); } catch (Throwable ignoredToo) { }
+        }
     }
 }
