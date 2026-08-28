@@ -123,7 +123,7 @@ Item {
             color: closeMouse.containsMouse ? "#2A2D3A" : "#1A1D27"
             Text {
                 anchors.centerIn: parent
-                text: "✕"
+                text: "X"
                 color: "#A0A8B8"
                 font.pixelSize: 14
             }
@@ -241,19 +241,19 @@ Item {
                                 Rectangle {
                                     Layout.fillWidth: true; Layout.fillHeight: true; radius: 6
                                     color: skinModal.currentAnim === "idle" ? EzTheme.surfaceActive : "transparent"
-                                    Text { anchors.centerIn: parent; text: "🧍"; font.pixelSize: 14 }
+                                    Text { anchors.centerIn: parent; text: "Idle"; font.pixelSize: 10; font.family: EzTheme.mcFontFamily; color: EzTheme.text }
                                     MouseArea { anchors.fill: parent; onClicked: { skinModal.currentAnim = "idle"; modalSkin3D.setAnim("idle") } }
                                 }
                                 Rectangle {
                                     Layout.fillWidth: true; Layout.fillHeight: true; radius: 6
                                     color: skinModal.currentAnim === "walk" ? EzTheme.surfaceActive : "transparent"
-                                    Text { anchors.centerIn: parent; text: "🚶"; font.pixelSize: 14 }
+                                    Text { anchors.centerIn: parent; text: "Walk"; font.pixelSize: 10; font.family: EzTheme.mcFontFamily; color: EzTheme.text }
                                     MouseArea { anchors.fill: parent; onClicked: { skinModal.currentAnim = "walk"; modalSkin3D.setAnim("walk") } }
                                 }
                                 Rectangle {
                                     Layout.fillWidth: true; Layout.fillHeight: true; radius: 6
                                     color: skinModal.currentAnim === "run" ? EzTheme.surfaceActive : "transparent"
-                                    Text { anchors.centerIn: parent; text: "🏃"; font.pixelSize: 14 }
+                                    Text { anchors.centerIn: parent; text: "Run"; font.pixelSize: 10; font.family: EzTheme.mcFontFamily; color: EzTheme.text }
                                     MouseArea { anchors.fill: parent; onClicked: { skinModal.currentAnim = "run"; modalSkin3D.setAnim("run") } }
                                 }
                             }
@@ -651,7 +651,7 @@ Item {
                                     width: 20; height: 20; radius: 4; color: "#AA2222"
                                     opacity: libDelMouse.containsMouse ? 1.0 : 0.0
                                     Behavior on opacity { NumberAnimation { duration: 150 } }
-                                    Text { anchors.centerIn: parent; text: "✕"; color: "#FFF"; font.pixelSize: 10 }
+                                    Text { anchors.centerIn: parent; text: "X"; color: "#FFF"; font.pixelSize: 10 }
                                     MouseArea {
                                         id: libDelMouse
                                         anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor

@@ -70,7 +70,7 @@ Rectangle {
                     color: EzTheme.surface2
                     border.color: EzTheme.border
                     border.width: 1
-                    Text { text: "🖼️"; font.pixelSize: 18; anchors.centerIn: parent }
+                    Image { source: "../icons/camera.svg"; width: 18; height: 18; anchors.centerIn: parent; fillMode: Image.PreserveAspectFit }
                 }
                 ColumnLayout {
                     spacing: 2
@@ -92,7 +92,7 @@ Rectangle {
                 Rectangle {
                     width: 28; height: 28; radius: 14
                     color: closeMouse.containsMouse ? "#2A2E39" : "transparent"
-                    Text { text: "✕"; color: EzTheme.textMuted; anchors.centerIn: parent; font.pixelSize: 13 }
+                    Image { source: "../icons/x.svg"; width: 12; height: 12; anchors.centerIn: parent; fillMode: Image.PreserveAspectFit; opacity: 0.6 }
                     MouseArea {
                         id: closeMouse
                         anchors.fill: parent
@@ -145,7 +145,7 @@ Rectangle {
                         width: 48; height: 64; radius: 6
                         color: "#182028"
                         border.color: EzTheme.border; border.width: 1
-                        Text { text: "👤"; anchors.centerIn: parent; font.pixelSize: 24 }
+                        Image { source: "../icons/user.svg"; width: 24; height: 24; anchors.centerIn: parent; fillMode: Image.PreserveAspectFit }
                     }
                     Rectangle {
                         Layout.alignment: Qt.AlignHCenter
@@ -161,7 +161,7 @@ Rectangle {
                     height: 22; width: 92; radius: 4
                     color: "#C0000000"
                     border.color: EzTheme.borderLight; border.width: 1
-                    Text { text: "👁️ Live-Vorschau"; color: EzTheme.accentLight; font.pixelSize: 10; anchors.centerIn: parent; font.bold: true }
+                    Text { text: "Live-Vorschau"; color: EzTheme.accentLight; font.pixelSize: 10; anchors.centerIn: parent; font.bold: true }
                 }
             }
 
@@ -171,7 +171,7 @@ Rectangle {
                 spacing: 10
 
                 EzButton {
-                    text: "📁 Neues Bild wählen…"
+                    text: "Neues Bild wählen…"
                     mcFont: false
                     implicitHeight: 34
                     Layout.fillWidth: true

@@ -37,7 +37,7 @@ except ImportError:
 
 
 APP_NAME = "EzClient"
-APP_VERSION = "1.6.7"
+APP_VERSION = "1.8.0"
 MINECRAFT_INSTALLER_URL = "https://launcher.mojang.com/download/MinecraftInstaller.msi"
 FABRIC_META_URL = "https://meta.fabricmc.net/v2/versions/installer"
 FABRIC_FALLBACK_URL = (
@@ -84,16 +84,8 @@ FALLBACK_VERSIONS = [
 ]
 
 RECOMMENDED_MODS = [
-    ("fabric-api", "Fabric API"),
     ("sodium", "Sodium"),
-    ("sodium-extra", "Sodium Extra"),
-    ("reeses-sodium-options", "Reese's Sodium Options"),
     ("lithium", "Lithium"),
-    ("ferrite-core", "FerriteCore"),
-    ("immediatelyfast", "ImmediatelyFast"),
-    ("entityculling", "Entity Culling"),
-    ("moreculling", "More Culling"),
-    ("dynamic-fps", "Dynamic FPS"),
 ]
 
 
@@ -2128,7 +2120,7 @@ class CreateFlow(ctk.CTkToplevel):
         ctk.CTkLabel(panel, text="Select your initial mod configuration.", font=("Segoe UI", 9), text_color=MUTED).pack(anchor="w", padx=16, pady=(0, 12))
 
         # Option 1: Performance Stack
-        self._radio_opt(panel, True, "⚡ Recommended Performance Stack", "Pre-configures Sodium, Lithium, FerriteCore and Entity Culling for optimal FPS.")
+        self._radio_opt(panel, True, "⚡ Recommended Performance Stack", "Installs only EzClient, Sodium and Lithium for optimal FPS.")
         # Option 2: Clean Fabric
         self._radio_opt(panel, False, "Clean Fabric Loader", "Pure Fabric installation without pre-bundled performance mods.")
 

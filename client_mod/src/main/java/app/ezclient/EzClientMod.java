@@ -11,15 +11,14 @@ import java.nio.file.*;
 import java.util.*;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.KeyMapping;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.resources.Identifier;
 import app.ezclient.gui.ConfigManager;
 import app.ezclient.gui.EzClientScreen;
 import app.ezclient.gui.EzHubScreen;
+import app.ezclient.gui.HudEditorScreen;
 import app.ezclient.gui.HudRenderer;
 import app.ezclient.gui.ModuleManager;
 import app.ezclient.cosmetics.CommunityPresence;
@@ -32,17 +31,14 @@ import app.ezclient.cosmetics.CommunityCapeManager;
  * - First-Launch Performance & PvP Optimization (Fast Graphics, 8 Chunks, No Shadows/Clouds, Biome Blend 0, Unlimited FPS)
  */
 public class EzClientMod implements ClientModInitializer {
-public static final String CLIENT_VERSION = "1.6.7";
-public static final String CLIENT_TITLE = "EzClient 1.6.7";
+    public static final String CLIENT_VERSION = "1.8.0";
+    public static final String CLIENT_TITLE = "EzClient 1.8.0";
     private static volatile boolean running = true;
     private static Path ezClientDataDir = null;
 
-    private static KeyMapping guiKey;
-    private static KeyMapping zoomKey;
     private static boolean isZooming = false;
-    private static final KeyMapping.Category KEY_CATEGORY = KeyMapping.Category.register(
-            Identifier.fromNamespaceAndPath("ezclient", "general")
-    );
+    private static boolean lastGuiKeyState = false;
+    private static boolean iconApplied = false;
 
     public static boolean isZooming() {
         return isZooming;
@@ -89,30 +85,51 @@ public static final String CLIENT_TITLE = "EzClient 1.6.7";
 
         ConfigManager.load();
 
-        guiKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                "key.ezclient.gui",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_RIGHT_SHIFT,
-                KEY_CATEGORY
-        ));
-
-        zoomKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                "key.ezclient.zoom",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_C,
-                KEY_CATEGORY
-        ));
-
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (guiKey.consumeClick()) {
-                if (!(client.gui.screen() instanceof EzHubScreen)) {
-                    client.gui.setScreen(new EzHubScreen(client.gui.screen()));
+            if (client.getWindow() != null) {
+                boolean isGuiKeyDown = InputConstants.isKeyDown(client.getWindow(), GLFW.GLFW_KEY_RIGHT_SHIFT);
+                if (isGuiKeyDown && !lastGuiKeyState) {
+                    if (client.gui.screen() instanceof EzHubScreen || client.gui.screen() instanceof HudEditorScreen) {
+                        client.gui.setScreen(null);
+                    } else if (client.gui.screen() == null && client.level != null && client.player != null) {
+                        client.gui.setScreen(new EzHubScreen(null));
+                    }
                 }
+                lastGuiKeyState = isGuiKeyDown;
             }
-            isZooming = zoomKey.isDown();
-            client.getWindow().setTitle(CLIENT_TITLE);
-            if (client.player != null && client.level != null) CommunityPresence.heartbeat(client.player.getUUID());
+            boolean currentlyZooming = ModuleManager.getInstance().getZoomModule().isEnabled() && 
+                                       ModuleManager.getInstance().getZoomModule().getKeyBind() != -1 && 
+                                       client.getWindow() != null && 
+                                       InputConstants.isKeyDown(client.getWindow(), ModuleManager.getInstance().getZoomModule().getKeyBind());
+            if (currentlyZooming && !isZooming) {
+                ModuleManager.getInstance().getZoomModule().resetToDefault();
+            }
+            isZooming = currentlyZooming;
+            
+            // Enforce clean "EzClient" title & icon once upon window initialization
+            if (!iconApplied && client.getWindow() != null) {
+                long window = client.getWindow().handle();
+                GLFW.glfwSetWindowTitle(window, CLIENT_TITLE);
+                applyWindowIcon(window);
+                iconApplied = true;
+            }
+            
+            app.ezclient.gui.KeystrokesModule.updateClicks(client);
+            
+            for (app.ezclient.gui.Module m : ModuleManager.getInstance().getModules()) {
+                m.onTick();
+            }
+
+            try {
+                if (client.getUser() != null && client.getUser().getProfileId() != null) {
+                    CommunityPresence.heartbeat(client.getUser().getProfileId(), client.getUser().getName());
+                } else if (client.player != null) {
+                    CommunityPresence.heartbeat(client.player.getUUID(), client.player.getScoreboardName());
+                }
+            } catch (Throwable ignored) {}
+
             CommunityCapeManager.tick(client);
+            
         });
 
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("ezclient", "performance_hud"), (graphics, tickDelta) -> {
@@ -127,14 +144,15 @@ public static final String CLIENT_TITLE = "EzClient 1.6.7";
         // 2. Apply optimized PvP & Sodium settings on first launch
         applyOptimizedSettings();
 
-        // 3. Start Window Title & Icon Watcher Daemon
-        startWindowDaemon();
-
-        // 4. Start Accessibility / Narrator Dismissal Daemon
-        startNarratorDismissDaemon();
+        // Window Daemon removed due to GLFW thread safety issues (moved to tick event)
+        // No runtime screen suppression: third-party UI screens must never be
+        // replaced while the player is in a world. Accessibility defaults are
+        // configured through options.txt only.
 
         log("EzClient Core Mod initialized successfully!");
     }
+    
+    private static int tickCounter = 0;
 
     /**
      * Reads and updates global client configuration stored in %APPDATA%/.ezclient/config/client_settings.json
@@ -215,7 +233,7 @@ public static final String CLIENT_TITLE = "EzClient 1.6.7";
                 }
 
                 // PvP & Performance Settings as specified
-                options.put("graphicsMode", "0");               // Fast (0=fast, 1=fancy, 2=fabulous)
+                options.put("graphicsMode", "1");               // Fancy (1=fancy, transparent leaves)
                 options.put("renderDistance", "8");             // 8 Chunks
                 options.put("simulationDistance", "5");         // 5 Chunks
                 options.put("entityShadows", "false");          // OFF
@@ -230,6 +248,7 @@ public static final String CLIENT_TITLE = "EzClient 1.6.7";
                 options.put("skipRealmsNotifications", "true"); // Skip notifications
                 options.put("gamma", "1.0");                    // Brightness 100%
                 options.put("smoothLighting", "false");         // Smooth Lighting OFF
+                options.put("soundCategory_music", "0.05");     // 5% Music Volume
 
                 List<String> outLines = new ArrayList<>();
                 for (Map.Entry<String, String> entry : options.entrySet()) {
@@ -244,7 +263,7 @@ public static final String CLIENT_TITLE = "EzClient 1.6.7";
                             "  \"quality\": {\n" +
                             "    \"graphics_quality\": \"DEFAULT\",\n" +
                             "    \"weather_quality\": \"FAST\",\n" +
-                            "    \"leaves_quality\": \"FAST\",\n" +
+                            "    \"leaves_quality\": \"FANCY\",\n" +
                             "    \"cloud_quality\": \"OFF\",\n" +
                             "    \"particles_quality\": \"MINIMAL\",\n" +
                             "    \"smooth_lighting\": \"OFF\",\n" +
@@ -277,67 +296,7 @@ public static final String CLIENT_TITLE = "EzClient 1.6.7";
         }
     }
 
-    /**
-     * Starts a background thread that sets and maintains the window title to "EzClient"
-     * and applies the custom EzClient icon via GLFW safely after Minecraft initializes.
-     */
-    private void startWindowDaemon() {
-        Thread thread = new Thread(() -> {
-            long lastWindow = 0L;
-            int tickCounter = 0;
-
-            while (running) {
-                try {
-                    Thread.sleep(50);
-                    tickCounter++;
-
-                    long window = 0L;
-                    try {
-                        Class<?> mcClass = Class.forName("net.minecraft.client.Minecraft");
-                        Object instance = mcClass.getMethod("getInstance").invoke(null);
-                        if (instance != null) {
-                            for (java.lang.reflect.Method m : mcClass.getMethods()) {
-                                if (m.getParameterCount() == 0 && m.getReturnType().getSimpleName().equals("Window")) {
-                                    Object winObj = m.invoke(instance);
-                                    if (winObj != null) {
-                                        for (java.lang.reflect.Method wm : winObj.getClass().getMethods()) {
-                                            if (wm.getName().equals("getHandle") && wm.getParameterCount() == 0) {
-                                                Object handle = wm.invoke(winObj);
-                                                if (handle instanceof Long) {
-                                                    window = (Long) handle;
-                                                }
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                    } catch (Throwable ignored) {}
-
-                    if (window == 0L) {
-                        continue;
-                    }
-
-                    // Enforce clean "EzClient" title every 50ms to override Minecraft's updates
-                    GLFW.glfwSetWindowTitle(window, CLIENT_TITLE);
-
-                    // Re-apply custom icon every 2 seconds (40 ticks) to ensure it overwrites the grass block
-                    if (window != lastWindow || tickCounter % 40 == 0) {
-                        lastWindow = window;
-                        applyWindowIcon(window);
-                    }
-                } catch (InterruptedException e) {
-                    break;
-                } catch (Throwable ignored) {
-                }
-            }
-        }, "EzClient-WindowDaemon");
-
-        thread.setDaemon(true);
-        thread.start();
-    }
+    // startWindowDaemon removed
 
     /**
      * Creates and loads a vibrant green EzClient icon buffer into GLFW.
@@ -381,63 +340,5 @@ public static final String CLIENT_TITLE = "EzClient 1.6.7";
         }
     }
 
-    /**
-     * Watches for and dismisses narrator / accessibility prompts automatically.
-     */
-    private void startNarratorDismissDaemon() {
-        Thread thread = new Thread(() -> {
-            int checks = 0;
-            while (running && checks < 300) {
-                try {
-                    Thread.sleep(250);
-                    checks++;
-
-                    // Use reflection to safely detect and dismiss AccessibilityOnboardingScreen or Narrator
-                    // without hard version binding
-                    try {
-                        Class<?> mcClass = Class.forName("net.minecraft.client.Minecraft");
-                        Object instance = mcClass.getMethod("getInstance").invoke(null);
-                        if (instance != null) {
-                            // Check current screen
-                            java.lang.reflect.Field screenField = null;
-                            for (java.lang.reflect.Field f : mcClass.getDeclaredFields()) {
-                                if (f.getType().getName().contains("Screen")) {
-                                    screenField = f;
-                                    break;
-                                }
-                            }
-                            if (screenField != null) {
-                                screenField.setAccessible(true);
-                                Object currentScreen = screenField.get(instance);
-                                if (currentScreen != null) {
-                                    String screenName = currentScreen.getClass().getSimpleName();
-                                    if (screenName.contains("Accessibility") || screenName.contains("Narrator") || screenName.contains("Onboarding")) {
-                                        System.out.println("[EzClient] Suppressing " + screenName + " -> Navigating to TitleScreen...");
-                                        
-                                        // Set screen to TitleScreen or null to bypass
-                                        Class<?> titleScreenClass = Class.forName("net.minecraft.client.gui.screens.TitleScreen");
-                                        Object titleScreen = titleScreenClass.getConstructor().newInstance();
-                                        
-                                        for (java.lang.reflect.Method m : mcClass.getMethods()) {
-                                            if (m.getParameterCount() == 1 && m.getParameterTypes()[0].getName().contains("Screen")) {
-                                                m.invoke(instance, titleScreen);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } catch (Throwable ignored) {
-                        // Safe reflection pass
-                    }
-                } catch (InterruptedException e) {
-                    break;
-                } catch (Throwable ignored) {}
-            }
-        }, "EzClient-NarratorDismissDaemon");
-
-        thread.setDaemon(true);
-        thread.start();
-    }
+    // startNarratorDismissDaemon removed
 }

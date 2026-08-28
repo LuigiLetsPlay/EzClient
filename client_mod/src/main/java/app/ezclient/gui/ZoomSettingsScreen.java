@@ -4,7 +4,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-/** Custom EzClient settings panel for Zoom. */
+/** Compact, clean settings screen for Zoom. */
 public final class ZoomSettingsScreen extends Screen {
     private final Screen parent;
     private int panelX;
@@ -13,85 +13,105 @@ public final class ZoomSettingsScreen extends Screen {
     private int panelHeight;
 
     public ZoomSettingsScreen(Screen parent) {
-        super(Component.literal("Zoom Settings"));
+        super(app.ezclient.util.EzI18n.comp("ezclient.zoom.title"));
         this.parent = parent;
     }
 
     @Override
     protected void init() {
         ZoomModule zoom = ModuleManager.getInstance().getZoomModule();
-        panelWidth = Math.min(390, width - 32);
-        panelHeight = Math.min(268, height - 32);
+        panelWidth = Math.min(340, width - 24);
+        panelHeight = Math.min(226, height - 24);
         panelX = (width - panelWidth) / 2;
         panelY = (height - panelHeight) / 2;
-        int controlX = panelX + 112;
-        int controlWidth = panelWidth - 126;
-        int y = panelY + 38;
 
-        addRenderableWidget(new EzButton(controlX, y, controlWidth, 20,
-                Component.literal(zoom.isEnabled() ? "Enabled" : "Disabled"), zoom.isEnabled(), ignored -> {
+        addRenderableWidget(new EzButton(panelX + panelWidth - 26, panelY + 6, 18, 16,
+                Component.literal("✕"), false, ignored -> onClose()));
+
+        int controlX = panelX + 100;
+        int controlWidth = panelWidth - 114;
+        int y = panelY + 44;
+
+        addRenderableWidget(new EzButton(controlX, y, controlWidth, 18,
+                Component.literal(app.ezclient.util.EzI18n.get("ezclient.zoom.status", app.ezclient.util.EzI18n.onOrOff(zoom.isEnabled()))), zoom.isEnabled(), ignored -> {
                     zoom.toggle();
                     rebuildWidgets();
                 }));
-        y += 27;
+        y += 24;
         addSlider(controlX, y, controlWidth, normalized(zoom.getZoomLevel(), 1, 30),
                 v -> zoom.setZoomLevel(scale(v, 1, 30)),
-                v -> Component.literal(String.format("Default strength  %.1fx", scale(v, 1, 30))));
-        y += 30;
+                v -> Component.literal(app.ezclient.util.EzI18n.get("ezclient.zoom.default_level", scale(v, 1, 30))));
+        y += 26;
         addSlider(controlX, y, controlWidth, normalized(zoom.getScrollSensitivity(), 0.1, 2),
                 v -> zoom.setScrollSensitivity(scale(v, 0.1, 2)),
-                v -> Component.literal(String.format("Wheel step  %.1fx", scale(v, 0.1, 2))));
-        y += 30;
+                v -> Component.literal(app.ezclient.util.EzI18n.get("ezclient.zoom.wheel_step", scale(v, 0.1, 2))));
+        y += 26;
         addSlider(controlX, y, controlWidth, normalized(zoom.getMinZoom(), 1, 10),
                 v -> zoom.setMinZoom(scale(v, 1, 10)),
-                v -> Component.literal(String.format("Minimum  %.1fx", scale(v, 1, 10))));
-        y += 30;
+                v -> Component.literal(app.ezclient.util.EzI18n.get("ezclient.zoom.min_zoom", scale(v, 1, 10))));
+        y += 26;
         addSlider(controlX, y, controlWidth, normalized(zoom.getMaxZoom(), 2, 30),
                 v -> zoom.setMaxZoom(scale(v, 2, 30)),
-                v -> Component.literal(String.format("Maximum  %.1fx", scale(v, 2, 30))));
-        y += 30;
-        addRenderableWidget(new EzButton(controlX, y, controlWidth, 20,
-                Component.literal("Smooth zoom: " + (zoom.isSmoothZoom() ? "ON" : "OFF")), zoom.isSmoothZoom(), ignored -> {
+                v -> Component.literal(app.ezclient.util.EzI18n.get("ezclient.zoom.max_zoom", scale(v, 2, 30))));
+        y += 26;
+        addRenderableWidget(new EzButton(controlX, y, controlWidth, 18,
+                Component.literal(app.ezclient.util.EzI18n.get("ezclient.zoom.smooth", app.ezclient.util.EzI18n.onOrOff(zoom.isSmoothZoom()))), zoom.isSmoothZoom(), ignored -> {
                     zoom.setSmoothZoom(!zoom.isSmoothZoom());
                     ConfigManager.save();
                     rebuildWidgets();
                 }));
 
-        addRenderableWidget(new EzButton(panelX + 12, panelY + panelHeight - 30, 82, 19,
-                Component.literal("Back"), false, ignored -> onClose()));
+        addRenderableWidget(new EzButton(panelX + panelWidth - 56, panelY + panelHeight - 24, 46, 16,
+                app.ezclient.util.EzI18n.comp("ezclient.zoom.back"), false, ignored -> onClose()));
     }
 
-    private void addSlider(int x, int y, int width, double value,
-                           java.util.function.DoubleConsumer setter,
-                           java.util.function.DoubleFunction<Component> label) {
-        addRenderableWidget(new EzSlider(x, y, width, 22, value, v -> {
-            setter.accept(v);
-            ConfigManager.save();
-        }, label));
+    private void addSlider(int x, int y, int width, double initial,
+                           java.util.function.DoubleConsumer onValueChange,
+                           java.util.function.DoubleFunction<Component> labelFactory) {
+        addRenderableWidget(new EzSlider(x, y, width, 18, initial, onValueChange, labelFactory));
     }
 
     private static double normalized(double value, double min, double max) {
-        return Math.max(0, Math.min(1, (value - min) / (max - min)));
+        return Math.max(0.0, Math.min(1.0, (value - min) / (max - min)));
     }
 
-    private static double scale(double value, double min, double max) {
-        return min + value * (max - min);
+    private static double scale(double normalized, double min, double max) {
+        return min + normalized * (max - min);
     }
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         extractTransparentBackground(graphics);
-        graphics.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, 0xF2111419);
-        graphics.outline(panelX, panelY, panelWidth, panelHeight, 0xFF303943);
-        graphics.fill(panelX, panelY, panelX + panelWidth, panelY + 30, 0xFF191E24);
-        graphics.text(font, "ZOOM", panelX + 12, panelY + 11, 0xFF43DD8C);
-        graphics.text(font, "UTILS", panelX + 50, panelY + 11, 0xFF77818C);
-        graphics.text(font, "Hold C + mouse wheel", panelX + 12, panelY + 40, 0xFF89939E);
+
+        EzUi.panel(graphics, panelX, panelY, panelWidth, panelHeight);
+
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(panelX + 14, panelY + 9);
+        graphics.pose().scale(1.15f, 1.15f);
+        graphics.text(font, app.ezclient.util.EzI18n.get("ezclient.zoom.title"), 0, 0, EzUi.TEXT_WHITE);
+        graphics.pose().popMatrix();
+
+        graphics.fill(panelX + 14, panelY + 28, panelX + panelWidth - 14, panelY + 29, EzUi.BORDER_SUBTLE);
+
+        int labelX = panelX + 14;
+        graphics.text(font, app.ezclient.util.EzI18n.get("ezclient.zoom.lbl_zoom"), labelX, panelY + 49, EzUi.TEXT_MUTED);
+        graphics.text(font, app.ezclient.util.EzI18n.get("ezclient.zoom.lbl_strength"), labelX, panelY + 74, EzUi.TEXT_MUTED);
+        graphics.text(font, app.ezclient.util.EzI18n.get("ezclient.zoom.lbl_wheel"), labelX, panelY + 100, EzUi.TEXT_MUTED);
+        graphics.text(font, app.ezclient.util.EzI18n.get("ezclient.zoom.lbl_min"), labelX, panelY + 126, EzUi.TEXT_MUTED);
+        graphics.text(font, app.ezclient.util.EzI18n.get("ezclient.zoom.lbl_max"), labelX, panelY + 152, EzUi.TEXT_MUTED);
+        graphics.text(font, app.ezclient.util.EzI18n.get("ezclient.zoom.lbl_smooth"), labelX, panelY + 178, EzUi.TEXT_MUTED);
+
         super.extractRenderState(graphics, mouseX, mouseY, delta);
     }
 
     @Override
+    public boolean isPauseScreen() {
+        return false;
+    }
+
+    @Override
     public void onClose() {
+        ConfigManager.save();
         minecraft.gui.setScreen(parent);
     }
 }

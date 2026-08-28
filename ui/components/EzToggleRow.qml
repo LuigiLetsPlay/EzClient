@@ -37,6 +37,7 @@ RowLayout {
     // iOS-style premium toggle switch
     Rectangle {
         id: toggleTrack
+        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
         width: 44
         height: 24
         radius: 12

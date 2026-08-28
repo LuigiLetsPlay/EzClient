@@ -101,19 +101,85 @@ ApplicationWindow {
                 color: EzTheme.bg
                 visible: !window.needsOnboarding
 
-                StackLayout {
-                    id: mainStack
+                Item {
+                    id: pageContainer
                     anchors.fill: parent
-                    currentIndex: 0
+                    property int activePage: 0
 
-                    HomePage {}
-                    ProfilesPage {}
-                    ProfileDetailPage {}
-                    ModsPage {}
-                    ModrinthPage {}
-                    CapePage { onNavigate: function(route) { window.navigateTo(route) } }
-                    CapeEditor { onNavigate: function(route) { window.navigateTo(route) } }
-                    SettingsPage {}
+                    HomePage {
+                        anchors.fill: parent
+                        visible: opacity > 0.001
+                        opacity: pageContainer.activePage === 0 ? 1.0 : 0.0
+                        y: pageContainer.activePage === 0 ? 0 : 8
+                        enabled: pageContainer.activePage === 0
+                        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+                        Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
+                    ProfilesPage {
+                        anchors.fill: parent
+                        visible: opacity > 0.001
+                        opacity: pageContainer.activePage === 1 ? 1.0 : 0.0
+                        y: pageContainer.activePage === 1 ? 0 : 8
+                        enabled: pageContainer.activePage === 1
+                        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+                        Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
+                    ProfileDetailPage {
+                        anchors.fill: parent
+                        visible: opacity > 0.001
+                        opacity: pageContainer.activePage === 2 ? 1.0 : 0.0
+                        y: pageContainer.activePage === 2 ? 0 : 8
+                        enabled: pageContainer.activePage === 2
+                        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+                        Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
+                    ModsPage {
+                        anchors.fill: parent
+                        visible: opacity > 0.001
+                        opacity: pageContainer.activePage === 3 ? 1.0 : 0.0
+                        y: pageContainer.activePage === 3 ? 0 : 8
+                        enabled: pageContainer.activePage === 3
+                        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+                        Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
+                    ModrinthPage {
+                        anchors.fill: parent
+                        visible: opacity > 0.001
+                        opacity: pageContainer.activePage === 4 ? 1.0 : 0.0
+                        y: pageContainer.activePage === 4 ? 0 : 8
+                        enabled: pageContainer.activePage === 4
+                        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+                        Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
+                    CapePage {
+                        anchors.fill: parent
+                        visible: opacity > 0.001
+                        opacity: pageContainer.activePage === 5 ? 1.0 : 0.0
+                        y: pageContainer.activePage === 5 ? 0 : 8
+                        enabled: pageContainer.activePage === 5
+                        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+                        Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                        onNavigate: function(route) { window.navigateTo(route) }
+                    }
+                    CapeEditor {
+                        anchors.fill: parent
+                        visible: opacity > 0.001
+                        opacity: pageContainer.activePage === 6 ? 1.0 : 0.0
+                        y: pageContainer.activePage === 6 ? 0 : 8
+                        enabled: pageContainer.activePage === 6
+                        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+                        Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                        onNavigate: function(route) { window.navigateTo(route) }
+                    }
+                    SettingsPage {
+                        anchors.fill: parent
+                        visible: opacity > 0.001
+                        opacity: pageContainer.activePage === 7 ? 1.0 : 0.0
+                        y: pageContainer.activePage === 7 ? 0 : 8
+                        enabled: pageContainer.activePage === 7
+                        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+                        Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
                 }
             }
         }
@@ -237,7 +303,7 @@ ApplicationWindow {
                 "settings":       7
             }
             if (indexMap[route] !== undefined) {
-                mainStack.currentIndex = indexMap[route]
+                pageContainer.activePage = indexMap[route]
             }
         }
     }
@@ -305,7 +371,7 @@ ApplicationWindow {
                     Rectangle {
                         width: 28; height: 28; radius: 14
                         color: closeCrashMouse.containsMouse ? "#2A2E39" : "transparent"
-                        Text { text: "✕"; color: EzTheme.textMuted; anchors.centerIn: parent; font.pixelSize: 13 }
+                        Image { source: "icons/x.svg"; width: 12; height: 12; anchors.centerIn: parent; fillMode: Image.PreserveAspectFit; opacity: 0.6 }
                         MouseArea {
                             id: closeCrashMouse
                             anchors.fill: parent

@@ -7,6 +7,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import struct
+import uuid
 import zlib
 from pathlib import Path
 from backend.models.types import APP_VERSION
@@ -14,6 +15,25 @@ from backend.models.types import APP_VERSION
 
 DEFAULT_API_URL = "http://5.175.192.90:18765/api"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+MAX_CAPE_BYTES = 2 * 1024 * 1024
+
+
+def normalize_player_uuid(value: str) -> str:
+    """Return the canonical UUID form used by the community API."""
+    try:
+        return str(uuid.UUID(str(value).strip()))
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise ValueError("Die Spieler-UUID ist ungültig. Bitte melde dich erneut an.") from exc
+
+
+def validate_cape_title(value: str) -> str:
+    """Validate user-facing cape metadata without silently truncating it."""
+    title = " ".join(str(value or "").split())
+    if not 3 <= len(title) <= 48:
+        raise ValueError("Der Cape-Name muss zwischen 3 und 48 Zeichen lang sein.")
+    if any(ord(char) < 32 or char in "<>" for char in title):
+        raise ValueError("Der Cape-Name enthält ungültige Zeichen.")
+    return title
 
 
 def is_safe_cape_png(raw: bytes) -> bool:
@@ -50,6 +70,10 @@ def _base_url() -> str:
     return os.environ.get("EZCLIENT_CAPE_API", DEFAULT_API_URL).rstrip("/")
 
 
+def _upload_url() -> str:
+    return f"{_base_url()}/capes"
+
+
 def list_capes() -> list[dict]:
     request = urllib.request.Request(
         f"{_base_url()}/capes", headers={"Accept": "application/json", "User-Agent": f"EzClient/{APP_VERSION}"}
@@ -62,16 +86,33 @@ def list_capes() -> list[dict]:
     return [item for item in capes if isinstance(item, dict)]
 
 
-def upload_cape(path: Path, owner: str, owner_uuid: str, title: str) -> dict:
-    """Upload one PNG cape using a small multipart request."""
+def upload_cape(
+    path: Path,
+    owner: str,
+    owner_uuid: str,
+    title: str,
+    token: str = "",
+    access_token: str = "",
+) -> dict:
+    """Upload one PNG cape using a small multipart request with ownership token support."""
     image = path.read_bytes()
-    if len(image) > 2 * 1024 * 1024:
-        raise ValueError("Das Cape darf maximal 512 KB groß sein.")
+    if len(image) > MAX_CAPE_BYTES:
+        raise ValueError("Das Cape darf maximal 2 MB groß sein.")
     if not is_safe_cape_png(image):
-        raise ValueError("Bitte wähle ein gültiges Cape-PNG (64×32, 128×64 oder 256×128).")
+        raise ValueError("Bitte wähle ein gültiges Cape-PNG (64×32 bis 1024×512, maximal 2 MB).")
 
+    if not access_token or any(char in access_token for char in "\r\n"):
+        raise ValueError("Die Minecraft-Sitzung ist abgelaufen. Bitte melde dich erneut an.")
+
+    canonical_uuid = normalize_player_uuid(owner_uuid)
+    clean_title = validate_cape_title(title)
     boundary = "----EzClientCapeBoundary"
-    fields = {"owner": owner, "owner_uuid": owner_uuid, "title": title or path.stem}
+    fields = {
+        "owner": owner,
+        "owner_uuid": canonical_uuid,
+        "title": clean_title,
+        "token": token or ""
+    }
     parts: list[bytes] = []
     for key, value in fields.items():
         parts.extend([
@@ -85,15 +126,36 @@ def upload_cape(path: Path, owner: str, owner_uuid: str, title: str) -> dict:
         b"Content-Type: image/png\r\n\r\n", image, b"\r\n",
         f"--{boundary}--\r\n".encode(),
     ])
+    headers = {
+        "Content-Type": f"multipart/form-data; boundary={boundary}",
+        "Accept": "application/json",
+        "User-Agent": f"EzClient/{APP_VERSION}",
+    }
+    # Never expose the Minecraft access token over the legacy HTTP endpoint.
+    # HTTPS deployments receive the stronger bearer-token verification; HTTP
+    # keeps the UUID/name + persistent cape ownership-token compatibility path.
+    if urllib.parse.urlparse(_base_url()).scheme == "https":
+        headers["Authorization"] = f"Bearer {access_token}"
+    if token:
+        headers["X-EzClient-Cape-Token"] = token
+
     request = urllib.request.Request(
-        f"{_base_url()}/capes",
+        _upload_url(),
         data=b"".join(parts),
         method="POST",
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "Accept": "application/json", "User-Agent": f"EzClient/{APP_VERSION}"},
+        headers=headers,
     )
-    with urllib.request.urlopen(request, timeout=20) as response:
-        payload = json.loads(response.read().decode("utf-8"))
-    return payload if isinstance(payload, dict) else {}
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        return payload if isinstance(payload, dict) else {}
+    except urllib.error.HTTPError as exc:
+        try:
+            err_data = json.loads(exc.read().decode("utf-8"))
+            err_msg = err_data.get("error") or str(exc)
+        except Exception:
+            err_msg = str(exc)
+        raise ValueError(err_msg)
 
 
 def cape_image_url(cape: dict) -> str:

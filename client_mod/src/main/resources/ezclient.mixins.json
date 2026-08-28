@@ -7,15 +7,26 @@
     "minVersion": "0.5.4"
   },
   "mixins": [],
+  "accessors": ["VertexBuilderAccessor", "RenderSectionRegionAccessor"],
   "client": [
+    "ClientBrandRetrieverMixin",
     "TitleScreenMixin",
     "PauseScreenMixin",
     "GameRendererMixin",
     "MouseMixin",
     "AbstractClientPlayerCapeMixin",
     "CapeLayerMixin",
+    "WingsLayerMixin",
     "AvatarRendererMixin",
-    "PlayerTabOverlayMixin"
+    "PlayerTabOverlayMixin",
+    "ConnectionMixin",
+    "ChatScreenMixin",
+    "GuiMixin",
+    "MinecraftMixin",
+    "LevelExtractorCullingMixin",
+    "BlockEntityCullingMixin",
+    "SectionCompilerOcclusionMixin",
+    "ClientLevelOcclusionMixin"
   ],
   "injectors": {
     "defaultRequire": 1

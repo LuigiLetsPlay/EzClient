@@ -99,8 +99,8 @@ Item {
     // AMBIENT FLOATING PARTICLES (Subtle Minecraft aesthetic)
     // ─────────────────────────────────────────────────────────
     Repeater {
-        model: 12
-        visible: false
+        model: 16
+        visible: true
         Rectangle {
             property real startX: Math.random() * root.width
             property real startY: Math.random() * root.height
@@ -111,17 +111,17 @@ Item {
             height: width
             radius: width / 2
             color: EzTheme.accent
-            opacity: 0.08 + Math.random() * 0.12
+            opacity: 0.12 + Math.random() * 0.15
 
             SequentialAnimation on y {
                 loops: Animation.Infinite
-                NumberAnimation { from: startY; to: startY - 80 - Math.random() * 120; duration: animDuration; easing.type: Easing.InOutSine }
-                NumberAnimation { from: startY - 80 - Math.random() * 120; to: startY; duration: animDuration; easing.type: Easing.InOutSine }
+                NumberAnimation { from: startY; to: startY - 90 - Math.random() * 120; duration: animDuration; easing.type: Easing.InOutSine }
+                NumberAnimation { from: startY - 90 - Math.random() * 120; to: startY; duration: animDuration; easing.type: Easing.InOutSine }
             }
             SequentialAnimation on opacity {
                 loops: Animation.Infinite
-                NumberAnimation { to: 0.02; duration: animDuration * 0.8 }
-                NumberAnimation { to: 0.08 + Math.random() * 0.12; duration: animDuration * 0.8 }
+                NumberAnimation { to: 0.04; duration: animDuration * 0.8 }
+                NumberAnimation { to: 0.14 + Math.random() * 0.16; duration: animDuration * 0.8 }
             }
         }
     }
@@ -164,20 +164,38 @@ Item {
             width: Math.min(200, parent.width * 0.28)
             height: Math.min(330, parent.height * 0.55)
             hoverEnabled: true
-            cursorShape: containsMouse ? Qt.PointingHandCursor : Qt.ArrowCursor
+            cursorShape: pressed ? Qt.ClosedHandCursor : (containsMouse ? Qt.OpenHandCursor : Qt.ArrowCursor)
+            property real startX: 0
+            property real startY: 0
             property real lastX: 0
             property real angle: -14
-            onPressed: function(mouse) { lastX = mouse.x }
+            property bool wasDragged: false
+
+            onPressed: function(mouse) {
+                startX = mouse.x
+                startY = mouse.y
+                lastX = mouse.x
+                wasDragged = false
+            }
+
             onPositionChanged: function(mouse) {
                 if (!pressed) return
                 var dx = mouse.x - lastX
+                var totalDist = Math.hypot(mouse.x - startX, mouse.y - startY)
+                if (totalDist > 5) {
+                    wasDragged = true
+                }
                 lastX = mouse.x
                 if (dx === 0) return
                 angle += dx * 0.8
                 centeredHomeSkin3D.setRotateY(angle)
             }
-            onClicked: {
-                if (typeof window !== "undefined" && window.openSkinModal) window.openSkinModal()
+
+            onClicked: function(mouse) {
+                if (wasDragged) return
+                if (typeof window !== "undefined" && window.openSkinModal) {
+                    window.openSkinModal()
+                }
             }
         }
 
@@ -361,16 +379,29 @@ Item {
             border.color: root.isLaunching ? "#FDE68A" : (launchMouse.containsMouse ? "#5AEEA0" : "#22C96E50")
             border.width: 2
 
-            // Outer glow effect
+            // Outer glow effect with breathing pulse
             Rectangle {
                 anchors.fill: parent
-                anchors.margins: -4
-                radius: parent.radius + 4
+                anchors.margins: -5
+                radius: parent.radius + 5
                 color: "transparent"
-                border.color: root.isLaunching ? "#F59E0B20" : EzTheme.accentGlow
-                border.width: 3
-                opacity: launchMouse.containsMouse ? 0.8 : 0.4
+                border.color: root.isLaunching ? "#F59E0B" : EzTheme.accent
+                border.width: 2.5
+                opacity: launchMouse.containsMouse ? 0.9 : 0.4
                 Behavior on opacity { NumberAnimation { duration: EzTheme.animNormal } }
+
+                SequentialAnimation on scale {
+                    loops: Animation.Infinite
+                    running: !root.isLaunching
+                    NumberAnimation { from: 1.0; to: 1.03; duration: 1600; easing.type: Easing.InOutSine }
+                    NumberAnimation { from: 1.03; to: 1.0; duration: 1600; easing.type: Easing.InOutSine }
+                }
+                SequentialAnimation on opacity {
+                    loops: Animation.Infinite
+                    running: !root.isLaunching && !launchMouse.containsMouse
+                    NumberAnimation { from: 0.3; to: 0.7; duration: 1600; easing.type: Easing.InOutSine }
+                    NumberAnimation { from: 0.7; to: 0.3; duration: 1600; easing.type: Easing.InOutSine }
+                }
             }
 
 
@@ -451,7 +482,7 @@ Item {
                 }
 
                 Text {
-                    text: "⚡ " + EzI18n.t("home_direct_badge", "DIREKTSTART AKTIV") + " (" + (typeof accountController !== "undefined" && accountController && accountController.isOnline ? "Microsoft Auth" : "Direct") + ")"
+                    text: "" + EzI18n.t("home_direct_badge", "SPIELBEREIT (NATIVE ENGINE)") + " (" + (typeof accountController !== "undefined" && accountController && accountController.isOnline ? "Microsoft Auth" : "Ready") + ")"
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 9
                     font.bold: true
@@ -499,7 +530,7 @@ Item {
                     spacing: 10
 
                     Text {
-                        text: EzI18n.t("home_direct_modal_title", "🟢 Direktstart & Online Verifiziert")
+                        text: EzI18n.t("home_direct_modal_title", "Online-Authentifizierung & Spielstart")
                         font.family: EzTheme.fontFamily; font.pixelSize: 14; font.bold: true
                         color: EzTheme.accentLight
                     }
@@ -522,7 +553,7 @@ Item {
                         Text {
                             id: infoNoteText
                             anchors.fill: parent; anchors.margins: 8
-                            text: EzI18n.t("home_direct_modal_note", "⚡ 100% Online-kompatibel für alle Multiplayer-Server (z.B. Hypixel), Realms und authentische Skins.")
+                            text: EzI18n.t("home_direct_modal_note", "100% Online-kompatibel für alle Multiplayer-Server (z.B. Hypixel), Realms und authentische Skins.")
                             font.family: EzTheme.fontFamily; font.pixelSize: 11
                             color: EzTheme.cyan; wrapMode: Text.WordWrap
                         }
@@ -543,9 +574,9 @@ Item {
 
         Repeater {
             model: [
-                { icon: "⚡", label: root.activeModsCount + " Mods", color: EzTheme.accentLight },
-                { icon: "💾", label: Math.round(root.activeRamMb / 1024 * 10) / 10 + " GB RAM", color: EzTheme.cyan },
-                { icon: "🎮", label: root.activeLoader + " " + root.activeVersion, color: EzTheme.purple }
+                { iconSource: "icons/zap.svg", label: root.activeModsCount + " Mods", color: EzTheme.accentLight },
+                { iconSource: "icons/cpu.svg", label: Math.round(root.activeRamMb / 1024 * 10) / 10 + " GB RAM", color: EzTheme.cyan },
+                { iconSource: "icons/play.svg", label: root.activeLoader + " " + root.activeVersion, color: EzTheme.purple }
             ]
 
             Rectangle {
@@ -561,13 +592,95 @@ Item {
                     anchors.centerIn: parent
                     spacing: 6
 
-                    Text { text: modelData.icon; font.pixelSize: 10 }
+                    Image { source: modelData.iconSource; width: 14; height: 14; fillMode: Image.PreserveAspectFit }
                     Text {
                         text: modelData.label
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 10
                         font.bold: true
                         color: modelData.color
+                    }
+                }
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // UPDATE POPUP
+    // ─────────────────────────────────────────────────────────
+    Rectangle {
+        id: updatePopup
+        z: 100
+        visible: profileController && profileController.ezClientUpdateAvailable
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        anchors.bottomMargin: 24
+        anchors.rightMargin: 24
+        width: 380
+        height: 80
+        radius: EzTheme.radius
+        color: EzTheme.surface
+        border.color: EzTheme.accent
+        border.width: 1
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -4
+            radius: parent.radius + 4
+            color: "transparent"
+            border.color: EzTheme.accentGlow
+            border.width: 2
+            opacity: 0.3
+        }
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 12
+
+            Rectangle {
+                width: 38
+                height: 38
+                radius: 8
+                color: EzTheme.surface2
+                border.color: EzTheme.borderLight
+                border.width: 1
+                Image {
+                    source: "icons/zap.svg"
+                    width: 18
+                    height: 18
+                    anchors.centerIn: parent
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 2
+                Text {
+                    text: "EzClient Mod Upgrade"
+                    font.family: EzTheme.fontFamily
+                    font.pixelSize: 13
+                    font.bold: true
+                    color: EzTheme.text
+                }
+                Text {
+                    text: (profileController ? profileController.ezClientOutdatedCount : 1) + " Profil(e) bereit für Update auf v" + (profileController ? profileController.ezClientLatestVersion : "1.8.0")
+                    font.family: EzTheme.fontFamily
+                    font.pixelSize: 11
+                    color: EzTheme.textMuted
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
+                }
+            }
+
+            EzButton {
+                text: "Upgrade v" + (profileController ? profileController.ezClientLatestVersion : "1.8.0")
+                primary: true
+                mcFont: true
+                Layout.preferredHeight: 32
+                onClicked: {
+                    if (profileController) {
+                        profileController.applyEzClientUpdates()
                     }
                 }
             }

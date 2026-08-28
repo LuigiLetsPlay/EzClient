@@ -11,13 +11,13 @@ Button {
     property string iconSource: ""
 
     implicitHeight: 36
-    implicitWidth: Math.max(90, contentItem.implicitWidth + 28)
+    implicitWidth: Math.max(80, btnRow.implicitWidth + 24)
 
     scale: control.down ? 0.96 : (control.hovered ? 1.02 : 1.0)
     Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
     font.family: control.mcFont ? EzTheme.mcFontFamily : EzTheme.fontFamily
-    font.pixelSize: control.mcFont ? 13 : 12
+    font.pixelSize: control.mcFont ? 12 : 11
     font.bold: true
 
     background: Rectangle {
@@ -43,7 +43,6 @@ Button {
 
         Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
         Behavior on border.color { ColorAnimation { duration: EzTheme.animNormal } }
-
     }
 
     // Windows Cursor Hand Feedback
@@ -53,37 +52,45 @@ Button {
         acceptedButtons: Qt.NoButton
     }
 
-    contentItem: Row {
-        spacing: 8
-        anchors.centerIn: parent
+    contentItem: Item {
+        anchors.fill: parent
+        anchors.leftMargin: 10
+        anchors.rightMargin: 10
 
-        Image {
-            source: {
-                if (!control.iconSource) return ""
-                if (control.iconSource.indexOf("/") !== -1 || control.iconSource.startsWith("qrc:") || control.iconSource.startsWith("data:") || control.iconSource.startsWith("http")) {
-                    return control.iconSource
+        Row {
+            id: btnRow
+            spacing: 6
+            anchors.centerIn: parent
+
+            Image {
+                source: {
+                    if (!control.iconSource) return ""
+                    if (control.iconSource.indexOf("/") !== -1 || control.iconSource.startsWith("qrc:") || control.iconSource.startsWith("data:") || control.iconSource.startsWith("http")) {
+                        return control.iconSource
+                    }
+                    return Qt.resolvedUrl("../icons/" + control.iconSource).toString()
                 }
-                return Qt.resolvedUrl("../icons/" + control.iconSource).toString()
+                visible: control.iconSource !== ""
+                width: 14
+                height: 14
+                fillMode: Image.PreserveAspectFit
+                anchors.verticalCenter: parent.verticalCenter
             }
-            visible: control.iconSource !== ""
-            width: 14
-            height: 14
-            fillMode: Image.PreserveAspectFit
-            anchors.verticalCenter: parent.verticalCenter
-        }
 
-        Text {
-            text: control.text
-            font: control.font
-            color: {
-                if (!control.enabled) return EzTheme.textMuted
-                if (control.primary) return "#000000"
-                if (control.danger) return control.hovered ? EzTheme.danger : EzTheme.text
-                if (control.cyan) return control.hovered ? EzTheme.cyan : EzTheme.text
-                return EzTheme.text
+            Text {
+                text: control.text
+                font: control.font
+                elide: Text.ElideRight
+                color: {
+                    if (!control.enabled) return EzTheme.textMuted
+                    if (control.primary) return "#000000"
+                    if (control.danger) return control.hovered ? EzTheme.danger : EzTheme.text
+                    if (control.cyan) return control.hovered ? EzTheme.cyan : EzTheme.text
+                    return EzTheme.text
+                }
+                Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
+                anchors.verticalCenter: parent.verticalCenter
             }
-            Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
-            anchors.verticalCenter: parent.verticalCenter
         }
     }
 }

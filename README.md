@@ -20,7 +20,7 @@
 
 ## ✨ Features
 
-- 🚀 **Maximum FPS & Ultra-Low Latency**: Built-in Sodium, Lithium, FerriteCore, Memory Leak Fix, Krypton, ImmediatelyFast, and Entity Culling.
+- 🚀 **Maximum FPS & Ultra-Low Latency**: EzClient's native culling/memory/UI pipeline plus Sodium and Lithium.
 - ⚡ **Standalone Ingame Client (`EzClient.jar`)**:
   - Sets GLFW window title dynamically to **`EzClient`** with custom icon.
   - Automatically bypasses narrator & accessibility onboarding prompts.

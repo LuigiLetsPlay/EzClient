@@ -123,7 +123,7 @@ Item {
                     Rectangle {
                         width: 28; height: 28; radius: 6
                         color: modalCloseMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
-                        Text { text: "✕"; font.pixelSize: 11; color: EzTheme.textMuted; anchors.centerIn: parent }
+                        Image { source: "icons/x.svg"; width: 10; height: 10; anchors.centerIn: parent; opacity: 0.6; fillMode: Image.PreserveAspectFit }
                         MouseArea {
                             id: modalCloseMouse
                             anchors.fill: parent
@@ -174,7 +174,7 @@ Item {
 
                     Text {
                         text: (modrinthController.selectedMod && modrinthController.selectedMod.downloads)
-                              ? ("⚡ " + formatNum(modrinthController.selectedMod.downloads) + " Downloads auf Modrinth")
+                              ? (formatNum(modrinthController.selectedMod.downloads) + " Downloads auf Modrinth")
                               : ""
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 10
@@ -297,7 +297,7 @@ Item {
                     Rectangle {
                         width: 28; height: 28; radius: 6
                         color: vCloseMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
-                        Text { text: "✕"; font.pixelSize: 11; color: EzTheme.textMuted; anchors.centerIn: parent }
+                        Image { source: "icons/x.svg"; width: 10; height: 10; anchors.centerIn: parent; opacity: 0.6; fillMode: Image.PreserveAspectFit }
                         MouseArea {
                             id: vCloseMouse
                             anchors.fill: parent
@@ -419,7 +419,7 @@ Item {
                                 border.width: 1
 
                                 Text {
-                                    text: modelData.version_number === root.versionSwitchCurrentVer ? "✓ Aktiv" : "Wählen"
+                                    text: modelData.version_number === root.versionSwitchCurrentVer ? "Aktiv" : "Wählen"
                                     font.family: EzTheme.mcFontFamily
                                     font.pixelSize: 10
                                     font.bold: true
@@ -434,7 +434,9 @@ Item {
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
                                         if (modelData.version_number !== root.versionSwitchCurrentVer) {
-                                            profileController.updateModVersion(root.versionSwitchModId, modelData.version_number)
+                                            var dlUrl = (modelData.files && modelData.files.length > 0) ? modelData.files[0].url : ""
+                                            var fn = (modelData.files && modelData.files.length > 0) ? modelData.files[0].filename : ""
+                                            profileController.switchModVersion(root.versionSwitchModId, modelData.version_number, fn, dlUrl)
                                             root.versionSwitchCurrentVer = modelData.version_number
                                         }
                                         root.versionModalOpen = false
@@ -497,7 +499,7 @@ Item {
 
             RowLayout {
                 spacing: 10
-                Text { text: "⚠️"; font.pixelSize: 22 }
+                Image { source: "icons/alert-triangle.svg"; width: 22; height: 22; fillMode: Image.PreserveAspectFit }
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 2
@@ -565,14 +567,14 @@ Item {
                 Layout.fillWidth: true
                 spacing: 2
                 Text {
-                    text: "INSTALLIERTE MODS"
+                    text: "ERWEITERUNGEN"
                     font.family: EzTheme.mcFontFamily
                     font.pixelSize: 16
                     font.bold: true
                     color: EzTheme.text
                 }
                 Text {
-                    text: (profileController ? profileController.activeModsCount : 0) + " Mods im aktiven Profil (" + (profileController ? profileController.activeName : "") + ")"
+                    text: (profileController ? profileController.activeModsCount : 0) + " Erweiterungen im aktiven Profil (" + (profileController ? profileController.activeName : "") + ")"
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 11
                     color: EzTheme.textMuted
@@ -598,9 +600,9 @@ Item {
             Layout.fillWidth: true
             spacing: 10
 
-            // Search Bar
+            // Search Bar (Stable width)
             Rectangle {
-                Layout.fillWidth: true
+                Layout.preferredWidth: 260
                 Layout.preferredHeight: 36
                 color: EzTheme.surface
                 border.color: modSearch.activeFocus ? EzTheme.accent : EzTheme.border
@@ -632,7 +634,7 @@ Item {
                         verticalAlignment: TextInput.AlignVCenter
 
                         Text {
-                            text: EzI18n.t("mods_search_placeholder", "Installierte Mods durchsuchen…")
+                            text: EzI18n.t("mods_search_placeholder", "Installierte Erweiterungen durchsuchen…")
                             font: parent.font
                             color: EzTheme.textSubtle
                             visible: parent.text === ""
@@ -642,7 +644,7 @@ Item {
 
                     Text {
                         visible: modSearch.text !== ""
-                        text: "✕"
+                        text: "X"
                         font.pixelSize: 10
                         color: EzTheme.textMuted
                         MouseArea {
@@ -655,16 +657,19 @@ Item {
                 }
             }
 
-            // Quick Status Filter Pills: Alle | ⚡ EzClient Mods | Aktiv | Inaktiv
+            // Quick Status Filter Pills: Alle | EzClient Mods | Aktiv | Inaktiv
             Row {
                 spacing: 6
 
                 Repeater {
                     model: [
-                        { id: "all",         label: EzI18n.t("mods_filter_all", "Alle") },
-                        { id: "performance", label: EzI18n.t("mods_filter_perf", "⚡ EzClient Mods") },
-                        { id: "enabled",     label: EzI18n.t("mods_filter_enabled", "Aktiv") },
-                        { id: "disabled",    label: EzI18n.t("mods_filter_disabled", "Inaktiv") }
+                        { id: "all",          label: EzI18n.t("mods_filter_all", "Alle") },
+                        { id: "mods",         label: "Mods" },
+                        { id: "shader",       label: "Shader" },
+                        { id: "resourcepack", label: "Resource Packs" },
+                        { id: "performance",  label: EzI18n.t("mods_filter_perf", "EzClient Mods") },
+                        { id: "enabled",      label: EzI18n.t("mods_filter_enabled", "Aktiv") },
+                        { id: "disabled",     label: EzI18n.t("mods_filter_disabled", "Inaktiv") }
                     ]
 
                     Rectangle {
@@ -698,10 +703,9 @@ Item {
 
             Item { Layout.fillWidth: true }
 
-            // Toggle for Core Mods (only visible in "all" or "enabled"/"disabled" views)
+            // Toggle for Core Mods
             RowLayout {
                 spacing: 8
-                visible: root.filterStatus !== "performance"
                 
                 EzButton {
                     text: "Alle updaten"
@@ -767,68 +771,13 @@ Item {
             visible: profileController && profileController.activeModsCount > 0
         }
 
-        // ─── Empty State ───
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            color: EzTheme.surface
-            radius: EzTheme.radius
-            border.color: EzTheme.border
-            border.width: 1
-            visible: !profileController || profileController.activeModsCount === 0
-
-            ColumnLayout {
-                anchors.centerIn: parent
-                spacing: 12
-
-                Text {
-                    text: "📦"
-                    font.pixelSize: 36
-                    Layout.alignment: Qt.AlignHCenter
-                }
-
-                Text {
-                    text: EzI18n.t("mods_no_installed", "Keine Mods installiert")
-                    font.family: EzTheme.mcFontFamily
-                    font.pixelSize: 15
-                    font.bold: true
-                    color: EzTheme.text
-                    Layout.alignment: Qt.AlignHCenter
-                }
-
-                Text {
-                    text: EzI18n.t("mods_empty_hint", "Füge Mods aus dem Modrinth Store hinzu, um Leistung und Aussehen anzupassen.")
-                    font.family: EzTheme.fontFamily
-                    font.pixelSize: 11
-                    color: EzTheme.textMuted
-                    Layout.alignment: Qt.AlignHCenter
-                }
-
-                Item { height: 4 }
-
-                EzButton {
-                    text: EzI18n.t("detail_add_mods", "Hinzufügen")
-                    primary: true
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredHeight: 36
-                    Layout.preferredWidth: 130
-                    onClicked: {
-                        if (typeof window !== "undefined" && window.navigateTo) {
-                            window.navigateTo("modrinth")
-                        }
-                    }
-                }
-            }
-        }
-
-        // ─── Mod List View ───
+        // ─── Main Mods List ───
         ListView {
             id: modList
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            spacing: 0
-            visible: profileController && profileController.activeModsCount > 0
+            spacing: 6
             model: profileController ? profileController.modModel : null
 
             ScrollBar.vertical: ScrollBar {
@@ -848,15 +797,23 @@ Item {
                 radius: 6
 
                 readonly property bool isFabricApi: model.slug === "fabric-api" || model.name === "Fabric API"
-                readonly property bool isEzClient: (model.slug || "").toLowerCase() === "ezclient" || (model.name || "").toLowerCase() === "ezclient"
+                readonly property bool isEzClient: (model.slug || "").toLowerCase() === "ezclient" || (model.name || "").toLowerCase() === "ezclient" || (model.name || "").toLowerCase() === "ezclient core"
+                readonly property bool isShader: (model.filename || "").toLowerCase().endsWith(".zip") && ((model.description || "").toLowerCase().indexOf("shader") !== -1 || (model.slug || "").toLowerCase().indexOf("shader") !== -1 || (model.name || "").toLowerCase().indexOf("shader") !== -1)
+                readonly property bool isResourcePack: (model.filename || "").toLowerCase().endsWith(".zip") && !isShader
                 readonly property bool isPerformanceMod: {
-                    var s = (model.slug || model.projectId || "").toLowerCase()
-                    return window.integratedMods && window.integratedMods.indexOf(s) !== -1
+                    var s = (model.slug || "").toLowerCase()
+                    var pid = (model.projectId || "").toLowerCase()
+                    var n = (model.name || "").toLowerCase()
+                    return (window.integratedMods && (window.integratedMods.indexOf(s) !== -1 || window.integratedMods.indexOf(pid) !== -1)) ||
+                           model.essential || model.recommended || s === "ezclient" || n === "ezclient" || n === "ezclient core"
                 }
                 readonly property bool matchesSearch: modSearch.text === "" ||
                     (model.name && model.name.toLowerCase().indexOf(modSearch.text.toLowerCase()) !== -1) ||
                     (model.description && model.description.toLowerCase().indexOf(modSearch.text.toLowerCase()) !== -1)
                 readonly property bool matchesStatus: root.filterStatus === "all" ||
+                    (root.filterStatus === "mods" && !modItem.isShader && !modItem.isResourcePack) ||
+                    (root.filterStatus === "shader" && modItem.isShader) ||
+                    (root.filterStatus === "resourcepack" && modItem.isResourcePack) ||
                     (root.filterStatus === "performance" && modItem.isPerformanceMod) ||
                     (root.filterStatus === "enabled" && model.enabled) ||
                     (root.filterStatus === "disabled" && !model.enabled)
@@ -869,15 +826,19 @@ Item {
                 visible: matchesSearch && matchesStatus && (!modItem.isPerformanceMod || root.showCoreMods || root.filterStatus === "performance")
                 height: visible ? 56 : 0
 
-                color: (modItem.isFabricApi || model.enabled)
+                scale: rowMouse.containsMouse ? 1.008 : 1.0
+                Behavior on scale { NumberAnimation { duration: 100; easing.type: Easing.OutCubic } }
+
+                color: model.enabled
                        ? (rowMouse.containsMouse ? EzTheme.surface2 : EzTheme.surface)
                        : (rowMouse.containsMouse ? "#14141A" : "#0E0E12")
-                border.color: (modItem.isFabricApi || model.enabled)
-                              ? (rowMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)
+                border.color: model.enabled
+                              ? (rowMouse.containsMouse ? EzTheme.accentLight : EzTheme.border)
                               : "#161620"
                 border.width: 1
 
                 Behavior on color { ColorAnimation { duration: 100 } }
+                Behavior on border.color { ColorAnimation { duration: 100 } }
 
                 RowLayout {
                     anchors.fill: parent
@@ -890,32 +851,23 @@ Item {
                         Layout.preferredWidth: 36
                         Layout.preferredHeight: 20
                         radius: 10
-                        color: modItem.isFabricApi ? EzTheme.accentDark : (model.enabled ? EzTheme.accent : EzTheme.surface3)
-                        border.color: modItem.isFabricApi ? EzTheme.accent : (model.enabled ? EzTheme.accentLight : EzTheme.border)
+                        color: model.enabled ? EzTheme.accent : EzTheme.surface3
+                        border.color: model.enabled ? EzTheme.accentLight : EzTheme.border
                         border.width: 1
 
                         Behavior on color { ColorAnimation { duration: 100 } }
 
                         Rectangle {
                             width: 14; height: 14; radius: 7
-                            color: modItem.isFabricApi ? EzTheme.accentLight : (model.enabled ? "#000000" : EzTheme.textMuted)
-                            x: (modItem.isFabricApi || model.enabled) ? 19 : 3
+                            color: model.enabled ? "#000000" : EzTheme.textMuted
+                            x: model.enabled ? 19 : 3
                             anchors.verticalCenter: parent.verticalCenter
                             Behavior on x { NumberAnimation { duration: 100 } }
-
-                            Text {
-                                visible: modItem.isFabricApi
-                                text: "🔒"
-                                font.pixelSize: 8
-                                anchors.centerIn: parent
-                            }
                         }
 
                         MouseArea {
                             anchors.fill: parent
-                            hoverEnabled: !modItem.isFabricApi
-                            cursorShape: modItem.isFabricApi ? Qt.ArrowCursor : Qt.PointingHandCursor
-                            enabled: !modItem.isFabricApi
+                            cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 profileController.toggleMod(model.slug || model.name)
                             }
@@ -1040,11 +992,35 @@ Item {
                                             id: perfRow
                                             anchors.centerIn: parent
                                             spacing: 3
-                                            Text { text: "⚡"; font.pixelSize: 8 }
+                                            Image { source: "icons/zap.svg"; width: 8; height: 8; fillMode: Image.PreserveAspectFit }
                                             Text {
                                                 text: "INTEGRIERT"
                                                 font.family: EzTheme.mcFontFamily; font.pixelSize: 8; font.bold: true
                                                 color: "#4ADE80"
+                                            }
+                                        }
+                                    }
+                                    Rectangle {
+                                        height: 14
+                                        width: typeRow.implicitWidth + 8
+                                        radius: 3
+                                        color: "#2C1E38"
+                                        border.color: "#8B5CF6"
+                                        border.width: 1
+                                        visible: modItem.isResourcePack || modItem.isShader
+                                        RowLayout {
+                                            id: typeRow
+                                            anchors.centerIn: parent
+                                            spacing: 3
+                                            Image {
+                                                source: modItem.isShader ? "icons/sparkles.svg" : "icons/palette.svg"
+                                                width: 8; height: 8
+                                                fillMode: Image.PreserveAspectFit
+                                            }
+                                            Text {
+                                                text: modItem.isShader ? "SHADER" : "RESOURCE PACK"
+                                                font.family: EzTheme.mcFontFamily; font.pixelSize: 8; font.bold: true
+                                                color: "#C4B5FD"
                                             }
                                         }
                                     }
@@ -1108,7 +1084,7 @@ Item {
                         color: delMouse.containsMouse ? "#3D1418" : "transparent"
                         border.color: delMouse.containsMouse ? EzTheme.danger : "transparent"
                         border.width: 1
-                        visible: !modItem.isFabricApi
+                        visible: !modItem.isEzClient
 
                         Image {
                             source: "icons/trash.svg"
@@ -1139,7 +1115,7 @@ Item {
 
                     Item {
                         Layout.preferredWidth: 28
-                        visible: modItem.isFabricApi
+                        visible: modItem.isEzClient
                     }
                 }
 

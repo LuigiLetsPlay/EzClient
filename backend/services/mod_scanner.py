@@ -97,6 +97,7 @@ def extract_jar_metadata(jar_path: Path, cache_data: dict[str, Any] = None) -> d
         meta["sha1"] = hashlib.sha1(raw_bytes).hexdigest()
         meta["murmur2"] = curseforge_murmur2(raw_bytes)
 
+        icon_field = None
         # Inspect ZIP archive contents
         with zipfile.ZipFile(jar_path, "r") as z:
             namelist = set(z.namelist())
@@ -109,6 +110,7 @@ def extract_jar_metadata(jar_path: Path, cache_data: dict[str, Any] = None) -> d
                 meta["name"] = str(f_data.get("name", meta["mod_id"] or jar_path.stem)).strip()
                 meta["version"] = str(f_data.get("version", "")).strip()
                 meta["description"] = str(f_data.get("description", "")).strip()
+                icon_field = f_data.get("icon")
                 authors = f_data.get("authors", [])
                 meta["authors"] = authors[0] if isinstance(authors, list) and authors else str(authors)
                 
@@ -127,6 +129,7 @@ def extract_jar_metadata(jar_path: Path, cache_data: dict[str, Any] = None) -> d
                 meta["mod_id"] = str(qlt.get("id", "")).strip()
                 meta["name"] = str(qlt.get("name", meta["mod_id"] or jar_path.stem)).strip()
                 meta["version"] = str(qlt.get("version", "")).strip()
+                icon_field = qlt.get("icon")
                 
                 dep_list = qlt.get("depends", [])
                 if isinstance(dep_list, list):
@@ -161,18 +164,84 @@ def extract_jar_metadata(jar_path: Path, cache_data: dict[str, Any] = None) -> d
                     meta["mod_id"] = str(info_data.get("modid", "")).strip()
                     meta["name"] = str(info_data.get("name", meta["mod_id"] or jar_path.stem)).strip()
 
+            # Extract in-jar icon if present
+            meta["icon_url"] = _extract_jar_icon(jar_path, z, icon_field)
+
+    except PermissionError:
+        # File is locked by a running Minecraft instance; use cached metadata if available
+        if jar_path.name in cache_data:
+            return cache_data[jar_path.name]
+        if "ezclient" in jar_path.name.lower():
+            meta["mod_id"] = "ezclient"
+            meta["name"] = "EzClient Core"
+            meta["loader"] = "fabric"
+            meta["icon_url"] = "assets/logo.png"
     except Exception as e:
+        if jar_path.name in cache_data:
+            return cache_data[jar_path.name]
         print(f"[ModScanner] Could not open jar {jar_path.name}: {e}")
 
     # Fallback to file name stem
     if not meta["mod_id"]:
         meta["mod_id"] = jar_path.stem.lower()
+        if "ezclient" in jar_path.name.lower():
+            meta["mod_id"] = "ezclient"
+            meta["name"] = "EzClient Core"
+            meta["loader"] = "fabric"
+            meta["icon_url"] = "assets/logo.png"
 
     # Update cache dict in memory
     meta["_cache_key"] = cache_key if 'cache_key' in locals() else ""
     cache_data[jar_path.name] = meta
 
     return meta
+
+
+def _extract_jar_icon(jar_path: Path, z: zipfile.ZipFile, icon_field: Any) -> str:
+    """Extracts mod icon PNG from a jar archive into cache and returns file:/// URL."""
+    try:
+        import os
+        icon_path = ""
+        if isinstance(icon_field, str) and icon_field:
+            icon_path = icon_field.strip()
+        elif isinstance(icon_field, dict) and icon_field:
+            for k in ("512", "256", "128", "64", "32", "16"):
+                if k in icon_field:
+                    icon_path = str(icon_field[k]).strip()
+                    break
+            if not icon_path:
+                icon_path = str(next(iter(icon_field.values()), "")).strip()
+
+        namelist = set(z.namelist())
+        candidates = []
+        if icon_path:
+            candidates.append(icon_path)
+            if icon_path.startswith("/"):
+                candidates.append(icon_path[1:])
+            if not icon_path.startswith("assets/"):
+                candidates.append(f"assets/{icon_path}")
+
+        # Fallback candidate search inside jar
+        for name in namelist:
+            nl = name.lower()
+            if (nl.endswith("/icon.png") or nl == "icon.png" or nl.endswith("/logo.png") or nl == "logo.png" or nl.endswith("/mod_icon.png")) and not nl.startswith("meta-inf/"):
+                candidates.append(name)
+
+        for cand in candidates:
+            if cand in namelist:
+                raw = z.read(cand)
+                if raw and len(raw) > 32:
+                    h = hashlib.md5(raw).hexdigest()
+                    appdata = os.environ.get("APPDATA", "")
+                    cache_dir = Path(appdata) / ".ezclient" / "cache" / "mod_icons" if appdata else Path.home() / ".ezclient" / "cache" / "mod_icons"
+                    cache_dir.mkdir(parents=True, exist_ok=True)
+                    out_path = cache_dir / f"{h}.png"
+                    if not out_path.exists():
+                        out_path.write_bytes(raw)
+                    return out_path.as_uri()
+    except Exception:
+        pass
+    return ""
 
 
 class InstalledModRegistry:

@@ -103,7 +103,7 @@ Rectangle {
             width: 46; height: root.height
             color: closeMouse.containsMouse ? "#C42B1C" : "transparent"
             Behavior on color { ColorAnimation { duration: 80 } }
-            Text { text: "✕"; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: closeMouse.containsMouse ? "#ffffff" : EzTheme.textMuted; anchors.centerIn: parent; Behavior on color { ColorAnimation { duration: 80 } } }
+            Image { source: "icons/x.svg"; width: 10; height: 10; anchors.centerIn: parent; opacity: closeMouse.containsMouse ? 1.0 : 0.6; fillMode: Image.PreserveAspectFit }
             MouseArea { id: closeMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor; onClicked: if (root.windowRef) root.windowRef.close() }
         }
     }

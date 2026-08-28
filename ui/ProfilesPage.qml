@@ -9,7 +9,7 @@ Item {
     property string createName: ""
     property string createVersion: "26.2"
     property string createLoader: "Fabric"
-    property string createPreset: "performance"
+    property string createPreset: "ezclient"
     property bool loginBeforeCreate: false
 
     Connections {
@@ -81,7 +81,7 @@ Item {
                         Layout.fillWidth: true
                     }
                     Text {
-                        text: "✕"
+                        text: "X"
                         font.pixelSize: 13
                         color: EzTheme.textMuted
                         MouseArea {
@@ -187,9 +187,9 @@ Item {
                         function updateChoices() {
                             var ver = versionPicker.choices[versionPicker.currentIndex]
                             if (versionPicker.isEzClientSupported(ver)) {
-                                choices = ["EzClient + Essentials", "EzClient Only", "Performance Mods + Essentials", "Raw / Vanilla"]
+                                choices = ["EzClient (Empfohlen)", "Raw / Vanilla"]
                             } else {
-                                choices = ["Performance Mods + Essentials", "Performance Mods", "Raw / Vanilla"]
+                                choices = ["Raw / Vanilla"]
                             }
                             currentIndex = 0 // Reset choice when choices change
                             updatePresetKey()
@@ -197,10 +197,7 @@ Item {
                         
                         function updatePresetKey() {
                             var choice = choices[currentIndex]
-                            if (choice === "EzClient + Essentials") root.createPreset = "essentials"
-                            else if (choice === "EzClient Only") root.createPreset = "performance"
-                            else if (choice === "Performance Mods + Essentials") root.createPreset = "perf_essentials"
-                            else if (choice === "Performance Mods") root.createPreset = "perf_only"
+                            if (choice === "EzClient (Empfohlen)") root.createPreset = "ezclient"
                             else root.createPreset = "raw"
                         }
                         
@@ -344,7 +341,7 @@ Item {
 
                 Text {
                     visible: profileSearch.text !== ""
-                    text: "✕"
+                    text: "X"
                     font.pixelSize: 10
                     color: EzTheme.textMuted
                     MouseArea {
@@ -388,7 +385,7 @@ Item {
                        ? EzTheme.surfaceActive
                        : (itemMouse.containsMouse ? EzTheme.surface2 : EzTheme.surface)
                 border.color: model.profileId === profileController.activeId
-                              ? EzTheme.accent : (itemMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)
+                              ? EzTheme.accent : (itemMouse.containsMouse ? EzTheme.accentLight : EzTheme.border)
                 border.width: 1
 
                 Behavior on color { ColorAnimation { duration: 100 } }
@@ -405,8 +402,8 @@ Item {
                         Layout.preferredWidth: 42
                         Layout.preferredHeight: 42
                         radius: 8
-                        color: EzTheme.surface3
-                        border.color: EzTheme.borderLight
+                        color: model.profileId === profileController.activeId ? EzTheme.surfaceActive : EzTheme.surface3
+                        border.color: model.profileId === profileController.activeId ? EzTheme.accent : EzTheme.borderLight
                         border.width: 1
 
                         Text {
@@ -476,6 +473,7 @@ Item {
                         EzButton {
                             text: EzI18n.t("profiles_select", "Auswählen")
                             visible: model.profileId !== profileController.activeId
+                            primary: true
                             Layout.preferredHeight: 32
                             Layout.preferredWidth: 90
                             onClicked: profileController.selectProfile(model.profileId)
@@ -514,15 +512,17 @@ Item {
                             Layout.preferredHeight: 32
                             radius: 6
                             color: dupBtnMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
-                            border.color: EzTheme.border
+                            border.color: dupBtnMouse.containsMouse ? EzTheme.accent : EzTheme.border
                             border.width: 1
                             Behavior on color { ColorAnimation { duration: 100 } }
 
-                            Text {
-                                text: "📋"
-                                font.pixelSize: 11
-                                color: EzTheme.textSecondary
+                            Image {
+                                source: "icons/copy.svg"
+                                width: 14
+                                height: 14
+                                fillMode: Image.PreserveAspectFit
                                 anchors.centerIn: parent
+                                opacity: dupBtnMouse.containsMouse ? 1.0 : 0.7
                             }
 
                             MouseArea {
@@ -534,15 +534,15 @@ Item {
                             }
                         }
 
-                        // Manage Mods Button
+                        // Manage / Inspect Details Button
                         EzButton {
-                            text: EzI18n.t("profiles_mods_btn", "Mods")
+                            text: "Details"
                             Layout.preferredHeight: 32
                             Layout.preferredWidth: 65
                             onClicked: {
-                                profileController.selectProfile(model.profileId)
+                                profileController.inspectProfile(model.profileId)
                                 if (typeof window !== "undefined" && window.navigateTo) {
-                                    window.navigateTo("installed_mods")
+                                    window.navigateTo("profile_detail")
                                 }
                             }
                         }
@@ -557,11 +557,13 @@ Item {
                             border.width: 1
                             Behavior on color { ColorAnimation { duration: 100 } }
 
-                            Text {
-                                text: "🗑"
-                                font.pixelSize: 11
-                                color: delBtnMouse.containsMouse ? EzTheme.danger : EzTheme.textMuted
+                            Image {
+                                source: "icons/trash.svg"
+                                width: 14
+                                height: 14
+                                fillMode: Image.PreserveAspectFit
                                 anchors.centerIn: parent
+                                opacity: delBtnMouse.containsMouse ? 1.0 : 0.6
                             }
 
                             MouseArea {
@@ -582,7 +584,7 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     z: -1
                     onClicked: {
-                        profileController.selectProfile(model.profileId)
+                        profileController.inspectProfile(model.profileId)
                         if (typeof window !== "undefined" && window.navigateTo) {
                             window.navigateTo("profile_detail")
                         }

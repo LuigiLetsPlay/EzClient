@@ -229,7 +229,7 @@ Rectangle {
                     opacity: root.currentRoute === "installed_mods" ? 1.0 : 0.55
                 }
                 Text {
-                    text: EzI18n.t("nav_installed_mods", "Installierte Mods")
+                    text: EzI18n.t("nav_installed_mods", "Erweiterungen")
                     font.family: EzTheme.mcFontFamily
                     font.pixelSize: 11
                     font.bold: root.currentRoute === "installed_mods"

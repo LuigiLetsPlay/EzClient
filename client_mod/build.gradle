@@ -11,13 +11,14 @@ base {
 }
 
 repositories {
-	maven { url "https://maven.terraformersmc.com/releases/" }
+	maven { url = "https://maven.terraformersmc.com/releases/" }
 }
 
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	// Keep the launcher profile to three top-level jars. Fabric API is loaded jar-in-jar.
+	include(implementation("net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"))
 	implementation "com.terraformersmc:modmenu:${project.modmenu_version}"
 }
 

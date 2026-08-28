@@ -219,11 +219,11 @@ Rectangle {
                                         }
                                     }
 
-                                    Text {
-                                        text: "✓"
-                                        font.bold: true
-                                        font.pixelSize: 13
-                                        color: EzTheme.accentLight
+                                    Image {
+                                        source: "icons/check.svg"
+                                        width: 14
+                                        height: 14
+                                        fillMode: Image.PreserveAspectFit
                                         visible: model.profileId === profileController.activeId
                                     }
                                 }
@@ -306,11 +306,18 @@ Rectangle {
                     width: root.width < 1300 ? 42 : (tabRowInner.implicitWidth + 26)
                     height: 36
                     radius: 8
+                    scale: tabMouse.pressed ? 0.95 : (tabMouse.containsMouse ? 1.04 : 1.0)
+                    Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+
                     color: root.isTabActive(modelData.id)
                            ? EzTheme.surfaceActive
                            : (tabMouse.containsMouse ? EzTheme.surfaceHover : "transparent")
 
+                    border.color: root.isTabActive(modelData.id) ? EzTheme.accent : (tabMouse.containsMouse ? EzTheme.borderLight : "transparent")
+                    border.width: 1
+
                     Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
+                    Behavior on border.color { ColorAnimation { duration: EzTheme.animNormal } }
 
                     RowLayout {
                         id: tabRowInner
@@ -321,6 +328,8 @@ Rectangle {
                             source: "icons/" + modelData.icon
                             width: 14; height: 14
                             fillMode: Image.PreserveAspectFit
+                            scale: tabMouse.containsMouse ? 1.15 : 1.0
+                            Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
                             opacity: root.isTabActive(modelData.id) ? 1.0 : (tabMouse.containsMouse ? 0.8 : 0.45)
                             Behavior on opacity { NumberAnimation { duration: EzTheme.animNormal } }
                         }
@@ -337,7 +346,19 @@ Rectangle {
                                    : (tabMouse.containsMouse ? EzTheme.text : EzTheme.textSecondary)
                             Behavior on color { ColorAnimation { duration: EzTheme.animNormal } }
                         }
-                        }
+                    }
+
+                    // Active Glowing Bottom Indicator
+                    Rectangle {
+                        height: 2
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 2
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: parent.width - 16
+                        radius: 1
+                        color: EzTheme.accent
+                        visible: root.isTabActive(modelData.id)
+                    }
 
                     MouseArea {
                         id: tabMouse
@@ -394,7 +415,7 @@ Rectangle {
                     width: 48; height: root.height
                     color: closeMouse.containsMouse ? "#C42B1C" : "transparent"
                     Behavior on color { ColorAnimation { duration: EzTheme.animFast } }
-                    Text { text: "✕"; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: closeMouse.containsMouse ? "#ffffff" : EzTheme.textMuted; anchors.centerIn: parent; Behavior on color { ColorAnimation { duration: EzTheme.animFast } } }
+                    Image { source: "icons/x.svg"; width: 12; height: 12; anchors.centerIn: parent; opacity: closeMouse.containsMouse ? 1.0 : 0.6; fillMode: Image.PreserveAspectFit }
                     MouseArea { id: closeMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor; onClicked: if (root.windowRef) root.windowRef.close() }
                 }
             }
@@ -402,15 +423,15 @@ Rectangle {
     RowLayout {
         id: rightSection
         anchors.right: winControls.left
-        anchors.rightMargin: 72
+        anchors.rightMargin: 20
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 10
+        spacing: 36
 
-            // Glowing Update Badge
+            // Glowing Update Badge (EzClient Update)
             Rectangle {
                 id: updateBadge
                 height: 28
-                visible: root.width >= 1050 && typeof updateController !== "undefined" && updateController && updateController.updateAvailable
+                visible: typeof profileController !== "undefined" && profileController && profileController.ezClientUpdateAvailable
                 width: updateBadgeRow.implicitWidth + 18
                 radius: 14
                 color: updateMouse.containsMouse ? "#1c3829" : "#13281c"
@@ -423,9 +444,9 @@ Rectangle {
                     id: updateBadgeRow
                     anchors.centerIn: parent
                     spacing: 6
-                    Text { text: "⚡"; font.pixelSize: 11; color: EzTheme.accent }
+                    Image { source: "icons/zap.svg"; width: 12; height: 12; fillMode: Image.PreserveAspectFit }
                     Text {
-                        text: "v" + (typeof updateController !== "undefined" && updateController ? updateController.latestVersion : "") + " Update"
+                        text: "Upgrade v" + (profileController ? profileController.ezClientLatestVersion : "1.8.0")
                         font.family: EzTheme.mcFontFamily
                         font.pixelSize: 10
                         font.bold: true
@@ -438,18 +459,19 @@ Rectangle {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.navigate("settings")
+                    onClicked: {
+                        if (profileController) profileController.applyEzClientUpdates()
+                    }
                 }
             }
 
             // Player Avatar & Username
-                Rectangle {
-                    id: accPill
-                    z: 30
-                    height: 34
-                    // The pill always wraps its real content. The username itself
-                    // elides, so name/avatar can never paint outside the gray pill.
-                    width: root.width >= 1100 ? Math.min(180, accRow.implicitWidth + 24) : 42
+            Rectangle {
+                id: accPill
+                z: 30
+                height: 34
+                // The pill is guaranteed to display avatar and full username
+                width: Math.max(120, Math.min(220, accRow.implicitWidth + 24))
                 radius: 17
                 color: accPopup.opened ? EzTheme.surface3 : (accMouse.containsMouse ? EzTheme.surfaceHover : EzTheme.surface2)
 
@@ -491,14 +513,13 @@ Rectangle {
                     }
 
                     Text {
-                        visible: root.width >= 1100
                         text: root.accountUser
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 12
                         font.bold: true
                         color: EzTheme.text
                         elide: Text.ElideRight
-                        Layout.maximumWidth: root.width >= 1300 ? 140 : 80
+                        Layout.maximumWidth: 130
                     }
 
                 }
@@ -562,8 +583,8 @@ Rectangle {
                                 }
                                 Text {
                                     text: (typeof accountController !== "undefined" && accountController && accountController.isOnline)
-                                          ? EzI18n.t("topbar_account_auth_online", "🟢 Microsoft Auth (Online)")
-                                          : EzI18n.t("topbar_account_auth_offline", "⚪ Offline / Lokales Profil")
+                                          ? EzI18n.t("topbar_account_auth_online", "Microsoft Auth (Online)")
+                                          : EzI18n.t("topbar_account_auth_offline", "Offline / Lokales Profil")
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 10
                                     color: (typeof accountController !== "undefined" && accountController && accountController.isOnline) ? EzTheme.accentLight : EzTheme.textMuted
@@ -586,7 +607,7 @@ Rectangle {
                             RowLayout {
                                 anchors.centerIn: parent
                                 spacing: 8
-                                Text { text: "🔑"; font.pixelSize: 12 }
+                                Image { source: "icons/user.svg"; width: 14; height: 14; fillMode: Image.PreserveAspectFit }
                                 Text {
                                     text: EzI18n.t("topbar_login_btn", "Microsoft Konto anmelden")
                                     font.family: EzTheme.fontFamily
@@ -622,7 +643,7 @@ Rectangle {
                                 anchors.left: parent.left; anchors.leftMargin: 10
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 8
-                                Text { text: "👕"; font.pixelSize: 11 }
+                                Image { source: "icons/user.svg"; width: 14; height: 14; fillMode: Image.PreserveAspectFit }
                                 Text {
                                     text: "Skin ändern (Mojang API)"
                                     font.family: EzTheme.fontFamily
@@ -658,7 +679,7 @@ Rectangle {
                                 anchors.left: parent.left; anchors.leftMargin: 10
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 8
-                                Text { text: "🔄"; font.pixelSize: 11 }
+                                Image { source: "icons/refresh-cw.svg"; width: 14; height: 14; fillMode: Image.PreserveAspectFit }
                                 Text {
                                     text: EzI18n.t("topbar_resync_btn", "Token neu synchronisieren")
                                     font.family: EzTheme.fontFamily
@@ -693,7 +714,7 @@ Rectangle {
                                 anchors.left: parent.left; anchors.leftMargin: 10
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 8
-                                Text { text: "🚪"; font.pixelSize: 11 }
+                                Image { source: "icons/x.svg"; width: 14; height: 14; fillMode: Image.PreserveAspectFit }
                                 Text {
                                     text: EzI18n.t("topbar_logout_btn", "Konto abmelden")
                                     font.family: EzTheme.fontFamily

@@ -17,8 +17,8 @@ import java.util.*;
  * - Does NOT include Zoom or MainMenu branding because it avoids Mixins and Minecraft class dependencies.
  */
 public class EzClientLiteMod implements ClientModInitializer {
-public static final String CLIENT_VERSION = "1.6.7";
-public static final String CLIENT_TITLE = "EzClient 1.6.7 (Lite)";
+public static final String CLIENT_VERSION = "1.8.0";
+public static final String CLIENT_TITLE = "EzClient 1.8.0 (Lite)";
     private static volatile boolean running = true;
     private static Path ezClientDataDir = null;
 
@@ -70,8 +70,8 @@ public static final String CLIENT_TITLE = "EzClient 1.6.7 (Lite)";
         // 3. Start Window Title & Icon Watcher Daemon
         startWindowDaemon();
 
-        // 4. Start Accessibility / Narrator Dismissal Daemon
-        startNarratorDismissDaemon();
+        // Accessibility defaults are written to options.txt. Never inspect or
+        // replace runtime screens: voice-chat and other mods own their UI.
 
         log("EzClient Core Mod initialized successfully!");
     }
@@ -298,54 +298,4 @@ public static final String CLIENT_TITLE = "EzClient 1.6.7 (Lite)";
         } catch (Throwable t) {}
     }
 
-    private void startNarratorDismissDaemon() {
-        Thread thread = new Thread(() -> {
-            int checks = 0;
-            while (running && checks < 300) {
-                try {
-                    Thread.sleep(250);
-                    checks++;
-
-                    try {
-                        Class<?> mcClass = Class.forName("net.minecraft.client.MinecraftClient");
-                        Object instance = mcClass.getMethod("getInstance").invoke(null);
-                        if (instance != null) {
-                            java.lang.reflect.Field screenField = null;
-                            for (java.lang.reflect.Field f : mcClass.getDeclaredFields()) {
-                                if (f.getType().getName().contains("Screen")) {
-                                    screenField = f;
-                                    break;
-                                }
-                            }
-                            if (screenField != null) {
-                                screenField.setAccessible(true);
-                                Object currentScreen = screenField.get(instance);
-                                if (currentScreen != null) {
-                                    String screenName = currentScreen.getClass().getSimpleName();
-                                    if (screenName.contains("Accessibility") || screenName.contains("Narrator") || screenName.contains("Onboarding")) {
-                                        System.out.println("[EzClient-Lite] Suppressing " + screenName + " -> Navigating to TitleScreen...");
-                                        
-                                        Class<?> titleScreenClass = Class.forName("net.minecraft.client.gui.screen.TitleScreen");
-                                        Object titleScreen = titleScreenClass.getConstructor().newInstance();
-                                        
-                                        for (java.lang.reflect.Method m : mcClass.getMethods()) {
-                                            if (m.getParameterCount() == 1 && m.getParameterTypes()[0].getName().contains("Screen")) {
-                                                m.invoke(instance, titleScreen);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } catch (Throwable ignored) {}
-                } catch (InterruptedException e) {
-                    break;
-                } catch (Throwable ignored) {}
-            }
-        }, "EzClient-Lite-NarratorDismissDaemon");
-
-        thread.setDaemon(true);
-        thread.start();
-    }
 }

@@ -221,7 +221,7 @@ Window {
                     }
                     Rectangle {
                         width: 46; height: 52; color: closeM.containsMouse ? "#C42B1C" : "transparent"
-                        Text { text: "✕"; font.pixelSize: 12; color: closeM.containsMouse ? "#ffffff" : EzTheme.textSecondary; anchors.centerIn: parent }
+                        Image { source: "icons/x.svg"; width: 12; height: 12; anchors.centerIn: parent; opacity: closeM.containsMouse ? 1.0 : 0.6; fillMode: Image.PreserveAspectFit }
                         MouseArea { id: closeM; anchors.fill: parent; hoverEnabled: true; onClicked: liveLogsWindow.close() }
                     }
                 }
@@ -531,7 +531,7 @@ Window {
                 spacing: 14
 
                 Text {
-                    text: "📄 " + logListModel.count + " LINES"
+                    text: "" + logListModel.count + " LINES"
                     font.family: "Consolas, monospace"
                     font.pixelSize: 10
                     color: EzTheme.textMuted
@@ -583,7 +583,7 @@ Window {
                         id: clearRow
                         anchors.centerIn: parent
                         spacing: 4
-                        Text { text: "🗑️"; font.pixelSize: 9 }
+                        Image { source: "icons/trash.svg"; width: 12; height: 12; fillMode: Image.PreserveAspectFit }
                         Text { text: "Clear"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
                     }
 
@@ -611,7 +611,7 @@ Window {
                         id: copyLogR
                         anchors.centerIn: parent
                         spacing: 4
-                        Text { text: "📋"; font.pixelSize: 9 }
+                        Image { source: "icons/clipboard.svg"; width: 14; height: 14; fillMode: Image.PreserveAspectFit }
                         Text { text: "Copy Logs"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textSecondary }
                     }
 

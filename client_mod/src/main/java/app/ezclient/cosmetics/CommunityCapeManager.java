@@ -42,7 +42,7 @@ public final class CommunityCapeManager {
             @Override public Identifier id() { return texture; }
             @Override public Identifier texturePath() { return texture; }
         };
-        return new PlayerSkin(original.body(), asset, original.elytra(), original.model(), original.secure());
+        return new PlayerSkin(original.body(), asset, asset, original.model(), original.secure());
     }
 
     public static void tick(Minecraft client) {

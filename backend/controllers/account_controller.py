@@ -1,4 +1,5 @@
 import re
+import json
 import time
 import threading
 import urllib.parse
@@ -7,7 +8,7 @@ import webbrowser
 import shutil
 import struct
 from pathlib import Path
-from backend.services import cape_community
+from backend.services import cape_community, cape_media
 from PySide6.QtCore import QObject, Signal, Slot, Property, QUrl, Qt, QByteArray, QBuffer, QIODevice
 from PySide6.QtGui import QImage, QPainter, QTransform
 from PySide6.QtWidgets import QDialog, QVBoxLayout
@@ -182,6 +183,8 @@ class AccountController(QObject):
     skinUploadStatusChanged = Signal(str, bool)
     capeCommunityChanged = Signal()
     capeCommunityStatusChanged = Signal(str, bool)
+    capeMediaPrepared = Signal(str, int, float)
+    capePreviewPrepared = Signal(str, int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -201,6 +204,10 @@ class AccountController(QObject):
         self._community_capes: list[dict] = []
         self._cape_community_status = "Lade Community-Capes …"
         self._active_community_cape_url = ""
+        self._cape_preview_lock = threading.Lock()
+        self._cape_preview_pending: tuple[int, str, str] | None = None
+        self._cape_preview_worker_running = False
+        self._cape_preview_revision = 0
         try:
             marker = Path(DATA_DIR) / "cosmetics" / "active_community_cape.txt"
             if marker.is_file():
@@ -439,6 +446,18 @@ class AccountController(QObject):
 
     @Slot(str, result=bool)
     def publishCape(self, title: str) -> bool:
+        if not self.isOnline or not self.uuid or self.uuid == "00000000000000000000000000000000":
+            self.capeCommunityStatusChanged.emit(
+                "Community-Capes erfordern einen verifizierten Microsoft-Account, um Identitätsdiebstahl zu verhindern.", True
+            )
+            return False
+
+        try:
+            clean_title = cape_community.validate_cape_title(title)
+        except ValueError as exc:
+            self.capeCommunityStatusChanged.emit(str(exc), True)
+            return False
+
         cape = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
         upload_atlas = Path(DATA_DIR) / "cosmetics" / "active_cape_upload.png"
         if upload_atlas.is_file():
@@ -453,7 +472,35 @@ class AccountController(QObject):
 
         def worker() -> None:
             try:
-                cape_community.upload_cape(cape, self.username, self.uuid, title.strip())
+                session = get_minecraft_session()
+                if not session or not session.is_online or not session.access_token:
+                    raise ValueError("Die Minecraft-Sitzung ist abgelaufen. Bitte melde dich erneut an.")
+                canonical_uuid = cape_community.normalize_player_uuid(session.uuid)
+
+                tokens_file = Path(DATA_DIR) / "cosmetics" / "cape_tokens.json"
+                tokens = {}
+                if tokens_file.is_file():
+                    try:
+                        tokens = json.loads(tokens_file.read_text(encoding="utf-8"))
+                    except Exception:
+                        tokens = {}
+
+                clean_uuid = canonical_uuid.replace("-", "")
+                current_token = tokens.get(clean_uuid, "")
+
+                res = cape_community.upload_cape(
+                    cape,
+                    session.username,
+                    canonical_uuid,
+                    clean_title,
+                    token=current_token,
+                    access_token=session.access_token,
+                )
+                if isinstance(res, dict) and res.get("token"):
+                    tokens[clean_uuid] = res["token"]
+                    tokens_file.parent.mkdir(parents=True, exist_ok=True)
+                    tokens_file.write_text(json.dumps(tokens, indent=2), encoding="utf-8")
+
                 self.capeCommunityStatusChanged.emit("Cape wurde in der Community veröffentlicht.", False)
                 self.refreshCapeCommunity()
             except Exception as exc:
@@ -505,11 +552,73 @@ class AccountController(QObject):
 
     @Slot(result=str)
     def pickCapeImage(self) -> str:
-        """Choose an image only; the caller previews it before publishing."""
+        """Choose a still or animated cape source; the editor decides how to process it."""
         file_path, _ = QFileDialog.getOpenFileName(
-            None, "Cape-Bild auswählen", "", "Bilder (*.png *.jpg *.jpeg *.webp);;Alle Dateien (*)"
+            None,
+            "Cape-Datei auswählen",
+            "",
+            "Cape-Medien (*.png *.jpg *.jpeg *.webp *.gif *.mp4 *.webm);;Alle Dateien (*)",
         )
         return QUrl.fromLocalFile(file_path).toString() if file_path else ""
+
+    @Slot(str, result="QVariantMap")
+    def probeCapeMedia(self, source_url: str) -> dict:
+        try:
+            source = QUrl(source_url).toLocalFile() if source_url.startswith("file:") else source_url
+            info = cape_media.probe_media(source)
+            return {
+                "ok": True,
+                "duration": info.duration,
+                "width": info.width,
+                "height": info.height,
+                "sourceFps": info.source_fps,
+            }
+        except Exception as exc:
+            self.skinUploadStatusChanged.emit(f"Animation konnte nicht gelesen werden: {exc}", True)
+            return {"ok": False}
+
+    @Slot(str, float, float, int, bool, result=bool)
+    def prepareAnimatedCape(self, source_url: str, start: float, end: float, fps: int, ping_pong: bool) -> bool:
+        """Convert media off the UI thread and expose its first frame as safe fallback."""
+        source = QUrl(source_url).toLocalFile() if source_url.startswith("file:") else source_url
+        if not source:
+            return False
+
+        def worker() -> None:
+            try:
+                cosmetics = (Path(DATA_DIR) / "cosmetics").resolve()
+                target = (cosmetics / "pending_cape_animation").resolve()
+                if target.parent != cosmetics:
+                    raise ValueError("Ungültiger Animationspfad.")
+                if target.exists():
+                    shutil.rmtree(target)
+
+                manifest = cape_media.generate_frame_sheet(
+                    source,
+                    target,
+                    cape_media.AnimationOptions(start, end, fps, ping_pong),
+                )
+                from PIL import Image
+                sheet_path = target / manifest.sheet
+                with Image.open(sheet_path) as sheet:
+                    first_frame = sheet.convert("RGBA").crop((0, 0, manifest.frame_width, manifest.frame_height))
+                    fallback = cosmetics / "pending_cape.png"
+                    first_frame.save(fallback, "PNG", optimize=True)
+                fallback.write_bytes(_strip_png_metadata(fallback.read_bytes()))
+                if not cape_community.is_safe_cape_png(fallback.read_bytes()):
+                    raise ValueError("Das Animations-Fallback entspricht nicht dem Cape-Format.")
+                shutil.copyfile(fallback, cosmetics / "pending_cape_preview.png")
+                shutil.copyfile(fallback, cosmetics / "pending_cape_upload.png")
+                preview_url = QUrl.fromLocalFile(str(cosmetics / "pending_cape_preview.png")).toString()
+                self.capeMediaPrepared.emit(preview_url, manifest.frame_count, manifest.duration)
+                self.skinUploadStatusChanged.emit(
+                    f"Animation bereit: {manifest.frame_count} Frames bei {manifest.fps} FPS.", False
+                )
+            except Exception as exc:
+                self.skinUploadStatusChanged.emit(f"Animation konnte nicht erstellt werden: {exc}", True)
+
+        threading.Thread(target=worker, name="EzClient-CapeMedia", daemon=True).start()
+        return True
 
     @Slot(str, str, result=str)
     def prepareCapeImage(self, source_url: str, fit_mode: str) -> str:
@@ -521,10 +630,10 @@ class AccountController(QObject):
             image = QImage(source)
             if image.isNull() or image.width() < 1 or image.height() < 1 or image.width() > 4096 or image.height() > 4096:
                 raise ValueError("Das Bild kann nicht verarbeitet werden.")
-            mode_part, _, crop_part = fit_mode.partition("|")
-            mode = "Stretch" if mode_part == "Stretch" else "Cover"
-            # Rotate the selected picture 90 degrees left once, up front.
-            # Every later step receives exactly this rotated image unchanged.
+            _, _, crop_part = fit_mode.partition("|")
+            # The UI always provides a cape-shaped 10:16 selection. Transfer
+            # that exact selection to the cape face without a second fit mode.
+            mode = "Stretch"
             rgba = image.convertToFormat(QImage.Format_RGBA8888)
             if crop_part:
                 try:
@@ -538,9 +647,6 @@ class AccountController(QObject):
                         rgba = cropped
                 except ValueError:
                     pass
-            if mode == "Crop":
-                # "Zuschneiden": the selected region fills the cape face as-is.
-                mode = "Stretch"
             cape = _bake_editor_cape(rgba, mode)
             if not _write_hd_cape_preview(rgba, editor=True, fit_mode=mode):
                 raise ValueError("Die Cape-Vorschau konnte nicht erzeugt werden.")
@@ -564,15 +670,63 @@ class AccountController(QObject):
             self.skinUploadStatusChanged.emit(str(exc), True)
             return ""
 
+    @Slot(str, str, result=int)
+    def requestCapePreview(self, source_url: str, fit_mode: str) -> int:
+        """Coalesce live crop requests and render only the latest state off the UI thread."""
+        with self._cape_preview_lock:
+            self._cape_preview_revision += 1
+            revision = self._cape_preview_revision
+            self._cape_preview_pending = (revision, source_url, fit_mode)
+            if self._cape_preview_worker_running:
+                return revision
+            self._cape_preview_worker_running = True
+
+        def worker() -> None:
+            completed_revision = revision
+            completed_preview = ""
+            while True:
+                with self._cape_preview_lock:
+                    job = self._cape_preview_pending
+                    self._cape_preview_pending = None
+                if job is None:
+                    with self._cape_preview_lock:
+                        # A request may have arrived between the previous check
+                        # and acquiring the lock again.
+                        if self._cape_preview_pending is not None:
+                            continue
+                        self._cape_preview_worker_running = False
+                    self.capePreviewPrepared.emit(completed_preview, completed_revision)
+                    return
+
+                completed_revision, source, mode = job
+                completed_preview = self.prepareCapeImage(source, mode)
+
+                with self._cape_preview_lock:
+                    if self._cape_preview_pending is None:
+                        self._cape_preview_worker_running = False
+                        should_finish = True
+                    else:
+                        should_finish = False
+                if should_finish:
+                    self.capePreviewPrepared.emit(completed_preview, completed_revision)
+                    return
+
+        threading.Thread(target=worker, name="EzClient-CapePreview", daemon=True).start()
+        return revision
+
     @Slot()
     def cancelPendingCape(self) -> None:
         cosmetics = Path(DATA_DIR) / "cosmetics"
         (cosmetics / "pending_cape.png").unlink(missing_ok=True)
         (cosmetics / "pending_cape_preview.png").unlink(missing_ok=True)
+        (cosmetics / "pending_cape_upload.png").unlink(missing_ok=True)
+        pending_animation = (cosmetics / "pending_cape_animation").resolve()
+        if pending_animation.parent == cosmetics.resolve() and pending_animation.exists():
+            shutil.rmtree(pending_animation)
         self.skinUploadStatusChanged.emit("Auswahl verworfen.", False)
 
-    @Slot(result=bool)
-    def confirmPendingCape(self) -> bool:
+    @Slot(str, result=bool)
+    def confirmPendingCape(self, title: str) -> bool:
         """Promote the previewed image and publish it to the community."""
         cosmetics = Path(DATA_DIR) / "cosmetics"
         pending = cosmetics / "pending_cape.png"
@@ -587,8 +741,14 @@ class AccountController(QObject):
         pending_upload = cosmetics / "pending_cape_upload.png"
         if pending_upload.exists():
             pending_upload.replace(cosmetics / "active_cape_upload.png")
+        pending_animation = (cosmetics / "pending_cape_animation").resolve()
+        active_animation = (cosmetics / "active_cape_animation").resolve()
+        if pending_animation.parent == cosmetics.resolve() and pending_animation.exists():
+            if active_animation.exists():
+                shutil.rmtree(active_animation)
+            pending_animation.replace(active_animation)
         self.accountChanged.emit()
-        return self.publishCape("EzClient Cape")
+        return self.publishCape(title)
 
     @Slot(result=bool)
     def resetCustomCape(self) -> bool:

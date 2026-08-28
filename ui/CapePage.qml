@@ -27,7 +27,7 @@ Item {
             Rectangle {
                 Layout.preferredWidth: 48; Layout.preferredHeight: 48; radius: 14
                 color: EzTheme.surfaceActive; border.color: EzTheme.accent; border.width: 1
-                Text { anchors.centerIn: parent; text: "♜"; font.pixelSize: 25; color: EzTheme.accentLight }
+                Image { anchors.centerIn: parent; source: "icons/shield.svg"; width: 24; height: 24; fillMode: Image.PreserveAspectFit }
             }
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 2
@@ -35,7 +35,7 @@ Item {
                 Text { text: "Wähle ein Cape oder teile dein eigenes mit der EzClient-Community."; font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textSecondary; elide: Text.ElideRight; Layout.fillWidth: true }
             }
             EzButton { text: "Editor"; onClicked: root.navigate("cape_editor") }
-            EzButton { text: "↻ Aktualisieren"; onClicked: accountController.refreshCapeCommunity() }
+            EzButton { text: "Aktualisieren"; onClicked: accountController.refreshCapeCommunity() }
         }
 
         Rectangle {
@@ -46,7 +46,7 @@ Item {
                 Rectangle {
                     Layout.preferredWidth: 70; Layout.preferredHeight: 70; radius: 10; color: EzTheme.surface3; clip: true
                     Image { id: activeCapeImage; anchors.fill: parent; anchors.margins: 8; source: typeof accountController !== "undefined" ? accountController.capeTextureUrl : ""; fillMode: Image.PreserveAspectFit; rotation: 90; transformOrigin: Item.Center; visible: source !== "" }
-                    Text { anchors.centerIn: parent; visible: !activeCapeImage.visible; text: "♜"; font.pixelSize: 30; color: EzTheme.textMuted }
+                    Image { anchors.centerIn: parent; visible: !activeCapeImage.visible; source: "icons/shield.svg"; width: 28; height: 28; fillMode: Image.PreserveAspectFit; opacity: 0.4 }
                 }
                 ColumnLayout {
                     Layout.fillWidth: true; spacing: 5
@@ -127,7 +127,7 @@ Item {
             Layout.alignment: Qt.AlignHCenter
             Layout.preferredWidth: 76; Layout.preferredHeight: 96
             radius: 18; color: EzTheme.surfaceActive; border.color: EzTheme.accent
-            Text { anchors.centerIn: parent; text: "♜"; font.pixelSize: 42; color: EzTheme.accentLight }
+            Image { anchors.centerIn: parent; source: "icons/shield.svg"; width: 36; height: 36; fillMode: Image.PreserveAspectFit }
         }
         Text { Layout.alignment: Qt.AlignHCenter; text: "Cape Studio"; font.family: EzTheme.mcFontFamily; font.pixelSize: 25; font.bold: true; color: EzTheme.text }
         Text { Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; text: "Entwirf, importiere und veröffentliche Capes vollständig im Editor."; font.family: EzTheme.fontFamily; font.pixelSize: 13; color: EzTheme.textSecondary }

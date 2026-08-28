@@ -68,8 +68,9 @@ Item {
                         }
                     }
 
-                    // Language Pills (DE / EN)
+                    // Language Pills (DE / EN) - aligned right
                     Row {
+                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                         spacing: 8
 
                         Rectangle {
@@ -83,7 +84,7 @@ Item {
                             RowLayout {
                                 anchors.centerIn: parent
                                 spacing: 6
-                                Text { text: "🇩🇪"; font.pixelSize: 12 }
+                                Image { source: "icons/globe.svg"; width: 14; height: 14; fillMode: Image.PreserveAspectFit }
                                 Text {
                                     text: "Deutsch"
                                     font.family: EzTheme.mcFontFamily
@@ -113,7 +114,7 @@ Item {
                             RowLayout {
                                 anchors.centerIn: parent
                                 spacing: 6
-                                Text { text: "🇬🇧"; font.pixelSize: 12 }
+                                Image { source: "icons/globe.svg"; width: 14; height: 14; fillMode: Image.PreserveAspectFit }
                                 Text {
                                     text: "English"
                                     font.family: EzTheme.mcFontFamily
@@ -147,12 +148,30 @@ Item {
                         Text { text: "Theme-Farbe"; font.family: EzTheme.mcFontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
                         Text { text: "Akzentfarbe für Buttons, Auswahl und Hervorhebungen"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
                     }
-                    Repeater {
-                        model: [{ id: "green", color: "#22C55E" }, { id: "purple", color: "#A78BFA" }, { id: "blue", color: "#60A5FA" }, { id: "rose", color: "#FB7185" }, { id: "orange", color: "#FB923C" }]
-                        delegate: Rectangle {
-                            width: 30; height: 30; radius: 15; color: modelData.color
-                            border.color: profileController.themeColor === modelData.id ? EzTheme.text : "transparent"; border.width: 2
-                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: profileController.setThemeColor(modelData.id) }
+                    Row {
+                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                        spacing: 8
+                        Repeater {
+                            model: [{ id: "green", color: "#22C55E" }, { id: "purple", color: "#A78BFA" }, { id: "blue", color: "#60A5FA" }, { id: "rose", color: "#FB7185" }, { id: "orange", color: "#FB923C" }]
+                            delegate: Rectangle {
+                                width: 30; height: 30; radius: 15; color: modelData.color
+                                scale: thMouse.pressed ? 0.88 : (thMouse.containsMouse ? 1.2 : 1.0)
+                                Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
+                                border.color: (typeof profileController !== "undefined" && profileController && profileController.themeColor === modelData.id) ? EzTheme.text : "transparent"
+                                border.width: 2
+                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                MouseArea {
+                                    id: thMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (typeof profileController !== "undefined" && profileController) {
+                                            profileController.setThemeColor(modelData.id)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -209,8 +228,8 @@ Item {
                     }
 
                     RowLayout {
+                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                         spacing: 8
-                        Layout.alignment: Qt.AlignVCenter
 
                         EzButton {
                             text: "Anpassen & Vorschau…"
@@ -293,7 +312,7 @@ Item {
 
                     RowLayout {
                         spacing: 8
-                        Layout.alignment: Qt.AlignVCenter
+                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
 
                         property string activeFontMode: typeof profileController !== "undefined" && profileController ? profileController.appFontMode : "mixed"
 
@@ -356,27 +375,41 @@ Item {
                             font.bold: true
                             color: EzTheme.text
                         }
-                        Text {
-                            text: (typeof accountController !== "undefined" && accountController && accountController.isOnline)
-                                  ? EzI18n.t("settings_account_online", "🟢 Microsoft Auth (Online Verifiziert)")
-                                  : EzI18n.t("settings_account_offline", "⚪ Lokales Konto / Offline")
-                            font.family: EzTheme.fontFamily
-                            font.pixelSize: 10
-                            color: (typeof accountController !== "undefined" && accountController && accountController.isOnline) ? EzTheme.accentLight : EzTheme.textMuted
+                        RowLayout {
+                            spacing: 5
+                            Rectangle {
+                                width: 7
+                                height: 7
+                                radius: 3.5
+                                color: (typeof accountController !== "undefined" && accountController && accountController.isOnline) ? EzTheme.accent : EzTheme.textMuted
+                            }
+                            Text {
+                                text: (typeof accountController !== "undefined" && accountController && accountController.isOnline)
+                                      ? EzI18n.t("settings_account_online", "Microsoft Auth (Online Verifiziert)")
+                                      : EzI18n.t("settings_account_offline", "Lokales Konto / Offline")
+                                font.family: EzTheme.fontFamily
+                                font.pixelSize: 10
+                                color: (typeof accountController !== "undefined" && accountController && accountController.isOnline) ? EzTheme.accentLight : EzTheme.textMuted
+                            }
                         }
                     }
 
-                    EzButton {
-                        text: EzI18n.t("settings_login_btn", "Konto anmelden")
-                        mcFont: true
-                        Layout.preferredHeight: 32
-                        onClicked: if (typeof accountController !== "undefined" && accountController) accountController.openLoginDialog()
-                    }
+                    RowLayout {
+                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                        spacing: 8
 
-                    EzButton {
-                        text: EzI18n.t("settings_sync_btn", "Sync")
-                        Layout.preferredHeight: 32
-                        onClicked: if (typeof accountController !== "undefined" && accountController) accountController.refresh()
+                        EzButton {
+                            text: EzI18n.t("settings_login_btn", "Konto anmelden")
+                            mcFont: true
+                            Layout.preferredHeight: 32
+                            onClicked: if (typeof accountController !== "undefined" && accountController) accountController.openLoginDialog()
+                        }
+
+                        EzButton {
+                            text: EzI18n.t("settings_sync_btn", "Sync")
+                            Layout.preferredHeight: 32
+                            onClicked: if (typeof accountController !== "undefined" && accountController) accountController.refresh()
+                        }
                     }
                 }
             }
@@ -453,10 +486,10 @@ Item {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         radius: EzTheme.radiusSm
-                        color: pMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
-                        border.color: pMouse.containsMouse ? EzTheme.warning : EzTheme.border
+                        color: profileFolderMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
+                        border.color: profileFolderMouse.containsMouse ? EzTheme.warning : EzTheme.border
                         border.width: 1
-                        scale: pMouse.pressed ? 0.98 : 1.0
+                        scale: profileFolderMouse.pressed ? 0.98 : 1.0
 
                         RowLayout {
                             anchors.centerIn: parent
@@ -466,7 +499,7 @@ Item {
                         }
 
                         MouseArea {
-                            id: pMouse
+                            id: profileFolderMouse
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
@@ -510,87 +543,160 @@ Item {
 
             EzSurface {
                 Layout.fillWidth: true
-                implicitHeight: 125
+                implicitHeight: ramCol.implicitHeight + 32
 
                 ColumnLayout {
+                    id: ramCol
                     anchors.fill: parent
                     anchors.margins: 16
-                    spacing: 12
+                    spacing: 14
 
                     RowLayout {
                         Layout.fillWidth: true
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 1
+                            spacing: 2
                             Text { text: EzI18n.t("settings_ram_allocation", "Zugewiesener Arbeitsspeicher für Minecraft"); font.family: EzTheme.mcFontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
-                            Text { text: EzI18n.t("settings_ram_desc", "Empfohlen: 4 GB für Sodium & Fabric · 6-8 GB für schwere Shader"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
+                            Text {
+                                readonly property int totalGb: (profileController && profileController.systemTotalRamGb) ? profileController.systemTotalRamGb : 16
+                                text: "System gesamt: " + totalGb + " GB RAM · Empfohlen: 4–8 GB für flüssiges Spielen"
+                                font.family: EzTheme.fontFamily
+                                font.pixelSize: 10
+                                color: EzTheme.textMuted
+                            }
                         }
 
                         Rectangle {
-                            height: 26
-                            width: ramDisplay.implicitWidth + 16
+                            height: 28
+                            width: ramDisplayRow.implicitWidth + 18
                             radius: 4
                             color: EzTheme.surfaceActive
                             border.color: EzTheme.accent
                             border.width: 1
 
-                            Text {
-                                id: ramDisplay
-                                text: Math.round((profileController ? profileController.activeRamMb : 4096) / 1024) + " GB RAM"
-                                font.family: EzTheme.mcFontFamily
-                                font.pixelSize: 11
-                                font.bold: true
-                                color: EzTheme.accentLight
+                            RowLayout {
+                                id: ramDisplayRow
                                 anchors.centerIn: parent
+                                spacing: 4
+                                Image { source: "icons/cpu.svg"; width: 12; height: 12; fillMode: Image.PreserveAspectFit }
+                                Text {
+                                    readonly property int curGb: ramSlider.localGb
+                                    readonly property int maxGb: (profileController && profileController.systemTotalRamGb) ? profileController.systemTotalRamGb : 16
+                                    text: curGb + " GB / " + maxGb + " GB (" + Math.round((curGb / Math.max(1, maxGb)) * 100) + "%)"
+                                    font.family: EzTheme.mcFontFamily
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                    color: EzTheme.accentLight
+                                }
                             }
                         }
                     }
 
-                    // Quick RAM Buttons
+                    // Modern RAM Slider (from 2 GB up to actual system RAM, e.g. 128 GB)
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 34
+
+                        Slider {
+                            id: ramSlider
+                            anchors.fill: parent
+                            from: 2
+                            to: (profileController && profileController.systemTotalRamGb) ? profileController.systemTotalRamGb : 16
+                            stepSize: 1
+                            value: Math.round((profileController ? profileController.activeRamMb : 4096) / 1024)
+                            live: true
+
+                            property int localGb: Math.round(value)
+
+                            onValueChanged: {
+                                localGb = Math.round(value)
+                            }
+
+                            onPressedChanged: {
+                                if (!pressed && profileController) {
+                                    profileController.setActiveRamMb(localGb * 1024)
+                                }
+                            }
+
+                            background: Rectangle {
+                                x: ramSlider.leftPadding
+                                y: ramSlider.topPadding + ramSlider.availableHeight / 2 - height / 2
+                                implicitWidth: 200
+                                implicitHeight: 6
+                                width: ramSlider.availableWidth
+                                height: implicitHeight
+                                radius: 3
+                                color: EzTheme.surface3
+
+                                Rectangle {
+                                    width: ramSlider.visualPosition * parent.width
+                                    height: parent.height
+                                    color: EzTheme.accent
+                                    radius: 3
+                                }
+                            }
+
+                            handle: Rectangle {
+                                x: ramSlider.leftPadding + ramSlider.visualPosition * (ramSlider.availableWidth - width)
+                                y: ramSlider.topPadding + ramSlider.availableHeight / 2 - height / 2
+                                implicitWidth: 20
+                                implicitHeight: 20
+                                radius: 10
+                                color: ramSlider.pressed ? EzTheme.accentLight : (ramSlider.hovered ? EzTheme.accentHover : EzTheme.accent)
+                                border.color: EzTheme.accentLight
+                                border.width: 1.5
+
+                                Behavior on color { ColorAnimation { duration: 80 } }
+                            }
+                        }
+                    }
+
+                    // Smart Dynamic Presets
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 8
 
                         Repeater {
-                            model: [
-                                { label: "2 GB",  mb: 2048 },
-                                { label: "4 GB (Standard)", mb: 4096 },
-                                { label: "6 GB",  mb: 6144 },
-                                { label: "8 GB (Shader)", mb: 8192 },
-                                { label: "12 GB", mb: 12288 },
-                                { label: "16 GB", mb: 16384 }
-                            ]
+                            model: {
+                                var sysGb = (profileController && profileController.systemTotalRamGb) ? profileController.systemTotalRamGb : 16
+                                var list = [
+                                    { label: "4 GB", gb: 4 },
+                                    { label: "6 GB", gb: 6 },
+                                    { label: "8 GB", gb: 8 }
+                                ]
+                                if (sysGb >= 16) list.push({ label: "16 GB", gb: 16 })
+                                if (sysGb >= 32) list.push({ label: "32 GB", gb: 32 })
+                                if (sysGb >= 64) list.push({ label: "64 GB", gb: 64 })
+                                if (sysGb >= 128) list.push({ label: "128 GB", gb: 128 })
+                                return list
+                            }
 
                             Rectangle {
                                 Layout.fillWidth: true
-                                height: 34
+                                height: 30
                                 radius: EzTheme.radiusSm
-                                color: (profileController && profileController.activeRamMb === modelData.mb)
-                                       ? EzTheme.surfaceActive
-                                       : (ramBtnMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2)
-                                border.color: (profileController && profileController.activeRamMb === modelData.mb)
-                                              ? EzTheme.accent
-                                              : (ramBtnMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)
+                                readonly property bool isSelected: profileController && Math.round(profileController.activeRamMb / 1024) === modelData.gb
+                                color: isSelected ? EzTheme.surfaceActive : (ramPresetMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2)
+                                border.color: isSelected ? EzTheme.accent : (ramPresetMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)
                                 border.width: 1
-
-                                Behavior on color { ColorAnimation { duration: 100 } }
-                                Behavior on border.color { ColorAnimation { duration: 100 } }
 
                                 Text {
                                     text: modelData.label
                                     font.family: EzTheme.mcFontFamily
                                     font.pixelSize: 10
-                                    font.bold: profileController && profileController.activeRamMb === modelData.mb
-                                    color: (profileController && profileController.activeRamMb === modelData.mb) ? EzTheme.accentLight : EzTheme.textSecondary
+                                    font.bold: isSelected
+                                    color: isSelected ? EzTheme.accentLight : EzTheme.textSecondary
                                     anchors.centerIn: parent
                                 }
 
                                 MouseArea {
-                                    id: ramBtnMouse
+                                    id: ramPresetMouse
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: profileController.setActiveRamMb(modelData.mb)
+                                    onClicked: {
+                                        if (profileController) profileController.setActiveRamMb(modelData.gb * 1024)
+                                    }
                                 }
                             }
                         }
@@ -624,8 +730,8 @@ Item {
                     Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border; opacity: 0.6; Layout.topMargin: 8; Layout.bottomMargin: 8 }
 
                     EzToggleRow {
-                        label: EzI18n.t("settings_direct_launch", "Direktstart (Direkt mit Java starten)")
-                        sub: EzI18n.t("settings_direct_launch_desc", "Startet Minecraft blitzschnell mit deinem .minecraft Token ohne Minecraft Launcher")
+                        label: EzI18n.t("settings_direct_launch", "Schnellstart (Native Java-Engine)")
+                        sub: EzI18n.t("settings_direct_launch_desc", "Startet Minecraft blitzschnell mit verifizierter Microsoft-Sitzung")
                         toggleValue: profileController ? profileController.preferDirectLaunch : true
                         onToggled: function(val) { if (profileController) profileController.setPreferDirectLaunch(val) }
                     }
@@ -678,6 +784,7 @@ Item {
                         }
                         EzButton {
                             text: EzI18n.t("settings_open", "Öffnen")
+                            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                             Layout.preferredHeight: 28
                             onClicked: profileController.openFolder("")
                         }
@@ -710,6 +817,7 @@ Item {
                     EzButton {
                         text: EzI18n.t("settings_java_detect", "Erkennen")
                         mcFont: true
+                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                         Layout.preferredHeight: 30
                         Layout.preferredWidth: 90
                         onClicked: {
@@ -768,7 +876,7 @@ Item {
                             Text {
                                 text: (typeof updateController !== "undefined" && updateController)
                                       ? updateController.statusMessage
-                                      : EzI18n.t("update_up_to_date", "✓ EzClient ist auf dem neuesten Stand")
+                                      : EzI18n.t("update_up_to_date", "EzClient ist auf dem neuesten Stand")
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 10
                                 color: (typeof updateController !== "undefined" && updateController && updateController.updateAvailable)
@@ -777,26 +885,31 @@ Item {
                             }
                         }
 
-                        // Check / Download Button
-                        EzButton {
-                            id: checkBtn
-                            text: (typeof updateController !== "undefined" && updateController && updateController.isChecking)
-                                  ? EzI18n.t("update_checking", "Prüfe…")
-                                  : EzI18n.t("update_check_btn", "Nach Updates suchen")
-                            Layout.preferredHeight: 32
-                            onClicked: {
-                                if (typeof updateController !== "undefined" && updateController) {
-                                    updateController.checkForUpdates(false)
+                        RowLayout {
+                            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                            spacing: 8
+
+                            // Check / Download Button
+                            EzButton {
+                                id: checkBtn
+                                text: (typeof updateController !== "undefined" && updateController && updateController.isChecking)
+                                      ? EzI18n.t("update_checking", "Prüfe…")
+                                      : EzI18n.t("update_check_btn", "Nach Updates suchen")
+                                Layout.preferredHeight: 32
+                                onClicked: {
+                                    if (typeof updateController !== "undefined" && updateController) {
+                                        updateController.checkForUpdates(false)
+                                    }
                                 }
                             }
-                        }
 
-                        EzButton {
-                            text: EzI18n.t("update_view_github", "GitHub")
-                            Layout.preferredHeight: 32
-                            onClicked: {
-                                if (typeof updateController !== "undefined" && updateController) {
-                                    updateController.openReleasePage()
+                            EzButton {
+                                text: EzI18n.t("update_view_github", "GitHub")
+                                Layout.preferredHeight: 32
+                                onClicked: {
+                                    if (typeof updateController !== "undefined" && updateController) {
+                                        updateController.openReleasePage()
+                                    }
                                 }
                             }
                         }
@@ -822,13 +935,17 @@ Item {
                                 Layout.fillWidth: true
                                 spacing: 8
 
-                                Text {
-                                    text: "⚡ " + (typeof updateController !== "undefined" && updateController ? updateController.releaseName : "Update")
-                                    font.family: EzTheme.mcFontFamily
-                                    font.pixelSize: 12
-                                    font.bold: true
-                                    color: EzTheme.accentLight
+                                RowLayout {
+                                    spacing: 6
                                     Layout.fillWidth: true
+                                    Image { source: "icons/zap.svg"; width: 12; height: 12; fillMode: Image.PreserveAspectFit }
+                                    Text {
+                                        text: (typeof updateController !== "undefined" && updateController ? updateController.releaseName : "Update")
+                                        font.family: EzTheme.mcFontFamily
+                                        font.pixelSize: 12
+                                        font.bold: true
+                                        color: EzTheme.accentLight
+                                    }
                                 }
 
                                 Text {

@@ -1,34 +1,44 @@
 import sys
-from PySide6.QtWidgets import QSplashScreen
-from PySide6.QtGui import QPixmap, QPainter, QColor, QFont, QLinearGradient, QPen, QBrush
+from PySide6.QtWidgets import QWidget
+from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient, QPen, QBrush, QPainterPath
 from PySide6.QtCore import Qt
 
+from backend.models.types import APP_VERSION
 
-class EzSplashScreen(QSplashScreen):
-    """Modern Minecraft-themed splash screen matching EzTheme."""
 
-    def __init__(self, version: str = "1.1.9"):
+class EzSplashScreen(QWidget):
+    """Ultra-fast, hardware-accelerated modern Minecraft-themed splash screen.
+    
+    Uses direct vector rendering (0ms font fallback lag) and native lightweight
+    QWidget window flags for sub-second instant popup on startup.
+    """
+
+    def __init__(self, version: str = APP_VERSION):
+        super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_NoSystemBackground)
         self.version = version
         self.current_msg = "EzClient wird geladen…"
         self.current_pct = 15
         
-        pix = self._render_pixmap()
-        super().__init__(pix, Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.resize(480, 240)
+        
+        # Center splash on the primary screen
+        if self.screen():
+            geo = self.screen().geometry()
+            self.move((geo.width() - 480) // 2, (geo.height() - 240) // 2)
 
     def setMessage(self, message: str, percent: int = 50) -> None:
         self.current_msg = message
         self.current_pct = max(0, min(100, percent))
-        self.setPixmap(self._render_pixmap())
+        self.update()
 
-    def _render_pixmap(self) -> QPixmap:
-        width = 480
-        height = 240
-        pix = QPixmap(width, height)
-        pix.fill(Qt.transparent)
-
-        painter = QPainter(pix)
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
+
+        width = self.width()
+        height = self.height()
 
         # 1. Background Card with Gradient & Subtle Border
         card_grad = QLinearGradient(0, 0, width, height)
@@ -52,23 +62,33 @@ class EzSplashScreen(QSplashScreen):
         painter.setPen(QPen(QColor("#22C96E"), 1.5))
         painter.drawRoundedRect(36, 36, 56, 56, 14, 14)
 
-        painter.setPen(QColor("#22C96E"))
-        painter.setFont(QFont("Segoe UI", 24, QFont.Bold))
-        painter.drawText(36, 36, 56, 56, Qt.AlignCenter, "⚡")
+        # Draw Crisp Vector Lightning Bolt (Bypasses Windows Emoji font table lookup lag)
+        painter.setBrush(QColor("#22C96E"))
+        painter.setPen(Qt.NoPen)
+        bx, by = 36 + 28, 36 + 28
+        bolt = QPainterPath()
+        bolt.moveTo(bx + 2, by - 15)
+        bolt.lineTo(bx - 10, by + 1)
+        bolt.lineTo(bx - 1, by + 1)
+        bolt.lineTo(bx - 3, by + 15)
+        bolt.lineTo(bx + 10, by - 1)
+        bolt.lineTo(bx + 1, by - 1)
+        bolt.closeSubpath()
+        painter.drawPath(bolt)
 
         # 4. App Title & Version
         painter.setPen(QColor("#F0F0F5"))
-        painter.setFont(QFont("Segoe UI", 20, QFont.Bold))
-        painter.drawText(108, 62, "EZCLIENT")
+        painter.setFont(QFont("Segoe UI", 19, QFont.Bold))
+        painter.drawText(108, 61, "EZCLIENT")
 
         painter.setFont(QFont("Segoe UI", 10, QFont.Bold))
         painter.setPen(QColor("#22C96E"))
-        painter.drawText(230, 61, f"v{self.version}")
+        painter.drawText(224, 60, f"v{self.version}")
 
         # Subtitle
         painter.setPen(QColor("#8A8F9E"))
         painter.setFont(QFont("Segoe UI", 11))
-        painter.drawText(108, 84, "High-Performance Minecraft Client")
+        painter.drawText(108, 83, "High-Performance Minecraft Client")
 
         # 5. Status Text
         painter.setPen(QColor("#8A90A0"))
@@ -101,4 +121,3 @@ class EzSplashScreen(QSplashScreen):
             painter.drawRoundedRect(track_x, track_y, max(6, fill_w), track_h, 3, 3)
 
         painter.end()
-        return pix

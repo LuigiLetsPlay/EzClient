@@ -120,9 +120,9 @@ Item {
                     spacing: 4
                     Repeater {
                         model: [
-                            { id: "all",        label: "Alle",        icon: "🌐" },
-                            { id: "modrinth",   label: "Modrinth",   icon: "🟢" },
-                            { id: "curseforge", label: "CurseForge", icon: "🔥" }
+                            { id: "all",        label: "Alle",        icon: "icons/globe.svg" },
+                            { id: "modrinth",   label: "Modrinth",   icon: "icons/box.svg" },
+                            { id: "curseforge", label: "CurseForge", icon: "icons/flame.svg" }
                         ]
                         Rectangle {
                             height: 32
@@ -136,7 +136,7 @@ Item {
                                 id: srcRow
                                 anchors.centerIn: parent
                                 spacing: 5
-                                Text { text: modelData.icon; font.pixelSize: 10 }
+                                Image { source: modelData.icon; width: 12; height: 12; fillMode: Image.PreserveAspectFit }
                                 Text {
                                     text: modelData.label
                                     font.family: EzTheme.fontFamily
@@ -168,9 +168,9 @@ Item {
                     spacing: 4
                     Repeater {
                         model: [
-                            { id: "mod",          label: "Mods",           icon: "📦" },
-                            { id: "shader",       label: "Shader",         icon: "✨" },
-                            { id: "resourcepack", label: "Resource Packs", icon: "🎨" }
+                            { id: "mod",          label: "Mods",           icon: "icons/package.svg" },
+                            { id: "shader",       label: "Shader",         icon: "icons/sparkles.svg" },
+                            { id: "resourcepack", label: "Resource Packs", icon: "icons/palette.svg" }
                         ]
                         Rectangle {
                             height: 32
@@ -184,7 +184,7 @@ Item {
                                 id: typeRow
                                 anchors.centerIn: parent
                                 spacing: 6
-                                Text { text: modelData.icon; font.pixelSize: 11 }
+                                Image { source: modelData.icon; width: 14; height: 14; fillMode: Image.PreserveAspectFit }
                                 Text {
                                     text: modelData.label
                                     font.family: EzTheme.fontFamily
@@ -282,11 +282,13 @@ Item {
                             color: clearMouse.containsMouse ? EzTheme.surface3 : "transparent"
                             visible: searchInput.text !== ""
 
-                            Text {
-                                text: "✕"
-                                font.pixelSize: 9
-                                color: EzTheme.textMuted
+                            Image {
+                                source: "icons/x.svg"
+                                width: 10
+                                height: 10
+                                fillMode: Image.PreserveAspectFit
                                 anchors.centerIn: parent
+                                opacity: clearMouse.containsMouse ? 1.0 : 0.6
                             }
 
                             MouseArea {
@@ -474,13 +476,20 @@ Item {
                                 return false
                             }
                             readonly property bool isPending: {
-                                var s = modelData.slug || modelData.project_id || modelData.id || ""
+                                var s = modelData.project_id || modelData.id || modelData.slug || ""
                                 return root.pendingInstalls.indexOf(s) !== -1
                             }
 
+                            radius: 6
+                            scale: rowMouse.containsMouse ? 1.008 : 1.0
+                            Behavior on scale { NumberAnimation { duration: 100; easing.type: Easing.OutCubic } }
+
                             color: isSel ? EzTheme.surfaceActive : (rowMouse.containsMouse ? EzTheme.surfaceHover : "transparent")
+                            border.color: isSel ? EzTheme.accent : (rowMouse.containsMouse ? EzTheme.borderLight : "transparent")
+                            border.width: 1
 
                             Behavior on color { ColorAnimation { duration: 100 } }
+                            Behavior on border.color { ColorAnimation { duration: 100 } }
 
                             RowLayout {
                                 anchors.fill: parent
@@ -555,7 +564,7 @@ Item {
                                         // INSTALLED BADGE IN STORE LIST (Instant visual feedback!)
                                         Rectangle {
                                             height: 18
-                                            width: instText.implicitWidth + 10
+                                            width: instText.implicitWidth + 12
                                             radius: 3
                                             color: "#0B2D19"
                                             border.color: EzTheme.accent
@@ -564,18 +573,18 @@ Item {
 
                                             Text {
                                                 id: instText
-                                                text: "✓ " + (window.integratedMods && window.integratedMods.indexOf(modelData.slug) !== -1 ? "Integriert" : EzI18n.t("modrinth_installed", "Installiert"))
+                                                anchors.centerIn: parent
+                                                text: (window.integratedMods && window.integratedMods.indexOf(modelData.slug) !== -1 ? "Integriert" : EzI18n.t("modrinth_installed", "Installiert"))
                                                 font.family: EzTheme.mcFontFamily
                                                 font.pixelSize: 9
                                                 font.bold: true
                                                 color: EzTheme.accentLight
-                                                anchors.centerIn: parent
                                             }
                                         }
 
                                         // Downloads badge
                                         Text {
-                                            text: "⬇ " + formatNum(modelData.downloads || 0)
+                                            text: formatNum(modelData.downloads || 0) + " Downloads"
                                             font.family: EzTheme.fontFamily
                                             font.pixelSize: 10
                                             color: EzTheme.textMuted
@@ -592,9 +601,11 @@ Item {
                                     }
                                 }
 
-                                // 1-Click Quick Install Button
+                                // 1-Click Quick Install Button (pure text, dynamic width, zero clipping)
                                 Rectangle {
-                                    Layout.preferredWidth: 96
+                                    id: quickInstallBtn
+                                    implicitWidth: Math.max(90, cInstText.implicitWidth + 24)
+                                    Layout.preferredWidth: implicitWidth
                                     Layout.preferredHeight: 30
                                     radius: 6
                                     color: resultItem.isPending ? "#808080" : (resultItem.isInstalled ? "#14281E" : (cInstMouse.containsMouse ? EzTheme.accentHover : EzTheme.accent))
@@ -602,23 +613,14 @@ Item {
                                     border.width: 1
                                     z: 10
 
-                                    RowLayout {
+                                    Text {
+                                        id: cInstText
                                         anchors.centerIn: parent
-                                        spacing: 4
-                                        Text {
-                                            text: resultItem.isPending ? "..." : (resultItem.isInstalled ? "✓" : "+")
-                                            font.family: EzTheme.fontFamily
-                                            font.pixelSize: 11
-                                            font.bold: true
-                                            color: (resultItem.isInstalled || resultItem.isPending) ? EzTheme.accentLight : "#000000"
-                                        }
-                                        Text {
-                                            text: resultItem.isPending ? "Lädt..." : (resultItem.isInstalled ? (window.integratedMods && window.integratedMods.indexOf(modelData.slug) !== -1 ? "Integriert" : "Installiert") : "Installieren")
-                                            font.family: EzTheme.mcFontFamily
-                                            font.pixelSize: 10
-                                            font.bold: true
-                                            color: (resultItem.isInstalled || resultItem.isPending) ? EzTheme.accentLight : "#000000"
-                                        }
+                                        text: resultItem.isPending ? "Lädt..." : (resultItem.isInstalled ? (window.integratedMods && window.integratedMods.indexOf(modelData.slug) !== -1 ? "Integriert" : "Installiert") : "Installieren")
+                                        font.family: EzTheme.mcFontFamily
+                                        font.pixelSize: 11
+                                        font.bold: true
+                                        color: (resultItem.isInstalled || resultItem.isPending) ? EzTheme.accentLight : "#000000"
                                     }
 
                                     MouseArea {
@@ -862,60 +864,24 @@ Item {
                                     border.width: 1
                                     visible: installBanner.isInstalled && root.isCoreMod
 
-                                    Text {
-                                        id: coreBadgeText
-                                        text: "🔒 CORE MOD"
-                                        font.family: EzTheme.mcFontFamily
-                                        font.pixelSize: 9
-                                        font.bold: true
-                                        color: EzTheme.accentLight
+                                    RowLayout {
                                         anchors.centerIn: parent
+                                        spacing: 4
+                                        Image { source: "icons/lock.svg"; width: 10; height: 10; fillMode: Image.PreserveAspectFit }
+                                        Text {
+                                            id: coreBadgeText
+                                            text: "CORE MOD"
+                                            font.family: EzTheme.mcFontFamily
+                                            font.pixelSize: 9
+                                            font.bold: true
+                                            color: EzTheme.accentLight
+                                        }
                                     }
                                 }
                             }
                         }
 
-                        // ── Dependency Warning Banner (Fabric API check) ──
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: depCol.implicitHeight + 16
-                            color: "#181308"
-                            border.color: EzTheme.warning
-                            border.width: 1
-                            visible: Boolean(root.selMod && root.selMod.title && root.selMod.slug !== "fabric-api" && (!profileController || !profileController.isModInstalled("Fabric API")))
 
-                            RowLayout {
-                                id: depCol
-                                anchors.fill: parent
-                                anchors.margins: 10
-                                spacing: 8
-
-                                Text {
-                                    text: "⚠️"
-                                    font.pixelSize: 14
-                                }
-
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 1
-
-                                    Text {
-                                        text: "Benötigt Fabric API"
-                                        font.family: EzTheme.mcFontFamily
-                                        font.pixelSize: 11
-                                        font.bold: true
-                                        color: EzTheme.warning
-                                    }
-
-                                    Text {
-                                        text: "Für diesen Mod wird Fabric API im Profil benötigt."
-                                        font.family: EzTheme.fontFamily
-                                        font.pixelSize: 9
-                                        color: EzTheme.textMuted
-                                    }
-                                }
-                            }
-                        }
 
                         // ── Stats Row ──
                         Rectangle {
@@ -1047,9 +1013,10 @@ Item {
 
                                     Repeater {
                                         model: [
+                                            { id: "all",     label: EzI18n.t("modrinth_all_versions", "Alle") },
                                             { id: "release", label: EzI18n.t("modrinth_release", "Release") },
                                             { id: "beta",    label: EzI18n.t("modrinth_beta", "Beta") },
-                                            { id: "all",     label: EzI18n.t("modrinth_all_versions", "Alle") }
+                                            { id: "alpha",   label: "Alpha" }
                                         ]
 
                                         Rectangle {
@@ -1244,7 +1211,12 @@ Item {
 
             RowLayout {
                 spacing: 10
-                Text { text: "⚠️"; font.pixelSize: 22 }
+                Image {
+                    source: "icons/alert-triangle.svg"
+                    width: 22
+                    height: 22
+                    fillMode: Image.PreserveAspectFit
+                }
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 2
@@ -1335,7 +1307,12 @@ Item {
 
                 RowLayout {
                     spacing: 10
-                    Text { text: "✨"; font.pixelSize: 22 }
+                    Image {
+                        source: "icons/sparkles.svg"
+                        width: 22
+                        height: 22
+                        fillMode: Image.PreserveAspectFit
+                    }
                     ColumnLayout {
                         spacing: 2
                         Text {
@@ -1385,8 +1362,9 @@ Item {
                     }
 
                     EzButton {
-                        text: "✓ Iris & Shader installieren"
+                        text: "Iris & Shader installieren"
                         primary: true
+                        iconSource: "check.svg"
                         mcFont: true
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34

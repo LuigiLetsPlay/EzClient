@@ -14,11 +14,23 @@ Item {
     property string newName: ""
     property string newVersion: "26.2"
     property string newLoader: "Fabric"
-    property string selectedPreset: "performance" // "raw" | "performance" | "essentials"
+    property string selectedPreset: "ezclient" // "ezclient" | "raw"
 
     // Download / loading state from backend
     property real downloadProgress: 0.0
     property string downloadStatus: "Bereite Profil vor…"
+
+    function beginProfileSetup(optionalMods) {
+        root.step = "downloading"
+        root.downloadProgress = 0.0
+        root.downloadStatus = EzI18n.currentLanguage === "en" ? "Initializing profile…" : "Initialisiere Profil…"
+        if (typeof profileController !== "undefined" && profileController) {
+            profileController.createAndOnboard(
+                root.newName.trim(), root.newVersion, root.newLoader,
+                root.selectedPreset, optionalMods
+            )
+        }
+    }
 
     Connections {
         target: typeof profileController !== "undefined" ? profileController : null
@@ -202,7 +214,7 @@ Item {
                     Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
 
                     Text {
-                        text: (EzI18n.t("onboard_step2_profile", "Erstes Profil erstellen")) + " →"
+                        text: (EzI18n.t("onboard_continue", "Weiter")) + " →"
                         font.family: EzTheme.mcFontFamily
                         font.pixelSize: 12
                         font.bold: true
@@ -216,8 +228,7 @@ Item {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            root.step = "create"
-                            nameInput.forceActiveFocus()
+                            root.step = "account"
                         }
                     }
                 }
@@ -230,6 +241,174 @@ Item {
                     font.pixelSize: 11
                     color: EzTheme.textSubtle
                     Layout.alignment: Qt.AlignHCenter
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────
+        //  STEP 1.5: MINECRAFT / MICROSOFT ACCOUNT
+        // ──────────────────────────────────────────
+        Item {
+            anchors.centerIn: parent
+            width: 460
+            height: 440
+            visible: opacity > 0.001
+            opacity: root.step === "account" ? 1.0 : 0.0
+            scale: root.step === "account" ? 1.0 : 0.95
+
+            Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+            Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 0
+
+                // Back button & Step indicator
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Rectangle {
+                        width: 30; height: 30; radius: 6
+                        color: backMouseAcc.containsMouse ? EzTheme.surface3 : EzTheme.surface2
+                        border.color: EzTheme.border; border.width: 1
+                        Behavior on color { ColorAnimation { duration: 100 } }
+
+                        Text { text: "←"; font.family: EzTheme.fontFamily; font.pixelSize: 13; color: EzTheme.text; anchors.centerIn: parent }
+                        MouseArea {
+                            id: backMouseAcc
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                root.forceActiveFocus()
+                                root.step = "welcome"
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: EzI18n.currentLanguage === "en" ? "Step 1 of 3: Minecraft Account" : "Schritt 1 von 3: Minecraft Konto"
+                        font.family: EzTheme.fontFamily
+                        font.pixelSize: 11
+                        color: EzTheme.textMuted
+                    }
+                }
+
+                Item { height: 24 }
+
+                Text {
+                    text: EzI18n.currentLanguage === "en" ? "Connect Minecraft Account" : "Minecraft-Konto verbinden"
+                    font.family: EzTheme.fontFamily
+                    font.pixelSize: 24
+                    font.bold: true
+                    color: EzTheme.text
+                }
+
+                Item { height: 6 }
+
+                Text {
+                    text: EzI18n.currentLanguage === "en" ? "Sign in with your Microsoft account to play Minecraft online." : "Melde dich mit deinem Microsoft-Konto an, um online auf Servern zu spielen."
+                    font.family: EzTheme.fontFamily
+                    font.pixelSize: 13
+                    color: EzTheme.textSecondary
+                }
+
+                Item { height: 24 }
+
+                // Account status card
+                EzSurface {
+                    Layout.fillWidth: true
+                    implicitHeight: 80
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 16
+                        spacing: 14
+
+                        Rectangle {
+                            width: 48; height: 48; radius: 24
+                            color: EzTheme.surface3
+                            clip: true
+
+                            Image {
+                                anchors.fill: parent
+                                source: typeof accountController !== "undefined" && accountController ? accountController.avatarUrl : ""
+                                fillMode: Image.PreserveAspectCrop
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 3
+                            Text {
+                                text: typeof accountController !== "undefined" && accountController ? accountController.username : "Player"
+                                font.family: EzTheme.mcFontFamily
+                                font.pixelSize: 15
+                                font.bold: true
+                                color: EzTheme.text
+                            }
+                            RowLayout {
+                                spacing: 5
+                                Rectangle {
+                                    width: 7; height: 7; radius: 3.5
+                                    color: (typeof accountController !== "undefined" && accountController && accountController.isOnline) ? EzTheme.accent : EzTheme.textMuted
+                                }
+                                Text {
+                                    text: (typeof accountController !== "undefined" && accountController && accountController.isOnline)
+                                          ? "Microsoft Auth (Online Verifiziert)"
+                                          : "Nicht angemeldet (Lokales Profil)"
+                                    font.family: EzTheme.fontFamily
+                                    font.pixelSize: 11
+                                    color: (typeof accountController !== "undefined" && accountController && accountController.isOnline) ? EzTheme.accentLight : EzTheme.textMuted
+                                }
+                            }
+                        }
+
+                        EzButton {
+                            text: (typeof accountController !== "undefined" && accountController && accountController.isOnline) ? "Konto wechseln" : "Anmelden"
+                            primary: !(typeof accountController !== "undefined" && accountController && accountController.isOnline)
+                            mcFont: true
+                            Layout.preferredHeight: 34
+                            onClicked: {
+                                if (typeof accountController !== "undefined" && accountController) {
+                                    accountController.openLoginDialog()
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Item { height: 28 }
+
+                // Continue button
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 44
+                    radius: EzTheme.radius
+                    color: nextAccMouse.containsMouse ? EzTheme.accentHover : EzTheme.accent
+                    scale: nextAccMouse.containsMouse ? 1.02 : 1.0
+                    Behavior on scale { NumberAnimation { duration: 100 } }
+
+                    Text {
+                        text: (EzI18n.t("onboard_continue", "Weiter")) + " →"
+                        font.family: EzTheme.mcFontFamily
+                        font.pixelSize: 12
+                        font.bold: true
+                        color: "#000000"
+                        anchors.centerIn: parent
+                    }
+
+                    MouseArea {
+                        id: nextAccMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            root.step = "create"
+                            nameInput.forceActiveFocus()
+                        }
+                    }
                 }
             }
         }
@@ -271,13 +450,13 @@ Item {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 root.forceActiveFocus()
-                                root.step = "welcome"
+                                root.step = "account"
                             }
                         }
                     }
 
                     Text {
-                        text: EzI18n.currentLanguage === "en" ? "Step 1 of 2: Basic Settings" : "Schritt 1 von 2: Basis-Einstellungen"
+                        text: EzI18n.currentLanguage === "en" ? "Step 2 of 3: Basic Settings" : "Schritt 2 von 3: Basis-Einstellungen"
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
                         color: EzTheme.textMuted
@@ -371,10 +550,10 @@ Item {
                             root.newVersion = choices[currentIndex]
                             
                             // Reset selected preset to raw if not supported to avoid invisible preset selection
-                            if (!versionPicker.isEzClientSupported(root.newVersion) && (root.selectedPreset === "essentials" || root.selectedPreset === "performance")) {
-                                root.selectedPreset = "perf_essentials"
-                            } else if (versionPicker.isEzClientSupported(root.newVersion) && (root.selectedPreset === "perf_essentials" || root.selectedPreset === "perf_only")) {
-                                root.selectedPreset = "performance"
+                            if (!versionPicker.isEzClientSupported(root.newVersion) && root.selectedPreset === "ezclient") {
+                                root.selectedPreset = "raw"
+                            } else if (versionPicker.isEzClientSupported(root.newVersion) && root.selectedPreset !== "raw") {
+                                root.selectedPreset = "ezclient"
                             }
                         }
                     }
@@ -583,7 +762,7 @@ Item {
                 Item { height: 4 }
 
                 Text {
-                    text: EzI18n.currentLanguage === "en" ? "EzClient can automatically equip your profile with top performance mods." : "EzClient kann dein Profil automatisch mit Best-in-Class Performance-Mods ausstatten."
+                    text: EzI18n.currentLanguage === "en" ? "Choose an optimized EzClient environment or a clean Raw profile." : "Wähle eine optimierte EzClient-Umgebung oder ein sauberes Raw-Profil."
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 12
                     color: EzTheme.textSecondary
@@ -596,62 +775,18 @@ Item {
                     Layout.fillWidth: true
                     spacing: 10
 
-                    // Supported Presets
-                    // Option 1: EzClient Standard (Recommended)
+                    // Option 1: EzClient (recommended)
                     EzPresetCard {
                         visible: versionPicker.isEzClientSupported(root.newVersion)
-                        presetKey: "performance"
-                        title: EzI18n.t("onboard_preset_perf", "EzClient Only")
-                        tag: EzI18n.currentLanguage === "en" ? "FULL CLIENT · MAX FPS" : "VOLLVERSION · MAX FPS"
+                        presetKey: "ezclient"
+                        title: "EzClient"
+                        tag: EzI18n.currentLanguage === "en" ? "RECOMMENDED" : "EMPFOHLEN"
                         tagColor: EzTheme.accent
                         tagTextColor: "#000000"
-                        sub: EzI18n.currentLanguage === "en" ? "Full client with max FPS, minimum RAM & optimized PvP setup" : "Vollwertiger Client mit maximalen FPS, minimalem RAM & optimiertem PvP-Setup"
-                        mods: "Inklusive: EzClient Core, Sodium, Lithium, FerriteCore, Memory Leak Fix, Krypton, ImmediatelyFast, EntityCulling"
-                        selected: root.selectedPreset === "performance"
-                        onClicked: root.selectedPreset = "performance"
-                    }
-
-                    // Option 2: EzClient + Essential Mod
-                    EzPresetCard {
-                        visible: versionPicker.isEzClientSupported(root.newVersion)
-                        presetKey: "essentials"
-                        title: EzI18n.t("onboard_preset_ess", "EzClient + Essentials")
-                        tag: "FEATURE CLIENT"
-                        tagColor: EzTheme.cyan
-                        tagTextColor: "#000000"
-                        sub: EzI18n.currentLanguage === "en" ? "EzClient setup plus world hosting, friend list & chat" : "EzClient Setup plus Welten hosten, Freundesliste & Chat"
-                        mods: "Inklusive: EzClient Setup + Essential Mod (Host Worlds & Friends)"
-                        selected: root.selectedPreset === "essentials"
-                        onClicked: root.selectedPreset = "essentials"
-                    }
-                    
-                    // Unsupported Presets
-                    // Option 3: Performance Mods + Essentials
-                    EzPresetCard {
-                        visible: !versionPicker.isEzClientSupported(root.newVersion)
-                        presetKey: "perf_essentials"
-                        title: "Performance Mods + Essentials"
-                        tag: "MODPACK"
-                        tagColor: EzTheme.cyan
-                        tagTextColor: "#000000"
-                        sub: "Sodium, Lithium, Essential Mod for World Hosting"
-                        mods: "Inklusive: Sodium, Lithium, Essential Mod"
-                        selected: root.selectedPreset === "perf_essentials"
-                        onClicked: root.selectedPreset = "perf_essentials"
-                    }
-
-                    // Option 4: Performance Mods Only
-                    EzPresetCard {
-                        visible: !versionPicker.isEzClientSupported(root.newVersion)
-                        presetKey: "perf_only"
-                        title: "Performance Mods"
-                        tag: "MAX FPS"
-                        tagColor: EzTheme.accent
-                        tagTextColor: "#000000"
-                        sub: "FPS Boost Engine, Chunk Optimization"
-                        mods: "Inklusive: Sodium, Lithium, FerriteCore"
-                        selected: root.selectedPreset === "perf_only"
-                        onClicked: root.selectedPreset = "perf_only"
+                        sub: EzI18n.currentLanguage === "en" ? "Optimized client environment with the managed core stack" : "Optimierte Client-Umgebung mit verwaltetem Core-Stack"
+                        mods: "EzClient.jar · Sodium · Lithium · Iris Shaders"
+                        selected: root.selectedPreset === "ezclient"
+                        onClicked: root.selectedPreset = "ezclient"
                     }
 
                     // Always Available Presets
@@ -696,18 +831,7 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (root.selectedPreset === "raw") {
-                                root.step = "downloading"
-                                root.downloadProgress = 0.0
-                                root.downloadStatus = EzI18n.t("onboard_downloading", "Richte EzClient ein & lade Mods…")
-                                if (typeof profileController !== "undefined" && profileController) {
-                                    profileController.createAndOnboard(root.newName.trim(), root.newVersion, root.newLoader, root.selectedPreset, [])
-                                }
-                            } else {
-                                root.step = "mod_selection"
-                            }
-                        }
+                        onClicked: root.step = "mod_selection"
                     }
                 }
             }
@@ -729,15 +853,10 @@ Item {
             Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
             property var optionalMods: [
-                { name: "Sodium", slug: "sodium", desc: "FPS Boost Engine", icon: "https://cdn.modrinth.com/data/AANobbMI/295862f4724dc3f78df3447ad6072b2dcd3ef0c9_96.webp" },
-                { name: "Lithium", slug: "lithium", desc: "Physik & Chunk Optimierung", icon: "https://cdn.modrinth.com/data/gvQqBUqZ/bcc8686c13af0143adf4285d741256af824f70b7_96.webp" },
-                { name: "FerriteCore", slug: "ferrite-core", desc: "Reduziert RAM-Verbrauch", icon: "https://cdn.modrinth.com/data/uXXizFIs/222a126f26f8f9ae1eb339f3b767677f18bff31f_96.webp" },
-                { name: "Memory Leak Fix", slug: "memoryleakfix", desc: "Behebt Java Speicherlecks", icon: "https://cdn.modrinth.com/data/NRjRiSSD/a279c19f9c3574339fa90f675aa8a94f8f6cff92_96.webp" },
-                { name: "ImmediatelyFast", slug: "immediatelyfast", desc: "Schnelleres UI Rendering", icon: "https://cdn.modrinth.com/data/5ZwdcRci/e57b6b451425692ac17ad322d5e14bea686a383a_96.webp" },
-                { name: "Entity Culling", slug: "entityculling", desc: "Versteckt unsichtbare Mobs", icon: "https://cdn.modrinth.com/data/NNAgCjsB/7873452d6cede4daed12da3d7d8c193ab88b4fd6_96.webp" },
-                { name: "Krypton", slug: "krypton", desc: "Optimiertes Netzwerk", icon: "https://cdn.modrinth.com/data/fQEb0iXm/3ea60899d060a9286e03b87bfa9e71d0cbe2dde7_96.webp" }
+                { name: "Simple Voice Chat", slug: "simple-voice-chat", desc: "Proximity Voice Chat im Spiel", icon: "https://cdn.modrinth.com/data/9eGKb6K1/icon.png" },
+                { name: "Essential Mod", slug: "essential", desc: "Freunde einladen, Welt-Hosting und Kosmetika", icon: "https://cdn.modrinth.com/data/k2ZPuTBm/7f7ac7cf2a46d5f02e9644372c44b3095ad61ffb_96.webp" }
             ]
-            property var selectedMods: ["sodium", "lithium", "ferrite-core", "memoryleakfix", "immediatelyfast", "entityculling", "krypton"]
+            property var selectedMods: []
 
             ColumnLayout {
                 anchors.fill: parent
@@ -765,7 +884,7 @@ Item {
                 Item { height: 18 }
 
                 Text {
-                    text: EzI18n.currentLanguage === "en" ? "Select Performance Mods" : "Wähle deine Performance Mods"
+                    text: EzI18n.currentLanguage === "en" ? "Recommended mods" : "Empfohlene Mods"
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 22
                     font.bold: true
@@ -775,7 +894,7 @@ Item {
                 Item { height: 4 }
 
                 Text {
-                    text: EzI18n.currentLanguage === "en" ? "Uncheck the ones you don't need. We recommend leaving the default selection." : "Wähle Mods ab, die du nicht brauchst. Es wird empfohlen, die Standardauswahl beizubehalten."
+                    text: EzI18n.currentLanguage === "en" ? "Optional additions—nothing is selected by default." : "Optionale Ergänzungen – standardmäßig ist nichts ausgewählt."
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 12
                     color: EzTheme.textSecondary
@@ -818,12 +937,11 @@ Item {
                                     border.color: isSelected ? EzTheme.accent : EzTheme.border
                                     border.width: 1
                                     
-                                    Text {
+                                    Image {
+                                        source: "icons/check.svg"
+                                        width: 12
+                                        height: 12
                                         anchors.centerIn: parent
-                                        text: "✓"
-                                        color: "#000000"
-                                        font.pixelSize: 14
-                                        font.bold: true
                                         visible: isSelected
                                     }
                                 }
@@ -889,47 +1007,62 @@ Item {
 
                 Item { height: 20 }
 
-                // Finish & Install Button
-                Rectangle {
+                RowLayout {
                     Layout.fillWidth: true
-                    height: 44
-                    radius: EzTheme.radius
-                    color: finalInstallBtnMouse.containsMouse ? EzTheme.accentHover : EzTheme.accent
-                    scale: finalInstallBtnMouse.containsMouse ? 1.02 : 1.0
+                    spacing: 10
 
-                    Behavior on color { ColorAnimation { duration: 120 } }
-                    Behavior on scale { NumberAnimation { duration: 120 } }
+                    Rectangle {
+                        Layout.preferredWidth: 130
+                        height: 44
+                        radius: EzTheme.radius
+                        color: skipModsMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
+                        border.color: EzTheme.border
+                        border.width: 1
 
-                    Text {
-                        text: EzI18n.t("onboard_btn_create", "Client-Profil erstellen & starten")
-                        font.family: EzTheme.fontFamily
-                        font.pixelSize: 13
-                        font.bold: true
-                        color: "#000000"
-                        anchors.centerIn: parent
+                        Text {
+                            text: EzI18n.currentLanguage === "en" ? "Skip" : "Überspringen"
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 12
+                            font.bold: true
+                            color: EzTheme.text
+                            anchors.centerIn: parent
+                        }
+
+                        MouseArea {
+                            id: skipModsMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.beginProfileSetup([])
+                        }
                     }
 
-                    MouseArea {
-                        id: finalInstallBtnMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            root.step = "downloading"
-                            root.downloadProgress = 0.0
-                            root.downloadStatus = EzI18n.t("onboard_downloading", "Richte EzClient ein & lade Mods…")
-                            
-                            var optionalSlugs = ["sodium", "lithium", "ferrite-core", "memoryleakfix", "immediatelyfast", "entityculling", "krypton", "zoomify"];
-                            var excluded = [];
-                            var selectedList = parent.parent.parent.selectedMods;
-                            for (var i = 0; i < optionalSlugs.length; i++) {
-                                if (selectedList.indexOf(optionalSlugs[i]) === -1) {
-                                    excluded.push(optionalSlugs[i]);
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 44
+                        radius: EzTheme.radius
+                        color: finalInstallBtnMouse.containsMouse ? EzTheme.accentHover : EzTheme.accent
+
+                        Text {
+                            text: EzI18n.currentLanguage === "en" ? "Install selected →" : "Ausgewählte installieren →"
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 12
+                            font.bold: true
+                            color: "#000000"
+                            anchors.centerIn: parent
+                        }
+
+                        MouseArea {
+                            id: finalInstallBtnMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                var selected = []
+                                for (var i = 0; i < modSelectionItem.selectedMods.length; i++) {
+                                    selected.push(modSelectionItem.selectedMods[i])
                                 }
-                            }
-                            
-                            if (typeof profileController !== "undefined" && profileController) {
-                                profileController.createAndOnboard(root.newName.trim(), root.newVersion, root.newLoader, root.selectedPreset, excluded)
+                                root.beginProfileSetup(selected)
                             }
                         }
                     }
@@ -972,16 +1105,12 @@ Item {
                         border.color: EzTheme.accentGlow
                         border.width: 2
                         opacity: root.downloadProgress < 1.0 ? 0.8 : 0.0
-                        Behavior on opacity { NumberAnimation { duration: 200 } }
-                    }
-
-                    Text {
-                        text: root.downloadProgress >= 1.0 ? "✓" : "⚡"
-                        font.family: EzTheme.fontFamily
-                        font.pixelSize: 26
-                        font.bold: true
-                        color: EzTheme.accentLight
+                    Image {
+                        source: root.downloadProgress >= 1.0 ? "icons/check.svg" : "icons/zap.svg"
+                        width: 28
+                        height: 28
                         anchors.centerIn: parent
+                        fillMode: Image.PreserveAspectFit
                     }
                 }
 
@@ -1052,5 +1181,7 @@ Item {
             }
         }
     }
+}
+
 
 }

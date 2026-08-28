@@ -1,6 +1,7 @@
 package app.ezclient.mixin;
 
 import app.ezclient.gui.EzHubScreen;
+import app.ezclient.gui.EzButton;
 import com.llamalad7.mixinextras.expression.Definition;
 import com.llamalad7.mixinextras.expression.Expression;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
@@ -9,11 +10,9 @@ import com.llamalad7.mixinextras.sugar.Local;
 import com.llamalad7.mixinextras.sugar.ref.LocalIntRef;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.SpriteIconButton;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -23,9 +22,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /** Adds EzClient to Minecraft 26.2's dynamically centered title icon row. */
 @Mixin(value = TitleScreen.class, priority = 900)
 public abstract class TitleScreenMixin {
-    private static final Identifier EZCLIENT_ICON =
-            Identifier.fromNamespaceAndPath("ezclient", "title/icon");
-
     @Shadow
     protected abstract int getHorizontalPosition(int currentButton, int numberOfButtons, int buttonWidth);
 
@@ -75,16 +71,12 @@ public abstract class TitleScreenMixin {
         currentButton.set(currentButton.get() + 1);
 
         Screen titleScreen = (TitleScreen) (Object) this;
-        Component tooltip = Component.literal("EzClient Modules");
-        SpriteIconButton button = SpriteIconButton.builder(
-                        tooltip,
-                        ignored -> Minecraft.getInstance().gui.setScreen(new EzHubScreen(titleScreen)),
-                        true
-                )
-                .size(20, 20)
-                .sprite(EZCLIENT_ICON, 16, 16)
-                .tooltip(tooltip)
-                .build();
+        Component tooltip = app.ezclient.util.EzI18n.comp("ezclient.title.tooltip", "EzClient Modules");
+        net.minecraft.resources.Identifier icon = net.minecraft.resources.Identifier.fromNamespaceAndPath("ezclient", "textures/icons/ezclient.png");
+        EzButton button = new EzButton(
+                0, 0, 20, 20, Component.empty(), icon, true,
+                ignored -> Minecraft.getInstance().gui.setScreen(new EzHubScreen(titleScreen))
+        );
 
         button.setPosition(
                 getHorizontalPosition(currentButton.get(), numberOfButtons, 20),

@@ -56,6 +56,8 @@ def build_exe():
         "psutil",
     ]
 
+    # We use our own QWidget-based splash screen in main.py instead.
+
     cmd = [
         "pyinstaller",
         "--name=EzClient",

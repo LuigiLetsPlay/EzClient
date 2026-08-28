@@ -2,7 +2,10 @@
 import hashlib
 import json
 import os
+import threading
+import time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Callable
 
@@ -12,21 +15,31 @@ VERSION_MANIFEST = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.j
 FABRIC_META = "https://meta.fabricmc.net/v2/versions/loader"
 ASSET_BASE = "https://resources.download.minecraft.net"
 
+# Parallel download settings
+_LIBRARY_WORKERS = 12
+_ASSET_WORKERS = 24
+
 
 def _json(url: str) -> dict:
-    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/1.6.7"})
+    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/1.8.0"})
     with urllib.request.urlopen(request, timeout=30) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
-def _download(url: str, target: Path, sha1: str = "") -> bool:
+def _download(url: str, target: Path, sha1: str = "", expected_size: int = 0) -> bool:
     """Download one file and report whether a network download was necessary."""
-    if target.is_file() and target.stat().st_size > 0:
-        if not sha1 or hashlib.sha1(target.read_bytes()).hexdigest() == sha1:
-            return False
+    if target.is_file():
+        file_size = target.stat().st_size
+        if file_size > 0:
+            # Fast path: if size matches and we have a hash, skip the expensive
+            # SHA1 read for files that are almost certainly correct.
+            if expected_size > 0 and file_size == expected_size:
+                return False
+            if not sha1 or hashlib.sha1(target.read_bytes()).hexdigest() == sha1:
+                return False
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_suffix(target.suffix + ".part")
-    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/1.6.7"})
+    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/1.8.0"})
     with urllib.request.urlopen(request, timeout=60) as response, temporary.open("wb") as output:
         while chunk := response.read(1024 * 256):
             output.write(chunk)
@@ -67,12 +80,35 @@ def _download_libraries(
     artifacts = [_library_artifact(library) for library in libraries]
     artifacts = [item for item in artifacts if item]
     total = len(artifacts)
-    downloaded = 0
-    for index, artifact in enumerate(artifacts, start=1):
-        if _download(artifact["url"], mc_dir / "libraries" / artifact["path"], artifact.get("sha1", "")):
-            downloaded += 1
-        if index == total or index % 25 == 0:
-            notify(f"{label}: {index}/{total} geprüft · {downloaded} neu geladen")
+    if total == 0:
+        return
+
+    lock = threading.Lock()
+    progress = {"checked": 0, "downloaded": 0}
+
+    def _do_download(artifact: dict) -> bool:
+        result = _download(
+            artifact["url"],
+            mc_dir / "libraries" / artifact["path"],
+            artifact.get("sha1", ""),
+            int(artifact.get("size", 0)),
+        )
+        with lock:
+            progress["checked"] += 1
+            if result:
+                progress["downloaded"] += 1
+            checked = progress["checked"]
+            downloaded = progress["downloaded"]
+        if checked == total or checked % 15 == 0:
+            notify(f"{label}: {checked}/{total} geprüft · {downloaded} neu geladen")
+        return result
+
+    with ThreadPoolExecutor(max_workers=min(_LIBRARY_WORKERS, total)) as pool:
+        futures = [pool.submit(_do_download, a) for a in artifacts]
+        for future in as_completed(futures):
+            future.result()  # Propagate exceptions
+
+    notify(f"{label}: {total}/{total} abgeschlossen · {progress['downloaded']} neu geladen")
 
 
 def _assets_are_ready(mc_dir: Path, vanilla_json: Path) -> bool:
@@ -93,6 +129,66 @@ def _assets_are_ready(mc_dir: Path, vanilla_json: Path) -> bool:
         )
     except (OSError, json.JSONDecodeError):
         return False
+
+
+def _download_assets_parallel(
+    mc_dir: Path, asset_list: list[dict], notify: Callable[[str], None]
+) -> None:
+    """Download all Minecraft assets using a parallel thread pool."""
+    total = len(asset_list)
+    if total == 0:
+        return
+
+    total_mb = sum(int(item.get("size", 0)) for item in asset_list) / (1024 * 1024)
+    notify(f"Minecraft-Assets: {total} Dateien werden geprüft (ca. {total_mb:.0f} MB).")
+
+    lock = threading.Lock()
+    progress = {"checked": 0, "downloaded": 0, "bytes": 0}
+    start_time = time.monotonic()
+
+    def _do_asset(asset: dict) -> bool:
+        digest = asset.get("hash", "")
+        size = int(asset.get("size", 0))
+        result = _download(
+            f"{ASSET_BASE}/{digest[:2]}/{digest}",
+            mc_dir / "assets" / "objects" / digest[:2] / digest,
+            digest,
+            size,
+        )
+        with lock:
+            progress["checked"] += 1
+            if result:
+                progress["downloaded"] += 1
+                progress["bytes"] += size
+            checked = progress["checked"]
+            downloaded = progress["downloaded"]
+            dl_bytes = progress["bytes"]
+
+        # Report progress every 50 files or at the end
+        if checked == total or checked % 50 == 0:
+            percent = (checked * 100) // total
+            elapsed = time.monotonic() - start_time
+            speed = (dl_bytes / (1024 * 1024)) / max(0.1, elapsed)
+            notify(
+                f"Minecraft-Assets: {checked}/{total} ({percent}%) · "
+                f"{downloaded} neu ({dl_bytes / (1024 * 1024):.1f} MB, {speed:.1f} MB/s)"
+            )
+        return result
+
+    with ThreadPoolExecutor(max_workers=min(_ASSET_WORKERS, total)) as pool:
+        futures = [pool.submit(_do_asset, a) for a in asset_list]
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as exc:
+                # Log but don't abort - retry missing assets on next launch
+                print(f"[GameBootstrap] Asset download failed: {exc}")
+
+    elapsed = time.monotonic() - start_time
+    notify(
+        f"Minecraft-Assets fertig: {progress['downloaded']} neu geladen "
+        f"({progress['bytes'] / (1024 * 1024):.1f} MB in {elapsed:.1f}s)"
+    )
 
 
 def ensure_game_ready(profile: ProfileData, mc_dir: Path, notify: Callable[[str], None]) -> None:
@@ -129,37 +225,22 @@ def ensure_game_ready(profile: ProfileData, mc_dir: Path, notify: Callable[[str]
     client = vanilla.get("downloads", {}).get("client", {})
     client_downloaded = _download(client["url"], vanilla_dir / f"{version}.jar", client.get("sha1", ""))
     notify("Minecraft-Client heruntergeladen." if client_downloaded else "Minecraft-Client bereits vorhanden.")
-    notify("Lade Minecraft-Bibliotheken herunter…")
+    notify("Lade Minecraft-Bibliotheken parallel herunter…")
     _download_libraries(mc_dir, vanilla.get("libraries", []), notify, "Minecraft-Bibliotheken")
 
     assets = vanilla.get("assetIndex", {})
     if assets.get("url"):
-        notify("Lade Minecraft-Assets herunter…")
+        notify("Lade Minecraft-Assets parallel herunter…")
         index_path = mc_dir / "assets" / "indexes" / f"{assets['id']}.json"
         _download(assets["url"], index_path, assets.get("sha1", ""))
         asset_list = [
             item for item in json.loads(index_path.read_text(encoding="utf-8")).get("objects", {}).values()
             if item.get("hash")
         ]
-        total_assets = len(asset_list)
-        total_mb = sum(int(item.get("size", 0)) for item in asset_list) / (1024 * 1024)
-        notify(f"Minecraft-Assets: {total_assets} Dateien werden geprüft (ca. {total_mb:.0f} MB).")
-        downloaded_assets = 0
-        downloaded_bytes = 0
-        for index, asset in enumerate(asset_list, start=1):
-            digest = asset.get("hash", "")
-            if _download(f"{ASSET_BASE}/{digest[:2]}/{digest}", mc_dir / "assets" / "objects" / digest[:2] / digest, digest):
-                downloaded_assets += 1
-                downloaded_bytes += int(asset.get("size", 0))
-            if index == total_assets or index % 100 == 0:
-                percent = (index * 100) // total_assets
-                notify(
-                    f"Minecraft-Assets: {index}/{total_assets} ({percent} %) geprüft · "
-                    f"{downloaded_assets} neu geladen ({downloaded_bytes / (1024 * 1024):.1f} MB)"
-                )
+        _download_assets_parallel(mc_dir, asset_list, notify)
 
     if profile.loader.lower() == "fabric":
-        notify("Installiere Fabric für den Direktstart…")
+        notify("Installiere Fabric-Komponenten…")
         loaders = _json(f"{FABRIC_META}/{version}")
         loader = next((item for item in loaders if item.get("loader", {}).get("stable")), loaders[0] if loaders else None)
         if not loader:
@@ -171,4 +252,4 @@ def ensure_game_ready(profile: ProfileData, mc_dir: Path, notify: Callable[[str]
         fabric_dir.mkdir(parents=True, exist_ok=True)
         (fabric_dir / f"{fabric_id}.json").write_text(json.dumps(fabric, indent=2), encoding="utf-8")
         _download_libraries(mc_dir, fabric.get("libraries", []), notify, "Fabric-Bibliotheken")
-    notify("Minecraft-Direktstart ist vorbereitet.")
+    notify("Minecraft-Dateien sind vorbereitet.")

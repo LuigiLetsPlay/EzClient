@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "ezclient",
-"version": "1.6.7",
+"version": "1.8.0",
   "name": "EzClient",
   "description": "EzClient Core Client Mod - Performance Optimizer & Window Customizer",
   "authors": [

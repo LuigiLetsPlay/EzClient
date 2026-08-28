@@ -14,7 +14,7 @@ public class GameRendererMixin {
     @Inject(method = "calculateFov", at = @At("RETURN"), cancellable = true)
     private void ezclient$applyZoom(float tickDelta, CallbackInfoReturnable<Float> cir) {
         var zoom = app.ezclient.gui.ModuleManager.getInstance().getZoomModule();
-        float target = zoom.isEnabled() && EzClientMod.isZooming() ? (float) zoom.getZoomLevel() : 1.0F;
+        float target = zoom.isEnabled() && EzClientMod.isZooming() ? (float) zoom.getActiveZoomLevel() : 1.0F;
         if (zoom.isSmoothZoom()) {
             ezclient$animatedFactor += (target - ezclient$animatedFactor) * 0.28F;
         } else {

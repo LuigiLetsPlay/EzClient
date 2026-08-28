@@ -8,32 +8,70 @@ Item {
     signal navigate(string route)
     property string selectedSource: ""
     property string pendingPreview: ""
-    property string fitMode: "Cover"
     // Normalized crop window over the selected picture (0..1).
     property real cropX: 0
     property real cropY: 0
     property real cropW: 1
     property real cropH: 1
+    property string capeName: ""
+    property string previewAnimation: "idle"
+    property bool showPixelGrid: true
+    property bool animatedSource: false
+    property bool mediaProcessing: false
+    property real mediaDuration: 0
+    property real trimStart: 0
+    property real trimEnd: 5
+    property int animationFps: 12
+    property bool pingPong: false
+    property int previewRequestId: 0
+    property bool previewProcessing: false
 
-    function chooseImage() {
-        var url = accountController.pickCapeImage()
+    function loadSource(url) {
         if (!url) return
         root.selectedSource = url
         root.cropX = 0; root.cropY = 0; root.cropW = 1; root.cropH = 1
-        root.prepare()
+        var clean = url.toLowerCase().split("?")[0]
+        root.animatedSource = clean.endsWith(".gif") || clean.endsWith(".mp4") || clean.endsWith(".webm")
+        if (root.animatedSource) {
+            var info = accountController.probeCapeMedia(url)
+            if (!info || !info.ok) return
+            root.mediaDuration = info.duration
+            root.trimStart = 0
+            root.trimEnd = Math.min(5, info.duration)
+            root.pendingPreview = ""
+        } else {
+            root.prepare()
+        }
+    }
+
+    function chooseImage() {
+        var url = accountController.pickCapeImage()
+        root.loadSource(url)
     }
 
     function prepare() {
         if (!root.selectedSource) return
         var crop = root.cropX.toFixed(4) + "," + root.cropY.toFixed(4) + "," + root.cropW.toFixed(4) + "," + root.cropH.toFixed(4)
-        root.pendingPreview = accountController.prepareCapeImage(root.selectedSource, root.fitMode + "|" + crop)
+        root.previewProcessing = true
+        root.previewRequestId = accountController.requestCapePreview(root.selectedSource, "Crop|" + crop)
+    }
+
+    function schedulePreview() {
+        if (!root.animatedSource && root.selectedSource !== "" && !liveCropTimer.running)
+            liveCropTimer.start()
+    }
+
+    function prepareAnimation() {
+        if (!root.animatedSource || root.mediaProcessing) return
+        root.mediaProcessing = accountController.prepareAnimatedCape(
+            root.selectedSource, root.trimStart, root.trimEnd, root.animationFps, root.pingPong)
     }
 
     Timer {
         id: liveCropTimer
-        interval: 200
+        interval: 120
         repeat: false
-        onTriggered: if (root.fitMode === "Crop" && root.selectedSource !== "") root.prepare()
+        onTriggered: root.prepare()
     }
 
     function discard() {
@@ -43,7 +81,8 @@ Item {
     }
 
     function confirm() {
-        if (root.pendingPreview && accountController.confirmPendingCape()) {
+        if (root.previewProcessing) return
+        if (root.pendingPreview && accountController.confirmPendingCape(root.capeName)) {
             root.selectedSource = ""
             root.pendingPreview = ""
         }
@@ -54,11 +93,21 @@ Item {
         function onSkinUploadStatusChanged(message, isError) {
             statusText.text = message
             statusText.color = isError ? "#FCA5A5" : "#86EFAC"
+            if (isError) root.mediaProcessing = false
         }
         function onCapeCommunityStatusChanged(message, isError) {
             if (!message) return
             statusText.text = message
             statusText.color = isError ? "#FCA5A5" : "#86EFAC"
+        }
+        function onCapeMediaPrepared(previewUrl, frameCount, duration) {
+            root.pendingPreview = previewUrl + "?v=" + Date.now()
+            root.mediaProcessing = false
+        }
+        function onCapePreviewPrepared(previewUrl, revision) {
+            if (revision !== root.previewRequestId) return
+            root.previewProcessing = false
+            if (previewUrl) root.pendingPreview = previewUrl
         }
     }
 
@@ -86,86 +135,187 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: 32
+            layoutDirection: Qt.RightToLeft
 
-            // Cape-shaped live preview of the formatted pending image.
+            // Interactive character preview on the right side.
             Rectangle {
-                Layout.preferredWidth: Math.min(280, parent.width * 0.38)
-                Layout.preferredHeight: width * 1.6
+                Layout.preferredWidth: Math.max(340, Math.min(480, root.width * 0.38))
+                Layout.fillHeight: true
                 radius: 10
                 color: "#171126"
                 border.color: EzTheme.border
                 clip: true
 
-                Item {
-                    id: capeCrop
+                Skin3DView {
+                    id: editorSkin3D
                     anchors.fill: parent
-                    anchors.margins: 14
+                    anchors.margins: 8
+                    skinSource: accountController.skinTextureUrl
+                    capeSource: root.pendingPreview !== "" ? root.pendingPreview : accountController.capePreviewTextureUrl
+                    animation: root.previewAnimation
+                    autoRotate: false
+                    interactive: true
+                }
 
-                    // The pending atlas is 1280x640; its visible cape face is
-                    // 200x320 at position 20,20. Show exactly that region.
-                    Image {
-                        source: root.pendingPreview
-                        visible: root.pendingPreview !== ""
-                        asynchronous: true
-                        fillMode: Image.Stretch
-                        width: capeCrop.width * 6.4
-                        height: capeCrop.height * 2.0
-                        x: -capeCrop.width * 0.1
-                        y: -capeCrop.height * 0.0625
-                    }
-
-                    ColumnLayout {
-                        visible: root.pendingPreview === ""
-                        anchors.centerIn: parent
-                        spacing: 12
-                        Text { text: "Noch kein Bild"; color: EzTheme.textSecondary; font.pixelSize: 15; Layout.alignment: Qt.AlignHCenter }
+                Rectangle {
+                    anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 14
+                    width: previewHint.implicitWidth + 20; height: 30; radius: 15
+                    color: "#B319132A"; border.color: EzTheme.border
+                    Text {
+                        id: previewHint; anchors.centerIn: parent
+                        text: "Ziehen: 360°  •  Mausrad: Zoom"
+                        color: EzTheme.textSecondary; font.pixelSize: 11
                     }
                 }
             }
 
-            ColumnLayout {
+            ScrollView {
+                id: toolsScroll
                 Layout.fillWidth: true
+                Layout.fillHeight: true
                 Layout.maximumWidth: 520
-                spacing: 16
+                clip: true
+                contentWidth: availableWidth
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
-                EzButton { text: "📁 Bild auswählen"; onClicked: root.chooseImage() }
+                ColumnLayout {
+                    width: toolsScroll.availableWidth
+                    spacing: 16
 
-                Text { text: "Skalierung"; color: EzTheme.text; font.bold: true; font.pixelSize: 15 }
+                EzButton { text: "Bild auswählen"; onClicked: root.chooseImage() }
 
-                RowLayout {
-                    spacing: 10
-                    Repeater {
-                        model: [{ id: "Cover", label: "Ausfüllen" }, { id: "Stretch", label: "Strecken" }, { id: "Crop", label: "Zuschneiden" }]
-                        delegate: Rectangle {
-                            property var item: modelData
-                            width: 110; height: 40; radius: 8
-                            color: root.fitMode === item.id ? EzTheme.surfaceActive : EzTheme.surface2
-                            border.color: root.fitMode === item.id ? EzTheme.accent : EzTheme.border
+                Text { text: "Cape-Name"; color: EzTheme.text; font.bold: true; font.pixelSize: 15 }
+                TextField {
+                    id: capeNameField
+                    Layout.fillWidth: true
+                    placeholderText: "z. B. Enderdrache"
+                    text: root.capeName
+                    maximumLength: 48
+                    color: EzTheme.text
+                    onTextChanged: root.capeName = text
+                    background: Rectangle {
+                        radius: 8
+                        color: EzTheme.surface2
+                        border.color: capeNameField.text.trim().length >= 3 ? EzTheme.border : "#F87171"
+                    }
+                }
+                Text {
+                    text: root.capeName.trim().length < 3 ? "Mindestens 3, maximal 48 Zeichen" : root.capeName.length + "/48 Zeichen"
+                    color: root.capeName.trim().length < 3 ? "#FCA5A5" : EzTheme.textMuted
+                    font.pixelSize: 11
+                }
 
-                            MouseArea {
-                                anchors.fill: parent
-                                enabled: item.id !== "Crop" || root.selectedSource !== ""
-                                onClicked: { root.fitMode = item.id; root.prepare() }
-                            }
-                            Text { anchors.centerIn: parent; text: item.label; color: EzTheme.text; font.pixelSize: 13 }
+                Rectangle {
+                    visible: root.selectedSource !== "" && !root.animatedSource
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 48
+                    radius: 9
+                    color: EzTheme.surface2
+                    border.color: EzTheme.border
+                    RowLayout {
+                        anchors.fill: parent; anchors.margins: 10; spacing: 10
+                        Rectangle {
+                            Layout.preferredWidth: 8; Layout.preferredHeight: 8
+                            radius: 4; color: EzTheme.accent
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Motiv frei platzieren: verschieben, breiter, schmaler, größer oder kleiner ziehen."
+                            color: EzTheme.textSecondary
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 12
                         }
                     }
                 }
 
-                Text { text: "Zuschneiden"; color: EzTheme.text; font.bold: true; font.pixelSize: 15; visible: root.selectedSource !== "" }
+                RowLayout {
+                    spacing: 10
+                    Text { text: "3D-Animation"; color: EzTheme.text; font.bold: true; font.pixelSize: 15 }
+                    EzButton { text: "Stehen"; primary: root.previewAnimation === "idle"; onClicked: root.previewAnimation = "idle" }
+                    EzButton { text: "Laufen"; primary: root.previewAnimation === "walk"; onClicked: root.previewAnimation = "walk" }
+                }
+
+                ColumnLayout {
+                    visible: root.animatedSource
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Text {
+                        text: "Animationstrimmer · " + root.trimStart.toFixed(1) + "–" + root.trimEnd.toFixed(1) + " s"
+                        color: EzTheme.text; font.bold: true; font.pixelSize: 15
+                    }
+                    Text { text: "Start"; color: EzTheme.textMuted; font.pixelSize: 11 }
+                    Slider {
+                        Layout.fillWidth: true
+                        from: 0; to: Math.max(0.1, root.mediaDuration - 0.1)
+                        value: root.trimStart
+                        onMoved: {
+                            root.trimStart = value
+                            if (root.trimEnd < value + 0.1)
+                                root.trimEnd = Math.min(root.mediaDuration, value + 0.1)
+                        }
+                    }
+                    Text { text: "Ende · maximal 10 Sekunden"; color: EzTheme.textMuted; font.pixelSize: 11 }
+                    Slider {
+                        Layout.fillWidth: true
+                        from: 0.1; to: Math.max(0.1, root.mediaDuration)
+                        value: root.trimEnd
+                        onMoved: root.trimEnd = Math.max(root.trimStart + 0.1, Math.min(value, root.trimStart + 10))
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text { text: "FPS: " + root.animationFps; color: EzTheme.textSecondary; Layout.fillWidth: true }
+                        Slider {
+                            from: 1; to: 20; stepSize: 1; value: root.animationFps
+                            onMoved: root.animationFps = Math.round(value)
+                            Layout.preferredWidth: 140
+                        }
+                        CheckBox { text: "Ping-Pong"; checked: root.pingPong; onToggled: root.pingPong = checked }
+                    }
+                    EzButton {
+                        text: root.mediaProcessing ? "Frames werden erstellt …" : "Loop vorbereiten"
+                        enabled: !root.mediaProcessing
+                        onClicked: root.prepareAnimation()
+                    }
+                }
+
+                Text { text: "Zuschneiden"; color: EzTheme.text; font.bold: true; font.pixelSize: 15; visible: root.selectedSource !== "" && !root.animatedSource }
 
                 // Interactive crop editor. Drag inside the frame to move it,
                 // drag the corner handle to resize. The cape is made from the
                 // framed region only.
                 Rectangle {
                     id: cropStage
-                    visible: root.selectedSource !== ""
+                    visible: root.selectedSource !== "" && !root.animatedSource
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 300
+                    Layout.preferredHeight: 360
                     radius: 10
                     color: "#171126"
                     border.color: EzTheme.border
                     clip: true
+                    readonly property real paintX: cropImage.x + (cropImage.width - cropImage.paintedWidth) / 2
+                    readonly property real paintY: cropImage.y + (cropImage.height - cropImage.paintedHeight) / 2
+                    readonly property real paintW: cropImage.paintedWidth
+                    readonly property real paintH: cropImage.paintedHeight
+
+                    function resetSelection() {
+                        if (paintW <= 0 || paintH <= 0) return
+                        var imageAspect = paintW / paintH
+                        var capeAspect = 10 / 16
+                        if (imageAspect >= capeAspect) {
+                            root.cropH = 1
+                            root.cropW = capeAspect / imageAspect
+                            root.cropX = (1 - root.cropW) / 2
+                            root.cropY = 0
+                        } else {
+                            root.cropW = 1
+                            root.cropH = imageAspect / capeAspect
+                            root.cropX = 0
+                            root.cropY = (1 - root.cropH) / 2
+                        }
+                        root.schedulePreview()
+                    }
 
                     Image {
                         id: cropImage
@@ -175,17 +325,17 @@ Item {
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
                         source: root.selectedSource
+                        onStatusChanged: if (status === Image.Ready) cropStage.resetSelection()
                     }
 
                     // Cape-proportioned crop frame (10x16 like the real cape).
                     // Drag it to move; drag the handle to resize (aspect kept).
                     Rectangle {
                         id: cropFrame
-                        x: cropImage.x + root.cropX * cropImage.paintedWidth
-                        y: cropImage.y + root.cropY * cropImage.paintedHeight
-                        width: Math.min(cropImage.paintedWidth, height * 0.625)
-                        height: Math.min(cropImage.paintedHeight * 0.9,
-                                         Math.max(40, cropImage.paintedHeight * 0.9))
+                        x: cropStage.paintX + root.cropX * cropStage.paintW
+                        y: cropStage.paintY + root.cropY * cropStage.paintH
+                        width: root.cropW * cropStage.paintW
+                        height: root.cropH * cropStage.paintH
                         color: "transparent"
                         border.color: EzTheme.accent
                         border.width: 2
@@ -194,25 +344,53 @@ Item {
                             id: cropMove
                             anchors.fill: parent
                             cursorShape: Qt.SizeAllCursor
-                            drag.target: cropFrame
-                            drag.minimumX: cropImage.x
-                            drag.maximumX: cropImage.x + Math.max(0, cropImage.paintedWidth - cropFrame.width)
-                            drag.minimumY: cropImage.y
-                            drag.maximumY: cropImage.y + Math.max(0, cropImage.paintedHeight - cropFrame.height)
+                            property real pressX: 0
+                            property real pressY: 0
+                            property real startX: 0
+                            property real startY: 0
+                            onPressed: function(mouse) {
+                                var point = mapToItem(cropStage, mouse.x, mouse.y)
+                                pressX = point.x; pressY = point.y
+                                startX = root.cropX; startY = root.cropY
+                            }
+                            onPositionChanged: function(mouse) {
+                                if (!pressed || cropStage.paintW <= 0 || cropStage.paintH <= 0) return
+                                var point = mapToItem(cropStage, mouse.x, mouse.y)
+                                root.cropX = Math.max(0, Math.min(1 - root.cropW,
+                                    startX + (point.x - pressX) / cropStage.paintW))
+                                root.cropY = Math.max(0, Math.min(1 - root.cropH,
+                                    startY + (point.y - pressY) / cropStage.paintH))
+                                root.schedulePreview()
+                            }
+                            onReleased: { liveCropTimer.stop(); root.prepare() }
+                            onCanceled: { liveCropTimer.stop(); root.prepare() }
                         }
 
-                        onXChanged: syncCrop()
-                        onYChanged: syncCrop()
-                        onWidthChanged: syncCrop()
-                        onHeightChanged: syncCrop()
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "#16000000"
+                        }
 
-                        function syncCrop() {
-                            if (cropImage.paintedWidth <= 0 || cropImage.paintedHeight <= 0) return
-                            root.cropX = (cropFrame.x - cropImage.x) / cropImage.paintedWidth
-                            root.cropY = (cropFrame.y - cropImage.y) / cropImage.paintedHeight
-                            root.cropW = Math.min(1, cropFrame.width / cropImage.paintedWidth)
-                            root.cropH = Math.min(1, cropFrame.height / cropImage.paintedHeight)
-                            liveCropTimer.restart()
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Cape-Motiv"
+                            color: "#E8FFFFFF"
+                            font.pixelSize: 12
+                            font.bold: true
+                        }
+
+                        function applyResize(newWidth, newHeight) {
+                            if (cropStage.paintW <= 0 || cropStage.paintH <= 0) return
+                            var widthPx = Math.max(40, Math.min(cropStage.paintW, newWidth))
+                            var heightPx = Math.max(40, Math.min(cropStage.paintH, newHeight))
+                            root.cropH = heightPx / cropStage.paintH
+                            root.cropW = widthPx / cropStage.paintW
+                            // Growing at the right/bottom edge keeps going up to
+                            // 100%; move the selection inward instead of changing
+                            // the control range or stopping early.
+                            root.cropX = Math.max(0, Math.min(root.cropX, 1 - root.cropW))
+                            root.cropY = Math.max(0, Math.min(root.cropY, 1 - root.cropH))
+                            root.schedulePreview()
                         }
 
                         Rectangle {
@@ -227,14 +405,42 @@ Item {
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.SizeFDiagCursor
+                                property real pressX: 0
+                                property real pressY: 0
+                                property real startWidth: 0
+                                property real startHeight: 0
+                                onPressed: function(mouse) {
+                                    var point = mapToItem(cropStage, mouse.x, mouse.y)
+                                    pressX = point.x; pressY = point.y
+                                    startWidth = cropFrame.width
+                                    startHeight = cropFrame.height
+                                }
                                 onPositionChanged: function(mouse) {
                                     if (!pressed) return
-                                    var absX = mapToItem(cropStage, mouse.x, mouse.y).x
-                                    var absY = mapToItem(cropStage, mouse.x, mouse.y).y
-                                    var maxH = cropImage.y + cropImage.paintedHeight - cropFrame.y
-                                    var newH = Math.max(40, Math.min(maxH, absY - cropFrame.y))
-                                    cropFrame.height = newH
-                                    cropFrame.width = newH * 0.625
+                                    var point = mapToItem(cropStage, mouse.x, mouse.y)
+                                    cropFrame.applyResize(
+                                        startWidth + point.x - pressX,
+                                        startHeight + point.y - pressY)
+                                }
+                                onReleased: { liveCropTimer.stop(); root.prepare() }
+                                onCanceled: { liveCropTimer.stop(); root.prepare() }
+                            }
+                        }
+
+                        Canvas {
+                            anchors.fill: parent
+                            visible: root.showPixelGrid
+                            opacity: 0.55
+                            onPaint: {
+                                var ctx = getContext("2d")
+                                ctx.clearRect(0, 0, width, height)
+                                ctx.strokeStyle = "#A78BFA"
+                                ctx.lineWidth = 1
+                                for (var x = 1; x < 10; ++x) {
+                                    ctx.beginPath(); ctx.moveTo(x * width / 10, 0); ctx.lineTo(x * width / 10, height); ctx.stroke()
+                                }
+                                for (var y = 1; y < 16; ++y) {
+                                    ctx.beginPath(); ctx.moveTo(0, y * height / 16); ctx.lineTo(width, y * height / 16); ctx.stroke()
                                 }
                             }
                         }
@@ -249,10 +455,46 @@ Item {
                 }
 
                 RowLayout {
-                    visible: root.selectedSource !== ""
+                    visible: root.selectedSource !== "" && !root.animatedSource
+                    Layout.fillWidth: true
                     spacing: 10
-                    EzButton { text: "Zuschnitt anwenden"; onClicked: root.prepare() }
-                    EzButton { text: "Alles auswählen"; onClicked: { root.cropX = 0; root.cropY = 0; root.cropW = 1; root.cropH = 1 } }
+                    EzButton { text: "Motiv zurücksetzen"; onClicked: cropStage.resetSelection() }
+                    EzButton { text: root.showPixelGrid ? "Grid aus" : "Grid an"; onClicked: root.showPixelGrid = !root.showPixelGrid }
+                }
+
+                GridLayout {
+                    visible: root.selectedSource !== "" && !root.animatedSource
+                    Layout.fillWidth: true
+                    columns: 2
+                    columnSpacing: 12
+                    rowSpacing: 6
+
+                    Text { text: "Breite"; color: EzTheme.textSecondary; font.pixelSize: 12 }
+                    Slider {
+                        Layout.fillWidth: true
+                        from: 0.05
+                        to: 1.0
+                        value: root.cropW
+                        onMoved: {
+                            root.cropW = value
+                            root.cropX = Math.max(0, Math.min(root.cropX, 1 - root.cropW))
+                            root.schedulePreview()
+                        }
+                        onPressedChanged: if (!pressed) { liveCropTimer.stop(); root.prepare() }
+                    }
+                    Text { text: "Höhe"; color: EzTheme.textSecondary; font.pixelSize: 12 }
+                    Slider {
+                        Layout.fillWidth: true
+                        from: 0.05
+                        to: 1.0
+                        value: root.cropH
+                        onMoved: {
+                            root.cropH = value
+                            root.cropY = Math.max(0, Math.min(root.cropY, 1 - root.cropH))
+                            root.schedulePreview()
+                        }
+                        onPressedChanged: if (!pressed) { liveCropTimer.stop(); root.prepare() }
+                    }
                 }
 
                 Text {
@@ -266,8 +508,8 @@ Item {
                 RowLayout {
                     spacing: 12
                     EzButton {
-                        text: "Bestätigen & hochladen"
-                        enabled: root.pendingPreview !== ""
+                        text: root.previewProcessing ? "Vorschau wird aktualisiert …" : "Bestätigen & hochladen"
+                        enabled: root.pendingPreview !== "" && root.capeName.trim().length >= 3 && !root.previewProcessing
                         onClicked: root.confirm()
                     }
                     EzButton {
@@ -285,6 +527,33 @@ Item {
                     Layout.fillWidth: true
                     font.pixelSize: 12
                 }
+                Item { Layout.fillWidth: true; Layout.preferredHeight: 12 }
+                }
+            }
+        }
+    }
+
+    DropArea {
+        id: mediaDropArea
+        anchors.fill: parent
+        z: 100
+        onEntered: function(drag) { drag.accepted = drag.hasUrls }
+        onDropped: function(drop) {
+            if (drop.hasUrls && drop.urls.length > 0) root.loadSource(drop.urls[0].toString())
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            visible: mediaDropArea.containsDrag
+            color: "#D9110D20"
+            border.color: EzTheme.accent
+            border.width: 2
+            Text {
+                anchors.centerIn: parent
+                text: "Cape-Datei hier ablegen"
+                color: EzTheme.text
+                font.pixelSize: 20
+                font.bold: true
             }
         }
     }

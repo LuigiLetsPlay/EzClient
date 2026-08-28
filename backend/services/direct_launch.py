@@ -208,14 +208,14 @@ def ensure_profile_defaults(
 
     options_file = profile_path / "options.txt"
     defaults = {
-        "soundCategory_music": "0.1",
+        "soundCategory_music": "0.05",
         "onboardAccessibility": "false",
         "narrator": "0",
         "tutorialStep": "none",
         "skipRealmsNotification": "true",
         "maxFps": "260",
         "enableVsync": "false",
-        "graphicsMode": "0",
+        "graphicsMode": "1",
         "renderDistance": "8",
         "simulationDistance": "5",
         "entityShadows": "false",
@@ -364,20 +364,27 @@ def launch_minecraft_direct(
     asset_index = vanilla_data.get("assetIndex", {}).get("id", inherits)
     main_class = fabric_data.get("mainClass", "net.fabricmc.loader.impl.launch.knot.KnotClient") if fabric_data else vanilla_data.get("mainClass", "net.minecraft.client.main.Main")
 
-    # High-Performance JVM Flags (Aggressive ZGC zero-stutter flags)
+    # Ultra-Fast High-Performance JVM Flags (Instant-Boot + Zero Stutter)
     jvm_args = [
         java_bin,
         f"-Xmx{ram}M",
-        f"-Xms{ram}M",
-        "-XX:+AlwaysPreTouch",
+        f"-Xms512M",
         "-XX:+UnlockExperimentalVMOptions",
-        "-XX:+UseZGC",
-        "-XX:+ZProactive",
-        "-XX:ZUncommitDelay=60",
+        "-XX:+UseG1GC",
+        "-XX:G1NewSizePercent=20",
+        "-XX:G1ReservePercent=20",
+        "-XX:MaxGCPauseMillis=30",
+        "-XX:G1HeapRegionSize=32M",
+        "-XX:+ParallelRefProcEnabled",
+        "-XX:+OptimizeStringConcat",
+        "-XX:+UseStringDeduplication",
+        "-XX:CICompilerCount=4",
+        "-XX:+TieredCompilation",
         "-XX:+PerfDisableSharedMem",
         "-XX:+DisableExplicitGC",
+        "-Djava.lang.invoke.stringConcat=BC_SB",
+        "-Dlog4j2.formatMsgNoLookups=true",
         "--enable-native-access=ALL-UNNAMED",
-        "-DFabricMcEmu=net.minecraft.client.main.Main",
         f"-Dfabric.modsFolder={profile.mods_path}",
         f"-Dfabric.gameVersion={profile.minecraft_version}",
         "-Dfabric.development=false",
