@@ -43,7 +43,12 @@ $RECYCLE.BIN/
 *.swo
 
 # Java build temp (keep src and backend/assets/EzClient.jar)
+.gradle/
+client_mod/.gradle/
+client_mod/run/
+client_mod/build/
+client_mod_lite/build/
 client_mod/bin/
 client_mod/*.class
 client_mod/**/*.class
-server/
+*.class

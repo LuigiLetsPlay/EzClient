@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from backend.services.store import ProfileStore
 
 
-MIGRATION_VERSION = 1800
+MIGRATION_VERSION = 1801
 CORE_IDS = ("ezclient", "sodium", "lithium", "iris")
 
 # Normalized Fabric/Forge ids and historical launcher slugs. Filename matching
@@ -26,6 +26,9 @@ LEGACY_ALIASES: dict[str, set[str]] = {
     "memoryleakfix": {"memoryleakfix", "memory-leak-fix"},
     "fastsuite": {"fastsuite", "fast-suite"},
     "moreculling": {"moreculling", "more-culling"},
+    "culllessleaves": {"culllessleaves", "cull-less-leaves", "cull_less_leaves"},
+    "yacl": {"yacl", "yet-another-config-lib", "yet_another_config_lib", "yet_another_config_lib_v3", "yacl3"},
+    "clothconfig": {"cloth-config", "cloth_config", "cloth-config-fabric", "clothconfig", "clothconfigv2", "cloth-config2"},
 }
 
 
@@ -126,7 +129,13 @@ class ProfileMigrationService:
                     jar_path.name,
                 )
                 filename = jar_path.name.lower().removesuffix(".disabled")
-                remove_legacy = bool(legacy and (legacy in owned_legacy_ids or filename in owned_filenames))
+                remove_legacy = bool(
+                    legacy and (
+                        profile.profile_type == "ezclient"
+                        or legacy in owned_legacy_ids
+                        or filename in owned_filenames
+                    )
+                )
                 remove_raw_core = profile.profile_type == "raw" and filename in raw_owned_core_filenames
                 if not remove_legacy and not remove_raw_core:
                     preserved_user_files.add(jar_path.name.removesuffix(".disabled"))
@@ -147,7 +156,7 @@ class ProfileMigrationService:
             legacy = _legacy_id(mod.slug, mod.project_id, mod.name, mod.filename)
             identifiers = {_normal(mod.slug), _normal(mod.project_id)}
             launcher_owned = bool(identifiers & managed_manifest) or bool(mod.recommended or mod.essential)
-            if legacy and launcher_owned and legacy not in failed_legacy_ids:
+            if legacy and (profile.profile_type == "ezclient" or (launcher_owned and legacy not in failed_legacy_ids)):
                 changed = True
                 continue
             core_id = _normal(mod.slug or mod.project_id)

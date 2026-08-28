@@ -664,7 +664,7 @@ Item {
                     color: EzTheme.text
                 }
                 Text {
-                    text: (profileController ? profileController.ezClientOutdatedCount : 1) + " Profil(e) bereit für Update auf v" + (profileController ? profileController.ezClientLatestVersion : "1.8.0")
+                    text: (profileController ? profileController.ezClientOutdatedCount : 1) + " Profil(e) bereit für Update auf v" + (profileController ? profileController.ezClientLatestVersion : "1.8.1")
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 11
                     color: EzTheme.textMuted
@@ -674,7 +674,7 @@ Item {
             }
 
             EzButton {
-                text: "Upgrade v" + (profileController ? profileController.ezClientLatestVersion : "1.8.0")
+                text: "Upgrade v" + (profileController ? profileController.ezClientLatestVersion : "1.8.1")
                 primary: true
                 mcFont: true
                 Layout.preferredHeight: 32

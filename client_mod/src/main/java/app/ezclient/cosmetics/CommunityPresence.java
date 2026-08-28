@@ -47,7 +47,7 @@ public final class CommunityPresence {
                 HttpRequest req = HttpRequest.newBuilder(URI.create(endpoint))
                         .timeout(Duration.ofSeconds(5))
                         .header("Content-Type", "application/json")
-                        .header("User-Agent", "EzClient/1.8.0")
+                        .header("User-Agent", "EzClient/1.8.1")
                         .POST(HttpRequest.BodyPublishers.ofString(body))
                         .build();
                 HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString());

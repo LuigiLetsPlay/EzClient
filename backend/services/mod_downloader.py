@@ -208,6 +208,10 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
                     if dep.get("dependency_type") == "required":
                         pid = dep.get("project_id")
                         if pid:
+                            if profile.profile_type == "ezclient":
+                                from backend.services.profile_migration import _legacy_id
+                                if _legacy_id(pid):
+                                    continue
                             pending_dep_pids.add(pid)
 
         except Exception as exc:
@@ -222,6 +226,10 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
         if dep_id in resolved_deps:
             continue
         resolved_deps.add(dep_id)
+        if profile.profile_type == "ezclient":
+            from backend.services.profile_migration import _legacy_id
+            if _legacy_id(dep_id):
+                continue
 
         try:
             versions = svc.get_project_versions(dep_id, mc_version=profile.minecraft_version, loader=profile.loader)
@@ -237,6 +245,10 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
             primary = next((f for f in files if f.get("primary")), files[0] if files else None)
             if primary and primary.get("url"):
                 fn = primary.get("filename", f"{dep_id}.jar")
+                if profile.profile_type == "ezclient":
+                    from backend.services.profile_migration import _legacy_id
+                    if _legacy_id(fn):
+                        continue
                 dest = mods_dir / fn
                 active_mods.add(fn)
                 if not dest.exists() or dest.stat().st_size <= 1024:
@@ -249,6 +261,10 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
                 if sub_dep.get("dependency_type") == "required":
                     sub_pid = sub_dep.get("project_id")
                     if sub_pid and sub_pid not in resolved_deps:
+                        if profile.profile_type == "ezclient":
+                            from backend.services.profile_migration import _legacy_id
+                            if _legacy_id(sub_pid):
+                                continue
                         pending_dep_pids.add(sub_pid)
 
         except Exception as e:

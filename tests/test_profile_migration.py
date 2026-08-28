@@ -64,6 +64,28 @@ class ProfileMigrationTests(unittest.TestCase):
         self.assertIn("custom.jar", profile.user_mods)
         self.assertEqual(MIGRATION_VERSION, store.settings["profile_migration_version"])
 
+    def test_removes_legacy_dependency_libraries_in_ezclient_profile(self) -> None:
+        profile = ProfileData(
+            id="managed", name="Managed", minecraft_version="26.2",
+            profile_type="ezclient",
+            integrated_mods=["ezclient"],
+            managed_core_mods=["ezclient"],
+            mods=[
+                ModData("ezclient", "ezclient", "EzClient", "1.8.0", "1.8.0", "EzClient.jar", essential=True),
+            ],
+        )
+        write_fabric_jar(profile.mods_path / "yet_another_config_lib_v3-3.9.6+26.2-fabric.jar", "yet_another_config_lib_v3", "Yet Another Config Lib")
+        write_fabric_jar(profile.mods_path / "cloth-config-fabric-17.0.144.jar", "cloth-config", "Cloth Config")
+        write_fabric_jar(profile.mods_path / "EzClient.jar", "ezclient", "EzClient")
+
+        store = FakeStore([profile])
+        report = ProfileMigrationService(store).run_if_needed()
+
+        self.assertTrue(report.changed)
+        self.assertFalse((profile.mods_path / "yet_another_config_lib_v3-3.9.6+26.2-fabric.jar").exists())
+        self.assertFalse((profile.mods_path / "cloth-config-fabric-17.0.144.jar").exists())
+        self.assertTrue((profile.mods_path / "EzClient.jar").exists())
+
     def test_preserves_manually_installed_legacy_mod_without_ownership(self) -> None:
         profile = ProfileData(
             id="manual", name="Manual", minecraft_version="26.2", profile_type="raw",

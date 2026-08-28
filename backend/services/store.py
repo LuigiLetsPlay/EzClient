@@ -27,7 +27,7 @@ def write_json(path: Path, value: Any) -> None:
 
 PERFORMANCE_MODS: list[ModData] = [
     ModData(
-        project_id="ezclient", slug="ezclient", name="EzClient Core", version_id="v-core", version="1.8.0",
+        project_id="ezclient", slug="ezclient", name="EzClient Core", version_id="v-core", version="1.8.1",
         filename="EzClient.jar", enabled=True, recommended=True, essential=True,
         icon_url="assets/logo.png", author="EzClient Team", description="EzClient Core Mod – Fenstertitel 'EzClient', Icon, Narrator-Bypass & Auto-Optimierung."
     ),

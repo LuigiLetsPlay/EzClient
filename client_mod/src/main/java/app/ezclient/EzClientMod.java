@@ -31,8 +31,8 @@ import app.ezclient.cosmetics.CommunityCapeManager;
  * - First-Launch Performance & PvP Optimization (Fast Graphics, 8 Chunks, No Shadows/Clouds, Biome Blend 0, Unlimited FPS)
  */
 public class EzClientMod implements ClientModInitializer {
-    public static final String CLIENT_VERSION = "1.8.0";
-    public static final String CLIENT_TITLE = "EzClient 1.8.0";
+    public static final String CLIENT_VERSION = "1.8.1";
+    public static final String CLIENT_TITLE = "EzClient 1.8.1";
     private static volatile boolean running = true;
     private static Path ezClientDataDir = null;
 

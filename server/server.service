@@ -1,0 +1,19 @@
+[Unit]
+Description=EzClient Community Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ezclient
+Group=ezclient
+WorkingDirectory=/opt/ezclient-cape-community
+EnvironmentFile=-/etc/ezclient-community.env
+ExecStart=/usr/bin/python3 /opt/ezclient-cape-community/server.py
+Restart=always
+RestartSec=3
+StartLimitIntervalSec=0
+UMask=027
+
+[Install]
+WantedBy=multi-user.target
