@@ -16,6 +16,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 /** Shows the EzClient badge glyph in front of EzClient names in the tab list cleanly and snugly. */
 @Mixin(net.minecraft.client.gui.components.PlayerTabOverlay.class)
 abstract class PlayerTabOverlayMixin {
+    private static final Component EZCLIENT_BADGE = Component.literal("\uE000")
+            .withStyle(style -> style.withFont(new FontDescription.Resource(
+                    Identifier.fromNamespaceAndPath("ezclient", "default"))));
+
     @Inject(method = "getNameForDisplay", at = @At("RETURN"), cancellable = true)
     private void ezclient$badgeInTab(PlayerInfo info, CallbackInfoReturnable<Component> cir) {
         try {
@@ -23,10 +27,7 @@ abstract class PlayerTabOverlayMixin {
             if (!CommunityPresence.isEzClientPlayer(info.getProfile().id())) return;
             Component current = cir.getReturnValue();
             if (current == null || current.getString().indexOf('\uE000') >= 0) return;
-            MutableComponent badge = Component.literal("\uE000")
-                    .withStyle(style -> style.withFont(new FontDescription.Resource(
-                            Identifier.fromNamespaceAndPath("ezclient", "default"))));
-            cir.setReturnValue(Component.empty().append(badge).append(current));
+            cir.setReturnValue(Component.empty().append(EZCLIENT_BADGE).append(current));
         } catch (Throwable ignored) {
         }
     }

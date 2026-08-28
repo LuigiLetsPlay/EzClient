@@ -7,6 +7,7 @@ Item {
 
     property string skinSource: ""
     property string capeSource: ""
+    property var capeAnimationInfo: ({})
     property string skinVariant: "classic"  // "classic" (4px) or "slim" (3px)
     property string animation: "idle"      // "idle", "walk", "run", "fly", "none"
     property bool autoRotate: false
@@ -34,8 +35,21 @@ Item {
 
     function updateCape() {
         if (!isLoaded || !webEngine) return
+        var info = capeAnimationInfo || {}
+        if (info.sheetUrl) {
+            setAnimatedCape(info.sheetUrl, info.frameCount, info.fps, info.columns,
+                            info.frameWidth, info.frameHeight, info.pingPong)
+            return
+        }
         var src = (capeSource || "").replace(/[\r\n]/g, "").replace(/'/g, "\\'")
         webEngine.runJavaScript("setCape('" + src + "');")
+    }
+
+    function setAnimatedCape(sheetUrl, frameCount, fps, columns, frameW, frameH, pingPong) {
+        if (!isLoaded || !webEngine) return
+        var cleanSheet = (sheetUrl || "").replace(/[\r\n]/g, "").replace(/'/g, "\\'")
+        var js = "setAnimatedCape('" + cleanSheet + "', " + Number(frameCount) + ", " + Number(fps) + ", " + Number(columns) + ", " + Number(frameW) + ", " + Number(frameH) + ", " + (pingPong ? "true" : "false") + ");"
+        webEngine.runJavaScript(js)
     }
 
     function setRotateY(deg) {
@@ -45,7 +59,7 @@ Item {
 
     function resetView() {
         if (!isLoaded || !webEngine) return
-        webEngine.runJavaScript("resetView();")
+        webEngine.runJavaScript("resetView(" + Number(skin3dRoot.initialRotateY) + ");")
     }
 
     function setAnim(name, speed) {
@@ -62,6 +76,7 @@ Item {
 
     onSkinSourceChanged: updateSkin()
     onCapeSourceChanged: updateCape()
+    onCapeAnimationInfoChanged: updateCape()
     onSkinVariantChanged: updateSkin()
     onAnimationChanged: setAnim(animation)
     onAutoRotateChanged: setAutoRot(autoRotate, autoRotateSpeed)
@@ -104,7 +119,7 @@ Item {
             skin3dRoot.updateSkin()
             skin3dRoot.updateCape()
             skin3dRoot.setAnim(skin3dRoot.animation)
-            webEngine.runJavaScript("skinViewer.playerObject.rotation.x = " + (skin3dRoot.initialRotateX * Math.PI / 180) + "; skinViewer.playerObject.rotation.y = " + (skin3dRoot.initialRotateY * Math.PI / 180) + ";")
+            webEngine.runJavaScript("setInitialRotation(" + Number(skin3dRoot.initialRotateX) + ", " + Number(skin3dRoot.initialRotateY) + ");")
             skin3dRoot.setAutoRot(skin3dRoot.autoRotate, skin3dRoot.autoRotateSpeed)
         }
     }

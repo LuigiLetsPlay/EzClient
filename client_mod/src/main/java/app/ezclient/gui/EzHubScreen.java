@@ -280,7 +280,7 @@ public final class EzHubScreen extends Screen {
         graphics.text(font, "EzClient", logoX + 24, logoY + 6, EzUi.TEXT_WHITE);
 
         // Version badge
-        String version = "v1.8.1";
+        String version = "v1.8.2";
         int vBadgeW = font.width(version) + 6;
         int vBadgeX = logoX + 24 + font.width("EzClient") + 4;
         EzUi.roundedRect(graphics, vBadgeX, logoY + 4, vBadgeW, 12, 3, 0xFF1A2630);

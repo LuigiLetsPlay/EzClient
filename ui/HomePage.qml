@@ -144,6 +144,7 @@ Item {
             anchors.fill: parent
             skinSource: root.skinTextureUrl
             capeSource: root.capeTextureUrl
+            capeAnimationInfo: typeof accountController !== "undefined" && accountController ? accountController.capeAnimationInfo : ({})
             animation: "idle"
             autoRotate: false
             interactive: false
@@ -664,7 +665,7 @@ Item {
                     color: EzTheme.text
                 }
                 Text {
-                    text: (profileController ? profileController.ezClientOutdatedCount : 1) + " Profil(e) bereit für Update auf v" + (profileController ? profileController.ezClientLatestVersion : "1.8.1")
+                    text: (profileController ? profileController.ezClientOutdatedCount : 1) + " Profil(e) bereit für Update auf v" + (profileController ? profileController.ezClientLatestVersion : "1.8.2")
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 11
                     color: EzTheme.textMuted
@@ -674,7 +675,7 @@ Item {
             }
 
             EzButton {
-                text: "Upgrade v" + (profileController ? profileController.ezClientLatestVersion : "1.8.1")
+                text: "Upgrade v" + (profileController ? profileController.ezClientLatestVersion : "1.8.2")
                 primary: true
                 mcFont: true
                 Layout.preferredHeight: 32

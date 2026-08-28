@@ -8,7 +8,7 @@ import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
-import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -48,7 +48,7 @@ abstract class EzNameTagLogoRenderer {
                 float x0 = submit.x() - gap - size;
                 float y0 = submit.y() - 0.5F;
 
-                Matrix4f matrix = new Matrix4f(submit.pose());
+                Matrix4fc matrix = submit.pose();
                 VertexConsumer vc = ((VertexBuilderAccessor) (Object) this)
                         .ezclient$getVertexBuilder(RenderTypes.text(LOGO));
 

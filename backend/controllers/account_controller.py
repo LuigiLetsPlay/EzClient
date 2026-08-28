@@ -7,6 +7,7 @@ import urllib.request
 import webbrowser
 import shutil
 import struct
+import tempfile
 from pathlib import Path
 from backend.services import cape_community, cape_media
 from PySide6.QtCore import QObject, Signal, Slot, Property, QUrl, Qt, QByteArray, QBuffer, QIODevice
@@ -51,13 +52,7 @@ def _strip_png_metadata(raw: bytes) -> bytes:
 
 
 def _bake_editor_cape(image: QImage, fit_mode: str = "Cover") -> QImage:
-    """Convert the portrait editor canvas to a vanilla cape texture.
-
-    The editor shows the complete artwork rotated as the visible back face.
-    Bake exactly that portrait into Minecraft's 10x16 visible cape rectangle;
-    all other vanilla UV faces remain transparent.  This is the same image that
-    the 3D launcher preview and the in-game renderer should display.
-    """
+    """Convert the portrait editor canvas to a vanilla cape texture with Elytra wings."""
     portrait = image
     aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
     scaled = portrait.scaled(10, 16, aspect, Qt.SmoothTransformation)
@@ -67,34 +62,61 @@ def _bake_editor_cape(image: QImage, fit_mode: str = "Cover") -> QImage:
     result = QImage(64, 32, QImage.Format_RGBA8888)
     result.fill(Qt.transparent)
     painter = QPainter(result)
+    # 1. Cape back face: (1, 1, 10, 16)
     painter.drawImage(1, 1, visible)
+    # Cape inner face: (12, 1, 10, 16)
+    painter.drawImage(12, 1, visible)
+    # Cape top/bottom/sides borders
+    painter.drawImage(1, 0, visible.scaled(10, 1))
+    painter.drawImage(0, 1, visible.scaled(1, 16))
+    painter.drawImage(11, 1, visible.scaled(1, 16))
+
+    # 2. Elytra wings: texOffs(22, 0)
+    elytra_scaled = portrait.scaled(10, 20, aspect, Qt.SmoothTransformation)
+    e_left = max(0, (elytra_scaled.width() - 10) // 2)
+    e_top = max(0, (elytra_scaled.height() - 20) // 2)
+    elytra_visible = elytra_scaled.copy(e_left, e_top, 10, 20)
+    # Outer wing: (24, 2, 10, 20)
+    painter.drawImage(24, 2, elytra_visible)
+    # Inner wing: (36, 2, 10, 20)
+    painter.drawImage(36, 2, elytra_visible)
+    # Wing borders & caps: (22, 0, 24, 22)
+    painter.drawImage(22, 2, elytra_visible.scaled(2, 20))
+    painter.drawImage(34, 2, elytra_visible.scaled(2, 20))
+    painter.drawImage(24, 0, elytra_visible.scaled(20, 2))
     painter.end()
     return result
 
 
 def _write_hd_cape_preview(image: QImage, editor: bool = False, fit_mode: str = "Cover") -> bool:
-    """Write a high-resolution preview texture for the launcher's 3D viewer.
-
-    Minecraft only samples the small vanilla cape UV rectangle. The preview can
-    use a proportionally larger atlas, so SkinView3D receives many more texels
-    for exactly the same visible face without changing the game file.
-    """
+    """Write a high-resolution preview texture for the launcher's 3D viewer."""
     rgba = image.convertToFormat(QImage.Format_RGBA8888)
     if not editor and abs((rgba.width() / max(1, rgba.height())) - 2.0) < 0.02:
         preview = rgba
     else:
         portrait = rgba
-        # A 1280x640 cape atlas has a texture scale of 20x. Its vanilla
-        # 10x16 visible face therefore occupies 200x320 pixels.
         aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
         scaled = portrait.scaled(200, 320, aspect, Qt.SmoothTransformation)
         left = max(0, (scaled.width() - 200) // 2)
         top = max(0, (scaled.height() - 320) // 2)
-        portrait = scaled.copy(left, top, 200, 320)
+        portrait_visible = scaled.copy(left, top, 200, 320)
         preview = QImage(1280, 640, QImage.Format_RGBA8888)
         preview.fill(Qt.transparent)
         painter = QPainter(preview)
-        painter.drawImage(20, 20, portrait)
+        # Cape visible face: (20, 20, 200, 320)
+        painter.drawImage(20, 20, portrait_visible)
+        # Cape inner face: (240, 20, 200, 320)
+        painter.drawImage(240, 20, portrait_visible)
+        # Elytra wings at 20x scale: (480, 40, 200, 400) and (720, 40, 200, 400)
+        elytra_scaled = portrait.scaled(200, 400, aspect, Qt.SmoothTransformation)
+        el_left = max(0, (elytra_scaled.width() - 200) // 2)
+        el_top = max(0, (elytra_scaled.height() - 400) // 2)
+        elytra_vis = elytra_scaled.copy(el_left, el_top, 200, 400)
+        painter.drawImage(480, 40, elytra_vis)
+        painter.drawImage(720, 40, elytra_vis)
+        painter.drawImage(440, 40, elytra_vis.scaled(40, 400))
+        painter.drawImage(680, 40, elytra_vis.scaled(40, 400))
+        painter.drawImage(480, 0, elytra_vis.scaled(400, 40))
         painter.end()
     encoded = QByteArray()
     buffer = QBuffer(encoded)
@@ -185,6 +207,7 @@ class AccountController(QObject):
     capeCommunityStatusChanged = Signal(str, bool)
     capeMediaPrepared = Signal(str, int, float)
     capePreviewPrepared = Signal(str, int)
+    capeAnimationPrepared = Signal(str, int, int, int, int, int, bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -382,6 +405,28 @@ class AccountController(QObject):
         except OSError:
             return ""
 
+    @Property("QVariantMap", notify=accountChanged)
+    def capeAnimationInfo(self) -> dict:
+        """Animation metadata shared by every launcher 3D cape preview."""
+        directory = Path(DATA_DIR) / "cosmetics" / "active_cape_animation"
+        manifest_path = directory / "animation.json"
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            sheet = directory / str(manifest.get("sheet") or "framesheet.png")
+            if not sheet.is_file():
+                return {}
+            return {
+                "sheetUrl": QUrl.fromLocalFile(str(sheet)).toString() + f"?v={sheet.stat().st_mtime_ns}",
+                "frameCount": max(1, int(manifest.get("frame_count", 1))),
+                "fps": max(1, int(manifest.get("fps", 12))),
+                "columns": max(1, int(manifest.get("columns", 1))),
+                "frameWidth": max(1, int(manifest.get("frame_width", 256))),
+                "frameHeight": max(1, int(manifest.get("frame_height", 128))),
+                "pingPong": bool(manifest.get("ping_pong", False)),
+            }
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            return {}
+
     @Property("QVariantList", notify=capeCommunityChanged)
     def communityCapes(self) -> list[dict]:
         return self._community_capes
@@ -404,6 +449,8 @@ class AccountController(QObject):
                 capes = cape_community.list_capes()
                 for cape in capes:
                     cape["imageUrl"] = cape_community.cape_image_url(cape)
+                    cape["isAnimated"] = bool(cape.get("is_animated") or cape.get("animation_url"))
+                    cape["animationUrl"] = str(cape.get("animation_url") or "")
                 self._community_capes = capes
                 self._cape_community_status = f"{len(capes)} Community-Capes"
                 self.capeCommunityStatusChanged.emit(self._cape_community_status, False)
@@ -419,30 +466,60 @@ class AccountController(QObject):
         threading.Thread(target=worker, daemon=True).start()
 
     @Slot(str, result=bool)
-    def activateCommunityCape(self, image_url: str) -> bool:
+    @Slot(str, str, result=bool)
+    def activateCommunityCape(self, image_url: str, animation_url: str = "") -> bool:
         """Download a chosen community cape and make it the local active cape."""
-        try:
-            from backend.models.types import APP_VERSION
-            request = urllib.request.Request(image_url, headers={"User-Agent": f"EzClient/{APP_VERSION}"})
-            with urllib.request.urlopen(request, timeout=15) as response:
-                raw = response.read(2 * 1024 * 1024 + 1)
-            if not cape_community.is_safe_cape_png(raw):
-                raise ValueError("Ungültiges Cape-Bild")
-            target = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(raw)
-            (target.parent / "active_community_cape.txt").write_text(image_url, encoding="utf-8")
-            self._active_community_cape_url = image_url
-            community_image = QImage()
-            if community_image.loadFromData(raw, "PNG"):
-                _write_hd_cape_preview(community_image, editor=False)
-            self.accountChanged.emit()
-            self.capeCommunityChanged.emit()
-            self.capeCommunityStatusChanged.emit("Cape aktiviert.", False)
-            return True
-        except Exception as exc:
-            self.capeCommunityStatusChanged.emit(f"Cape konnte nicht aktiviert werden: {exc}", True)
+        if not image_url.startswith(("http://", "https://")):
+            self.capeCommunityStatusChanged.emit("Ungültige Cape-Adresse.", True)
             return False
+        self.capeCommunityStatusChanged.emit("Cape wird synchronisiert …", False)
+
+        def worker() -> None:
+            try:
+                from backend.models.types import APP_VERSION
+                request = urllib.request.Request(image_url, headers={"User-Agent": f"EzClient/{APP_VERSION}"})
+                with urllib.request.urlopen(request, timeout=15) as response:
+                    raw = response.read(2 * 1024 * 1024 + 1)
+                if not cape_community.is_safe_cape_png(raw):
+                    raise ValueError("Ungültiges Cape-Bild")
+                target = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(raw)
+                (target.parent / "active_community_cape.txt").write_text(image_url, encoding="utf-8")
+                self._active_community_cape_url = image_url
+                community_image = QImage()
+                if community_image.loadFromData(raw, "PNG"):
+                    _write_hd_cape_preview(community_image, editor=False)
+
+                anim_dir = Path(DATA_DIR) / "cosmetics" / "active_cape_animation"
+                if anim_dir.exists():
+                    shutil.rmtree(anim_dir)
+                if animation_url:
+                    animation_request = urllib.request.Request(
+                        animation_url, headers={"User-Agent": f"EzClient/{APP_VERSION}"}
+                    )
+                    with urllib.request.urlopen(animation_request, timeout=20) as response:
+                        animation_raw = response.read(8 * 1024 * 1024 + 1)
+                    if len(animation_raw) > 8 * 1024 * 1024 or not animation_raw.startswith((b"GIF87a", b"GIF89a")):
+                        raise ValueError("Ungültige Cape-Animation")
+                    with tempfile.TemporaryDirectory(prefix="ezclient-cape-") as temporary:
+                        source = Path(temporary) / "community.gif"
+                        source.write_bytes(animation_raw)
+                        info = cape_media.probe_media(source)
+                        fps = max(1, min(20, round(info.source_fps or 12)))
+                        cape_media.generate_frame_sheet(
+                            source, anim_dir,
+                            cape_media.AnimationOptions(0.0, min(10.0, info.duration), fps, False, None),
+                        )
+
+                self.accountChanged.emit()
+                self.capeCommunityChanged.emit()
+                self.capeCommunityStatusChanged.emit("Cape aktiviert und synchronisiert.", False)
+            except Exception as exc:
+                self.capeCommunityStatusChanged.emit(f"Cape konnte nicht aktiviert werden: {exc}", True)
+
+        threading.Thread(target=worker, name="EzClient-CapeActivate", daemon=True).start()
+        return True
 
     @Slot(str, result=bool)
     def publishCape(self, title: str) -> bool:
@@ -470,6 +547,14 @@ class AccountController(QObject):
             self.capeCommunityStatusChanged.emit("Wähle zuerst ein Cape als PNG aus.", True)
             return False
 
+        anim_gif_bytes: bytes | None = None
+        anim_gif_path = Path(DATA_DIR) / "cosmetics" / "active_cape_animation" / "preview.gif"
+        if anim_gif_path.is_file():
+            try:
+                anim_gif_bytes = anim_gif_path.read_bytes()
+            except OSError:
+                anim_gif_bytes = None
+
         def worker() -> None:
             try:
                 session = get_minecraft_session()
@@ -495,6 +580,7 @@ class AccountController(QObject):
                     clean_title,
                     token=current_token,
                     access_token=session.access_token,
+                    anim_gif=anim_gif_bytes,
                 )
                 if isinstance(res, dict) and res.get("token"):
                     tokens[clean_uuid] = res["token"]
@@ -566,23 +652,33 @@ class AccountController(QObject):
         try:
             source = QUrl(source_url).toLocalFile() if source_url.startswith("file:") else source_url
             info = cape_media.probe_media(source)
+            thumb_url = QUrl.fromLocalFile(info.thumbnail_path).toString() if info.thumbnail_path else ""
             return {
                 "ok": True,
                 "duration": info.duration,
                 "width": info.width,
                 "height": info.height,
                 "sourceFps": info.source_fps,
+                "thumbnailUrl": thumb_url,
             }
         except Exception as exc:
             self.skinUploadStatusChanged.emit(f"Animation konnte nicht gelesen werden: {exc}", True)
             return {"ok": False}
 
     @Slot(str, float, float, int, bool, result=bool)
-    def prepareAnimatedCape(self, source_url: str, start: float, end: float, fps: int, ping_pong: bool) -> bool:
+    @Slot(str, float, float, int, bool, str, result=bool)
+    def prepareAnimatedCape(self, source_url: str, start: float, end: float, fps: int, ping_pong: bool, crop_part: str = "") -> bool:
         """Convert media off the UI thread and expose its first frame as safe fallback."""
         source = QUrl(source_url).toLocalFile() if source_url.startswith("file:") else source_url
         if not source:
             return False
+
+        crop_box: tuple[float, float, float, float] | None = None
+        if crop_part:
+            raw_crop = crop_part.replace("Crop|", "").strip()
+            parts = [float(p.strip()) for p in raw_crop.split(",") if p.strip()]
+            if len(parts) == 4 and all(0.0 <= p <= 1.0 for p in parts) and parts[2] > 0 and parts[3] > 0:
+                crop_box = (parts[0], parts[1], parts[2], parts[3])
 
         def worker() -> None:
             try:
@@ -596,7 +692,7 @@ class AccountController(QObject):
                 manifest = cape_media.generate_frame_sheet(
                     source,
                     target,
-                    cape_media.AnimationOptions(start, end, fps, ping_pong),
+                    cape_media.AnimationOptions(start, end, fps, ping_pong, crop_box),
                 )
                 from PIL import Image
                 sheet_path = target / manifest.sheet
@@ -610,7 +706,17 @@ class AccountController(QObject):
                 shutil.copyfile(fallback, cosmetics / "pending_cape_preview.png")
                 shutil.copyfile(fallback, cosmetics / "pending_cape_upload.png")
                 preview_url = QUrl.fromLocalFile(str(cosmetics / "pending_cape_preview.png")).toString()
+                sheet_url = QUrl.fromLocalFile(str(sheet_path)).toString()
                 self.capeMediaPrepared.emit(preview_url, manifest.frame_count, manifest.duration)
+                self.capeAnimationPrepared.emit(
+                    sheet_url,
+                    manifest.frame_count,
+                    manifest.fps,
+                    manifest.columns,
+                    manifest.frame_width,
+                    manifest.frame_height,
+                    manifest.ping_pong,
+                )
                 self.skinUploadStatusChanged.emit(
                     f"Animation bereit: {manifest.frame_count} Frames bei {manifest.fps} FPS.", False
                 )
@@ -747,22 +853,57 @@ class AccountController(QObject):
             if active_animation.exists():
                 shutil.rmtree(active_animation)
             pending_animation.replace(active_animation)
+        elif active_animation.exists():
+            shutil.rmtree(active_animation)
+        (cosmetics / "active_community_cape.txt").unlink(missing_ok=True)
+        self._active_community_cape_url = ""
         self.accountChanged.emit()
+        self.capeCommunityChanged.emit()
         return self.publishCape(title)
 
     @Slot(result=bool)
     def resetCustomCape(self) -> bool:
         """Remove only EzClient's local override so Minecraft can use Mojang's cape."""
         try:
-            cape = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
-            cape.unlink(missing_ok=True)
-            (Path(DATA_DIR) / "cosmetics" / "active_cape_preview.png").unlink(missing_ok=True)
+            cosmetics = Path(DATA_DIR) / "cosmetics"
+            for name in (
+                "active_cape.png", "active_cape_preview.png", "active_cape_upload.png",
+                "active_community_cape.txt",
+            ):
+                (cosmetics / name).unlink(missing_ok=True)
+            animation = (cosmetics / "active_cape_animation").resolve()
+            if animation.parent == cosmetics.resolve() and animation.exists():
+                shutil.rmtree(animation)
+            self._active_community_cape_url = ""
             self.accountChanged.emit()
+            self.capeCommunityChanged.emit()
             self.skinUploadStatusChanged.emit("EzClient-Cape entfernt – Mojang-Cape wird wieder verwendet.", False)
+            session = get_minecraft_session()
+            if session and session.is_online and session.uuid:
+                tokens_file = cosmetics / "cape_tokens.json"
+                try:
+                    tokens = json.loads(tokens_file.read_text(encoding="utf-8")) if tokens_file.is_file() else {}
+                except (OSError, json.JSONDecodeError):
+                    tokens = {}
+                token = str(tokens.get(session.uuid.replace("-", ""), ""))
+                if token:
+                    threading.Thread(
+                        target=self._deactivate_server_cape,
+                        args=(session.uuid, token, session.access_token),
+                        name="EzClient-CapeReset",
+                        daemon=True,
+                    ).start()
             return True
         except OSError as exc:
             self.skinUploadStatusChanged.emit(f"Cape konnte nicht zurückgesetzt werden: {exc}", True)
             return False
+
+    def _deactivate_server_cape(self, owner_uuid: str, token: str, access_token: str) -> None:
+        try:
+            cape_community.deactivate_cape(owner_uuid, token, access_token)
+            self.capeCommunityStatusChanged.emit("Cape-Synchronisierung zurückgesetzt.", False)
+        except Exception as exc:
+            self.capeCommunityStatusChanged.emit(f"Server-Cape konnte nicht zurückgesetzt werden: {exc}", True)
 
     @Slot(result=bool)
     def exportCapeFile(self) -> bool:

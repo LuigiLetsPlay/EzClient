@@ -61,8 +61,13 @@ public final class CoordinatesModule extends HudModule {
 
     private String formatCoord(double val) {
         if (decimalPrecision == 0) return Integer.toString((int) Math.floor(val));
-        if (decimalPrecision == 1) return String.format("%.1f", val);
-        return String.format("%.2f", val);
+        long factor = decimalPrecision == 1 ? 10L : 100L;
+        long scaled = Math.round(val * factor);
+        boolean negative = scaled < 0;
+        long absolute = Math.abs(scaled);
+        long fraction = absolute % factor;
+        String fractionText = decimalPrecision == 2 && fraction < 10 ? "0" + fraction : Long.toString(fraction);
+        return (negative ? "-" : "") + (absolute / factor) + "." + fractionText;
     }
 
     @Override

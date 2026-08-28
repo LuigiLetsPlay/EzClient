@@ -4,9 +4,6 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * High-performance, Badlion-style Keystrokes overlay with WASD, Mouse, Space,
  * Sneak, Sprint, smooth key release fading, custom box colors, and CPS integration.
@@ -44,8 +41,11 @@ public final class KeystrokesModule extends HudModule {
     private static boolean wasSpace = false, wasLmb = false, wasRmb = false;
     private static boolean wasSneak = false, wasSprint = false;
 
-    private static final List<Long> leftClicks = new ArrayList<>();
-    private static final List<Long> rightClicks = new ArrayList<>();
+    private static final int CLICK_BUFFER_SIZE = 128;
+    private static final long[] leftClicks = new long[CLICK_BUFFER_SIZE];
+    private static final long[] rightClicks = new long[CLICK_BUFFER_SIZE];
+    private static int leftWriteIndex, rightWriteIndex, leftClickCount, rightClickCount;
+    private long currentRenderTime;
 
     public KeystrokesModule() {
         super("Keystrokes", "HUD", false, 6, 86, "", "");
@@ -61,12 +61,20 @@ public final class KeystrokesModule extends HudModule {
         long now = System.currentTimeMillis();
 
         boolean left = client.options.keyAttack.isDown();
-        if (left && !wasLmb) leftClicks.add(now);
+        if (left && !wasLmb) {
+            leftClicks[leftWriteIndex] = now;
+            leftWriteIndex = (leftWriteIndex + 1) % CLICK_BUFFER_SIZE;
+            leftClickCount = Math.min(CLICK_BUFFER_SIZE, leftClickCount + 1);
+        }
         if (!left && wasLmb) lmbReleaseTime = now;
         wasLmb = left;
 
         boolean right = client.options.keyUse.isDown();
-        if (right && !wasRmb) rightClicks.add(now);
+        if (right && !wasRmb) {
+            rightClicks[rightWriteIndex] = now;
+            rightWriteIndex = (rightWriteIndex + 1) % CLICK_BUFFER_SIZE;
+            rightClickCount = Math.min(CLICK_BUFFER_SIZE, rightClickCount + 1);
+        }
         if (!right && wasRmb) rmbReleaseTime = now;
         wasRmb = right;
 
@@ -98,12 +106,21 @@ public final class KeystrokesModule extends HudModule {
         if (!sprint && wasSprint) sprintReleaseTime = now;
         wasSprint = sprint;
 
-        leftClicks.removeIf(t -> now - t > 1000L);
-        rightClicks.removeIf(t -> now - t > 1000L);
+        leftClickCount = pruneClicks(leftClicks, leftWriteIndex, leftClickCount, now);
+        rightClickCount = pruneClicks(rightClicks, rightWriteIndex, rightClickCount, now);
     }
 
-    public static int getLeftCps() { return leftClicks.size(); }
-    public static int getRightCps() { return rightClicks.size(); }
+    private static int pruneClicks(long[] clicks, int writeIndex, int count, long now) {
+        while (count > 0) {
+            int oldest = (writeIndex - count + CLICK_BUFFER_SIZE) % CLICK_BUFFER_SIZE;
+            if (now - clicks[oldest] <= 1000L) break;
+            count--;
+        }
+        return count;
+    }
+
+    public static int getLeftCps() { return leftClickCount; }
+    public static int getRightCps() { return rightClickCount; }
 
     public LayoutPreset getLayoutPreset() { return layoutPreset; }
     public void setLayoutPreset(LayoutPreset layoutPreset) { this.layoutPreset = layoutPreset; ConfigManager.save(); }
@@ -165,6 +182,7 @@ public final class KeystrokesModule extends HudModule {
     }
 
     public void renderCustom(GuiGraphicsExtractor graphics, Minecraft client, boolean editor) {
+        currentRenderTime = renderFrameTimeMillis();
         float scale = (float) getScale();
         graphics.pose().pushMatrix();
         graphics.pose().translate(getX(), getY());
@@ -211,7 +229,7 @@ public final class KeystrokesModule extends HudModule {
     private float getPressFactor(boolean pressed, long releaseTime) {
         if (pressed) return 1.0f;
         if (fadeTimeMs <= 0) return 0.0f;
-        long elapsed = System.currentTimeMillis() - releaseTime;
+        long elapsed = currentRenderTime - releaseTime;
         if (elapsed >= fadeTimeMs) return 0.0f;
         return 1.0f - ((float) elapsed / fadeTimeMs);
     }

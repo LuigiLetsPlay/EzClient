@@ -33,10 +33,10 @@ public final class CommunityPresence {
 
     public static void heartbeat(UUID playerId, String username) {
         if (playerId == null) return;
-        ONLINE.put(playerId, System.currentTimeMillis());
         long now = System.currentTimeMillis();
         if (now < nextHeartbeat) return;
         nextHeartbeat = now + INTERVAL_MS;
+        ONLINE.put(playerId, now);
 
         String name = username != null && !username.isBlank() ? username : "Spieler";
         String body = "{\"player_uuid\":\"" + playerId + "\",\"username\":\"" + name + "\"}";
@@ -47,7 +47,7 @@ public final class CommunityPresence {
                 HttpRequest req = HttpRequest.newBuilder(URI.create(endpoint))
                         .timeout(Duration.ofSeconds(5))
                         .header("Content-Type", "application/json")
-                        .header("User-Agent", "EzClient/1.8.1")
+                        .header("User-Agent", "EzClient/1.8.2")
                         .POST(HttpRequest.BodyPublishers.ofString(body))
                         .build();
                 HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString());

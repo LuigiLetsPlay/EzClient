@@ -1,6 +1,5 @@
 package app.ezclient.mixin;
 
-import app.ezclient.cosmetics.CommunityCapeManager;
 import app.ezclient.cosmetics.CommunityPresence;
 
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
@@ -22,20 +21,18 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(AvatarRenderer.class)
 abstract class AvatarRendererMixin {
+    private static final Component EZCLIENT_BADGE = Component.literal("\uE000")
+            .withStyle(style -> style.withFont(new FontDescription.Resource(
+                    Identifier.fromNamespaceAndPath("ezclient", "default"))));
 
     @Inject(method = "extractRenderState", at = @At("TAIL"))
     private void ezclient$attachNameTagBadge(Avatar player, AvatarRenderState state, float tickDelta, CallbackInfo ci) {
         if (player == null || state == null) return;
 
         try {
-            state.skin = CommunityCapeManager.replaceCape(state.skin, player.getUUID());
-
             if (state.nameTag != null && CommunityPresence.isEzClientPlayer(player.getUUID())) {
                 if (state.nameTag.getString().indexOf('\uE000') < 0) {
-                    MutableComponent badge = Component.literal("\uE000")
-                            .withStyle(style -> style.withFont(new FontDescription.Resource(
-                                    Identifier.fromNamespaceAndPath("ezclient", "default"))));
-                    state.nameTag = Component.empty().append(badge).append(state.nameTag);
+                    state.nameTag = Component.empty().append(EZCLIENT_BADGE).append(state.nameTag);
                 }
             }
         } catch (Throwable ignored) {

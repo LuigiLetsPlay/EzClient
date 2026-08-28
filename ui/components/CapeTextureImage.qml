@@ -1,11 +1,24 @@
 import QtQuick 2.15
 
-// Displays the visible 10x16 vanilla cape face, not the entire sparse atlas.
+// Displays the visible 10x16 vanilla cape face, or an animated GIF preview.
 Item {
     id: root
     property string capeSource: ""
+    property string animationSource: ""
+
+    AnimatedImage {
+        visible: root.animationSource !== ""
+        anchors.fill: parent
+        source: root.animationSource
+        asynchronous: true
+        fillMode: Image.PreserveAspectCrop
+        smooth: true
+        mipmap: true
+        playing: true
+    }
 
     Image {
+        visible: root.animationSource === ""
         source: root.capeSource
         asynchronous: true
         fillMode: Image.Stretch

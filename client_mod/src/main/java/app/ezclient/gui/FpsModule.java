@@ -109,6 +109,10 @@ public final class FpsModule extends HudModule {
     @Override
     public String displayText(Minecraft client) {
         sampleFps(client);
+        return currentDisplayText();
+    }
+
+    private String currentDisplayText() {
         return switch (formatOption) {
             case LABEL_VALUE -> getPrefix() + smoothedFps + getSuffix();
             case VALUE_LABEL -> smoothedFps + " FPS" + getSuffix();
@@ -123,7 +127,7 @@ public final class FpsModule extends HudModule {
         graphics.pose().translate(getX(), getY());
         graphics.pose().scale(scale, scale);
 
-        String text = displayText(client);
+        String text = currentDisplayText();
         if (editor) {
             text = switch (formatOption) {
                 case LABEL_VALUE -> getPrefix() + "240" + getSuffix();

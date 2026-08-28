@@ -23,6 +23,7 @@ import app.ezclient.gui.HudRenderer;
 import app.ezclient.gui.ModuleManager;
 import app.ezclient.cosmetics.CommunityPresence;
 import app.ezclient.cosmetics.CommunityCapeManager;
+import app.ezclient.render.ConnectedGlassModel;
 
 /**
  * EzClient Core Mod
@@ -31,8 +32,8 @@ import app.ezclient.cosmetics.CommunityCapeManager;
  * - First-Launch Performance & PvP Optimization (Fast Graphics, 8 Chunks, No Shadows/Clouds, Biome Blend 0, Unlimited FPS)
  */
 public class EzClientMod implements ClientModInitializer {
-    public static final String CLIENT_VERSION = "1.8.1";
-    public static final String CLIENT_TITLE = "EzClient 1.8.1";
+    public static final String CLIENT_VERSION = "1.8.2";
+    public static final String CLIENT_TITLE = "EzClient 1.8.2";
     private static volatile boolean running = true;
     private static Path ezClientDataDir = null;
 
@@ -77,6 +78,7 @@ public class EzClientMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        ConnectedGlassModel.register();
         Path dataDir = getEzClientDataDir();
         log("========================================");
         log("EzClient Core Mod v" + CLIENT_VERSION + " initializing...");
@@ -135,6 +137,7 @@ public class EzClientMod implements ClientModInitializer {
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("ezclient", "performance_hud"), (graphics, tickDelta) -> {
             Minecraft client = Minecraft.getInstance();
             if (client.player == null) return;
+            app.ezclient.gui.HudModule.beginRenderFrame(System.currentTimeMillis());
             for (var hud : ModuleManager.getInstance().getHudModules()) HudRenderer.draw(graphics, hud, false);
         });
 

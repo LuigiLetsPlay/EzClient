@@ -1,6 +1,6 @@
 package app.ezclient.mixin;
 
-import app.ezclient.performance.culling.OcclusionCullingManager;
+import app.ezclient.performance.visibility.EzVisibilityEngine;
 import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -15,17 +15,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** 26.2 equivalent of the former WorldRenderer.renderEntity HEAD hook. */
 @Mixin(LevelExtractor.class)
-public abstract class LevelExtractorCullingMixin {
+public abstract class LevelVisibilityMixin {
     @Inject(method = "extract", at = @At("HEAD"))
     private void ezclient$beginOcclusionFrame(DeltaTracker deltaTracker, Camera camera, float tickDelta,
                                                CallbackInfo ci) {
-        OcclusionCullingManager.INSTANCE.beginFrame(camera.position());
+        EzVisibilityEngine.INSTANCE.beginFrame(camera.position());
     }
 
     @Inject(method = "extract", at = @At("RETURN"))
     private void ezclient$finishOcclusionFrame(DeltaTracker deltaTracker, Camera camera, float tickDelta,
                                                 CallbackInfo ci) {
-        OcclusionCullingManager.INSTANCE.endFrame();
+        EzVisibilityEngine.INSTANCE.endFrame();
     }
 
     @Inject(method = "isEntityVisible", at = @At("RETURN"), cancellable = true)
@@ -33,13 +33,13 @@ public abstract class LevelExtractorCullingMixin {
                                                      double cameraX, double cameraY, double cameraZ,
                                                      CallbackInfoReturnable<Boolean> cir) {
         // Vanilla has already performed its AABB frustum and section-visibility-graph checks.
-        if (cir.getReturnValueZ() && !OcclusionCullingManager.INSTANCE.shouldRender(entity)) {
+        if (cir.getReturnValueZ() && !EzVisibilityEngine.INSTANCE.shouldRender(entity)) {
             cir.setReturnValue(false);
         }
     }
 
     @Inject(method = "setLevel", at = @At("HEAD"))
     private void ezclient$clearOcclusionCache(ClientLevel level, CallbackInfo ci) {
-        OcclusionCullingManager.INSTANCE.setLevel(level);
+        EzVisibilityEngine.INSTANCE.setLevel(level);
     }
 }

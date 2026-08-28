@@ -15,18 +15,17 @@
     "GameRendererMixin",
     "MouseMixin",
     "AbstractClientPlayerCapeMixin",
-    "CapeLayerMixin",
-    "WingsLayerMixin",
     "AvatarRendererMixin",
     "PlayerTabOverlayMixin",
     "ConnectionMixin",
     "ChatScreenMixin",
     "GuiMixin",
     "MinecraftMixin",
-    "LevelExtractorCullingMixin",
-    "BlockEntityCullingMixin",
-    "SectionCompilerOcclusionMixin",
-    "ClientLevelOcclusionMixin"
+    "LevelVisibilityMixin",
+    "BlockEntityVisibilityMixin",
+    "SectionVisibilityDataMixin",
+    "ClientLevelVisibilityMixin",
+    "ClearGlassMixin"
   ],
   "injectors": {
     "defaultRequire": 1

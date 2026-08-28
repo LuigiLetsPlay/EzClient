@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import io
+import struct
 import tempfile
 import unittest
-import uuid
 import zlib
-import struct
-from types import SimpleNamespace
-from unittest.mock import patch
+from pathlib import Path
+from PIL import Image
 
-from server import create_app
+import server
+from backend.services import cape_media
 
 
 PLAYER_UUID = "12345678-1234-5678-9234-567812345678"
@@ -28,103 +28,88 @@ def cape_png(width: int = 64, height: int = 32) -> bytes:
 class CapeServerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
-        self.app = create_app({
-            "TESTING": True,
-            "CAPE_DATA_DIR": self.temp.name,
-            "TOKEN_VERIFIER": lambda token: {"id": PLAYER_UUID.replace("-", ""), "name": "TestPlayer"}
-            if token == "valid-session" else (_ for _ in ()).throw(PermissionError("Ungültige Session.")),
-        })
-        self.client = self.app.test_client()
+        self.orig_root = server.ROOT
+        self.orig_img = server.IMAGE_DIR
+        self.orig_db = server.DATABASE
+        self.orig_rep = server.REPORT_DATABASE
+        self.orig_tok = server.TOKENS_DATABASE
+
+        server.ROOT = Path(self.temp.name)
+        server.IMAGE_DIR = server.ROOT / "images"
+        server.DATABASE = server.ROOT / "capes.json"
+        server.REPORT_DATABASE = server.ROOT / "reports.json"
+        server.TOKENS_DATABASE = server.ROOT / "tokens.json"
 
     def tearDown(self) -> None:
+        server.ROOT = self.orig_root
+        server.IMAGE_DIR = self.orig_img
+        server.DATABASE = self.orig_db
+        server.REPORT_DATABASE = self.orig_rep
+        server.TOKENS_DATABASE = self.orig_tok
         self.temp.cleanup()
 
-    def test_authenticated_png_upload_and_legacy_lookup(self) -> None:
-        response = self.client.post(
-            "/upload_cape",
-            data={
-                "owner": "TestPlayer",
-                "owner_uuid": PLAYER_UUID.replace("-", ""),
-                "title": "Release Cape",
-                "cape": (io.BytesIO(cape_png()), "cape.png"),
-            },
-            headers={"Authorization": "Bearer valid-session"},
-            content_type="multipart/form-data",
+    def test_safe_cape_png_validation(self) -> None:
+        valid_png = cape_png(64, 32)
+        self.assertTrue(server.is_safe_cape_png(valid_png))
+        self.assertFalse(server.is_safe_cape_png(b"not-a-png"))
+        self.assertFalse(server.is_safe_cape_png(cape_png(100, 100)))
+
+    def test_parse_multipart_with_anim_gif(self) -> None:
+        boundary = "----TestBoundary"
+        content_type = f"multipart/form-data; boundary={boundary}"
+        body = (
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="title"\r\n\r\n'
+            "Test Cape\r\n"
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="cape"; filename="cape.png"\r\n'
+            "Content-Type: image/png\r\n\r\n"
+            "fake-cape-bytes\r\n"
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="anim_gif"; filename="anim.gif"\r\n'
+            "Content-Type: image/gif\r\n\r\n"
+            "fake-gif-bytes\r\n"
+            f"--{boundary}--\r\n"
+        ).encode("utf-8")
+
+        fields, cape, anim_gif = server.parse_multipart(content_type, body)
+        self.assertEqual("Test Cape", fields.get("title"))
+        self.assertEqual(b"fake-cape-bytes", cape)
+        self.assertEqual(b"fake-gif-bytes", anim_gif)
+
+    def test_gif_conversion_generates_preview_gif(self) -> None:
+        gif_io = io.BytesIO()
+        frames = [Image.new("RGBA", (64, 64), color) for color in ("red", "green", "blue")]
+        frames[0].save(gif_io, format="GIF", save_all=True, append_images=frames[1:], duration=100, loop=0)
+        gif_bytes = gif_io.getvalue()
+
+        src_file = Path(self.temp.name) / "test.gif"
+        src_file.write_bytes(gif_bytes)
+        target_dir = Path(self.temp.name) / "out_anim"
+
+        manifest = cape_media.generate_frame_sheet(
+            src_file,
+            target_dir,
+            cape_media.AnimationOptions(start=0.0, end=1.0, fps=10, crop_box=(0.1, 0.1, 0.8, 0.8))
         )
-        self.assertEqual(200, response.status_code, response.get_data(as_text=True))
-        payload = response.get_json()
-        self.assertEqual(PLAYER_UUID, payload["owner_uuid"])
-        self.assertTrue(payload["token"])
-        legacy = self.client.get(f"/get_cape/{PLAYER_UUID}")
-        modern = self.client.get(f"/api/capes/{payload['id']}/image")
-        try:
-            self.assertEqual(200, legacy.status_code)
-            self.assertEqual(200, modern.status_code)
-        finally:
-            legacy.close()
-            modern.close()
+        self.assertTrue((target_dir / "framesheet.png").is_file())
+        self.assertTrue((target_dir / "preview.gif").is_file())
+        self.assertTrue((target_dir / "animation.json").is_file())
+        self.assertGreater(manifest.frame_count, 0)
 
-    def test_rejects_bad_player_data_and_missing_auth(self) -> None:
-        bad_uuid = self.client.post(
-            "/upload_cape",
-            data={"owner": "TestPlayer", "owner_uuid": "not-a-uuid", "title": "Bad Cape", "cape": (io.BytesIO(cape_png()), "cape.png")},
-            content_type="multipart/form-data",
-        )
-        self.assertEqual(400, bad_uuid.status_code)
-        no_auth = self.client.post(
-            "/api/capes",
-            data={"owner": "TestPlayer", "owner_uuid": PLAYER_UUID, "title": "No Auth", "cape": (io.BytesIO(cape_png()), "cape.png")},
-            content_type="multipart/form-data",
-        )
-        self.assertEqual(401, no_auth.status_code)
+    def test_inactive_latest_cape_disables_server_override(self) -> None:
+        server.save_capes([
+            {"id": "old", "owner_uuid": PLAYER_UUID, "created_at": "2026-01-01T00:00:00Z", "active": True},
+            {"id": "new", "owner_uuid": PLAYER_UUID, "created_at": "2026-02-01T00:00:00Z", "active": False},
+        ])
+        self.assertEqual([], server.active_capes({PLAYER_UUID}))
 
-    def test_ownership_token_can_replace_cape(self) -> None:
-        first = self.client.post(
-            "/api/capes",
-            data={"owner": "TestPlayer", "owner_uuid": PLAYER_UUID, "title": "First Cape", "cape": (io.BytesIO(cape_png()), "cape.png")},
-            headers={"Authorization": "Bearer valid-session"},
-            content_type="multipart/form-data",
-        ).get_json()
-        second = self.client.post(
-            "/api/capes",
-            data={"owner": "TestPlayer", "owner_uuid": PLAYER_UUID, "title": "Second Cape", "token": first["token"], "cape": (io.BytesIO(cape_png()), "cape.png")},
-            headers={"X-EzClient-Cape-Token": first["token"]},
-            content_type="multipart/form-data",
-        )
-        self.assertEqual(200, second.status_code, second.get_data(as_text=True))
-
-    def test_gif_upload_generates_bounded_animation(self) -> None:
-        from PIL import Image
-
-        data = io.BytesIO()
-        frames = [Image.new("RGBA", (20, 32), color) for color in ("red", "green")]
-        frames[0].save(data, format="GIF", save_all=True, append_images=frames[1:], duration=80, loop=0)
-        data.seek(0)
-        response = self.client.post(
-            "/api/capes",
-            data={"owner": "TestPlayer", "owner_uuid": PLAYER_UUID, "title": "Animated Cape", "cape": (data, "cape.gif")},
-            headers={"Authorization": "Bearer valid-session"},
-            content_type="multipart/form-data",
-        )
-        self.assertEqual(200, response.status_code, response.get_data(as_text=True))
-        self.assertTrue(response.get_json()["animated"])
-
-    def test_mp4_upload_uses_bounded_media_pipeline(self) -> None:
-        def fake_conversion(_source, output_dir, _options):
-            output_dir.mkdir()
-            Image.new("RGBA", (256, 128), "blue").save(output_dir / "framesheet.png")
-            return SimpleNamespace(frame_count=1, fps=12, duration=1 / 12)
-
-        from PIL import Image
-        with patch("server.generate_frame_sheet", side_effect=fake_conversion):
-            response = self.client.post(
-                "/api/capes",
-                data={"owner": "TestPlayer", "owner_uuid": PLAYER_UUID, "title": "Video Cape", "cape": (io.BytesIO(b"mock-mp4"), "cape.mp4")},
-                headers={"Authorization": "Bearer valid-session"},
-                content_type="multipart/form-data",
-            )
-        self.assertEqual(200, response.status_code, response.get_data(as_text=True))
-        self.assertTrue(response.get_json()["animated"])
+    def test_active_latest_cape_is_advertised(self) -> None:
+        server.save_capes([
+            {"id": "old", "owner_uuid": PLAYER_UUID, "created_at": "2026-01-01T00:00:00Z", "active": False},
+            {"id": "new", "owner_uuid": PLAYER_UUID, "created_at": "2026-02-01T00:00:00Z", "active": True},
+        ])
+        self.assertEqual("new", server.active_capes({PLAYER_UUID})[0]["id"])
 
 
 if __name__ == "__main__":

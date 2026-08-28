@@ -1,4 +1,4 @@
-package app.ezclient.performance.culling;
+package app.ezclient.performance.visibility;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -34,11 +34,15 @@ import java.util.concurrent.atomic.AtomicReference;
  * consecutive completed evaluations before it is culled. These two rules deliberately trade a
  * little potential work for immunity to chunk-load holes and one-frame pop-in.</p>
  */
-public final class OcclusionCullingManager implements AutoCloseable {
-    public static final OcclusionCullingManager INSTANCE = new OcclusionCullingManager();
+public final class EzVisibilityEngine implements AutoCloseable {
+    public static final EzVisibilityEngine INSTANCE = new EzVisibilityEngine();
 
     private static final long[] EMPTY_SECTION = new long[64];
+    private static final long[] FULL_SECTION = fullSection();
     private static final int MAX_TARGETS_PER_FRAME = 4096;
+    private static final long EVALUATION_INTERVAL_NANOS = 100_000_000L;
+    private static final long SECTION_PRUNE_INTERVAL_NANOS = 5_000_000_000L;
+    private static final int RETAIN_SECTION_RADIUS = 16;
     private static final double MIN_CULL_DISTANCE_SQ = 16.0;
     private static final double MAX_RAY_DISTANCE_SQ = 192.0 * 192.0;
 
@@ -46,6 +50,7 @@ public final class OcclusionCullingManager implements AutoCloseable {
     private final AtomicReference<VisibilitySnapshot> published =
             new AtomicReference<>(VisibilitySnapshot.EMPTY);
     private final AtomicBoolean evaluationRunning = new AtomicBoolean();
+    private final ThreadLocal<SectionCapture> sectionCapture = new ThreadLocal<>();
     private final ExecutorService worker = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "EzClient Occlusion Worker");
         thread.setDaemon(true);
@@ -58,18 +63,28 @@ public final class OcclusionCullingManager implements AutoCloseable {
     private Vec3 frameCamera = Vec3.ZERO;
     private volatile ClientLevel activeLevel;
     private boolean collecting;
+    private long nextEvaluationNanos;
+    private long nextSectionPruneNanos;
 
-    private OcclusionCullingManager() {
+    private EzVisibilityEngine() {
     }
 
     public void beginFrame(Vec3 cameraPosition) {
+        if (evaluationRunning.get() || System.nanoTime() < nextEvaluationNanos) {
+            collecting = false;
+            return;
+        }
         frameTargets.clear();
         frameCamera = Objects.requireNonNull(cameraPosition, "cameraPosition");
         collecting = true;
     }
 
     public void endFrame() {
+        if (!collecting) {
+            return;
+        }
         collecting = false;
+        nextEvaluationNanos = System.nanoTime() + EVALUATION_INTERVAL_NANOS;
         if (frameTargets.isEmpty() || !evaluationRunning.compareAndSet(false, true)) {
             return;
         }
@@ -82,14 +97,20 @@ public final class OcclusionCullingManager implements AutoCloseable {
 
     /** Returns false only from a completed, hysteresis-filtered worker result. */
     public boolean shouldRender(Entity entity) {
+        VisibilitySnapshot snapshot = published.get();
+        if (!collecting && snapshot.culled().isEmpty()) {
+            return true;
+        }
         if (isEntityExempt(entity)) {
             return true;
         }
 
         long key = entityKey(entity.getId());
-        AABB bounds = expandedBounds(entity.getBoundingBox());
-        register(new Target(key, bounds));
-        return !published.get().culled().contains(key);
+        if (collecting) {
+            AABB bounds = expandedBounds(entity.getBoundingBox());
+            register(new Target(key, bounds));
+        }
+        return !snapshot.culled().contains(key);
     }
 
     /** Globally rendered block entities are never culled by this subsystem. */
@@ -100,7 +121,9 @@ public final class OcclusionCullingManager implements AutoCloseable {
 
         BlockPos pos = blockEntity.getBlockPos();
         long key = blockEntityKey(pos.asLong());
-        register(new Target(key, new AABB(pos).inflate(0.0625)));
+        if (collecting) {
+            register(new Target(key, new AABB(pos).inflate(0.0625)));
+        }
         return !published.get().culled().contains(key);
     }
 
@@ -130,6 +153,7 @@ public final class OcclusionCullingManager implements AutoCloseable {
 
     private void evaluate(Vec3 camera, List<Target> targets, VisibilitySnapshot previous) {
         try {
+            pruneDistantSections(camera);
             long[] occluded = new long[targets.size()];
             long[] culled = new long[targets.size()];
             int occludedCount = 0;
@@ -252,33 +276,26 @@ public final class OcclusionCullingManager implements AutoCloseable {
         return value < integer ? integer - 1 : integer;
     }
 
-    /** Captures one immutable section from Minecraft's render-region snapshot. */
-    public void captureSection(ClientLevel sourceLevel, SectionPos section, RenderSectionRegion region) {
-        if (sourceLevel != activeLevel) {
-            return;
-        }
-        long[] mask = new long[64];
-        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        int baseX = section.minBlockX();
-        int baseY = section.minBlockY();
-        int baseZ = section.minBlockZ();
-        boolean any = false;
+    /** Starts piggyback capture on Minecraft's own 4096-block compiler pass. */
+    public void beginSectionCapture(ClientLevel sourceLevel, SectionPos section) {
+        sectionCapture.set(new SectionCapture(sourceLevel, section.asLong(), new long[64]));
+    }
 
-        for (int y = 0; y < 16; y++) {
-            for (int z = 0; z < 16; z++) {
-                for (int x = 0; x < 16; x++) {
-                    cursor.set(baseX + x, baseY + y, baseZ + z);
-                    BlockState state = region.getBlockState(cursor);
-                    if (state.canOcclude() && state.isSolidRender()) {
-                        int bit = (y << 8) | (z << 4) | x;
-                        mask[bit >>> 6] |= 1L << (bit & 63);
-                        any = true;
-                    }
-                }
-            }
+    public void captureCompiledBlock(BlockPos pos, BlockState state) {
+        SectionCapture capture = sectionCapture.get();
+        if (capture == null || capture.level() != activeLevel) return;
+        if (state.canOcclude() && state.isSolidRender()) {
+            int bit = ((pos.getY() & 15) << 8) | ((pos.getZ() & 15) << 4) | (pos.getX() & 15);
+            capture.mask()[bit >>> 6] |= 1L << (bit & 63);
+            capture.any()[0] = true;
         }
-        if (sourceLevel == activeLevel) {
-            opaqueSections.put(section.asLong(), any ? mask : EMPTY_SECTION);
+    }
+
+    public void endSectionCapture() {
+        SectionCapture capture = sectionCapture.get();
+        sectionCapture.remove();
+        if (capture != null && capture.level() == activeLevel) {
+            opaqueSections.put(capture.sectionKey(), canonicalSection(capture.mask(), capture.any()[0]));
         }
     }
 
@@ -288,17 +305,54 @@ public final class OcclusionCullingManager implements AutoCloseable {
             return;
         }
         long sectionKey = SectionPos.asLong(pos);
-        opaqueSections.compute(sectionKey, (ignored, oldMask) -> {
-            long[] next = oldMask == null ? new long[64] : oldMask.clone();
+        opaqueSections.computeIfPresent(sectionKey, (ignored, oldMask) -> {
             int bit = ((pos.getY() & 15) << 8) | ((pos.getZ() & 15) << 4) | (pos.getX() & 15);
             long bitMask = 1L << (bit & 63);
-            if (state.canOcclude() && state.isSolidRender()) {
+            boolean opaque = state.canOcclude() && state.isSolidRender();
+            boolean wasOpaque = (oldMask[bit >>> 6] & bitMask) != 0L;
+            if (opaque == wasOpaque) {
+                return oldMask;
+            }
+            long[] next = oldMask.clone();
+            if (opaque) {
                 next[bit >>> 6] |= bitMask;
             } else {
                 next[bit >>> 6] &= ~bitMask;
             }
-            return next;
+            return canonicalSection(next, true);
         });
+    }
+
+    private void pruneDistantSections(Vec3 camera) {
+        long now = System.nanoTime();
+        if (now < nextSectionPruneNanos) return;
+        nextSectionPruneNanos = now + SECTION_PRUNE_INTERVAL_NANOS;
+        int cameraX = SectionPos.blockToSectionCoord(floor(camera.x));
+        int cameraY = SectionPos.blockToSectionCoord(floor(camera.y));
+        int cameraZ = SectionPos.blockToSectionCoord(floor(camera.z));
+        opaqueSections.keySet().removeIf(key ->
+                Math.abs(SectionPos.x(key) - cameraX) > RETAIN_SECTION_RADIUS
+                        || Math.abs(SectionPos.y(key) - cameraY) > RETAIN_SECTION_RADIUS
+                        || Math.abs(SectionPos.z(key) - cameraZ) > RETAIN_SECTION_RADIUS);
+    }
+
+    private static long[] canonicalSection(long[] mask, boolean any) {
+        if (!any) return EMPTY_SECTION;
+        boolean empty = true;
+        boolean full = true;
+        for (long word : mask) {
+            empty &= word == 0L;
+            full &= word == -1L;
+            if (!empty && !full) return mask;
+        }
+        if (empty) return EMPTY_SECTION;
+        return full ? FULL_SECTION : mask;
+    }
+
+    private static long[] fullSection() {
+        long[] mask = new long[64];
+        Arrays.fill(mask, -1L);
+        return mask;
     }
 
     public void clear() {
@@ -356,6 +410,16 @@ public final class OcclusionCullingManager implements AutoCloseable {
 
         private boolean contains(long value) {
             return Arrays.binarySearch(values, value) >= 0;
+        }
+
+        private boolean isEmpty() {
+            return values.length == 0;
+        }
+    }
+
+    private record SectionCapture(ClientLevel level, long sectionKey, long[] mask, boolean[] any) {
+        private SectionCapture(ClientLevel level, long sectionKey, long[] mask) {
+            this(level, sectionKey, mask, new boolean[1]);
         }
     }
 }

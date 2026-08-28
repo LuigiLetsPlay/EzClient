@@ -22,23 +22,34 @@ Item {
     property real trimStart: 0
     property real trimEnd: 5
     property int animationFps: 12
-    property bool pingPong: false
+    property string cropImageSource: ""
     property int previewRequestId: 0
     property bool previewProcessing: false
 
     function loadSource(url) {
         if (!url) return
         root.selectedSource = url
+        root.cropImageSource = url
         root.cropX = 0; root.cropY = 0; root.cropW = 1; root.cropH = 1
         var clean = url.toLowerCase().split("?")[0]
         root.animatedSource = clean.endsWith(".gif") || clean.endsWith(".mp4") || clean.endsWith(".webm")
         if (root.animatedSource) {
+            root.mediaProcessing = true
+            statusText.text = "Animation wird verarbeitet …"
+            statusText.color = EzTheme.textSecondary
             var info = accountController.probeCapeMedia(url)
-            if (!info || !info.ok) return
+            if (!info || !info.ok) {
+                root.mediaProcessing = false
+                return
+            }
+            if (info.thumbnailUrl && info.thumbnailUrl !== "") {
+                root.cropImageSource = info.thumbnailUrl
+            }
             root.mediaDuration = info.duration
             root.trimStart = 0
             root.trimEnd = Math.min(5, info.duration)
             root.pendingPreview = ""
+            root.prepareAnimation()
         } else {
             root.prepare()
         }
@@ -51,20 +62,28 @@ Item {
 
     function prepare() {
         if (!root.selectedSource) return
-        var crop = root.cropX.toFixed(4) + "," + root.cropY.toFixed(4) + "," + root.cropW.toFixed(4) + "," + root.cropH.toFixed(4)
-        root.previewProcessing = true
-        root.previewRequestId = accountController.requestCapePreview(root.selectedSource, "Crop|" + crop)
+        if (root.animatedSource) {
+            root.prepareAnimation()
+        } else {
+            var crop = root.cropX.toFixed(4) + "," + root.cropY.toFixed(4) + "," + root.cropW.toFixed(4) + "," + root.cropH.toFixed(4)
+            root.previewProcessing = true
+            root.previewRequestId = accountController.requestCapePreview(root.selectedSource, "Crop|" + crop)
+        }
     }
 
     function schedulePreview() {
-        if (!root.animatedSource && root.selectedSource !== "" && !liveCropTimer.running)
+        if (root.selectedSource !== "" && !liveCropTimer.running)
             liveCropTimer.start()
     }
 
     function prepareAnimation() {
-        if (!root.animatedSource || root.mediaProcessing) return
-        root.mediaProcessing = accountController.prepareAnimatedCape(
-            root.selectedSource, root.trimStart, root.trimEnd, root.animationFps, root.pingPong)
+        if (!root.animatedSource) return
+        root.mediaProcessing = true
+        statusText.text = "Animation wird generiert …"
+        statusText.color = EzTheme.textSecondary
+        var crop = root.cropX.toFixed(4) + "," + root.cropY.toFixed(4) + "," + root.cropW.toFixed(4) + "," + root.cropH.toFixed(4)
+        accountController.prepareAnimatedCape(
+            root.selectedSource, root.trimStart, root.trimEnd, root.animationFps, false, crop)
     }
 
     Timer {
@@ -78,6 +97,7 @@ Item {
         accountController.cancelPendingCape()
         root.selectedSource = ""
         root.pendingPreview = ""
+        editorSkin3D.updateCape()
     }
 
     function confirm() {
@@ -104,10 +124,17 @@ Item {
             root.pendingPreview = previewUrl + "?v=" + Date.now()
             root.mediaProcessing = false
         }
+        function onCapeAnimationPrepared(sheetUrl, frameCount, fps, columns, frameW, frameH, pingPong) {
+            root.mediaProcessing = false
+            editorSkin3D.setAnimatedCape(sheetUrl, frameCount, fps, columns, frameW, frameH, pingPong)
+        }
         function onCapePreviewPrepared(previewUrl, revision) {
             if (revision !== root.previewRequestId) return
             root.previewProcessing = false
-            if (previewUrl) root.pendingPreview = previewUrl
+            if (previewUrl) {
+                root.pendingPreview = previewUrl
+                editorSkin3D.updateCape()
+            }
         }
     }
 
@@ -155,6 +182,29 @@ Item {
                     animation: root.previewAnimation
                     autoRotate: false
                     interactive: true
+                    initialRotateY: 180
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    visible: root.mediaProcessing || root.previewProcessing
+                    color: "#CC0F0B18"
+                    z: 50
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        spacing: 12
+                        BusyIndicator {
+                            Layout.alignment: Qt.AlignHCenter
+                            running: root.mediaProcessing || root.previewProcessing
+                        }
+                        Text {
+                            text: root.mediaProcessing ? "Animation wird vorbereitet …" : "Vorschau wird geladen …"
+                            color: EzTheme.text
+                            font.pixelSize: 13
+                            font.bold: true
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+                    }
                 }
 
                 Rectangle {
@@ -207,7 +257,7 @@ Item {
                 }
 
                 Rectangle {
-                    visible: root.selectedSource !== "" && !root.animatedSource
+                    visible: root.selectedSource !== ""
                     Layout.fillWidth: true
                     Layout.preferredHeight: 48
                     radius: 9
@@ -255,6 +305,7 @@ Item {
                             if (root.trimEnd < value + 0.1)
                                 root.trimEnd = Math.min(root.mediaDuration, value + 0.1)
                         }
+                        onPressedChanged: if (!pressed) root.prepareAnimation()
                     }
                     Text { text: "Ende · maximal 10 Sekunden"; color: EzTheme.textMuted; font.pixelSize: 11 }
                     Slider {
@@ -262,6 +313,7 @@ Item {
                         from: 0.1; to: Math.max(0.1, root.mediaDuration)
                         value: root.trimEnd
                         onMoved: root.trimEnd = Math.max(root.trimStart + 0.1, Math.min(value, root.trimStart + 10))
+                        onPressedChanged: if (!pressed) root.prepareAnimation()
                     }
                     RowLayout {
                         Layout.fillWidth: true
@@ -269,25 +321,25 @@ Item {
                         Slider {
                             from: 1; to: 20; stepSize: 1; value: root.animationFps
                             onMoved: root.animationFps = Math.round(value)
-                            Layout.preferredWidth: 140
+                            onPressedChanged: if (!pressed) root.prepareAnimation()
+                            Layout.preferredWidth: 160
                         }
-                        CheckBox { text: "Ping-Pong"; checked: root.pingPong; onToggled: root.pingPong = checked }
                     }
                     EzButton {
-                        text: root.mediaProcessing ? "Frames werden erstellt …" : "Loop vorbereiten"
+                        text: root.mediaProcessing ? "Frames werden erstellt …" : "Loop aktualisieren"
                         enabled: !root.mediaProcessing
                         onClicked: root.prepareAnimation()
                     }
                 }
 
-                Text { text: "Zuschneiden"; color: EzTheme.text; font.bold: true; font.pixelSize: 15; visible: root.selectedSource !== "" && !root.animatedSource }
+                Text { text: "Zuschneiden"; color: EzTheme.text; font.bold: true; font.pixelSize: 15; visible: root.selectedSource !== "" }
 
                 // Interactive crop editor. Drag inside the frame to move it,
                 // drag the corner handle to resize. The cape is made from the
                 // framed region only.
                 Rectangle {
                     id: cropStage
-                    visible: root.selectedSource !== "" && !root.animatedSource
+                    visible: root.selectedSource !== ""
                     Layout.fillWidth: true
                     Layout.preferredHeight: 360
                     radius: 10
@@ -324,7 +376,7 @@ Item {
                         height: parent.height
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
-                        source: root.selectedSource
+                        source: root.cropImageSource
                         onStatusChanged: if (status === Image.Ready) cropStage.resetSelection()
                     }
 
@@ -343,6 +395,7 @@ Item {
                         MouseArea {
                             id: cropMove
                             anchors.fill: parent
+                            enabled: false
                             cursorShape: Qt.SizeAllCursor
                             property real pressX: 0
                             property real pressY: 0
@@ -404,6 +457,7 @@ Item {
 
                             MouseArea {
                                 anchors.fill: parent
+                                enabled: false
                                 cursorShape: Qt.SizeFDiagCursor
                                 property real pressX: 0
                                 property real pressY: 0
@@ -446,6 +500,61 @@ Item {
                         }
                     }
 
+                    // One stage-sized pointer surface keeps drag coordinates stable
+                    // even while the crop rectangle itself is moving.
+                    MouseArea {
+                        id: cropPointer
+                        anchors.fill: parent
+                        z: 20
+                        hoverEnabled: true
+                        cursorShape: !hoverInside ? Qt.ArrowCursor : (resizeMode ? Qt.SizeFDiagCursor : Qt.SizeAllCursor)
+                        property bool hoverInside: false
+                        property bool resizeMode: false
+                        property real pressX: 0
+                        property real pressY: 0
+                        property real startCropX: 0
+                        property real startCropY: 0
+                        property real startWidth: 0
+                        property real startHeight: 0
+
+                        onPressed: function(mouse) {
+                            var inside = mouse.x >= cropFrame.x && mouse.x <= cropFrame.x + cropFrame.width
+                                      && mouse.y >= cropFrame.y && mouse.y <= cropFrame.y + cropFrame.height
+                            if (!inside) {
+                                mouse.accepted = false
+                                return
+                            }
+                            hoverInside = true
+                            resizeMode = mouse.x >= cropFrame.x + cropFrame.width - 24
+                                      && mouse.y >= cropFrame.y + cropFrame.height - 24
+                            pressX = mouse.x; pressY = mouse.y
+                            startCropX = root.cropX; startCropY = root.cropY
+                            startWidth = cropFrame.width; startHeight = cropFrame.height
+                        }
+                        onPositionChanged: function(mouse) {
+                            if (!pressed) {
+                                hoverInside = mouse.x >= cropFrame.x && mouse.x <= cropFrame.x + cropFrame.width
+                                           && mouse.y >= cropFrame.y && mouse.y <= cropFrame.y + cropFrame.height
+                                resizeMode = hoverInside && mouse.x >= cropFrame.x + cropFrame.width - 24
+                                           && mouse.y >= cropFrame.y + cropFrame.height - 24
+                                return
+                            }
+                            if (cropStage.paintW <= 0 || cropStage.paintH <= 0) return
+                            if (resizeMode) {
+                                cropFrame.applyResize(startWidth + mouse.x - pressX,
+                                                      startHeight + mouse.y - pressY)
+                            } else {
+                                root.cropX = Math.max(0, Math.min(1 - root.cropW,
+                                    startCropX + (mouse.x - pressX) / cropStage.paintW))
+                                root.cropY = Math.max(0, Math.min(1 - root.cropH,
+                                    startCropY + (mouse.y - pressY) / cropStage.paintH))
+                                root.schedulePreview()
+                            }
+                        }
+                        onReleased: { liveCropTimer.stop(); root.prepare() }
+                        onCanceled: { liveCropTimer.stop(); root.prepare() }
+                    }
+
                     Text {
                         visible: cropImage.status === Image.Loading
                         anchors.centerIn: parent
@@ -455,7 +564,7 @@ Item {
                 }
 
                 RowLayout {
-                    visible: root.selectedSource !== "" && !root.animatedSource
+                    visible: root.selectedSource !== ""
                     Layout.fillWidth: true
                     spacing: 10
                     EzButton { text: "Motiv zurücksetzen"; onClicked: cropStage.resetSelection() }
@@ -463,7 +572,7 @@ Item {
                 }
 
                 GridLayout {
-                    visible: root.selectedSource !== "" && !root.animatedSource
+                    visible: root.selectedSource !== ""
                     Layout.fillWidth: true
                     columns: 2
                     columnSpacing: 12

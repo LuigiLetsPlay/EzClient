@@ -10,6 +10,7 @@ Item {
     readonly property string activeCommunityCapeUrl: typeof accountController !== "undefined" && accountController ? accountController.activeCommunityCapeUrl : ""
     property string previewCapeUrl: ""
     property string previewCapeTitle: ""
+    property string previewCapeAnimUrl: ""
     readonly property var capes: typeof accountController !== "undefined" && accountController ? accountController.communityCapes : []
     readonly property string status: typeof accountController !== "undefined" && accountController ? accountController.capeCommunityStatus : ""
 
@@ -36,6 +37,12 @@ Item {
             }
             EzButton { text: "Editor"; onClicked: root.navigate("cape_editor") }
             EzButton { text: "Aktualisieren"; onClicked: accountController.refreshCapeCommunity() }
+            EzButton {
+                text: "Zurücksetzen"
+                enabled: typeof accountController !== "undefined" && accountController
+                         && (accountController.capeTextureUrl !== "" || root.activeCommunityCapeUrl !== "")
+                onClicked: accountController.resetCustomCape()
+            }
         }
 
         Rectangle {
@@ -70,7 +77,6 @@ Item {
         ScrollView {
             Layout.fillWidth: true; Layout.fillHeight: true; clip: true
 
-            
             GridView {
                 id: capeGrid
                 anchors.fill: parent
@@ -90,13 +96,33 @@ Item {
                                     anchors.fill: parent
                                     anchors.margins: 7
                                     capeSource: modelData.imageUrl || ""
+                                    animationSource: modelData.animationUrl || ""
+                                }
+                                Rectangle {
+                                    visible: !!modelData.isAnimated
+                                    anchors.top: parent.top; anchors.right: parent.right; anchors.margins: 4
+                                    width: 16; height: 16; radius: 8; color: EzTheme.accent
+                                    Text { anchors.centerIn: parent; text: "▶"; font.pixelSize: 9; color: "#0B0E14"; font.bold: true }
                                 }
                                 MouseArea {
                                     anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: { root.previewCapeUrl = modelData.imageUrl || ""; root.previewCapeTitle = modelData.title || "Community Cape"; capePreviewDialog.open() }
+                                    onClicked: {
+                                        root.previewCapeUrl = modelData.imageUrl || ""
+                                        root.previewCapeAnimUrl = modelData.animationUrl || ""
+                                        root.previewCapeTitle = modelData.title || "Community Cape"
+                                        capePreviewDialog.open()
+                                    }
                                 }
                             }
-                            Text { text: modelData.title || "Community Cape"; font.family: EzTheme.mcFontFamily; font.pixelSize: 12; font.bold: true; color: EzTheme.text; Layout.fillWidth: true; elide: Text.ElideRight }
+                            RowLayout {
+                                Layout.fillWidth: true; spacing: 4
+                                Text { text: modelData.title || "Community Cape"; font.family: EzTheme.mcFontFamily; font.pixelSize: 12; font.bold: true; color: EzTheme.text; Layout.fillWidth: true; elide: Text.ElideRight }
+                                Rectangle {
+                                    visible: !!modelData.isAnimated
+                                    Layout.preferredHeight: 16; Layout.preferredWidth: 42; radius: 4; color: "#16A34A"
+                                    Text { anchors.centerIn: parent; text: "ANIM"; font.pixelSize: 9; font.bold: true; color: "#FFF" }
+                                }
+                            }
                             RowLayout {
                                 Layout.fillWidth: true
                                 Text { text: "von " + (modelData.owner || "EzClient Spieler"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted; Layout.fillWidth: true; elide: Text.ElideRight }
@@ -105,7 +131,7 @@ Item {
                                     primary: root.activeCommunityCapeUrl === (modelData.imageUrl || "")
                                     onClicked: {
                                         if (root.activeCommunityCapeUrl === (modelData.imageUrl || "")) return
-                                        if (accountController.activateCommunityCape(modelData.imageUrl)) root.activeCommunityCapeUrl = modelData.imageUrl || ""
+                                        accountController.activateCommunityCape(modelData.imageUrl, modelData.animationUrl || "")
                                     }
                                 }
                             }
@@ -143,6 +169,7 @@ Item {
                 anchors.fill: parent
                 anchors.margins: 12
                 capeSource: root.previewCapeUrl
+                animationSource: root.previewCapeAnimUrl
             }
         }
     }

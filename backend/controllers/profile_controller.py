@@ -101,7 +101,7 @@ class ProfileController(QObject):
         candidates = [
             root / "backend" / "assets" / filename,
             root / filename,
-            root / "client_mod" / "build" / "libs" / "EzClient-1.8.1.jar",
+            root / "client_mod" / "build" / "libs" / "EzClient-1.8.2.jar",
             Path(appdata) / ".ezclient" / "assets" / filename if appdata else Path.home() / ".ezclient" / "assets" / filename
         ]
         for c in candidates:
@@ -1312,7 +1312,7 @@ class ProfileController(QObject):
                 if download_url and filename:
                     dest = self._active_profile.mods_path / filename
                     dest.parent.mkdir(parents=True, exist_ok=True)
-                    req = urllib.request.Request(download_url, headers={"User-Agent": "EzClient/1.8.1"})
+                    req = urllib.request.Request(download_url, headers={"User-Agent": "EzClient/1.8.2"})
                     with urllib.request.urlopen(req, timeout=30) as resp:
                         dest.write_bytes(resp.read())
                 else:

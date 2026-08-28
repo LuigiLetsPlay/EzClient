@@ -726,7 +726,7 @@ public final class HudEditorScreen extends Screen {
         if (!hasLiveScoreboard) {
             EzUi.roundedRect(g, sx, sy, sw, sh, 4, selectedVanilla == VanillaType.SCOREBOARD ? 0x8000D2FF : 0xA00D111A);
             if (selectedVanilla == VanillaType.SCOREBOARD) g.outline(sx, sy, sw, sh, 0xFF00D2FF);
-            g.centeredText(font, Component.literal("§e§lEzClient §7(v1.8.1)"), sx + sw / 2, sy + 5, 0xFFFFFFFF);
+            g.centeredText(font, Component.literal("§e§lEzClient §7(v1.8.2)"), sx + sw / 2, sy + 5, 0xFFFFFFFF);
             g.text(font, "§7-----------------", sx + 6, sy + 16, 0xFF888888);
             g.text(font, "§fKills: §a12", sx + 6, sy + 27, 0xFFFFFFFF);
             g.text(font, "§fDeaths: §c2", sx + 6, sy + 38, 0xFFFFFFFF);

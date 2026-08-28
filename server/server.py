@@ -313,16 +313,17 @@ def active_capes(player_ids: set[str] | None = None) -> list[dict]:
             continue
         if owner_uuid not in newest or str(cape.get("created_at", "")) > str(newest[owner_uuid].get("created_at", "")):
             newest[owner_uuid] = cape
-    return list(newest.values())
+    return [cape for cape in newest.values() if cape.get("active", True) is not False]
 
 
-def parse_multipart(content_type: str, body: bytes) -> tuple[dict[str, str], bytes]:
+def parse_multipart(content_type: str, body: bytes) -> tuple[dict[str, str], bytes, bytes]:
     match = re.search(r"boundary=([^;]+)", content_type)
     if not match:
         raise ValueError("multipart boundary fehlt")
     boundary = b"--" + match.group(1).strip('"').encode()
     fields: dict[str, str] = {}
     cape = b""
+    anim_gif = b""
     for section in body.split(boundary):
         section = section.strip(b"\r\n")
         if not section or section == b"--":
@@ -337,9 +338,11 @@ def parse_multipart(content_type: str, body: bytes) -> tuple[dict[str, str], byt
         value = value.rstrip(b"\r\n")
         if name.group(1) == "cape":
             cape = value
+        elif name.group(1) == "anim_gif":
+            anim_gif = value
         else:
             fields[name.group(1)] = value.decode("utf-8", "replace")
-    return fields, cape
+    return fields, cape, anim_gif
 
 
 class CapeHandler(BaseHTTPRequestHandler):
@@ -377,7 +380,12 @@ class CapeHandler(BaseHTTPRequestHandler):
             capes = []
             for item in active_capes(requested or None):
                 copy = dict(item)
-                copy["image_url"] = f"http://{host}/api/capes/{item['id']}/image"
+                cape_id = item["id"]
+                copy["image_url"] = f"http://{host}/api/capes/{cape_id}/image"
+                has_gif = (IMAGE_DIR / f"{cape_id}.gif").is_file() or bool(item.get("is_animated"))
+                copy["is_animated"] = has_gif
+                if has_gif:
+                    copy["animation_url"] = f"http://{host}/api/capes/{cape_id}/animation"
                 capes.append(copy)
             self.send_json(HTTPStatus.OK, {"capes": capes})
             return
@@ -386,10 +394,29 @@ class CapeHandler(BaseHTTPRequestHandler):
             capes = []
             for item in reversed(load_capes()):
                 copy = dict(item)
-                copy["image_url"] = f"http://{host}/api/capes/{item['id']}/image"
+                cape_id = item["id"]
+                copy["image_url"] = f"http://{host}/api/capes/{cape_id}/image"
+                has_gif = (IMAGE_DIR / f"{cape_id}.gif").is_file() or bool(item.get("is_animated"))
+                copy["is_animated"] = has_gif
+                if has_gif:
+                    copy["animation_url"] = f"http://{host}/api/capes/{cape_id}/animation"
                 capes.append(copy)
             self.send_json(HTTPStatus.OK, {"capes": capes})
             return
+
+        anim_match = re.fullmatch(r"/api/capes/([a-f0-9-]{36})/(?:animation|gif)", path)
+        if anim_match:
+            gif_file = IMAGE_DIR / f"{anim_match.group(1)}.gif"
+            if gif_file.is_file():
+                raw = gif_file.read_bytes()
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "image/gif")
+                self.send_header("Content-Length", str(len(raw)))
+                self.send_header("Cache-Control", "public, max-age=3600")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(raw)
+                return
 
         match = re.fullmatch(r"/api/capes/([a-f0-9-]{36})/image", path)
         if match:
@@ -413,6 +440,9 @@ class CapeHandler(BaseHTTPRequestHandler):
         if path == "/api/presence":
             self.update_presence()
             return
+        if path == "/api/capes/deactivate":
+            self.deactivate_cape()
+            return
         if path == "/api/reports":
             self.create_report()
             return
@@ -423,11 +453,11 @@ class CapeHandler(BaseHTTPRequestHandler):
             self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Upload-Limit erreicht. Bitte kurz warten."})
             return
         length = int(self.headers.get("Content-Length", "0"))
-        if length <= 0 or length > MAX_CAPE_BYTES + 16_384:
+        if length <= 0 or length > MAX_CAPE_BYTES + 8 * 1024 * 1024 + 16_384:
             self.send_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "Cape ist zu groß"})
             return
         try:
-            fields, cape = parse_multipart(self.headers.get("Content-Type", ""), self.rfile.read(length))
+            fields, cape, anim_gif = parse_multipart(self.headers.get("Content-Type", ""), self.rfile.read(length))
             if not is_safe_cape_png(cape):
                 raise ValueError("Nur geprüfte Cape-PNGs (64×32 bis 1024×512) bis 2 MB sind erlaubt")
 
@@ -462,13 +492,23 @@ class CapeHandler(BaseHTTPRequestHandler):
             cape_id = str(uuid.uuid4())
             IMAGE_DIR.mkdir(parents=True, exist_ok=True)
             (IMAGE_DIR / f"{cape_id}.png").write_bytes(cape)
+            is_animated = False
+            if anim_gif and len(anim_gif) > 0 and len(anim_gif) <= 8 * 1024 * 1024:
+                (IMAGE_DIR / f"{cape_id}.gif").write_bytes(anim_gif)
+                is_animated = True
+
             capes = load_capes()
+            for existing in capes:
+                if str(existing.get("owner_uuid", "")).lower() == owner_uuid.lower():
+                    existing["active"] = False
             capes.append({
                 "id": cape_id,
                 "title": title,
                 "owner": owner,
                 "owner_uuid": owner_uuid,
-                "created_at": datetime.now(UTC).isoformat()
+                "created_at": datetime.now(UTC).isoformat(),
+                "is_animated": is_animated,
+                "active": True,
             })
             save_capes(capes)
 
@@ -477,13 +517,42 @@ class CapeHandler(BaseHTTPRequestHandler):
                 "title": title,
                 "owner": owner,
                 "owner_uuid": owner_uuid,
-                "token": current_token
+                "token": current_token,
+                "is_animated": is_animated,
             })
         except ValueError as exc:
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except Exception as exc:
             print(f"Upload failed: {exc}")
             self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "Upload fehlgeschlagen"})
+
+    def deactivate_cape(self) -> None:
+        if not allow_request(self.client_address[0], 30, 60):
+            self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Zu viele Anfragen"})
+            return
+        length = int(self.headers.get("Content-Length", "0"))
+        if length <= 0 or length > 4096:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Ungültige Anfrage"})
+            return
+        try:
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            owner_uuid = normalize_player_uuid(payload.get("owner_uuid", ""))
+            provided = clean_text(payload.get("token", "") or self.headers.get("X-EzClient-Cape-Token", ""), 64)
+            stored = str(load_tokens().get(owner_uuid.replace("-", "").lower(), ""))
+            if not stored or not provided or not hmac.compare_digest(stored, provided):
+                self.send_json(HTTPStatus.FORBIDDEN, {"error": "Cape-Besitz konnte nicht bestätigt werden."})
+                return
+            capes = load_capes()
+            changed = False
+            for cape in capes:
+                if str(cape.get("owner_uuid", "")).lower() == owner_uuid.lower() and cape.get("active", True):
+                    cape["active"] = False
+                    changed = True
+            if changed:
+                save_capes(capes)
+            self.send_json(HTTPStatus.OK, {"active": False})
+        except (ValueError, json.JSONDecodeError) as exc:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
 
     def update_presence(self) -> None:
         if not allow_request(self.client_address[0], 90, 60):
@@ -802,22 +871,26 @@ th {{ background: #0F172A; color: #94A3B8; font-weight: 600; text-transform: upp
                 html_out += '<div class="card-grid">'
                 for c in filtered_capes:
                     cape_id = c["id"]
-                    img_url = f"http://{host_ip}:{PORT}/api/capes/{cape_id}/image"
+                    has_gif = (IMAGE_DIR / f"{cape_id}.gif").is_file() or bool(c.get("is_animated"))
+                    display_url = f"http://{host_ip}:{PORT}/api/capes/{cape_id}/animation" if has_gif else f"http://{host_ip}:{PORT}/api/capes/{cape_id}/image"
+                    raw_url = f"http://{host_ip}:{PORT}/api/capes/{cape_id}/image"
                     created = c.get("created_at", "")[:19].replace("T", " ")
                     title_esc = html.escape(c.get('title', 'Ohne Titel'))
                     owner_esc = html.escape(c.get('owner', 'Unbekannt'))
+                    badge_html = '<span style="background:#22C96E;color:#0B0E14;font-size:10.5px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:6px;">🎬 ANIMIERT</span>' if has_gif else ''
+                    portrait_img_html = f'<img src="{display_url}" alt="Cape" style="width:100%;height:100%;object-fit:cover;image-rendering:pixelated;">' if has_gif else f'<img src="{display_url}" alt="Cape" class="cape-portrait-img">'
                     html_out += f"""
         <div class="cape-card">
-            <div class="cape-portrait-box" title="Klicken für Großansicht" onclick="openModal('{img_url}', '{title_esc}', '{owner_esc}')">
-                <img src="{img_url}" alt="Cape" class="cape-portrait-img">
+            <div class="cape-portrait-box" title="Klicken für Großansicht" onclick="openModal('{display_url}', '{raw_url}', '{title_esc}', '{owner_esc}', {str(has_gif).lower()})">
+                {portrait_img_html}
             </div>
             <div class="cape-info">
-                <div class="cape-title" title="{title_esc}">{title_esc}</div>
+                <div class="cape-title" title="{title_esc}">{title_esc}{badge_html}</div>
                 <div class="cape-owner">👤 {owner_esc}</div>
                 <div class="cape-uuid">{html.escape(c.get('owner_uuid', ''))}</div>
                 <div class="cape-date">📅 {html.escape(created)}</div>
                 <div class="btn-row">
-                    <button type="button" class="btn btn-secondary" onclick="openModal('{img_url}', '{title_esc}', '{owner_esc}')">🔍 Groß</button>
+                    <button type="button" class="btn btn-secondary" onclick="openModal('{display_url}', '{raw_url}', '{title_esc}', '{owner_esc}', {str(has_gif).lower()})">🔍 Groß</button>
                     <form method="post" action="/capes/{cape_id}/delete" onsubmit="return confirm('Möchtest du dieses Cape wirklich sofort löschen?');" style="flex:1;">
                         <button type="submit" class="btn btn-danger" style="width:100%;">Löschen</button>
                     </form>
@@ -849,13 +922,17 @@ th {{ background: #0F172A; color: #94A3B8; font-weight: 600; text-transform: upp
                 for r in reversed(reports):
                     cape = capes_by_id.get(r.get("cape_id", ""), {})
                     cape_id = r.get("cape_id", "")
-                    img_url = f"http://{host_ip}:{PORT}/api/capes/{cape_id}/image"
+                    has_gif = (IMAGE_DIR / f"{cape_id}.gif").is_file() or bool(cape.get("is_animated"))
+                    display_url = f"http://{host_ip}:{PORT}/api/capes/{cape_id}/animation" if has_gif else f"http://{host_ip}:{PORT}/api/capes/{cape_id}/image"
+                    raw_url = f"http://{host_ip}:{PORT}/api/capes/{cape_id}/image"
                     status = r.get("status", "open")
                     status_class = f"status-{status}"
                     status_label = "🚨 Offen" if status == "open" else ("✅ Erledigt" if status == "resolved" else "🗑️ Cape Gelöscht")
                     created = r.get("created_at", "")[:19].replace("T", " ")
                     title_esc = html.escape(cape.get('title', 'Gelöschtes Cape'))
                     owner_esc = html.escape(cape.get('owner', ''))
+                    badge_html = ' <span style="background:#22C96E;color:#0B0E14;font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;">🎬 ANIMIERT</span>' if has_gif else ''
+                    report_img_html = f'<img src="{display_url}" style="width:100%;height:100%;object-fit:cover;image-rendering:pixelated;" onerror="this.alt=\'Gelöscht\';this.src=\'\';">' if has_gif else f'<img src="{display_url}" class="cape-portrait-img" onerror="this.alt=\'Gelöscht\';this.src=\'\';">'
 
                     action_buttons = ""
                     if status == "open":
@@ -878,12 +955,12 @@ th {{ background: #0F172A; color: #94A3B8; font-weight: 600; text-transform: upp
             <tr>
                 <td><span class="{status_class}">{status_label}</span></td>
                 <td>
-                    <div class="report-cape-box" title="Klicken für Großansicht" onclick="openModal('{img_url}', '{title_esc}', '{owner_esc}')">
-                        <img src="{img_url}" class="cape-portrait-img" onerror="this.alt='Gelöscht';this.src='';">
+                    <div class="report-cape-box" title="Klicken für Großansicht" onclick="openModal('{display_url}', '{raw_url}', '{title_esc}', '{owner_esc}', {str(has_gif).lower()})">
+                        {report_img_html}
                     </div>
                 </td>
                 <td>
-                    <div style="font-weight:700;">{title_esc}</div>
+                    <div style="font-weight:700;">{title_esc}{badge_html}</div>
                     <div style="font-size:12px;color:#43DD8C;">{owner_esc}</div>
                 </td>
                 <td style="max-width:280px;color:#F1F5F9;">{html.escape(r.get('reason', ''))}</td>
@@ -939,7 +1016,7 @@ th {{ background: #0F172A; color: #94A3B8; font-weight: 600; text-transform: upp
         <div style="display:flex;gap:20px;align-items:center;margin-top:10px;">
             <div style="text-align:center;">
                 <div style="font-size:11px;color:#94A3B8;margin-bottom:6px;text-transform:uppercase;">Ingame (10:16)</div>
-                <div class="modal-cape-large">
+                <div class="modal-cape-large" id="modalCapeLarge">
                     <img id="modalCapeImg" src="" class="cape-portrait-img">
                 </div>
             </div>
@@ -950,20 +1027,35 @@ th {{ background: #0F172A; color: #94A3B8; font-weight: 600; text-transform: upp
         </div>
 
         <div style="display:flex;gap:10px;width:100%;margin-top:14px;">
-            <a id="modalDirectLink" href="#" target="_blank" class="btn btn-secondary">PNG Öffnen</a>
-            <a id="modalDownloadLink" href="#" download class="btn btn-success">PNG Herunterladen</a>
+            <a id="modalDirectLink" href="#" target="_blank" class="btn btn-secondary">Datei Öffnen</a>
+            <a id="modalDownloadLink" href="#" download class="btn btn-success">Herunterladen</a>
         </div>
     </div>
 </div>
 
 <script>
-function openModal(url, title, owner) {
-    document.getElementById('modalTitle').textContent = title || 'Cape Vorschau';
+function openModal(displayUrl, rawUrl, title, owner, isAnim) {
+    document.getElementById('modalTitle').innerHTML = (title || 'Cape Vorschau') + (isAnim ? ' <span style="background:#22C96E;color:#0B0E14;font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;">🎬 ANIMIERT</span>' : '');
     document.getElementById('modalOwner').textContent = '👤 ' + (owner || 'Unbekannt');
-    document.getElementById('modalCapeImg').src = url;
-    document.getElementById('modalRawImg').src = url;
-    document.getElementById('modalDirectLink').href = url;
-    document.getElementById('modalDownloadLink').href = url;
+    const capeImg = document.getElementById('modalCapeImg');
+    if (isAnim) {
+        capeImg.className = '';
+        capeImg.style.width = '100%';
+        capeImg.style.height = '100%';
+        capeImg.style.objectFit = 'cover';
+        capeImg.style.imageRendering = 'pixelated';
+        capeImg.src = displayUrl;
+    } else {
+        capeImg.className = 'cape-portrait-img';
+        capeImg.style.width = '640%';
+        capeImg.style.height = '200%';
+        capeImg.style.left = '-10%';
+        capeImg.style.top = '-6.25%';
+        capeImg.src = rawUrl;
+    }
+    document.getElementById('modalRawImg').src = rawUrl;
+    document.getElementById('modalDirectLink').href = displayUrl;
+    document.getElementById('modalDownloadLink').href = displayUrl;
     document.getElementById('capeModal').classList.add('open');
 }
 function closeModalDirect() {
@@ -1000,11 +1092,62 @@ document.addEventListener('keydown', function(e) {
         if match_cape_del:
             cape_id = match_cape_del.group(1)
             (IMAGE_DIR / f"{cape_id}.png").unlink(missing_ok=True)
+            (IMAGE_DIR / f"{cape_id}.gif").unlink(missing_ok=True)
             save_capes([c for c in load_capes() if c.get("id") != cape_id])
             self.send_response(HTTPStatus.SEE_OTHER)
             self.send_header("Location", "/?tab=capes")
             self.end_headers()
             return
+
+        # 2. Resolve Report: /reports/<id>/resolve
+        match_resolve = re.fullmatch(r"/reports/([a-f0-9-]{36})/resolve", parsed_path)
+        if match_resolve:
+            rep_id = match_resolve.group(1)
+            with REPORTS_LOCK:
+                reports = load_reports()
+                for r in reports:
+                    if r.get("id") == rep_id:
+                        r["status"] = "resolved"
+                save_reports(reports)
+            self.send_response(HTTPStatus.SEE_OTHER)
+            self.send_header("Location", "/?tab=reports")
+            self.end_headers()
+            return
+
+        # 3. Dismiss Report: /reports/<id>/dismiss
+        match_dismiss = re.fullmatch(r"/reports/([a-f0-9-]{36})/dismiss", parsed_path)
+        if match_dismiss:
+            rep_id = match_dismiss.group(1)
+            with REPORTS_LOCK:
+                save_reports([r for r in load_reports() if r.get("id") != rep_id])
+            self.send_response(HTTPStatus.SEE_OTHER)
+            self.send_header("Location", "/?tab=reports")
+            self.end_headers()
+            return
+
+        # 4. Remove Cape from Report: /reports/<id>/remove-cape
+        match_remove_cape = re.fullmatch(r"/reports/([a-f0-9-]{36})/remove-cape", parsed_path)
+        if match_remove_cape:
+            rep_id = match_remove_cape.group(1)
+            cape_to_del = None
+            with REPORTS_LOCK:
+                reports = load_reports()
+                for r in reports:
+                    if r.get("id") == rep_id:
+                        cape_to_del = r.get("cape_id")
+                        r["status"] = "removed"
+                save_reports(reports)
+            if cape_to_del:
+                (IMAGE_DIR / f"{cape_to_del}.png").unlink(missing_ok=True)
+                (IMAGE_DIR / f"{cape_to_del}.gif").unlink(missing_ok=True)
+                save_capes([c for c in load_capes() if c.get("id") != cape_to_del])
+            self.send_response(HTTPStatus.SEE_OTHER)
+            self.send_header("Location", "/?tab=reports")
+            self.end_headers()
+            return
+
+        self.send_response(HTTPStatus.NOT_FOUND)
+        self.end_headers()
 
         # 2. Report Actions: /reports/<id>/(resolve|remove-cape|dismiss)
         match_report = re.fullmatch(r"/reports/([a-f0-9-]{36})/(resolve|remove-cape|dismiss)", parsed_path)

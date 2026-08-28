@@ -6,6 +6,7 @@ import java.util.List;
 public class ModuleManager {
     private static ModuleManager instance;
     private final List<Module> modules;
+    private final List<HudModule> hudModules;
     private final ZoomModule zoomModule;
     private final FpsModule fpsModule;
     private final CpsModule cpsModule;
@@ -52,6 +53,13 @@ public class ModuleManager {
         this.modules.add(this.potionEffectModule);
         this.modules.add(this.crosshairModule);
         this.modules.add(this.clearGlassModule);
+
+        // This collection is read every rendered frame. Build it once instead of
+        // allocating a stream pipeline and a new list for every frame.
+        this.hudModules = this.modules.stream()
+                .filter(m -> m instanceof HudModule && !(m instanceof CrosshairModule))
+                .map(HudModule.class::cast)
+                .toList();
     }
 
     public static ModuleManager getInstance() {
@@ -80,7 +88,7 @@ public class ModuleManager {
     public CrosshairModule getCrosshairModule() { return crosshairModule; }
     public ClearGlassModule getClearGlassModule() { return clearGlassModule; }
 
-    public java.util.List<HudModule> getHudModules() {
-        return modules.stream().filter(m -> m instanceof HudModule && !(m instanceof CrosshairModule)).map(HudModule.class::cast).toList();
+    public List<HudModule> getHudModules() {
+        return hudModules;
     }
 }

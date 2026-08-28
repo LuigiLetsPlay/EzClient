@@ -93,8 +93,9 @@ def upload_cape(
     title: str,
     token: str = "",
     access_token: str = "",
+    anim_gif: bytes | None = None,
 ) -> dict:
-    """Upload one PNG cape using a small multipart request with ownership token support."""
+    """Upload one PNG cape (and optional animated GIF) using a small multipart request with ownership token support."""
     image = path.read_bytes()
     if len(image) > MAX_CAPE_BYTES:
         raise ValueError("Das Cape darf maximal 2 MB groß sein.")
@@ -124,8 +125,14 @@ def upload_cape(
         f"--{boundary}\r\n".encode(),
         b'Content-Disposition: form-data; name="cape"; filename="cape.png"\r\n',
         b"Content-Type: image/png\r\n\r\n", image, b"\r\n",
-        f"--{boundary}--\r\n".encode(),
     ])
+    if anim_gif and len(anim_gif) > 0 and len(anim_gif) <= 8 * 1024 * 1024:
+        parts.extend([
+            f"--{boundary}\r\n".encode(),
+            b'Content-Disposition: form-data; name="anim_gif"; filename="anim.gif"\r\n',
+            b"Content-Type: image/gif\r\n\r\n", anim_gif, b"\r\n",
+        ])
+    parts.append(f"--{boundary}--\r\n".encode())
     headers = {
         "Content-Type": f"multipart/form-data; boundary={boundary}",
         "Accept": "application/json",
@@ -164,6 +171,33 @@ def cape_image_url(cape: dict) -> str:
         return value
     cape_id = str(cape.get("id") or cape.get("slug") or "")
     return f"{_base_url()}/capes/{urllib.parse.quote(cape_id)}/image" if cape_id else ""
+
+
+def deactivate_cape(owner_uuid: str, token: str, access_token: str = "") -> None:
+    """Stop advertising an EzClient cape for this player without deleting uploads."""
+    canonical_uuid = normalize_player_uuid(owner_uuid)
+    data = json.dumps({"owner_uuid": canonical_uuid, "token": token or ""}).encode("utf-8")
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": f"EzClient/{APP_VERSION}",
+    }
+    if urllib.parse.urlparse(_base_url()).scheme == "https" and access_token:
+        headers["Authorization"] = f"Bearer {access_token}"
+    if token:
+        headers["X-EzClient-Cape-Token"] = token
+    request = urllib.request.Request(
+        f"{_base_url()}/capes/deactivate", data=data, method="POST", headers=headers
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10):
+            pass
+    except urllib.error.HTTPError as exc:
+        try:
+            message = json.loads(exc.read().decode("utf-8")).get("error") or str(exc)
+        except Exception:
+            message = str(exc)
+        raise ValueError(message)
 
 
 def report_cape(cape_id: str, reason: str, reporter: str) -> None:

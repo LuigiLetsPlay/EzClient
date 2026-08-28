@@ -33,6 +33,9 @@ public final class PotionEffectModule extends HudModule {
     private boolean showTime = true;
     private int blinkWarningSeconds = 5;
     private boolean useCustomColors = true;
+    private long cachedEffectTick = Long.MIN_VALUE;
+    private List<MobEffectInstance> cachedEffects = List.of();
+    private List<MobEffectInstance> editorEffects;
 
     public PotionEffectModule() {
         super("Potion Effects", "HUD", false, 10, 100, "", "");
@@ -62,14 +65,20 @@ public final class PotionEffectModule extends HudModule {
     public void setUseCustomColors(boolean useCustomColors) { this.useCustomColors = useCustomColors; ConfigManager.save(); }
 
     private List<MobEffectInstance> getSortedEffects(Minecraft client, boolean editor) {
-        List<MobEffectInstance> list = new ArrayList<>();
         if (editor) {
-            list.add(new MobEffectInstance(MobEffects.SPEED, 1200, 1, false, false, false));
-            list.add(new MobEffectInstance(MobEffects.STRENGTH, 2400, 0, false, false, false));
-            list.add(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 3600, 0, false, false, false));
-            return list;
+            if (editorEffects == null) {
+                editorEffects = List.of(
+                        new MobEffectInstance(MobEffects.SPEED, 1200, 1, false, false, false),
+                        new MobEffectInstance(MobEffects.STRENGTH, 2400, 0, false, false, false),
+                        new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 3600, 0, false, false, false));
+            }
+            return editorEffects;
         }
 
+        long tick = client.level == null ? Long.MIN_VALUE : client.level.getOverworldClockTime();
+        if (tick == cachedEffectTick) return cachedEffects;
+
+        List<MobEffectInstance> list = new ArrayList<>();
         if (client.player != null) {
             list.addAll(client.player.getActiveEffects());
         }
@@ -81,31 +90,31 @@ public final class PotionEffectModule extends HudModule {
         } else if (sortOrder == SortOrder.BUFF_FIRST) {
             list.sort((a, b) -> Boolean.compare(!a.getEffect().value().isBeneficial(), !b.getEffect().value().isBeneficial()));
         }
-        return list;
+        cachedEffectTick = tick;
+        cachedEffects = list;
+        return cachedEffects;
     }
 
     @Override
     public int getWidth(Minecraft client) {
-        List<MobEffectInstance> effects = getSortedEffects(client, true);
-        if (effects.isEmpty()) return 60;
-
-        int maxItemW = displayStyle == DisplayStyle.COMPACT ? 42 : 94;
-        if (!vertical) {
-            return effects.size() * (maxItemW + 4);
-        }
-        return maxItemW;
+        return widthForCount(3);
     }
 
     @Override
     public int getHeight(Minecraft client) {
-        List<MobEffectInstance> effects = getSortedEffects(client, true);
-        if (effects.isEmpty()) return 24;
+        return heightForCount(3);
+    }
 
+    private int widthForCount(int count) {
+        if (count <= 0) return 60;
+        int maxItemW = displayStyle == DisplayStyle.COMPACT ? 42 : 94;
+        return vertical ? maxItemW : count * (maxItemW + 4);
+    }
+
+    private int heightForCount(int count) {
+        if (count <= 0) return 24;
         int itemH = displayStyle == DisplayStyle.COMPACT ? 16 : 20;
-        if (vertical) {
-            return effects.size() * (itemH + 2);
-        }
-        return itemH;
+        return vertical ? count * (itemH + 2) : itemH;
     }
 
     @Override
@@ -133,8 +142,10 @@ public final class PotionEffectModule extends HudModule {
         graphics.pose().translate(getX(), getY());
         graphics.pose().scale(scale, scale);
 
-        int totalW = getWidth(client);
-        int totalH = getHeight(client);
+        // Reuse the already collected effects. The old code constructed three
+        // dummy effect instances again every frame just to calculate this box.
+        int totalW = widthForCount(effects.size());
+        int totalH = heightForCount(effects.size());
 
         renderBackgroundAndBorder(graphics, 0, 0, totalW, totalH);
 
@@ -152,7 +163,8 @@ public final class PotionEffectModule extends HudModule {
 
             String name = net.minecraft.network.chat.Component.translatable(effect.getDescriptionId()).getString();
             String amp = toRoman(effect.getAmplifier());
-            String timeStr = (secs / 60) + ":" + String.format("%02d", secs % 60);
+            int remainingSeconds = secs % 60;
+            String timeStr = (secs / 60) + (remainingSeconds < 10 ? ":0" : ":") + remainingSeconds;
 
             int nameColor = color();
             if (getColorMode() == ColorMode.SOLID && useCustomColors) {

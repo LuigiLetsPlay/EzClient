@@ -139,13 +139,86 @@
     });
   }
 
+  let capeAnimTimer = null;
+  let capeAnimImg = null;
+  let capeAnimCanvas = null;
+  let capeAnimCtx = null;
+
+  function stopCapeAnimation() {
+    if (capeAnimTimer) {
+      clearInterval(capeAnimTimer);
+      capeAnimTimer = null;
+    }
+    capeAnimImg = null;
+  }
+
   function setCape(capeUrl) {
+    stopCapeAnimation();
     if (!skinViewer) return;
     if (!capeUrl) {
       skinViewer.resetCape();
     } else {
       skinViewer.loadCape(capeUrl);
     }
+  }
+
+  function setAnimatedCape(sheetUrl, frameCount, fps, columns, frameW, frameH, pingPong) {
+    stopCapeAnimation();
+    if (!skinViewer || !sheetUrl) return;
+
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      capeAnimImg = img;
+      const count = Math.max(1, Number(frameCount) || 1);
+      const fFps = Math.max(1, Math.min(60, Number(fps) || 12));
+      const cols = Math.max(1, Number(columns) || count);
+      const fw = Math.max(1, Number(frameW) || 256);
+      const fh = Math.max(1, Number(frameH) || 128);
+      const intervalMs = Math.max(16, Math.round(1000 / fFps));
+
+      if (skinViewer.capeCanvas) {
+        skinViewer.capeCanvas.width = fw;
+        skinViewer.capeCanvas.height = fh;
+        skinViewer.recreateCapeTexture();
+      }
+
+      let currentFrame = 0;
+
+      function renderFrame(idx) {
+        if (!skinViewer || !capeAnimImg || !skinViewer.capeCanvas) return;
+        const validIdx = Math.max(0, Math.min(count - 1, ((idx % count) + count) % count));
+        const col = validIdx % cols;
+        const row = Math.floor(validIdx / cols);
+        const sx = col * fw;
+        const sy = row * fh;
+
+        const skinCapeCtx = skinViewer.capeCanvas.getContext("2d", { willReadFrequently: true });
+        if (skinCapeCtx) {
+          // Draw new frame directly over canvas without clearRect / width reset to prevent 1-frame blank flicker
+          skinCapeCtx.drawImage(capeAnimImg, sx, sy, fw, fh, 0, 0, fw, fh);
+        }
+        if (skinViewer.capeTexture) {
+          skinViewer.capeTexture.needsUpdate = true;
+        }
+        skinViewer.playerObject.backEquipment = "cape";
+        if (skinViewer.playerObject.cape) {
+          skinViewer.playerObject.cape.visible = true;
+        }
+      }
+
+      renderFrame(0);
+
+      capeAnimTimer = setInterval(() => {
+        if (!skinViewer || !capeAnimImg) {
+          stopCapeAnimation();
+          return;
+        }
+        currentFrame = (currentFrame + 1) % count;
+        renderFrame(currentFrame);
+      }, intervalMs);
+    };
+    img.src = sheetUrl;
   }
 
   function setAnimation(name, speed) {
@@ -219,7 +292,13 @@
     skinViewer.playerObject.rotation.y = (deg * Math.PI) / 180;
   }
 
-  function resetView() {
+  function setInitialRotation(degX, degY) {
+    if (!skinViewer) return;
+    if (degX !== undefined) skinViewer.playerObject.rotation.x = (degX * Math.PI) / 180;
+    if (degY !== undefined) skinViewer.playerObject.rotation.y = (degY * Math.PI) / 180;
+  }
+
+  function resetView(defaultRotY) {
     if (!skinViewer) return;
     skinViewer.controls.reset();
     skinViewer.zoom = 0.68;
@@ -227,7 +306,7 @@
     skinViewer.camera.position.y = 0;
     skinViewer.camera.position.z = 65;
     skinViewer.playerObject.rotation.x = 0;
-    skinViewer.playerObject.rotation.y = 0;
+    skinViewer.playerObject.rotation.y = ((defaultRotY !== undefined ? defaultRotY : 0) * Math.PI) / 180;
     skinViewer.playerObject.rotation.z = 0;
   }
 

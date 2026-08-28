@@ -15,6 +15,10 @@ import net.minecraft.world.phys.HitResult;
  * target entity highlighting, outline styling, and auto-hide rules.
  */
 public class CrosshairModule extends HudModule {
+    private static final double[] CIRCLE_X = {1.0, 0.8660254, 0.5, 0.0, -0.5, -0.8660254,
+            -1.0, -0.8660254, -0.5, 0.0, 0.5, 0.8660254};
+    private static final double[] CIRCLE_Y = {0.0, 0.5, 0.8660254, 1.0, 0.8660254, 0.5,
+            0.0, -0.5, -0.8660254, -1.0, -0.8660254, -0.5};
     public enum CrosshairType {
         CLASSIC_CROSS,
         CUSTOM_CROSS,
@@ -332,10 +336,9 @@ public class CrosshairModule extends HudModule {
             }
             case CIRCLE -> {
                 int r = g + s / 2;
-                for (int angle = 0; angle < 360; angle += 30) {
-                    double rad = Math.toRadians(angle);
-                    int px = cx + (int) Math.round(Math.cos(rad) * r);
-                    int py = cy + (int) Math.round(Math.sin(rad) * r);
+                for (int i = 0; i < CIRCLE_X.length; i++) {
+                    int px = cx + (int) Math.round(CIRCLE_X[i] * r);
+                    int py = cy + (int) Math.round(CIRCLE_Y[i] * r);
                     drawRect(graphics, px - halfT, py - halfT, t, t, col);
                 }
             }

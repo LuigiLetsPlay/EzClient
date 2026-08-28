@@ -5,6 +5,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 /** Shared, fully user-configurable state for every EzClient HUD module. */
 public abstract class HudModule extends Module {
+    private static long renderFrameTimeMillis;
     public enum ColorMode {
         SOLID,
         WAVE,
@@ -114,16 +115,25 @@ public abstract class HudModule extends Module {
     }
 
     public int color(long offsetMs) {
+        long now = renderFrameTimeMillis != 0L ? renderFrameTimeMillis : System.currentTimeMillis();
         if (colorMode == ColorMode.RAINBOW) {
             long period = (long) (4000L / Math.max(0.1f, rainbowSpeed));
-            float hue = ((System.currentTimeMillis() + offsetMs) % period) / (float) period;
+            float hue = ((now + offsetMs) % period) / (float) period;
             return 0xFF000000 | (java.awt.Color.HSBtoRGB(hue, rainbowSaturation, 1.0f) & 0xFFFFFF);
         } else if (colorMode == ColorMode.WAVE) {
-            double time = ((System.currentTimeMillis() + offsetMs) % 3000L) / 3000.0;
+            double time = ((now + offsetMs) % 3000L) / 3000.0;
             float factor = (float) ((Math.sin(time * Math.PI * 2.0) + 1.0) / 2.0);
             return interpolateColor(textColor, waveColor2, factor);
         }
         return textColor;
+    }
+
+    public static void beginRenderFrame(long nowMillis) {
+        renderFrameTimeMillis = nowMillis;
+    }
+
+    protected static long renderFrameTimeMillis() {
+        return renderFrameTimeMillis != 0L ? renderFrameTimeMillis : System.currentTimeMillis();
     }
 
     public int currentBorderColor() {
@@ -160,18 +170,13 @@ public abstract class HudModule extends Module {
         // Left & right side strips
         graphics.fill(x, y + r, x + r, y + h - r, color);
         graphics.fill(x + w - r, y + r, x + w, y + h - r, color);
-        // Corner approximation steps
+        // One span per scanline produces the same rounded silhouette with two
+        // draw calls instead of four per row.
         for (int i = 1; i < r; i++) {
             int cx = (int) Math.round(Math.sqrt(r * r - (r - i) * (r - i)));
             int span = r - cx;
-            // Top-left
-            graphics.fill(x + span, y + i, x + r, y + i + 1, color);
-            // Top-right
-            graphics.fill(x + w - r, y + i, x + w - span, y + i + 1, color);
-            // Bottom-left
-            graphics.fill(x + span, y + h - i - 1, x + r, y + h - i, color);
-            // Bottom-right
-            graphics.fill(x + w - r, y + h - i - 1, x + w - span, y + h - i, color);
+            graphics.fill(x + span, y + i, x + w - span, y + i + 1, color);
+            graphics.fill(x + span, y + h - i - 1, x + w - span, y + h - i, color);
         }
     }
 
