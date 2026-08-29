@@ -12,15 +12,28 @@ def build() -> None:
     if not launcher.exists():
         raise FileNotFoundError("Build the launcher first: python build_exe.py")
 
+    hidden_imports = [
+        "PySide6.QtCore",
+        "PySide6.QtGui",
+        "PySide6.QtWidgets",
+        "shiboken6",
+        "psutil",
+    ]
+
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--name=EzClient-Setup",
         "--onefile", "--windowed", "--clean", "--noconfirm",
+        "--noupx",
         f"--icon={ROOT / 'ui' / 'assets' / 'icon.ico'}",
         f"--add-data={launcher};.",
         f"--add-data={ROOT / 'ui' / 'assets'};ui/assets",
-        str(ROOT / "installer" / "installer_gui.py"),
     ]
+
+    for h in hidden_imports:
+        cmd.append(f"--hidden-import={h}")
+
+    cmd.append(str(ROOT / "installer" / "installer_gui.py"))
     subprocess.run(cmd, cwd=ROOT, check=True)
 
 
