@@ -53,6 +53,7 @@ def build_exe():
         "backend.controllers.account_controller",
         "backend.controllers.update_controller",
         "backend.ui_splash",
+        "shiboken6",
         "psutil",
     ]
 
@@ -63,6 +64,7 @@ def build_exe():
         "--name=EzClient",
         "--onefile",
         "--windowed",
+        "--noupx",
         f"--icon={icon_path}",
         f"--add-data={ui_data}",
         f"--add-data={assets_data}",
