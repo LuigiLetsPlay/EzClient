@@ -52,6 +52,7 @@ Diese Version bringt native Unterstützung für die moderne Minecraft 26.x-Reihe
 
 ## 📦 Downloads & Installation
 - **`EzClient-Setup.exe`**: Komfortabler Windows-Installer (Desktop- & Startmenü-Verknüpfungen)
+- **`EzClient-v2.0.0-Windows-Portable.zip`**: Portable Version (ohne Installation sofort entpacken und starten)
 - **`EzClient.exe`**: Standalone Executable (sofort startbar)
 - **`EzClient-2.0.0+26.1.jar`**: Client Mod JAR für Minecraft 26.1
 - **`EzClient-2.0.0+26.1.1.jar`**: Client Mod JAR für Minecraft 26.1.1
