@@ -1,5 +1,7 @@
 package app.ezclient.gui;
 
+import net.minecraft.resources.Identifier;
+
 public final class BossBarModule extends FeatureModule {
     public BossBarModule() {
         super("Boss Bar Customizer", true, 12);
@@ -19,5 +21,10 @@ public final class BossBarModule extends FeatureModule {
     @Override public int getHeight(net.minecraft.client.Minecraft mc) { return 28; }
     @Override public void renderFeature(net.minecraft.client.gui.GuiGraphicsExtractor g, net.minecraft.client.Minecraft mc, boolean editor) {
         if (editor) super.renderFeature(g, mc, true); // Live bars are drawn from BossHealthOverlay's synchronized events.
+    }
+
+    @Override
+    public Identifier getIcon() {
+        return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/boss_bar.png");
     }
 }

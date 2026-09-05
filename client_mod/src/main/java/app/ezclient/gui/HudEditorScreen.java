@@ -116,16 +116,9 @@ public final class HudEditorScreen extends Screen {
     }
 
     private HudModule hit(double mx, double my) {
-        // First check enabled modules
+        // Only check enabled modules - disabled modules are not shown or interactive in HUD editor
         for (HudModule h : ModuleManager.getInstance().getHudModules()) {
             if (!h.isEnabled()) continue;
-            int w = getModuleWidth(h);
-            int he = getModuleHeight(h);
-            if (mx >= h.getX() && mx <= h.getX() + w && my >= h.getY() && my <= h.getY() + he) return h;
-        }
-        // Then check disabled modules
-        for (HudModule h : ModuleManager.getInstance().getHudModules()) {
-            if (h.isEnabled()) continue;
             int w = getModuleWidth(h);
             int he = getModuleHeight(h);
             if (mx >= h.getX() && mx <= h.getX() + w && my >= h.getY() && my <= h.getY() + he) return h;
@@ -219,9 +212,13 @@ public final class HudEditorScreen extends Screen {
                         // Toggle enabled/disabled item
                         showContextMenu = false;
                         if (contextModule != null) {
-                            contextModule.setEnabled(!contextModule.isEnabled());
+                            boolean nowEnabled = !contextModule.isEnabled();
+                            contextModule.setEnabled(nowEnabled);
                             ConfigManager.save();
                             hasUnsavedChanges = true;
+                            if (!nowEnabled && selected == contextModule) {
+                                selected = null;
+                            }
                         }
                     } else {
                         // Reset item
@@ -323,7 +320,13 @@ public final class HudEditorScreen extends Screen {
             if (Math.abs(targetX) < SNAP_DISTANCE) { snapX = 0; guideX = 0; }
             if (Math.abs(targetX + mw - width) < SNAP_DISTANCE) { snapX = width - mw; guideX = width; }
             if (Math.abs(targetY) < SNAP_DISTANCE) { snapY = 0; guideY = 0; }
-            if (Math.abs(targetY + mh - (height - 30)) < SNAP_DISTANCE) { snapY = height - 30 - mh; guideY = height - 30; }
+            if (Math.abs(targetY + mh - height) < SNAP_DISTANCE) { snapY = height - mh; guideY = height; }
+
+            // Center-screen snapping (horizontal and vertical center axes)
+            int centerX = (width - mw) / 2;
+            if (Math.abs(targetX - centerX) < SNAP_DISTANCE) { snapX = centerX; guideX = width / 2; }
+            int centerY = (height - mh) / 2;
+            if (Math.abs(targetY - centerY) < SNAP_DISTANCE) { snapY = centerY; guideY = height / 2; }
 
             // Inter-module snapping
             for (HudModule other : ModuleManager.getInstance().getHudModules()) {
@@ -343,9 +346,9 @@ public final class HudEditorScreen extends Screen {
                 if (Math.abs(targetY + mh + STACK_GAP - oy) < SNAP_DISTANCE) { snapY = oy - mh - STACK_GAP; guideY = oy; }
             }
 
-            // Keep within visible bounds
+            // Keep within visible bounds (can place anywhere across the entire Minecraft screen)
             snapX = Math.max(0, Math.min(width - mw, snapX));
-            snapY = Math.max(0, Math.min(height - 30 - mh, snapY));
+            snapY = Math.max(0, Math.min(height - mh, snapY));
 
             selected.setPosition(snapX, snapY);
             return true;
@@ -373,22 +376,10 @@ public final class HudEditorScreen extends Screen {
         if (guideX >= 0) g.fill(guideX, 0, guideX + 1, height, 0xAA00D2FF);
         if (guideY >= 0) g.fill(0, guideY, width, guideY + 1, 0xAA00D2FF);
 
-        // ── 2. Render EzClient Modules ──
+        // ── 2. Render Active EzClient HUD Modules (Disabled modules are not shown) ──
         for (HudModule h : ModuleManager.getInstance().getHudModules()) {
             if (h.isEnabled()) {
                 HudRenderer.draw(g, h, true);
-            } else {
-                int hx = h.getX();
-                int hy = h.getY();
-                int hw = getModuleWidth(h);
-                int hh = getModuleHeight(h);
-                // Ghost preview with outline and OFF badge so disabled modules are visible and positionable
-                g.fill(hx, hy, hx + hw, hy + hh, 0x40101722);
-                g.outline(hx, hy, hw, hh, 0x608090A0);
-                HudRenderer.draw(g, h, true);
-                int badgeW = font.width("AUS") + 4;
-                g.fill(hx + hw - badgeW - 1, hy + 1, hx + hw - 1, hy + 9, 0xC0992222);
-                g.text(font, "AUS", hx + hw - badgeW + 1, hy + 1, 0xFFFFFFFF);
             }
         }
 

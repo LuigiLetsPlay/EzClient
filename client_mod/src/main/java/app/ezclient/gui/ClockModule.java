@@ -1,6 +1,7 @@
 package app.ezclient.gui;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.resources.Identifier;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
@@ -52,5 +53,10 @@ public final class ClockModule extends HudModule {
     @Override
     public String displayText(Minecraft client) {
         return (showPrefix ? "Time: " : "") + value(client);
+    }
+
+    @Override
+    public Identifier getIcon() {
+        return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/clock.png");
     }
 }

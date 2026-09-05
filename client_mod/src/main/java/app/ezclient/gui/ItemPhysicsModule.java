@@ -1,6 +1,7 @@
 package app.ezclient.gui;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.item.ItemEntity;
 
 public final class ItemPhysicsModule extends FeatureModule {
@@ -21,4 +22,9 @@ public final class ItemPhysicsModule extends FeatureModule {
         }
     }
     public boolean active() { return isEnabled() && nearbyItems <= number("cap"); }
+
+    @Override
+    public Identifier getIcon() {
+        return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/item_physics.png");
+    }
 }

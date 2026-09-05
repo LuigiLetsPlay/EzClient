@@ -1,5 +1,7 @@
 package app.ezclient.gui;
 
+import net.minecraft.resources.Identifier;
+
 public final class TimeWeatherModule extends FeatureModule {
     private long startNanos = System.nanoTime();
     public TimeWeatherModule() {
@@ -18,4 +20,9 @@ public final class TimeWeatherModule extends FeatureModule {
         };
     }
     @Override protected void onToggle() { startNanos = System.nanoTime(); }
+
+    @Override
+    public Identifier getIcon() {
+        return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/time_weather.png");
+    }
 }

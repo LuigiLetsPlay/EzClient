@@ -6,7 +6,7 @@ import zipfile
 import subprocess
 from pathlib import Path
 from typing import Any, Callable, Optional, Tuple, List
-from backend.models.types import ProfileData
+from backend.models.types import ProfileData, APP_VERSION
 from backend.services.minecraft import minecraft_dir
 from backend.services.msa_auth import get_minecraft_session, MinecraftSession
 
@@ -357,7 +357,7 @@ def launch_minecraft_direct(
                     "executablePath": str(java_bin),
                     "jvmArguments": [f"-Xmx{getattr(profile, 'ram_mb', 4096) or 4096}M", "-Xms512M"],
                     "launcherName": "EzClient",
-                    "launcherVersion": "2.0.0",
+                    "launcherVersion": APP_VERSION,
                     "gameDirectory": str(profile.path),
                 },
             )
@@ -500,7 +500,7 @@ def launch_minecraft_direct(
         f"-Dorg.lwjgl.system.SharedLibraryExtractPath={natives_dir}",
         f"-Dorg.lwjgl.librarypath={natives_dir}",
         "-Dminecraft.launcher.brand=EzClient",
-        "-Dminecraft.launcher.version=2.0.0",
+        f"-Dminecraft.launcher.version={APP_VERSION}",
         "-cp", classpath_str,
         main_class,
     ]

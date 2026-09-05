@@ -33,8 +33,8 @@ import app.ezclient.render.ConnectedGlassModel;
  * - First-Launch Performance & PvP Optimization (Fast Graphics, 8 Chunks, No Shadows/Clouds, Biome Blend 0, 120 FPS default)
  */
 public class EzClientMod implements ClientModInitializer {
-    public static final String CLIENT_VERSION = "2.0.0";
-    public static final String CLIENT_TITLE = "EzClient 2.0.0";
+    public static final String CLIENT_VERSION = "2.0.1";
+    public static final String CLIENT_TITLE = "EzClient 2.0.1";
     private static volatile boolean running = true;
     private static Path ezClientDataDir = null;
 

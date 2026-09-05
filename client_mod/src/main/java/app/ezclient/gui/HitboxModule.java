@@ -1,5 +1,6 @@
 package app.ezclient.gui;
 
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.monster.Enemy;
@@ -21,5 +22,10 @@ public final class HitboxModule extends FeatureModule {
     public boolean accepts(Entity e) {
         return e instanceof Player ? flag("players") : e instanceof Enemy ? flag("hostile") : e instanceof Animal ? flag("animals")
             : e instanceof Projectile ? flag("projectiles") : e instanceof ItemEntity && flag("items");
+    }
+
+    @Override
+    public Identifier getIcon() {
+        return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/hitbox.png");
     }
 }

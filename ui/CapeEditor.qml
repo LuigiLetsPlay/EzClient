@@ -29,7 +29,6 @@ Item {
     function loadSource(url) {
         if (!url) return
         root.selectedSource = url
-        root.cropImageSource = url
         root.cropX = 0; root.cropY = 0; root.cropW = 1; root.cropH = 1
         var clean = url.toLowerCase().split("?")[0]
         root.animatedSource = clean.endsWith(".gif") || clean.endsWith(".mp4") || clean.endsWith(".webm")
@@ -42,15 +41,14 @@ Item {
                 root.mediaProcessing = false
                 return
             }
-            if (info.thumbnailUrl && info.thumbnailUrl !== "") {
-                root.cropImageSource = info.thumbnailUrl
-            }
+            root.cropImageSource = (info.thumbnailUrl && info.thumbnailUrl !== "") ? (info.thumbnailUrl + "?t=" + Date.now()) : url
             root.mediaDuration = info.duration
             root.trimStart = 0
             root.trimEnd = Math.min(5, info.duration)
             root.pendingPreview = ""
             root.prepareAnimation()
         } else {
+            root.cropImageSource = url
             root.prepare()
         }
     }
@@ -376,14 +374,17 @@ Item {
                         height: parent.height
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
+                        cache: false
                         source: root.cropImageSource
-                        onStatusChanged: if (status === Image.Ready) cropStage.resetSelection()
+                        onStatusChanged: if (status === Image.Ready && cropStage.paintW > 0 && cropStage.paintH > 0) cropStage.resetSelection()
+                        onPaintedWidthChanged: if (status === Image.Ready && cropStage.paintW > 0 && cropStage.paintH > 0 && root.cropW === 1 && root.cropH === 1) cropStage.resetSelection()
                     }
 
                     // Cape-proportioned crop frame (10x16 like the real cape).
                     // Drag it to move; drag the handle to resize (aspect kept).
                     Rectangle {
                         id: cropFrame
+                        visible: cropStage.paintW > 0 && cropStage.paintH > 0
                         x: cropStage.paintX + root.cropX * cropStage.paintW
                         y: cropStage.paintY + root.cropY * cropStage.paintH
                         width: root.cropW * cropStage.paintW
@@ -482,12 +483,17 @@ Item {
                         }
 
                         Canvas {
+                            id: gridCanvas
                             anchors.fill: parent
                             visible: root.showPixelGrid
                             opacity: 0.55
+                            onWidthChanged: requestPaint()
+                            onHeightChanged: requestPaint()
+                            onVisibleChanged: if (visible) requestPaint()
                             onPaint: {
                                 var ctx = getContext("2d")
                                 ctx.clearRect(0, 0, width, height)
+                                if (width <= 0 || height <= 0) return
                                 ctx.strokeStyle = "#A78BFA"
                                 ctx.lineWidth = 1
                                 for (var x = 1; x < 10; ++x) {

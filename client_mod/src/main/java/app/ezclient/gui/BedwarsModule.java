@@ -2,6 +2,7 @@ package app.ezclient.gui;
 
 import java.util.*;
 import net.minecraft.client.Minecraft;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.scores.DisplaySlot;
 import net.minecraft.world.scores.PlayerTeam;
@@ -48,5 +49,10 @@ public final class BedwarsModule extends FeatureModule {
         for (String team : List.of("Red", "Blue", "Green", "Yellow", "Aqua", "White", "Pink", "Gray"))
             if (text.contains(team)) return component.copy().withStyle(style -> style.withColor(tint(team, false) & 0xffffff));
         return component;
+    }
+
+    @Override
+    public Identifier getIcon() {
+        return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/bedwars.png");
     }
 }

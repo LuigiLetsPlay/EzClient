@@ -1,6 +1,7 @@
 package app.ezclient.gui;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.resources.Identifier;
 
 /** Live JVM memory indicator with configurable format presets. */
 public final class MemoryModule extends HudModule {
@@ -74,5 +75,10 @@ public final class MemoryModule extends HudModule {
             return (showPrefix ? "RAM: " : "") + val;
         }
         return displayText(client);
+    }
+
+    @Override
+    public Identifier getIcon() {
+        return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/memory.png");
     }
 }

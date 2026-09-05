@@ -438,7 +438,7 @@ Rectangle {
                 spacing: 6
                 Image { source: "icons/zap.svg"; width: 12; height: 12; fillMode: Image.PreserveAspectFit }
                 Text {
-                    text: "Update v" + (profileController ? profileController.ezClientLatestVersion : "2.0.0")
+                    text: "Update v" + (profileController ? profileController.ezClientLatestVersion : "2.0.1")
                     font.family: EzTheme.mcFontFamily
                     font.pixelSize: 10
                     font.bold: true

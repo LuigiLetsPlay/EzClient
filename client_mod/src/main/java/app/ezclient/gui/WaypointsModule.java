@@ -3,6 +3,7 @@ package app.ezclient.gui;
 import java.util.*;
 import com.google.gson.*;
 import net.minecraft.client.Minecraft;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.Vec3;
 
 public final class WaypointsModule extends FeatureModule {
@@ -78,5 +79,10 @@ public final class WaypointsModule extends FeatureModule {
         active(mc).stream().sorted(Comparator.comparingDouble(p -> p.position().distanceToSqr(mc.player.position()))).limit(8)
             .forEach(p -> rows.add(direction(mc, p.position()) + " " + p.icon() + " " + p.name() + " " + Math.round(p.position().distanceTo(mc.player.position())) + "m"));
         return rows;
+    }
+
+    @Override
+    public Identifier getIcon() {
+        return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/waypoints.png");
     }
 }

@@ -1,6 +1,7 @@
 package app.ezclient.gui;
 
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.client.Minecraft;
 
@@ -17,5 +18,10 @@ public final class ParticleCustomizerModule extends FeatureModule {
         var engine = Minecraft.getInstance().particleEngine;
         if (flag("alwaysCrit")) engine.createTrackingEmitter(target, ParticleTypes.CRIT);
         if (flag("alwaysSharpness")) engine.createTrackingEmitter(target, ParticleTypes.ENCHANTED_HIT);
+    }
+
+    @Override
+    public Identifier getIcon() {
+        return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/particle.png");
     }
 }

@@ -11,7 +11,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Minecraft-26.x%20%7C%20Fabric-24D677?style=flat-square" alt="Minecraft" />
-  <img src="https://img.shields.io/badge/Version-2.0.0-gold?style=flat-square" alt="Version 2.0.0" />
+  <img src="https://img.shields.io/badge/Version-2.0.1-gold?style=flat-square" alt="Version 2.0.1" />
   <img src="https://img.shields.io/badge/Sprache-Deutsch%20%2F%20English-blue?style=flat-square" alt="Sprache" />
   <img src="https://img.shields.io/badge/Plattform-Windows-0078D6?style=flat-square" alt="Plattform" />
   <img src="https://img.shields.io/badge/Lizenz-EzClient%20License-purple?style=flat-square" alt="Lizenz" />

@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.SoundEventListener;
 import net.minecraft.client.sounds.WeighedSoundEvents;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.Vec3;
 
 public final class SoundEnhancerModule extends FeatureModule implements SoundEventListener {
@@ -56,5 +57,10 @@ public final class SoundEnhancerModule extends FeatureModule implements SoundEve
     @Override public net.minecraft.network.chat.Component styledText(String text) {
         var component = super.styledText(text);
         return text.startsWith("!") ? component.copy().withStyle(style -> style.withColor(tint("highlightColor", false) & 0xffffff)) : component;
+    }
+
+    @Override
+    public Identifier getIcon() {
+        return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/sound.png");
     }
 }

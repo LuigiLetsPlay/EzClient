@@ -1,5 +1,7 @@
 package app.ezclient.gui;
 
+import net.minecraft.resources.Identifier;
+
 public final class NameplateModule extends FeatureModule {
     public NameplateModule() {
         super("Nameplate Levelhead", false, 10);
@@ -13,5 +15,10 @@ public final class NameplateModule extends FeatureModule {
     public boolean friend(String name) {
         for (String value : text("friends").split(",")) if (value.trim().equalsIgnoreCase(name)) return true;
         return false;
+    }
+
+    @Override
+    public Identifier getIcon() {
+        return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/nameplate.png");
     }
 }

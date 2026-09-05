@@ -25,7 +25,7 @@ _DOWNLOAD_LOCKS_GUARD = threading.Lock()
 
 
 def _json(url: str) -> dict:
-    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/2.0.0"})
+    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/2.0.1"})
     with urllib.request.urlopen(request, timeout=30) as response:
         return json.loads(response.read().decode("utf-8"))
 
@@ -55,7 +55,7 @@ def _download_locked(url: str, target: Path, sha1: str = "", expected_size: int 
     temporary = target.with_name(
         f"{target.name}.{os.getpid()}.{threading.get_ident()}.part"
     )
-    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/2.0.0"})
+    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/2.0.1"})
     try:
         with urllib.request.urlopen(request, timeout=60) as response, temporary.open("wb") as output:
             while chunk := response.read(1024 * 256):
