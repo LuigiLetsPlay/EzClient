@@ -46,17 +46,11 @@ Name: "startmenuicon"; Description: "Create Start Menu shortcut"; GroupDescripti
 
 [Files]
 Source: "..\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "EzClient_CodeSign.cer"; DestDir: "{app}"; Flags: ignoreversion
-Source: "TrustCertificate.bat"; DestDir: "{app}"; Flags: ignoreversion
-Source: "TrustCertificate.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon; IconFilename: "{app}\{#MyAppExeName}"
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: startmenuicon; IconFilename: "{app}\{#MyAppExeName}"
-Name: "{autoprograms}\{#MyAppName} - Zertifikat vertrauen"; Filename: "{app}\TrustCertificate.bat"; Tasks: startmenuicon; IconFilename: "{app}\{#MyAppExeName}"
 
 [Run]
-Filename: "certutil.exe"; Parameters: "-user -addstore TrustedPublisher ""{app}\EzClient_CodeSign.cer"""; Flags: runhidden; StatusMsg: "Registriere Zertifikat in vertrauenswürdige Herausgeber..."
-Filename: "{app}\TrustCertificate.bat"; Description: "Zertifikat für Smart App Control vertrauen (empfohlen)"; Flags: postinstall skipifsilent unchecked; Languages: german
-Filename: "{app}\TrustCertificate.bat"; Description: "Trust certificate for Smart App Control (recommended)"; Flags: postinstall skipifsilent unchecked; Languages: english
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+
