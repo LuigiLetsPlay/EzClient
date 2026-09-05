@@ -69,7 +69,7 @@ def build() -> None:
     try:
         from tools.sign_tool import sign_binary
         print("[Installer] Signing installer executable with Authenticode...")
-        sign_binary(setup_exe)
+        sign_binary(setup_exe, description="EzClient Setup")
     except Exception as e:
         print(f"[Installer] Note: Could not sign installer: {e}")
 

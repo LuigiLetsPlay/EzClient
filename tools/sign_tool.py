@@ -64,7 +64,7 @@ def ensure_certificate() -> bool:
     return PFX_PATH.is_file()
 
 
-def sign_binary(target_path: Path, timestamp: bool = True) -> bool:
+def sign_binary(target_path: Path, description: str | None = None, timestamp: bool = True) -> bool:
     signtool = find_signtool()
     if not signtool:
         print("[SignTool] Warning: signtool.exe not found. Binary left unsigned.")
@@ -78,7 +78,10 @@ def sign_binary(target_path: Path, timestamp: bool = True) -> bool:
         print(f"[SignTool] File not found: {target_path}")
         return False
 
-    print(f"[SignTool] Signing {target_path.name} with Authenticode (SHA256)...")
+    if description is None:
+        description = "EzClient Setup" if "setup" in target_path.name.lower() else "EzClient"
+
+    print(f"[SignTool] Signing {target_path.name} as '{description}' with Authenticode (SHA256)...")
 
     # Build signtool command
     cmd = [
@@ -87,7 +90,7 @@ def sign_binary(target_path: Path, timestamp: bool = True) -> bool:
         "/f", str(PFX_PATH),
         "/p", PFX_PASSWORD,
         "/fd", "sha256",
-        "/d", "EzClient",
+        "/d", description,
         "/du", "https://github.com/LuigiLetsPlay/EzClient",
     ]
 
@@ -106,7 +109,7 @@ def sign_binary(target_path: Path, timestamp: bool = True) -> bool:
     # If failed with timestamp (e.g. network timeout), retry without timestamp
     if timestamp:
         print("[SignTool] Timestamp failed, retrying without timestamp...")
-        return sign_binary(target_path, timestamp=False)
+        return sign_binary(target_path, description=description, timestamp=False)
 
     print(f"[SignTool] Signing failed for {target_path.name}:\n{res.stderr or res.stdout}")
     return False

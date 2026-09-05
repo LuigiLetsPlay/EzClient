@@ -26,6 +26,14 @@ SolidCompression=yes
 WizardStyle=modern
 CloseApplications=force
 RestartApplications=no
+VersionInfoVersion=2.0.0.0
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription=EzClient Setup
+VersionInfoTextVersion={#MyAppVersion}
+VersionInfoCopyright=Copyright (C) 2026 {#MyAppPublisher}
+VersionInfoProductName={#MyAppName}
+VersionInfoProductVersion=2.0.0.0
+
 
 [Languages]
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
