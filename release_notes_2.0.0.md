@@ -44,14 +44,14 @@ Diese Version bringt native Unterstützung für die moderne Minecraft 26.x-Reihe
 - **Intelligente Fehlerbehebung:** Bei Startproblemen oder inkompatiblen Mods schlägt der Crash Doctor die Lösung sofort vor.
 - **Live-Logs-Fenster:** Farbkodierte Konsolenausgabe zur einfachen Diagnose.
 
-### 🔐 Windows Setup & Smart App Control
-- **Authenticode-Signatur:** Alle ausführbaren Dateien (`EzClient.exe` und `EzClient-Setup.exe`) sind digital signiert.
-- **Integrierte Zertifikatsregistrierung:** Das Setup registriert das Entwicklerzertifikat automatisch in den vertrauenswürdigen Herausgebern (`TrustedPublisher`). Über die Abschlussoption kann das Zertifikat mit einem Klick auch für die Stammzertifizierungsstellen (`Root`) bestätigt werden, um Blockaden durch Windows Smart App Control dauerhaft zu verhindern.
+### 🪟 Nativer Windows Installer & Standalone Launcher
+- **Inno Setup Engine:** Schnelle, native C++ Installation mit moderner LZMA2-Kompression, automatischen Verknüpfungen und sauberem Deinstallations-Eintrag in den Windows Apps & Features.
+- **Authenticode Signatur:** Setup und Launcher sind mit vollständigen Windows PE-Versions- und Signatur-Metadaten ausgestattet.
 
 ---
 
 ## 📦 Downloads & Installation
-- **`EzClient-Setup.exe`**: Komfortabler Windows-Installer (automatische Verknüpfungen, Zertifikatsregistrierung & Updates)
+- **`EzClient-Setup.exe`**: Komfortabler Windows-Installer (Desktop- & Startmenü-Verknüpfungen)
 - **`EzClient.exe`**: Standalone Executable (sofort startbar)
 - **`EzClient-2.0.0+26.1.jar`**: Client Mod JAR für Minecraft 26.1
 - **`EzClient-2.0.0+26.1.1.jar`**: Client Mod JAR für Minecraft 26.1.1
