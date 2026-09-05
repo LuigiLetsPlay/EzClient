@@ -33,6 +33,7 @@ public final class HudSettingsScreen extends Screen {
     private boolean isDraggingHue = false;
 
     private EditBox hexInput;
+    private static int crosshairTab = 0;
     private boolean updatingHexInternally = false;
 
     // Reset confirmation modal state
@@ -59,9 +60,11 @@ public final class HudSettingsScreen extends Screen {
     @Override
     protected void init() {
         panelWidth = 416;
-        panelHeight = module instanceof CrosshairModule ? 326 : 256;
+        panelHeight = 236;
         panelX = (width - panelWidth) / 2;
         panelY = (height - panelHeight) / 2;
+        addRenderableWidget(new EzButton(panelX, panelY - 22, 160, 18, Component.literal("Font / Shadow / HUD Style"), true,
+            b -> EzScreenBridge.set(minecraft, new FeatureStyleScreen(this, module))));
 
         int rightX = panelX + 148;
         int rightWidth = panelWidth - 160;
@@ -232,7 +235,12 @@ public final class HudSettingsScreen extends Screen {
                     }
             ));
             addRenderableWidget(new EzButton(
-                    rightX, row2Y, btnW * 2 + btnGap, 16,
+                    rightX, row2Y, btnW, 16,
+                    Component.literal("Dynamic Box: " + app.ezclient.util.EzI18n.onOrOff(armor.isDynamicBox())), armor.isDynamicBox(),
+                    b -> { armor.setDynamicBox(!armor.isDynamicBox()); rebuildWidgets(); }
+            ));
+            addRenderableWidget(new EzButton(
+                    col2X, row2Y, btnW, 16,
                     Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.armor_warning", app.ezclient.util.EzI18n.onOrOff(armor.isDamageWarning()))), armor.isDamageWarning(),
                     b -> { armor.setDamageWarning(!armor.isDamageWarning()); rebuildWidgets(); }
             ));
@@ -259,8 +267,8 @@ public final class HudSettingsScreen extends Screen {
             ));
             addRenderableWidget(new EzButton(
                     rightX, row2Y, btnW * 2 + btnGap, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.togglesprint_hide_inactive", app.ezclient.util.EzI18n.onOrOff(ts.isHideWhenInactive()))), ts.isHideWhenInactive(),
-                    b -> { ts.setHideWhenInactive(!ts.isHideWhenInactive()); rebuildWidgets(); }
+                    Component.literal("Hide HUD: " + app.ezclient.util.EzI18n.onOrOff(ts.isHideHud())), ts.isHideHud(),
+                    b -> { ts.setHideHud(!ts.isHideHud()); rebuildWidgets(); }
             ));
         } else if (module instanceof PotionEffectModule potion) {
             addRenderableWidget(new EzButton(
@@ -295,77 +303,345 @@ public final class HudSettingsScreen extends Screen {
         } else if (module instanceof CrosshairModule crosshair) {
             addRenderableWidget(new EzButton(
                     rightX, row1Y, btnW, 16,
-                    Component.literal(crosshair.getCrosshairType().name().replace('_', ' ')), true,
-                    b -> {
-                        CrosshairModule.CrosshairType[] types = CrosshairModule.CrosshairType.values();
-                        int next = (crosshair.getCrosshairType().ordinal() + 1) % types.length;
-                        crosshair.setCrosshairType(types[next]);
-                        rebuildWidgets();
-                    }
+                    Component.literal("Aussehen"), crosshairTab == 0,
+                    b -> { crosshairTab = 0; rebuildWidgets(); }
             ));
             addRenderableWidget(new EzButton(
                     col2X, row1Y, btnW, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_gap", crosshair.getGap())), true,
+                    Component.literal("Trefferfarben"), crosshairTab == 1,
+                    b -> { crosshairTab = 1; rebuildWidgets(); }
+            ));
+
+            if (crosshairTab == 0) {
+                // Style Tab
+                addRenderableWidget(new EzButton(
+                        rightX, row2Y, btnW, 16,
+                        Component.literal("‹ Form: " + crosshair.getCrosshairTypeLabel() + " ›"), true,
+                        b -> {
+                            crosshair.cycleCrosshairType(1);
+                            rebuildWidgets();
+                        }
+                ).withRightClick(b -> {
+                    crosshair.cycleCrosshairType(-1);
+                    rebuildWidgets();
+                }));
+
+                addRenderableWidget(new EzButton(
+                        col2X, row2Y, btnW, 16,
+                        Component.literal("‹ Abstand: " + crosshair.getGap() + " ›"), true,
+                        b -> {
+                            crosshair.setGap((crosshair.getGap() + 1) % 16);
+                            rebuildWidgets();
+                        }
+                ).withRightClick(b -> {
+                    crosshair.setGap((crosshair.getGap() - 1 + 16) % 16);
+                    rebuildWidgets();
+                }));
+
+                int row3Y = panelY + 76;
+                addRenderableWidget(new EzButton(
+                        rightX, row3Y, btnW, 16,
+                        Component.literal("‹ Größe: " + crosshair.getSize() + " ›"), true,
+                        b -> {
+                            crosshair.setSize(crosshair.getSize() >= 20 ? 2 : crosshair.getSize() + 1);
+                            rebuildWidgets();
+                        }
+                ).withRightClick(b -> {
+                    crosshair.setSize(crosshair.getSize() <= 2 ? 20 : crosshair.getSize() - 1);
+                    rebuildWidgets();
+                }));
+
+                addRenderableWidget(new EzButton(
+                        col2X, row3Y, btnW, 16,
+                        Component.literal("‹ Dicke: " + crosshair.getThickness() + " ›"), true,
+                        b -> {
+                            crosshair.setThickness(crosshair.getThickness() % 4 + 1);
+                            rebuildWidgets();
+                        }
+                ).withRightClick(b -> {
+                    crosshair.setThickness(crosshair.getThickness() <= 1 ? 4 : crosshair.getThickness() - 1);
+                    rebuildWidgets();
+                }));
+
+                int row4Y = panelY + 96;
+                addRenderableWidget(new EzButton(
+                        rightX, row4Y, btnW, 16,
+                        Component.literal("‹ Deckkraft: " + crosshair.getOpacity() + "% ›"), true,
+                        b -> {
+                            crosshair.setOpacity(crosshair.getOpacity() >= 100 ? 10 : crosshair.getOpacity() + 10);
+                            rebuildWidgets();
+                        }
+                ).withRightClick(b -> {
+                    crosshair.setOpacity(crosshair.getOpacity() <= 10 ? 100 : crosshair.getOpacity() - 10);
+                    rebuildWidgets();
+                }));
+
+                addRenderableWidget(new EzButton(
+                        col2X, row4Y, btnW, 16,
+                        Component.literal("Kontur: " + app.ezclient.util.EzI18n.onOrOff(crosshair.isShowOutline())), crosshair.isShowOutline(),
+                        b -> { crosshair.setShowOutline(!crosshair.isShowOutline()); rebuildWidgets(); }
+                ));
+
+                int row5Y = panelY + 116;
+                if (crosshair.getCrosshairType() == CrosshairModule.CrosshairType.DOT) {
+                    addRenderableWidget(new EzButton(
+                            rightX, row5Y, btnW * 2 + btnGap, 16,
+                            Component.literal("‹ Punktgröße: " + crosshair.getDotSize() + " ›"), true,
+                            b -> { crosshair.setDotSize(crosshair.getDotSize() >= 6 ? 1 : crosshair.getDotSize() + 1); rebuildWidgets(); }
+                    ).withRightClick(b -> {
+                        crosshair.setDotSize(crosshair.getDotSize() <= 1 ? 6 : crosshair.getDotSize() - 1);
+                        rebuildWidgets();
+                    }));
+                } else {
+                    addRenderableWidget(new EzButton(
+                            rightX, row5Y, btnW, 16,
+                            Component.literal("Mittelpunkt: " + app.ezclient.util.EzI18n.onOrOff(crosshair.isShowDot())), crosshair.isShowDot(),
+                            b -> { crosshair.setShowDot(!crosshair.isShowDot()); rebuildWidgets(); }
+                    ));
+                    addRenderableWidget(new EzButton(
+                            col2X, row5Y, btnW, 16,
+                            Component.literal("Dynamisch: " + app.ezclient.util.EzI18n.onOrOff(crosshair.isDynamicSpread())), crosshair.isDynamicSpread(),
+                            b -> { crosshair.setDynamicSpread(!crosshair.isDynamicSpread()); rebuildWidgets(); }
+                    ));
+                }
+
+                int row6Y = panelY + 136;
+                addRenderableWidget(new EzButton(
+                        rightX, row6Y, btnW, 16,
+                        Component.literal("In F3 ausbl.: " + app.ezclient.util.EzI18n.onOrOff(crosshair.isHideInF3())), crosshair.isHideInF3(),
+                        b -> { crosshair.setHideInF3(!crosshair.isHideInF3()); rebuildWidgets(); }
+                ));
+
+                addRenderableWidget(new EzButton(
+                        col2X, row6Y, btnW, 16,
+                        Component.literal("3. Person ausbl.: " + app.ezclient.util.EzI18n.onOrOff(crosshair.isHideInThirdPerson())), crosshair.isHideInThirdPerson(),
+                        b -> { crosshair.setHideInThirdPerson(!crosshair.isHideInThirdPerson()); rebuildWidgets(); }
+                ));
+            } else {
+                // Target & Colors Tab
+                String targetModeName = switch (crosshair.getTargetMode()) {
+                    case OFF -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_target_off");
+                    case ENTITIES -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_target_entities");
+                    case PLAYERS -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_target_players");
+                    case HOSTILE -> "Hostile";
+                    case NEUTRAL -> "Neutral";
+                    case BLOCKS -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_target_blocks");
+                    case ALL -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_target_all");
+                };
+
+                addRenderableWidget(new EzButton(
+                        rightX, row2Y, btnW, 16,
+                        Component.literal("‹ Target: " + targetModeName + " ›"), crosshair.isTargetHighlight(),
+                        b -> {
+                            CrosshairModule.TargetMode[] modes = CrosshairModule.TargetMode.values();
+                            int next = (crosshair.getTargetMode().ordinal() + 1) % modes.length;
+                            crosshair.setTargetMode(modes[next]);
+                            rebuildWidgets();
+                        }
+                ).withRightClick(b -> {
+                    CrosshairModule.TargetMode[] modes = CrosshairModule.TargetMode.values();
+                    int prev = (crosshair.getTargetMode().ordinal() - 1 + modes.length) % modes.length;
+                    crosshair.setTargetMode(modes[prev]);
+                    rebuildWidgets();
+                }));
+
+                addRenderableWidget(new EzButton(
+                        col2X, row2Y, btnW, 16,
+                        Component.literal(String.format("‹ Scale: %.2fx ›", crosshair.getSelectedRuleScale())), crosshair.isTargetHighlight(),
+                        b -> {
+                            float current = crosshair.getSelectedRuleScale();
+                            crosshair.setSelectedRuleScale(current >= 1.5f ? 0.75f : current + 0.25f);
+                            rebuildWidgets();
+                        }
+                ).withRightClick(b -> {
+                    float current = crosshair.getSelectedRuleScale();
+                    crosshair.setSelectedRuleScale(current <= 0.75f ? 1.5f : current - 0.25f);
+                    rebuildWidgets();
+                }));
+            }
+        } else if (module instanceof ClockModule clock) {
+            addRenderableWidget(new EzButton(
+                    rightX, row1Y, btnW, 16,
+                    Component.literal("‹ " + clock.getClockFormat().getLabel() + " ›"), true,
                     b -> {
-                        crosshair.setGap((crosshair.getGap() + 1) % 8);
+                        ClockModule.ClockFormat[] formats = ClockModule.ClockFormat.values();
+                        int next = (clock.getClockFormat().ordinal() + 1) % formats.length;
+                        clock.setClockFormat(formats[next]);
+                        rebuildWidgets();
+                    }
+            ).withRightClick(b -> {
+                ClockModule.ClockFormat[] formats = ClockModule.ClockFormat.values();
+                int prev = (clock.getClockFormat().ordinal() - 1 + formats.length) % formats.length;
+                clock.setClockFormat(formats[prev]);
+                rebuildWidgets();
+            }));
+
+            addRenderableWidget(new EzButton(
+                    col2X, row1Y, btnW, 16,
+                    Component.literal("Prefix: " + (clock.isShowPrefix() ? "Time:" : "None")), clock.isShowPrefix(),
+                    b -> {
+                        clock.setShowPrefix(!clock.isShowPrefix());
                         rebuildWidgets();
                     }
             ));
+        } else if (module instanceof MemoryModule memory) {
+            addRenderableWidget(new EzButton(
+                    rightX, row1Y, btnW, 16,
+                    Component.literal("‹ " + memory.getMemoryFormat().getLabel() + " ›"), true,
+                    b -> {
+                        MemoryModule.MemoryFormat[] formats = MemoryModule.MemoryFormat.values();
+                        int next = (memory.getMemoryFormat().ordinal() + 1) % formats.length;
+                        memory.setMemoryFormat(formats[next]);
+                        rebuildWidgets();
+                    }
+            ).withRightClick(b -> {
+                MemoryModule.MemoryFormat[] formats = MemoryModule.MemoryFormat.values();
+                int prev = (memory.getMemoryFormat().ordinal() - 1 + formats.length) % formats.length;
+                memory.setMemoryFormat(formats[prev]);
+                rebuildWidgets();
+            }));
+
+            addRenderableWidget(new EzButton(
+                    col2X, row1Y, btnW, 16,
+                    Component.literal("Prefix: " + (memory.isShowPrefix() ? "RAM:" : "None")), memory.isShowPrefix(),
+                    b -> {
+                        memory.setShowPrefix(!memory.isShowPrefix());
+                        rebuildWidgets();
+                    }
+            ));
+        } else if (module instanceof PingModule ping) {
+            addRenderableWidget(new EzButton(
+                    rightX, row1Y, btnW, 16,
+                    Component.literal("‹ " + ping.getDisplayLayout().name().replace('_', ' ') + " ›"), true,
+                    b -> {
+                        PingModule.DisplayLayout[] layouts = PingModule.DisplayLayout.values();
+                        int next = (ping.getDisplayLayout().ordinal() + 1) % layouts.length;
+                        ping.setDisplayLayout(layouts[next]);
+                        rebuildWidgets();
+                    }
+            ).withRightClick(b -> {
+                PingModule.DisplayLayout[] layouts = PingModule.DisplayLayout.values();
+                int prev = (ping.getDisplayLayout().ordinal() - 1 + layouts.length) % layouts.length;
+                ping.setDisplayLayout(layouts[prev]);
+                rebuildWidgets();
+            }));
+
+            addRenderableWidget(new EzButton(
+                    col2X, row1Y, btnW, 16,
+                    Component.literal("‹ " + ping.getUpdateIntervalSeconds() + "s Interval ›"), true,
+                    b -> {
+                        int cur = ping.getUpdateIntervalSeconds();
+                        ping.setUpdateIntervalSeconds(cur >= 10 ? 1 : cur + 1);
+                        rebuildWidgets();
+                    }
+            ).withRightClick(b -> {
+                int cur = ping.getUpdateIntervalSeconds();
+                ping.setUpdateIntervalSeconds(cur <= 1 ? 10 : cur - 1);
+                rebuildWidgets();
+            }));
+
             addRenderableWidget(new EzButton(
                     rightX, row2Y, btnW, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_spread", app.ezclient.util.EzI18n.onOrOff(crosshair.isDynamicSpread()))), crosshair.isDynamicSpread(),
-                    b -> { crosshair.setDynamicSpread(!crosshair.isDynamicSpread()); rebuildWidgets(); }
+                    Component.literal("Alert Farben: " + (ping.isPingAlert() ? "ON" : "OFF")), ping.isPingAlert(),
+                    b -> { ping.setPingAlert(!ping.isPingAlert()); rebuildWidgets(); }
             ));
-            String targetModeName = switch (crosshair.getTargetMode()) {
-                case OFF -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_target_off");
-                case ENTITIES -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_target_entities");
-                case PLAYERS -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_target_players");
-                case HOSTILE -> "Hostile";
-                case NEUTRAL -> "Neutral";
-                case BLOCKS -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_target_blocks");
-                case ALL -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_target_all");
-            };
+
             addRenderableWidget(new EzButton(
                     col2X, row2Y, btnW, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_target", targetModeName)), crosshair.isTargetHighlight(),
+                    Component.literal("Spieler: " + (ping.isShowPlayerCount() ? "ON" : "OFF")), ping.isShowPlayerCount(),
+                    b -> { ping.setShowPlayerCount(!ping.isShowPlayerCount()); rebuildWidgets(); }
+            ));
+        } else if (module instanceof ReachModule reach) {
+            addRenderableWidget(new EzButton(
+                    rightX, row1Y, btnW, 16,
+                    Component.literal("‹ " + reach.getDisplayFormat().name() + " ›"), true,
                     b -> {
-                        CrosshairModule.TargetMode[] modes = CrosshairModule.TargetMode.values();
-                        int next = (crosshair.getTargetMode().ordinal() + 1) % modes.length;
-                        crosshair.setTargetMode(modes[next]);
+                        ReachModule.DisplayFormat[] formats = ReachModule.DisplayFormat.values();
+                        int next = (reach.getDisplayFormat().ordinal() + 1) % formats.length;
+                        reach.setDisplayFormat(formats[next]);
                         rebuildWidgets();
                     }
-            ));
-            int row3Y = panelY + 78;
-            int row4Y = panelY + 98;
-            int row5Y = panelY + 118;
+            ).withRightClick(b -> {
+                ReachModule.DisplayFormat[] formats = ReachModule.DisplayFormat.values();
+                int prev = (reach.getDisplayFormat().ordinal() - 1 + formats.length) % formats.length;
+                reach.setDisplayFormat(formats[prev]);
+                rebuildWidgets();
+            }));
+
             addRenderableWidget(new EzButton(
-                    rightX, row3Y, btnW, 16,
-                    Component.literal("Size: " + crosshair.getSize()), true,
-                    b -> { crosshair.setSize(crosshair.getSize() >= 20 ? 2 : crosshair.getSize() + 1); rebuildWidgets(); }
-            ));
-            addRenderableWidget(new EzButton(
-                    col2X, row3Y, btnW, 16,
-                    Component.literal("Thickness: " + crosshair.getThickness()), true,
-                    b -> { crosshair.setThickness(crosshair.getThickness() % 4 + 1); rebuildWidgets(); }
-            ));
-            addRenderableWidget(new EzButton(
-                    rightX, row4Y, btnW, 16,
-                    Component.literal("Opacity: " + crosshair.getOpacity() + "%"), true,
-                    b -> { crosshair.setOpacity(crosshair.getOpacity() >= 100 ? 25 : crosshair.getOpacity() + 25); rebuildWidgets(); }
-            ));
-            addRenderableWidget(new EzButton(
-                    col2X, row4Y, btnW, 16,
-                    Component.literal("Outline: " + app.ezclient.util.EzI18n.onOrOff(crosshair.isShowOutline())), crosshair.isShowOutline(),
-                    b -> { crosshair.setShowOutline(!crosshair.isShowOutline()); rebuildWidgets(); }
-            ));
-            addRenderableWidget(new EzButton(
-                    rightX, row5Y, btnW * 2 + btnGap, 16,
-                    Component.literal(String.format("Target scale (%s): %.2fx", targetModeName, crosshair.getSelectedRuleScale())), crosshair.isTargetHighlight(),
+                    col2X, row1Y, btnW, 16,
+                    Component.literal("‹ " + reach.getPrecision() + " Dezimalstellen ›"), true,
                     b -> {
-                        float current = crosshair.getSelectedRuleScale();
-                        crosshair.setSelectedRuleScale(current >= 1.5f ? 0.75f : current + 0.25f);
+                        int p = reach.getPrecision() >= 3 ? 1 : reach.getPrecision() + 1;
+                        reach.setPrecision(p);
                         rebuildWidgets();
                     }
+            ).withRightClick(b -> {
+                int p = reach.getPrecision() <= 1 ? 3 : reach.getPrecision() - 1;
+                reach.setPrecision(p);
+                rebuildWidgets();
+            }));
+
+            addRenderableWidget(new EzButton(
+                    rightX, row2Y, btnW, 16,
+                    Component.literal("‹ Fade: " + reach.getFadeOutDurationMs() + "ms ›"), true,
+                    b -> {
+                        int f = reach.getFadeOutDurationMs() >= 3000 ? 500 : reach.getFadeOutDurationMs() + 500;
+                        reach.setFadeOutDurationMs(f);
+                        rebuildWidgets();
+                    }
+            ).withRightClick(b -> {
+                int f = reach.getFadeOutDurationMs() <= 500 ? 3000 : reach.getFadeOutDurationMs() - 500;
+                reach.setFadeOutDurationMs(f);
+                rebuildWidgets();
+            }));
+
+            addRenderableWidget(new EzButton(
+                    col2X, row2Y, btnW, 16,
+                    Component.literal("Farben: " + (reach.isColorCoding() ? "Distanz" : "Custom")), reach.isColorCoding(),
+                    b -> { reach.setColorCoding(!reach.isColorCoding()); rebuildWidgets(); }
+            ));
+        } else if (module instanceof ComboCounterModule combo) {
+            addRenderableWidget(new EzButton(
+                    rightX, row1Y, btnW, 16,
+                    Component.literal("‹ " + combo.getDisplayFormat().name() + " ›"), true,
+                    b -> {
+                        ComboCounterModule.DisplayFormat[] formats = ComboCounterModule.DisplayFormat.values();
+                        int next = (combo.getDisplayFormat().ordinal() + 1) % formats.length;
+                        combo.setDisplayFormat(formats[next]);
+                        rebuildWidgets();
+                    }
+            ).withRightClick(b -> {
+                ComboCounterModule.DisplayFormat[] formats = ComboCounterModule.DisplayFormat.values();
+                int prev = (combo.getDisplayFormat().ordinal() - 1 + formats.length) % formats.length;
+                combo.setDisplayFormat(formats[prev]);
+                rebuildWidgets();
+            }));
+
+            addRenderableWidget(new EzButton(
+                    col2X, row1Y, btnW, 16,
+                    Component.literal(String.format("‹ Reset: %.1fs ›", combo.getResetWindowSeconds())), true,
+                    b -> {
+                        float r = combo.getResetWindowSeconds() >= 3.0f ? 1.0f : combo.getResetWindowSeconds() + 0.5f;
+                        combo.setResetWindowSeconds(r);
+                        rebuildWidgets();
+                    }
+            ).withRightClick(b -> {
+                float r = combo.getResetWindowSeconds() <= 1.0f ? 3.0f : combo.getResetWindowSeconds() - 0.5f;
+                combo.setResetWindowSeconds(r);
+                rebuildWidgets();
+            }));
+
+            addRenderableWidget(new EzButton(
+                    rightX, row2Y, btnW, 16,
+                    Component.literal("Scale-Punch: " + (combo.isScalePunch() ? "ON" : "OFF")), combo.isScalePunch(),
+                    b -> { combo.setScalePunch(!combo.isScalePunch()); rebuildWidgets(); }
+            ));
+
+            addRenderableWidget(new EzButton(
+                    col2X, row2Y, btnW, 16,
+                    Component.literal("Hit-Sound: " + (combo.isSoundFeedback() ? "ON" : "OFF")), combo.isSoundFeedback(),
+                    b -> { combo.setSoundFeedback(!combo.isSoundFeedback()); rebuildWidgets(); }
             ));
         } else {
             EditBox prefix = new EditBox(font, rightX + 36, row1Y, 80, 16, Component.literal("Prefix"));
@@ -380,140 +656,142 @@ public final class HudSettingsScreen extends Screen {
         }
 
         // ── Color Modes (Vanilla / Einfarbig / Welle / Rainbow) ──
-        int modeY = panelY + (module instanceof CrosshairModule ? 138 : 78);
-        if (module instanceof PotionEffectModule potion) {
-            int pW = 60;
-            int pGap = 5;
-            // 1. Vanilla / Effektfarben
-            addRenderableWidget(new EzButton(
-                    rightX, modeY, pW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_vanilla"),
-                    potion.isUseCustomColors() && potion.getColorMode() == HudModule.ColorMode.SOLID,
-                    b -> {
-                        potion.setUseCustomColors(true);
-                        potion.setColorMode(HudModule.ColorMode.SOLID);
-                        rebuildWidgets();
-                    }
-            ));
+        if (!(module instanceof CrosshairModule) || crosshairTab == 1) {
+            int modeY = panelY + 76;
+            if (module instanceof PotionEffectModule potion) {
+                int pW = 60;
+                int pGap = 5;
+                // 1. Vanilla / Effektfarben
+                addRenderableWidget(new EzButton(
+                        rightX, modeY, pW, 16,
+                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_vanilla"),
+                        potion.isUseCustomColors() && potion.getColorMode() == HudModule.ColorMode.SOLID,
+                        b -> {
+                            potion.setUseCustomColors(true);
+                            potion.setColorMode(HudModule.ColorMode.SOLID);
+                            rebuildWidgets();
+                        }
+                ));
 
-            // 2. Solid / Einfarbig
-            addRenderableWidget(new EzButton(
-                    rightX + pW + pGap, modeY, pW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_solid"),
-                    !potion.isUseCustomColors() && potion.getColorMode() == HudModule.ColorMode.SOLID,
-                    b -> {
-                        potion.setUseCustomColors(false);
-                        potion.setColorMode(HudModule.ColorMode.SOLID);
-                        syncPickerFromCurrentSlot();
-                        rebuildWidgets();
-                    }
-            ));
+                // 2. Solid / Einfarbig
+                addRenderableWidget(new EzButton(
+                        rightX + pW + pGap, modeY, pW, 16,
+                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_solid"),
+                        !potion.isUseCustomColors() && potion.getColorMode() == HudModule.ColorMode.SOLID,
+                        b -> {
+                            potion.setUseCustomColors(false);
+                            potion.setColorMode(HudModule.ColorMode.SOLID);
+                            syncPickerFromCurrentSlot();
+                            rebuildWidgets();
+                        }
+                ));
 
-            // 3. Wave / Welle
-            addRenderableWidget(new EzButton(
-                    rightX + (pW + pGap) * 2, modeY, pW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_wave"),
-                    potion.getColorMode() == HudModule.ColorMode.WAVE,
-                    b -> {
-                        potion.setUseCustomColors(false);
-                        potion.setColorMode(HudModule.ColorMode.WAVE);
-                        syncPickerFromCurrentSlot();
-                        rebuildWidgets();
-                    }
-            ));
+                // 3. Wave / Welle
+                addRenderableWidget(new EzButton(
+                        rightX + (pW + pGap) * 2, modeY, pW, 16,
+                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_wave"),
+                        potion.getColorMode() == HudModule.ColorMode.WAVE,
+                        b -> {
+                            potion.setUseCustomColors(false);
+                            potion.setColorMode(HudModule.ColorMode.WAVE);
+                            syncPickerFromCurrentSlot();
+                            rebuildWidgets();
+                        }
+                ));
 
-            // 4. Rainbow
-            addRenderableWidget(new EzButton(
-                    rightX + (pW + pGap) * 3, modeY, pW + 4, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_rainbow"),
-                    potion.getColorMode() == HudModule.ColorMode.RAINBOW,
-                    b -> {
-                        potion.setUseCustomColors(false);
-                        potion.setColorMode(HudModule.ColorMode.RAINBOW);
-                        rebuildWidgets();
-                    }
-            ));
-        } else {
-            int cW = 82;
-            int cGap = 4;
-            addRenderableWidget(new EzButton(
-                    rightX, modeY, cW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_solid"), module.getColorMode() == HudModule.ColorMode.SOLID,
-                    b -> {
-                        module.setColorMode(HudModule.ColorMode.SOLID);
-                        syncPickerFromCurrentSlot();
-                        rebuildWidgets();
-                    }
-            ));
+                // 4. Rainbow
+                addRenderableWidget(new EzButton(
+                        rightX + (pW + pGap) * 3, modeY, pW + 4, 16,
+                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_rainbow"),
+                        potion.getColorMode() == HudModule.ColorMode.RAINBOW,
+                        b -> {
+                            potion.setUseCustomColors(false);
+                            potion.setColorMode(HudModule.ColorMode.RAINBOW);
+                            rebuildWidgets();
+                        }
+                ));
+            } else {
+                int cW = 82;
+                int cGap = 4;
+                addRenderableWidget(new EzButton(
+                        rightX, modeY, cW, 16,
+                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_solid"), module.getColorMode() == HudModule.ColorMode.SOLID,
+                        b -> {
+                            module.setColorMode(HudModule.ColorMode.SOLID);
+                            syncPickerFromCurrentSlot();
+                            rebuildWidgets();
+                        }
+                ));
 
-            addRenderableWidget(new EzButton(
-                    rightX + cW + cGap, modeY, cW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_wave"), module.getColorMode() == HudModule.ColorMode.WAVE,
-                    b -> {
-                        module.setColorMode(HudModule.ColorMode.WAVE);
-                        syncPickerFromCurrentSlot();
-                        rebuildWidgets();
-                    }
-            ));
+                addRenderableWidget(new EzButton(
+                        rightX + cW + cGap, modeY, cW, 16,
+                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_wave"), module.getColorMode() == HudModule.ColorMode.WAVE,
+                        b -> {
+                            module.setColorMode(HudModule.ColorMode.WAVE);
+                            syncPickerFromCurrentSlot();
+                            rebuildWidgets();
+                        }
+                ));
 
-            addRenderableWidget(new EzButton(
-                    rightX + (cW + cGap) * 2, modeY, cW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_rainbow"), module.getColorMode() == HudModule.ColorMode.RAINBOW,
-                    b -> {
-                        module.setColorMode(HudModule.ColorMode.RAINBOW);
-                        rebuildWidgets();
-                    }
-            ));
-        }
+                addRenderableWidget(new EzButton(
+                        rightX + (cW + cGap) * 2, modeY, cW, 16,
+                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_rainbow"), module.getColorMode() == HudModule.ColorMode.RAINBOW,
+                        b -> {
+                            module.setColorMode(HudModule.ColorMode.RAINBOW);
+                            rebuildWidgets();
+                        }
+                ));
+            }
 
-        // If Welle is active: Color 1 / Color 2 switch
-        int pickerStartY = modeY + 20;
-        if (module.getColorMode() == HudModule.ColorMode.WAVE) {
-            addRenderableWidget(new EzButton(
-                    rightX, pickerStartY, btnW, 14,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color1"), activeColorSlot == 1,
-                    b -> {
-                        activeColorSlot = 1;
-                        selectedPresetIndex = -1;
-                        syncPickerFromCurrentSlot();
-                        rebuildWidgets();
-                    }
-            ));
+            // If Welle is active: Color 1 / Color 2 switch
+            int pickerStartY = modeY + 20;
+            if (module.getColorMode() == HudModule.ColorMode.WAVE) {
+                addRenderableWidget(new EzButton(
+                        rightX, pickerStartY, btnW, 14,
+                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color1"), activeColorSlot == 1,
+                        b -> {
+                            activeColorSlot = 1;
+                            selectedPresetIndex = -1;
+                            syncPickerFromCurrentSlot();
+                            rebuildWidgets();
+                        }
+                ));
 
-            addRenderableWidget(new EzButton(
-                    col2X, pickerStartY, btnW, 14,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color2"), activeColorSlot == 2,
-                    b -> {
-                        activeColorSlot = 2;
-                        selectedPresetIndex = -1;
-                        syncPickerFromCurrentSlot();
-                        rebuildWidgets();
-                    }
-            ));
-            pickerStartY += 18;
-        }
+                addRenderableWidget(new EzButton(
+                        col2X, pickerStartY, btnW, 14,
+                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color2"), activeColorSlot == 2,
+                        b -> {
+                            activeColorSlot = 2;
+                            selectedPresetIndex = -1;
+                            syncPickerFromCurrentSlot();
+                            rebuildWidgets();
+                        }
+                ));
+                pickerStartY += 18;
+            }
 
-        svX = rightX;
-        svY = pickerStartY;
-        svW = 84;
-        svH = 68;
-        hueX = svX + svW + 6;
-        hueY = pickerStartY;
-        hueW = 12;
-        hueH = 68;
+            svX = rightX;
+            svY = pickerStartY;
+            svW = 84;
+            svH = 68;
+            hueX = svX + svW + 6;
+            hueY = pickerStartY;
+            hueW = 12;
+            hueH = 68;
 
-        if (isColorPickerVisible()) {
-            // Hex Input Field
-            int hexX = hueX + hueW + 12;
-            int hexY = svY;
-            hexInput = new EditBox(font, hexX, hexY, 60, 13, Component.literal("Hex"));
-            hexInput.setMaxLength(8);
-            hexInput.setResponder(this::onHexInputChanged);
-            addRenderableWidget(hexInput);
+            if (isColorPickerVisible()) {
+                // Hex Input Field
+                int hexX = hueX + hueW + 12;
+                int hexY = svY;
+                hexInput = new EditBox(font, hexX, hexY, 60, 13, Component.literal("Hex"));
+                hexInput.setMaxLength(8);
+                hexInput.setResponder(this::onHexInputChanged);
+                addRenderableWidget(hexInput);
 
-            syncPickerFromCurrentSlot();
-        } else {
-            hexInput = null;
+                syncPickerFromCurrentSlot();
+            } else {
+                hexInput = null;
+            }
         }
 
         // ── Reset Button (Bottom Right) ──
@@ -525,6 +803,9 @@ public final class HudSettingsScreen extends Screen {
     }
 
     private boolean isColorPickerVisible() {
+        if (module instanceof CrosshairModule) {
+            return crosshairTab == 1;
+        }
         if (module.getColorMode() == HudModule.ColorMode.RAINBOW) return false;
         if (module instanceof PotionEffectModule potion && potion.isUseCustomColors()) return false;
         return true;
@@ -709,7 +990,8 @@ public final class HudSettingsScreen extends Screen {
         int prevX = panelX + 12;
         int prevY = panelY + 38;
         int prevW = 124;
-        int prevH = 176;
+        int previewButtonY = panelY + panelHeight - 26;
+        int prevH = Math.max(96, previewButtonY - prevY - 4);
 
         EzUi.roundedRect(g, prevX, prevY, prevW, prevH, 6, 0x95080A0E);
         // Checkerboard
@@ -724,16 +1006,26 @@ public final class HudSettingsScreen extends Screen {
         g.outline(prevX, prevY, prevW, prevH, EzUi.BORDER_SUBTLE);
         g.text(font, app.ezclient.util.EzI18n.get("ezclient.hud_settings.preview"), prevX + 8, prevY + 6, EzUi.TEXT_MUTED);
 
-        // Render preview centered
-        int origX = module.getX();
-        int origY = module.getY();
-        module.setPosition(prevX + 8, prevY + 22);
-
+        // Render preview safely centered without mutating module position & triggering ConfigManager.save()
         g.enableScissor(prevX + 2, prevY + 18, prevX + prevW - 2, prevY + prevH - 2);
-        HudRenderer.draw(g, module, true);
-        g.disableScissor();
 
-        module.setPosition(origX, origY);
+        int mw = module.getWidth(minecraft, true);
+        int mh = module.getHeight(minecraft);
+        double origScale = module.getScale();
+        float fitScale = (float) Math.min(1.0, Math.min((double)(prevW - 16) / Math.max(1.0, mw * origScale), (double)(prevH - 28) / Math.max(1.0, mh * origScale)));
+
+        int targetCenterX = prevX + prevW / 2;
+        int targetCenterY = prevY + 22 + (prevH - 24) / 2;
+
+        g.pose().pushMatrix();
+        g.pose().translate(targetCenterX, targetCenterY);
+        g.pose().scale(fitScale, fitScale);
+        g.pose().translate(-module.getX() - (mw * (float) origScale) / 2.0f, -module.getY() - (mh * (float) origScale) / 2.0f);
+
+        HudRenderer.draw(g, module, true);
+
+        g.pose().popMatrix();
+        g.disableScissor();
 
         // ── RIGHT SIDE: Color Picker or Info Banner ──
         if (isColorPickerVisible()) {
@@ -850,7 +1142,7 @@ public final class HudSettingsScreen extends Screen {
     @Override
     public void onClose() {
         if (minecraft != null) {
-            minecraft.gui.setScreen(parent);
+            EzScreenBridge.set(minecraft, parent);
         }
     }
 }

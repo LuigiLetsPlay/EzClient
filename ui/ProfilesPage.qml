@@ -10,7 +10,20 @@ Item {
     property string createVersion: "26.2"
     property string createLoader: "Fabric"
     property string createPreset: "ezclient"
+    property string createIcon: "ezclient"
     property bool loginBeforeCreate: false
+    readonly property var createIconPresets: [
+        { id: "grass-block", label: "Grass" },
+        { id: "sand-block", label: "Sand" },
+        { id: "norisk", label: "NoRisk" },
+        { id: "ezclient", label: "EzClient" },
+        { id: "tnt", label: "TNT" },
+        { id: "potion", label: "Trank" },
+        { id: "clock", label: "Uhr" },
+        { id: "compass", label: "Kompass" },
+        { id: "star", label: "Stern" },
+        { id: "flint", label: "Feuer" }
+    ]
 
     Connections {
         target: accountController
@@ -52,7 +65,7 @@ Item {
         Rectangle {
             anchors.centerIn: parent
             width: 480
-            height: 390
+            height: 486
             radius: EzTheme.radius
             color: EzTheme.surface
             border.color: EzTheme.borderLight
@@ -206,6 +219,131 @@ Item {
                     }
                 }
 
+                // Icon selection row
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    RowLayout {
+                        spacing: 6
+                        Text {
+                            text: EzI18n.t("profiles_icon_label", "Profil-Icon")
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 11
+                            font.bold: true
+                            color: EzTheme.textSecondary
+                        }
+                        Text {
+                            text: "(Wähle ein Preset oder eigenes Bild)"
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 10
+                            color: EzTheme.textSubtle
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        // Selected icon preview
+                        ProfileIcon {
+                        Layout.preferredWidth: 56
+                        Layout.preferredHeight: 56
+                        radius: 12
+                        iconNameOrPath: root.createIcon
+                        fallbackName: nameField.text.trim() || "EZ"
+                    }
+
+                        GridLayout {
+                            Layout.fillWidth: true
+                            columns: 3
+                            columnSpacing: 6
+                            rowSpacing: 6
+                            Repeater {
+                                model: root.createIconPresets
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 48
+                                    radius: 9
+                                    color: (root.createIcon === modelData.id) ? EzTheme.surfaceActive : (presetIconMouse.containsMouse ? EzTheme.surfaceHover : EzTheme.surface3)
+                                    border.color: (root.createIcon === modelData.id) ? EzTheme.accent : EzTheme.borderLight
+                                    border.width: (root.createIcon === modelData.id) ? 1.5 : 1
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 6
+                                        spacing: 6
+                                        ProfileIcon {
+                                            Layout.preferredWidth: 30
+                                            Layout.preferredHeight: 30
+                                            iconNameOrPath: modelData.id
+                                            radius: 6
+                                            bgColor: "transparent"
+                                            borderColor: "transparent"
+                                            borderWidth: 0
+                                        }
+                                        Text {
+                                            text: modelData.label
+                                            color: root.createIcon === modelData.id ? EzTheme.accentLight : EzTheme.textSecondary
+                                            font.family: EzTheme.fontFamily
+                                            font.pixelSize: 10
+                                            font.bold: root.createIcon === modelData.id
+                                            Layout.fillWidth: true
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: presetIconMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.createIcon = modelData.id
+                                    }
+                                }
+                            }
+                        }
+
+                        // Custom image button
+                        Rectangle {
+                            Layout.preferredWidth: 68
+                            Layout.preferredHeight: 56
+                            radius: 9
+                            color: uploadMouse.containsMouse ? EzTheme.surfaceHover : EzTheme.surface2
+                            border.color: uploadMouse.containsMouse ? EzTheme.accent : EzTheme.borderLight
+                            border.width: 1
+
+                            RowLayout {
+                                id: customPngRow
+                                anchors.centerIn: parent
+                                spacing: 4
+                                Text {
+                                    text: "+ Bild"
+                                    font.family: EzTheme.fontFamily
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    color: EzTheme.accentLight
+                                }
+                            }
+
+                            MouseArea {
+                                id: uploadMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (profileController) {
+                                        var path = profileController.pickProfileIconImage()
+                                        if (path && path !== "") {
+                                            root.createIcon = path
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Item { height: 4 }
 
                 RowLayout {
@@ -243,9 +381,10 @@ Item {
                 accountController.openLoginDialog()
                 return
             }
-            profileController.createProfile(nameField.text.trim(), root.createVersion, root.createLoader, root.createPreset)
+            profileController.createProfile(nameField.text.trim(), root.createVersion, root.createLoader, root.createPreset, root.createIcon)
             createDialog.opacity = 0.0
             nameField.text = ""
+            root.createIcon = "ezclient"
         }
     }
 
@@ -397,22 +536,22 @@ Item {
                     anchors.rightMargin: 16
                     spacing: 16
 
-                    // Avatar
-                    Rectangle {
+                    // Avatar / Icon (Click to edit icon)
+                    ProfileIcon {
                         Layout.preferredWidth: 42
                         Layout.preferredHeight: 42
                         radius: 8
-                        color: model.profileId === profileController.activeId ? EzTheme.surfaceActive : EzTheme.surface3
-                        border.color: model.profileId === profileController.activeId ? EzTheme.accent : EzTheme.borderLight
-                        border.width: 1
-
-                        Text {
-                            text: model.profileName ? model.profileName.substring(0, 2).toUpperCase() : "MC"
-                            font.family: EzTheme.fontFamily
-                            font.pixelSize: 14
-                            font.bold: true
-                            color: EzTheme.accentLight
-                            anchors.centerIn: parent
+                        iconNameOrPath: model.icon || ""
+                        fallbackName: model.profileName || "MC"
+                        bgColor: model.profileId === profileController.activeId ? EzTheme.surfaceActive : EzTheme.surface3
+                        borderColor: model.profileId === profileController.activeId ? EzTheme.accent : EzTheme.borderLight
+                        borderWidth: 1
+                        fontSize: 14
+                        interactive: true
+                        onClicked: {
+                            if (typeof window !== "undefined" && window && window.openProfileIconPicker) {
+                                window.openProfileIconPicker(model.profileId, model.icon || "", model.profileName || "")
+                            }
                         }
                     }
 
@@ -571,7 +710,13 @@ Item {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: profileController.deleteProfile(model.profileId)
+                                onClicked: {
+                                    if (typeof window !== "undefined" && window.confirmDeleteProfile) {
+                                        window.confirmDeleteProfile(model.profileId, model.profileName)
+                                    } else {
+                                        profileController.deleteProfile(model.profileId)
+                                    }
+                                }
                             }
                         }
                     }

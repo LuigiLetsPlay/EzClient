@@ -10,14 +10,14 @@ Button {
     property bool mcFont: true
     property string iconSource: ""
 
-    implicitHeight: 36
-    implicitWidth: Math.max(80, btnRow.implicitWidth + 24)
+    implicitHeight: 40
+    implicitWidth: Math.max(88, btnRow.implicitWidth + 28)
 
     scale: control.down ? 0.96 : (control.hovered ? 1.02 : 1.0)
     Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
     font.family: control.mcFont ? EzTheme.mcFontFamily : EzTheme.fontFamily
-    font.pixelSize: control.mcFont ? 12 : 11
+    font.pixelSize: control.mcFont ? 12 : 12
     font.bold: true
 
     background: Rectangle {
@@ -59,7 +59,7 @@ Button {
 
         Row {
             id: btnRow
-            spacing: 6
+            spacing: 8
             anchors.centerIn: parent
 
             Image {
@@ -71,8 +71,8 @@ Button {
                     return Qt.resolvedUrl("../icons/" + control.iconSource).toString()
                 }
                 visible: control.iconSource !== ""
-                width: 14
-                height: 14
+                width: 16
+                height: 16
                 fillMode: Image.PreserveAspectFit
                 anchors.verticalCenter: parent.verticalCenter
             }

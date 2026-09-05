@@ -5,27 +5,21 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.scores.Objective;
-import net.minecraft.world.scores.Scoreboard;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Clean, smooth HUD Editor:
- * - Unified 1px snug selection outline (same across all modules)
- * - 4-button unified bottom toolbar (Vanilla Toggle, Speichern, Alles Resetten, Abbrechen)
- * - Inter-Module Vertical Stacking Snapping (4px gap alignment)
- * - Authentic 4-Slot Vanilla Armor HUD & Real Status Effect Badges
- * - Instant persistence of Vanilla toggle
+ * Clean, focused HUD Editor for EzClient modules:
+ * - Unified 1px snug emerald selection outline
+ * - Bottom toolbar: Save, Reset All, Cancel
+ * - Inter-module vertical stacking and boundary snapping
+ * - Corner resize handle with live scale indicator
  * - Unobstructed view during drag
+ * - Zero interference with vanilla elements
  */
 public final class HudEditorScreen extends Screen {
-    public enum VanillaType {
-        NONE, BOSSBAR, SCOREBOARD, EFFECTS
-    }
-
     private static class ModuleSnapshot {
         final int x, y;
         final double scale;
@@ -34,7 +28,6 @@ public final class HudEditorScreen extends Screen {
 
     private final Screen parent;
     private HudModule selected;
-    private VanillaType selectedVanilla = VanillaType.NONE;
 
     private double offsetX, offsetY;
     private boolean dragging;
@@ -52,13 +45,6 @@ public final class HudEditorScreen extends Screen {
 
     // Snapshots for Discard / Cancel
     private final Map<HudModule, ModuleSnapshot> initialModules = new HashMap<>();
-    private int initialBossbarX, initialBossbarY;
-    private double initialBossbarScale;
-    private int initialScoreboardX, initialScoreboardY;
-    private double initialScoreboardScale;
-    private int initialEffectsX, initialEffectsY;
-    private double initialEffectsScale;
-    private boolean initialCustomVanilla;
 
     // Modals
     private boolean showUnsavedModal = false;
@@ -69,9 +55,8 @@ public final class HudEditorScreen extends Screen {
     private boolean showContextMenu = false;
     private int contextMenuX, contextMenuY;
     private HudModule contextModule;
-    private VanillaType contextVanilla = VanillaType.NONE;
 
-    private EzButton btnVanillaToggle, btnSave, btnResetAll, btnCancel;
+    private EzButton btnSave, btnResetAll, btnCancel;
 
     public HudEditorScreen(Screen parent) {
         super(Component.literal("HUD Editor"));
@@ -80,44 +65,19 @@ public final class HudEditorScreen extends Screen {
 
     @Override
     protected void init() {
-        if (ConfigManager.bossbarX == -1) ConfigManager.bossbarX = (width - 182) / 2;
-        if (ConfigManager.bossbarY == -1) ConfigManager.bossbarY = 12;
-        if (ConfigManager.scoreboardX == -1) ConfigManager.scoreboardX = width - 116;
-        if (ConfigManager.scoreboardY == -1) ConfigManager.scoreboardY = Math.max(0, height / 2 - 45);
-        if (ConfigManager.effectsX == -1) ConfigManager.effectsX = width - 70;
-        if (ConfigManager.effectsY == -1) ConfigManager.effectsY = 12;
-
         // Capture initial snapshot once on open
         if (initialModules.isEmpty()) {
             for (HudModule m : ModuleManager.getInstance().getHudModules()) {
                 initialModules.put(m, new ModuleSnapshot(m.getX(), m.getY(), m.getScale()));
             }
-            initialBossbarX = ConfigManager.bossbarX; initialBossbarY = ConfigManager.bossbarY; initialBossbarScale = ConfigManager.bossbarScale;
-            initialScoreboardX = ConfigManager.scoreboardX; initialScoreboardY = ConfigManager.scoreboardY; initialScoreboardScale = ConfigManager.scoreboardScale;
-            initialEffectsX = ConfigManager.effectsX; initialEffectsY = ConfigManager.effectsY; initialEffectsScale = ConfigManager.effectsScale;
-            initialCustomVanilla = ConfigManager.customVanillaHud;
         }
 
-        // Bottom Action Toolbar (4 cohesive buttons)
+        // Bottom Action Toolbar (3 cohesive buttons)
         int btnY = height - 26;
-        btnVanillaToggle = new EzButton(
-                width / 2 - 210, btnY, 102, 20,
-                Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_editor.vanilla", app.ezclient.util.EzI18n.onOrOff(ConfigManager.customVanillaHud))),
-                ConfigManager.customVanillaHud,
-                b -> {
-                    ConfigManager.customVanillaHud = !ConfigManager.customVanillaHud;
-                    ConfigManager.save();
-                    hasUnsavedChanges = true;
-                    if (!ConfigManager.customVanillaHud) selectedVanilla = VanillaType.NONE;
-                    rebuildWidgets();
-                }
-        );
+        btnSave = new EzButton(width / 2 - 155, btnY, 100, 20, app.ezclient.util.EzI18n.comp("ezclient.hud_editor.save"), true, b -> saveAndClose());
+        btnResetAll = new EzButton(width / 2 - 50, btnY, 110, 20, app.ezclient.util.EzI18n.comp("ezclient.hud_editor.reset_all"), false, b -> showResetAllModal = true);
+        btnCancel = new EzButton(width / 2 + 65, btnY, 100, 20, app.ezclient.util.EzI18n.comp("ezclient.hud_editor.cancel"), false, b -> handleCloseRequest());
 
-        btnSave = new EzButton(width / 2 - 102, btnY, 94, 20, app.ezclient.util.EzI18n.comp("ezclient.hud_editor.save"), true, b -> saveAndClose());
-        btnResetAll = new EzButton(width / 2 - 2, btnY, 114, 20, app.ezclient.util.EzI18n.comp("ezclient.hud_editor.reset_all"), false, b -> showResetAllModal = true);
-        btnCancel = new EzButton(width / 2 + 118, btnY, 94, 20, app.ezclient.util.EzI18n.comp("ezclient.hud_editor.cancel"), false, b -> handleCloseRequest());
-
-        addRenderableWidget(btnVanillaToggle);
         addRenderableWidget(btnSave);
         addRenderableWidget(btnResetAll);
         addRenderableWidget(btnCancel);
@@ -126,7 +86,7 @@ public final class HudEditorScreen extends Screen {
     private void saveAndClose() {
         ConfigManager.save();
         hasUnsavedChanges = false;
-        minecraft.gui.setScreen(parent);
+        EzScreenBridge.set(minecraft, parent);
     }
 
     private void discardAndClose() {
@@ -134,86 +94,43 @@ public final class HudEditorScreen extends Screen {
             entry.getKey().setPosition(entry.getValue().x, entry.getValue().y);
             entry.getKey().setScale(entry.getValue().scale);
         }
-        ConfigManager.bossbarX = initialBossbarX; ConfigManager.bossbarY = initialBossbarY; ConfigManager.bossbarScale = initialBossbarScale;
-        ConfigManager.scoreboardX = initialScoreboardX; ConfigManager.scoreboardY = initialScoreboardY; ConfigManager.scoreboardScale = initialScoreboardScale;
-        ConfigManager.effectsX = initialEffectsX; ConfigManager.effectsY = initialEffectsY; ConfigManager.effectsScale = initialEffectsScale;
-        ConfigManager.customVanillaHud = initialCustomVanilla;
         ConfigManager.save();
         hasUnsavedChanges = false;
-        minecraft.gui.setScreen(parent);
+        EzScreenBridge.set(minecraft, parent);
     }
 
     private void handleCloseRequest() {
         if (hasUnsavedChanges) {
             showUnsavedModal = true;
         } else {
-            minecraft.gui.setScreen(parent);
+            EzScreenBridge.set(minecraft, parent);
         }
     }
 
     private int getModuleWidth(HudModule h) {
-        return (int) (h.getWidth(minecraft) * h.getScale());
+        return (int) (h.getWidth(minecraft, true) * h.getScale());
     }
 
     private int getModuleHeight(HudModule h) {
         return (int) (h.getHeight(minecraft) * h.getScale());
     }
 
-    private int getVanillaWidth(VanillaType type) {
-        return switch (type) {
-            case BOSSBAR -> (int) (182 * ConfigManager.bossbarScale);
-            case SCOREBOARD -> (int) (110 * ConfigManager.scoreboardScale);
-            case EFFECTS -> (int) (66 * ConfigManager.effectsScale);
-            default -> 0;
-        };
-    }
-
-    private int getVanillaHeight(VanillaType type) {
-        return switch (type) {
-            case BOSSBAR -> (int) (20 * ConfigManager.bossbarScale);
-            case SCOREBOARD -> (int) (90 * ConfigManager.scoreboardScale);
-            case EFFECTS -> (int) (22 * ConfigManager.effectsScale);
-            default -> 0;
-        };
-    }
-
-    private int getVanillaX(VanillaType type) {
-        return switch (type) {
-            case BOSSBAR -> ConfigManager.bossbarX;
-            case SCOREBOARD -> ConfigManager.scoreboardX;
-            case EFFECTS -> ConfigManager.effectsX;
-            default -> 0;
-        };
-    }
-
-    private int getVanillaY(VanillaType type) {
-        return switch (type) {
-            case BOSSBAR -> ConfigManager.bossbarY;
-            case SCOREBOARD -> ConfigManager.scoreboardY;
-            case EFFECTS -> ConfigManager.effectsY;
-            default -> 0;
-        };
-    }
-
     private HudModule hit(double mx, double my) {
+        // First check enabled modules
         for (HudModule h : ModuleManager.getInstance().getHudModules()) {
             if (!h.isEnabled()) continue;
             int w = getModuleWidth(h);
             int he = getModuleHeight(h);
             if (mx >= h.getX() && mx <= h.getX() + w && my >= h.getY() && my <= h.getY() + he) return h;
         }
-        return null;
-    }
-
-    private VanillaType hitVanilla(double mx, double my) {
-        if (!ConfigManager.customVanillaHud) return VanillaType.NONE;
-
-        for (VanillaType t : new VanillaType[]{VanillaType.BOSSBAR, VanillaType.SCOREBOARD, VanillaType.EFFECTS}) {
-            int vx = getVanillaX(t), vy = getVanillaY(t);
-            int vw = getVanillaWidth(t), vh = getVanillaHeight(t);
-            if (mx >= vx && mx <= vx + vw && my >= vy && my <= vy + vh) return t;
+        // Then check disabled modules
+        for (HudModule h : ModuleManager.getInstance().getHudModules()) {
+            if (h.isEnabled()) continue;
+            int w = getModuleWidth(h);
+            int he = getModuleHeight(h);
+            if (mx >= h.getX() && mx <= h.getX() + w && my >= h.getY() && my <= h.getY() + he) return h;
         }
-        return VanillaType.NONE;
+        return null;
     }
 
     private boolean isResizeHandleHit(double mx, double my, int x, int y, int w, int h) {
@@ -248,7 +165,10 @@ public final class HudEditorScreen extends Screen {
             int diaX = (width - diaW) / 2, diaY = (height - diaH) / 2;
             if (e.button() == 0) {
                 if (e.x() >= diaX + 16 && e.x() <= diaX + 120 && e.y() >= diaY + 54 && e.y() <= diaY + 76) {
-                    ConfigManager.resetAllLayout(width, height);
+                    for (HudModule m : ModuleManager.getInstance().getHudModules()) {
+                        m.resetToDefaults();
+                    }
+                    ConfigManager.save();
                     hasUnsavedChanges = true;
                     showResetAllModal = false;
                     return true;
@@ -258,7 +178,6 @@ public final class HudEditorScreen extends Screen {
                     return true;
                 }
             }
-            showResetAllModal = false;
             return true;
         }
 
@@ -268,14 +187,10 @@ public final class HudEditorScreen extends Screen {
             if (e.button() == 0) {
                 if (e.x() >= diaX + 16 && e.x() <= diaX + 116 && e.y() >= diaY + 52 && e.y() <= diaY + 74) {
                     if (contextModule != null) {
-                        contextModule.setPosition(10, 10);
-                        contextModule.setScale(1.0);
-                    } else if (contextVanilla != VanillaType.NONE) {
-                        if (contextVanilla == VanillaType.BOSSBAR) { ConfigManager.bossbarX = (width - 182) / 2; ConfigManager.bossbarY = 12; ConfigManager.bossbarScale = 1.0; }
-                        else if (contextVanilla == VanillaType.SCOREBOARD) { ConfigManager.scoreboardX = width - 116; ConfigManager.scoreboardY = Math.max(0, height / 2 - 45); ConfigManager.scoreboardScale = 1.0; }
-                        else if (contextVanilla == VanillaType.EFFECTS) { ConfigManager.effectsX = width - 70; ConfigManager.effectsY = 12; ConfigManager.effectsScale = 1.0; }
+                        contextModule.resetToDefaults();
+                        ConfigManager.save();
+                        hasUnsavedChanges = true;
                     }
-                    hasUnsavedChanges = true;
                     showResetElementModal = false;
                     return true;
                 }
@@ -284,228 +199,159 @@ public final class HudEditorScreen extends Screen {
                     return true;
                 }
             }
-            showResetElementModal = false;
             return true;
         }
 
-        // ── Context Menu Click ──
+        // ── Check Context Menu Clicks ──
         if (showContextMenu) {
             int cmW = 142;
-            int cmH = (contextModule != null) ? 46 : 26;
+            int cmH = 68;
             if (e.x() >= contextMenuX && e.x() <= contextMenuX + cmW && e.y() >= contextMenuY && e.y() <= contextMenuY + cmH) {
                 if (e.button() == 0) {
-                    if (contextModule != null) {
-                        if (e.y() < contextMenuY + 23) {
-                            showContextMenu = false;
-                            minecraft.gui.setScreen(new HudSettingsScreen(this, contextModule));
-                            return true;
-                        } else {
-                            showContextMenu = false;
-                            showResetElementModal = true;
-                            return true;
+                    int relY = (int) e.y() - contextMenuY;
+                    if (relY < 22) {
+                        // Settings item
+                        showContextMenu = false;
+                        if (contextModule != null) {
+                            EzScreenBridge.set(minecraft, new HudSettingsScreen(this, contextModule));
                         }
-                    } else if (contextVanilla != VanillaType.NONE) {
+                    } else if (relY < 44) {
+                        // Toggle enabled/disabled item
+                        showContextMenu = false;
+                        if (contextModule != null) {
+                            contextModule.setEnabled(!contextModule.isEnabled());
+                            ConfigManager.save();
+                            hasUnsavedChanges = true;
+                        }
+                    } else {
+                        // Reset item
                         showContextMenu = false;
                         showResetElementModal = true;
-                        return true;
                     }
+                    return true;
                 }
+            } else {
+                showContextMenu = false;
+            }
+        }
+
+        // ── Right Click -> Context Menu ──
+        if (e.button() == 1) {
+            HudModule mHit = hit(e.x(), e.y());
+            if (mHit != null) {
+                selected = mHit;
+                contextModule = mHit;
+                contextMenuX = Math.min((int) e.x(), width - 146);
+                contextMenuY = Math.min((int) e.y(), height - 52);
+                showContextMenu = true;
+                return true;
             }
             showContextMenu = false;
         }
 
-        // ── Resize Handle Click ──
+        // ── Left Click: Select, Drag or Resize ──
         if (e.button() == 0) {
+            // Check if clicking resize handle on selected module
             if (selected != null) {
                 int sw = getModuleWidth(selected);
                 int sh = getModuleHeight(selected);
                 if (isResizeHandleHit(e.x(), e.y(), selected.getX(), selected.getY(), sw, sh)) {
                     resizing = true;
-                    dragging = true;
+                    resizeStartX = e.x();
+                    resizeStartY = e.y();
+                    resizeStartWidth = selected.getWidth(minecraft);
                     resizeStartScale = selected.getScale();
-                    resizeStartX = e.x();
-                    resizeStartY = e.y();
-                    resizeStartWidth = Math.max(1, selected.getWidth(minecraft));
-                    return true;
-                }
-            } else if (selectedVanilla != VanillaType.NONE) {
-                int vx = getVanillaX(selectedVanilla);
-                int vy = getVanillaY(selectedVanilla);
-                int vw = getVanillaWidth(selectedVanilla);
-                int vh = getVanillaHeight(selectedVanilla);
-                if (isResizeHandleHit(e.x(), e.y(), vx, vy, vw, vh)) {
-                    resizing = true;
-                    dragging = true;
-                    resizeStartScale = (selectedVanilla == VanillaType.BOSSBAR) ? ConfigManager.bossbarScale :
-                            (selectedVanilla == VanillaType.SCOREBOARD) ? ConfigManager.scoreboardScale : ConfigManager.effectsScale;
-                    resizeStartX = e.x();
-                    resizeStartY = e.y();
-                    resizeStartWidth = (selectedVanilla == VanillaType.BOSSBAR) ? 182 :
-                            (selectedVanilla == VanillaType.SCOREBOARD) ? 110 : 66;
+                    hasUnsavedChanges = true;
                     return true;
                 }
             }
-        }
 
-        // ── Module Selection ──
-        HudModule hitModule = hit(e.x(), e.y());
-        if (hitModule != null) {
-            selected = hitModule;
-            selectedVanilla = VanillaType.NONE;
-
-            if (e.button() == 1) {
-                showContextMenu = true;
-                contextMenuX = (int) Math.min(width - 146, e.x());
-                contextMenuY = (int) Math.min(height - 52, e.y());
-                contextModule = hitModule;
-                contextVanilla = VanillaType.NONE;
+            HudModule mHit = hit(e.x(), e.y());
+            if (mHit != null) {
+                selected = mHit;
+                offsetX = e.x() - selected.getX();
+                offsetY = e.y() - selected.getY();
+                dragging = true;
+                hasUnsavedChanges = true;
                 return true;
             }
 
-            offsetX = e.x() - hitModule.getX();
-            offsetY = e.y() - hitModule.getY();
-            dragging = e.button() == 0;
-            resizing = false;
-            return true;
-        }
-
-        // ── Vanilla Selection ──
-        VanillaType vHit = hitVanilla(e.x(), e.y());
-        if (vHit != VanillaType.NONE) {
-            selected = null;
-            selectedVanilla = vHit;
-
-            if (e.button() == 1) {
-                showContextMenu = true;
-                contextMenuX = (int) Math.min(width - 146, e.x());
-                contextMenuY = (int) Math.min(height - 35, e.y());
-                contextModule = null;
-                contextVanilla = vHit;
-                return true;
+            // Clicked background -> deselect
+            if (e.y() < height - 32) {
+                selected = null;
             }
-
-            offsetX = e.x() - getVanillaX(vHit);
-            offsetY = e.y() - getVanillaY(vHit);
-            dragging = e.button() == 0;
-            resizing = false;
-            return true;
         }
 
-        selected = null;
-        selectedVanilla = VanillaType.NONE;
-        dragging = false;
-        resizing = false;
-        showContextMenu = false;
         return super.mouseClicked(e, doubleClick);
     }
 
     @Override
+    public boolean mouseReleased(MouseButtonEvent e) {
+        if (e.button() == 0) {
+            dragging = false;
+            resizing = false;
+            guideX = -1;
+            guideY = -1;
+        }
+        return super.mouseReleased(e);
+    }
+
+    @Override
     public boolean mouseDragged(MouseButtonEvent e, double dx, double dy) {
-        if (showUnsavedModal || showResetAllModal || showResetElementModal) return true;
+        if (resizing && selected != null && e.button() == 0) {
+            int baseW = Math.max(20, resizeStartWidth);
+            double deltaX = e.x() - resizeStartX;
+            double newScale = resizeStartScale + (deltaX / baseW);
+            newScale = Math.round(Math.max(0.5, Math.min(2.5, newScale)) * 10.0) / 10.0;
+            selected.setScale(newScale);
+            return true;
+        }
 
-        if (selected != null && dragging && e.button() == 0) {
-            hasUnsavedChanges = true;
-            if (resizing) {
-                double deltaDist = ((e.x() - resizeStartX) + (e.y() - resizeStartY)) / 2.0;
-                double newScale = Math.max(0.5, Math.min(3.0, resizeStartScale + deltaDist / resizeStartWidth));
-                newScale = Math.round(newScale * 20.0) / 20.0;
-                selected.setScale(newScale);
-                return true;
-            }
+        if (dragging && selected != null && e.button() == 0) {
+            int mw = getModuleWidth(selected);
+            int mh = getModuleHeight(selected);
 
-            // Smooth Jitter-Free Magnetic Snapping with Inter-Module Stacking Gap
-            int rawX = (int) (e.x() - offsetX);
-            int rawY = (int) (e.y() - offsetY);
-            int sw = getModuleWidth(selected);
-            int sh = getModuleHeight(selected);
+            int targetX = (int) (e.x() - offsetX);
+            int targetY = (int) (e.y() - offsetY);
 
-            int snapX = rawX;
-            int snapY = rawY;
+            int snapX = targetX;
+            int snapY = targetY;
             guideX = -1;
             guideY = -1;
 
-            // Snap against screen boundaries
-            if (Math.abs(rawX - 10) <= SNAP_DISTANCE) { snapX = 10; guideX = 10; }
-            if (Math.abs((rawX + sw) - (width - 10)) <= SNAP_DISTANCE) { snapX = width - 10 - sw; guideX = width - 10; }
-            if (Math.abs(rawY - 10) <= SNAP_DISTANCE) { snapY = 10; guideY = 10; }
-            if (Math.abs((rawY + sh) - (height - 10)) <= SNAP_DISTANCE) { snapY = height - 10 - sh; guideY = height - 10; }
+            // Screen edge snapping
+            if (Math.abs(targetX) < SNAP_DISTANCE) { snapX = 0; guideX = 0; }
+            if (Math.abs(targetX + mw - width) < SNAP_DISTANCE) { snapX = width - mw; guideX = width; }
+            if (Math.abs(targetY) < SNAP_DISTANCE) { snapY = 0; guideY = 0; }
+            if (Math.abs(targetY + mh - (height - 30)) < SNAP_DISTANCE) { snapY = height - 30 - mh; guideY = height - 30; }
 
-            // Snap against other modules (Edge alignments + Stacking Gap)
+            // Inter-module snapping
             for (HudModule other : ModuleManager.getInstance().getHudModules()) {
                 if (other == selected || !other.isEnabled()) continue;
                 int ox = other.getX(), oy = other.getY();
                 int ow = getModuleWidth(other), oh = getModuleHeight(other);
 
-                // Horizontal alignments
-                if (Math.abs(rawX - ox) <= SNAP_DISTANCE) { snapX = ox; guideX = ox; }
-                else if (Math.abs((rawX + sw) - (ox + ow)) <= SNAP_DISTANCE) { snapX = ox + ow - sw; guideX = ox + ow; }
-                else if (Math.abs((rawX + sw / 2) - (ox + ow / 2)) <= SNAP_DISTANCE) { snapX = ox + ow / 2 - sw / 2; guideX = ox + ow / 2; }
-                // Horizontal Stacking (directly right of other)
-                else if (Math.abs(rawX - (ox + ow + STACK_GAP)) <= SNAP_DISTANCE) { snapX = ox + ow + STACK_GAP; guideX = snapX; }
-
-                // Vertical alignments
-                if (Math.abs(rawY - oy) <= SNAP_DISTANCE) { snapY = oy; guideY = oy; }
-                else if (Math.abs((rawY + sh) - (oy + oh)) <= SNAP_DISTANCE) { snapY = oy + oh - sh; guideY = oy + oh; }
-                else if (Math.abs((rawY + sh / 2) - (oy + oh / 2)) <= SNAP_DISTANCE) { snapY = oy + oh / 2 - sh / 2; guideY = oy + oh / 2; }
-                // Vertical Stacking (directly below other with crisp 4px gap)
-                else if (Math.abs(rawY - (oy + oh + STACK_GAP)) <= SNAP_DISTANCE) { snapY = oy + oh + STACK_GAP; guideY = snapY; }
-                // Vertical Stacking (directly above other with crisp 4px gap)
-                else if (Math.abs((rawY + sh) - (oy - STACK_GAP)) <= SNAP_DISTANCE) { snapY = oy - STACK_GAP - sh; guideY = oy - STACK_GAP; }
+                // Left-edge align
+                if (Math.abs(targetX - ox) < SNAP_DISTANCE) { snapX = ox; guideX = ox; }
+                // Right-edge align
+                if (Math.abs(targetX + mw - (ox + ow)) < SNAP_DISTANCE) { snapX = ox + ow - mw; guideX = ox + ow; }
+                // Top-edge align
+                if (Math.abs(targetY - oy) < SNAP_DISTANCE) { snapY = oy; guideY = oy; }
+                // Bottom stack align with 4px gap
+                if (Math.abs(targetY - (oy + oh + STACK_GAP)) < SNAP_DISTANCE) { snapY = oy + oh + STACK_GAP; guideY = snapY; }
+                // Top stack align with 4px gap
+                if (Math.abs(targetY + mh + STACK_GAP - oy) < SNAP_DISTANCE) { snapY = oy - mh - STACK_GAP; guideY = oy; }
             }
 
-            snapX = Math.max(0, Math.min(width - sw, snapX));
-            snapY = Math.max(0, Math.min(height - sh, snapY));
+            // Keep within visible bounds
+            snapX = Math.max(0, Math.min(width - mw, snapX));
+            snapY = Math.max(0, Math.min(height - 30 - mh, snapY));
+
             selected.setPosition(snapX, snapY);
             return true;
         }
 
-        if (selectedVanilla != VanillaType.NONE && dragging && e.button() == 0) {
-            hasUnsavedChanges = true;
-            if (resizing) {
-                double deltaDist = ((e.x() - resizeStartX) + (e.y() - resizeStartY)) / 2.0;
-                double newScale = Math.max(0.5, Math.min(2.5, resizeStartScale + deltaDist / resizeStartWidth));
-                newScale = Math.round(newScale * 20.0) / 20.0;
-                if (selectedVanilla == VanillaType.BOSSBAR) ConfigManager.bossbarScale = newScale;
-                else if (selectedVanilla == VanillaType.SCOREBOARD) ConfigManager.scoreboardScale = newScale;
-                else if (selectedVanilla == VanillaType.EFFECTS) ConfigManager.effectsScale = newScale;
-                return true;
-            }
-
-            int rawX = (int) (e.x() - offsetX);
-            int rawY = (int) (e.y() - offsetY);
-            int vw = getVanillaWidth(selectedVanilla);
-            int vh = getVanillaHeight(selectedVanilla);
-
-            int snapX = rawX;
-            int snapY = rawY;
-            guideX = -1;
-            guideY = -1;
-
-            if (Math.abs(rawX - (width - vw) / 2) <= SNAP_DISTANCE) { snapX = (width - vw) / 2; guideX = width / 2; }
-            if (Math.abs(rawY - 12) <= SNAP_DISTANCE) { snapY = 12; guideY = 12; }
-
-            snapX = Math.max(0, Math.min(width - vw, snapX));
-            snapY = Math.max(0, Math.min(height - vh, snapY));
-
-            if (selectedVanilla == VanillaType.BOSSBAR) { ConfigManager.bossbarX = snapX; ConfigManager.bossbarY = snapY; }
-            else if (selectedVanilla == VanillaType.SCOREBOARD) { ConfigManager.scoreboardX = snapX; ConfigManager.scoreboardY = snapY; }
-            else if (selectedVanilla == VanillaType.EFFECTS) { ConfigManager.effectsX = snapX; ConfigManager.effectsY = snapY; }
-            return true;
-        }
-
         return super.mouseDragged(e, dx, dy);
-    }
-
-    @Override
-    public boolean mouseReleased(MouseButtonEvent e) {
-        if (dragging) {
-            dragging = false;
-            resizing = false;
-            guideX = -1;
-            guideY = -1;
-            return true;
-        }
-        return super.mouseReleased(e);
     }
 
     @Override
@@ -514,59 +360,46 @@ public final class HudEditorScreen extends Screen {
             handleCloseRequest();
             return true;
         }
-
-        if (selected != null) {
-            int step = (event.modifiers() & GLFW.GLFW_MOD_SHIFT) != 0 ? 10 : 1;
-            int moveX = 0, moveY = 0;
-            if (event.key() == GLFW.GLFW_KEY_LEFT) moveX = -step;
-            else if (event.key() == GLFW.GLFW_KEY_RIGHT) moveX = step;
-            else if (event.key() == GLFW.GLFW_KEY_UP) moveY = -step;
-            else if (event.key() == GLFW.GLFW_KEY_DOWN) moveY = step;
-            else return super.keyPressed(event);
-
-            int moduleWidth = getModuleWidth(selected);
-            int moduleHeight = getModuleHeight(selected);
-            int nextX = Math.max(0, Math.min(width - moduleWidth, selected.getX() + moveX));
-            int nextY = Math.max(0, Math.min(height - moduleHeight, selected.getY() + moveY));
-            selected.setPosition(nextX, nextY);
-            hasUnsavedChanges = true;
-            return true;
-        }
         return super.keyPressed(event);
     }
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float d) {
-        // Dynamic visibility: Hide ALL overlays & buttons during drag/resize for complete clarity
+        extractTransparentBackground(g);
+
         boolean isInteracting = dragging || resizing;
 
-        if (btnVanillaToggle != null) btnVanillaToggle.visible = !isInteracting;
-        if (btnSave != null) btnSave.visible = !isInteracting;
-        if (btnResetAll != null) btnResetAll.visible = !isInteracting;
-        if (btnCancel != null) btnCancel.visible = !isInteracting;
-
-        // ── 1. Render Snapping Guide Lines ──
+        // ── 1. Render Snapping Guides ──
         if (guideX >= 0) g.fill(guideX, 0, guideX + 1, height, 0xAA00D2FF);
         if (guideY >= 0) g.fill(0, guideY, width, guideY + 1, 0xAA00D2FF);
 
-        // ── 2. Render Vanilla HUD (Live or Template) ──
-        if (ConfigManager.customVanillaHud) {
-            renderVanillaElements(g);
-        }
-
-        // ── 3. Render Mod Modules ──
+        // ── 2. Render EzClient Modules ──
         for (HudModule h : ModuleManager.getInstance().getHudModules()) {
-            if (h.isEnabled()) HudRenderer.draw(g, h, true);
+            if (h.isEnabled()) {
+                HudRenderer.draw(g, h, true);
+            } else {
+                int hx = h.getX();
+                int hy = h.getY();
+                int hw = getModuleWidth(h);
+                int hh = getModuleHeight(h);
+                // Ghost preview with outline and OFF badge so disabled modules are visible and positionable
+                g.fill(hx, hy, hx + hw, hy + hh, 0x40101722);
+                g.outline(hx, hy, hw, hh, 0x608090A0);
+                HudRenderer.draw(g, h, true);
+                int badgeW = font.width("AUS") + 4;
+                g.fill(hx + hw - badgeW - 1, hy + 1, hx + hw - 1, hy + 9, 0xC0992222);
+                g.text(font, "AUS", hx + hw - badgeW + 1, hy + 1, 0xFFFFFFFF);
+            }
         }
 
-        // ── 4. Highlight Active Selection with Snug 1px Outline & Corner Resize Handle ──
+        // ── 3. Highlight Active Selection with Snug 1px Outline & Corner Resize Handle ──
         if (selected != null) {
             int sx = selected.getX();
             int sy = selected.getY();
             int sw = getModuleWidth(selected);
             int sh = getModuleHeight(selected);
 
-            // Clean, exact 1px emerald border fitting tightly around module
+            // Snug 1px emerald border fitting tightly around module
             g.outline(sx, sy, sw, sh, 0xFF22C96E);
 
             // Bottom-Right Corner Resize Handle (↘)
@@ -580,26 +413,6 @@ public final class HudEditorScreen extends Screen {
                 EzUi.roundedRect(g, hx + 10, hy - 4, 30, 14, 3, 0xF0121722);
                 g.centeredText(font, Component.literal(scaleStr), hx + 25, hy - 1, 0xFF43DD8C);
             }
-        } else if (ConfigManager.customVanillaHud && selectedVanilla != VanillaType.NONE) {
-            int vx = getVanillaX(selectedVanilla);
-            int vy = getVanillaY(selectedVanilla);
-            int vw = getVanillaWidth(selectedVanilla);
-            int vh = getVanillaHeight(selectedVanilla);
-
-            g.outline(vx, vy, vw, vh, 0xFF00D2FF);
-
-            int hx = vx + vw - 8;
-            int hy = vy + vh - 8;
-            EzUi.roundedRect(g, hx, hy, 8, 8, 2, 0xFF00D2FF);
-            g.text(font, "↘", hx + 1, hy - 1, 0xFFFFFFFF);
-
-            if (resizing) {
-                double scale = (selectedVanilla == VanillaType.BOSSBAR) ? ConfigManager.bossbarScale :
-                        (selectedVanilla == VanillaType.SCOREBOARD) ? ConfigManager.scoreboardScale : ConfigManager.effectsScale;
-                String scaleStr = String.format(java.util.Locale.ROOT, "%.1fx", scale);
-                EzUi.roundedRect(g, hx + 10, hy - 4, 30, 14, 3, 0xF0121722);
-                g.centeredText(font, Component.literal(scaleStr), hx + 25, hy - 1, 0xFF00D2FF);
-            }
         }
 
         // Top Status Bar (Hidden during drag)
@@ -608,33 +421,32 @@ public final class HudEditorScreen extends Screen {
             g.centeredText(font, Component.literal("● " + app.ezclient.util.EzI18n.get("ezclient.hud_editor.modal.unsaved_title")), width / 2, 13, 0xFFEAB308);
         }
 
-        // ── 5. Render Right-Click Context Menu Popup (100% White text) ──
-        if (showContextMenu && !isInteracting) {
+        // ── 4. Render Right-Click Context Menu Popup ──
+        if (showContextMenu && !isInteracting && contextModule != null) {
             int cmW = 142;
-            int cmH = (contextModule != null) ? 46 : 26;
+            int cmH = 68;
 
             EzUi.roundedRect(g, contextMenuX - 2, contextMenuY - 2, cmW + 4, cmH + 4, 6, 0xFF202736);
             EzUi.roundedRect(g, contextMenuX, contextMenuY, cmW, cmH, 5, 0xF5131A26);
 
-            if (contextModule != null) {
-                boolean hovSettings = mx >= contextMenuX && mx <= contextMenuX + cmW && my >= contextMenuY && my < contextMenuY + 23;
-                boolean hovReset = mx >= contextMenuX && mx <= contextMenuX + cmW && my >= contextMenuY + 23 && my <= contextMenuY + cmH;
+            boolean hovSettings = mx >= contextMenuX && mx <= contextMenuX + cmW && my >= contextMenuY && my < contextMenuY + 22;
+            boolean hovToggle = mx >= contextMenuX && mx <= contextMenuX + cmW && my >= contextMenuY + 22 && my < contextMenuY + 44;
+            boolean hovReset = mx >= contextMenuX && mx <= contextMenuX + cmW && my >= contextMenuY + 44 && my <= contextMenuY + cmH;
 
-                if (hovSettings) EzUi.roundedRect(g, contextMenuX + 2, contextMenuY + 2, cmW - 4, 19, 4, 0xFF22C96E);
-                g.text(font, app.ezclient.util.EzI18n.get("ezclient.hud_editor.context.edit"), contextMenuX + 8, contextMenuY + 7, 0xFFFFFFFF);
+            if (hovSettings) EzUi.roundedRect(g, contextMenuX + 2, contextMenuY + 2, cmW - 4, 19, 4, 0xFF22C96E);
+            g.text(font, app.ezclient.util.EzI18n.get("ezclient.hud_editor.context.edit"), contextMenuX + 8, contextMenuY + 7, 0xFFFFFFFF);
 
-                if (hovReset) EzUi.roundedRect(g, contextMenuX + 2, contextMenuY + 24, cmW - 4, 19, 4, 0xFF334155);
-                g.text(font, "↺ " + app.ezclient.util.EzI18n.get("ezclient.hud_editor.context.reset_pos"), contextMenuX + 8, contextMenuY + 29, 0xFFFFFFFF);
-            } else if (contextVanilla != VanillaType.NONE) {
-                boolean hovReset = mx >= contextMenuX && mx <= contextMenuX + cmW && my >= contextMenuY && my <= contextMenuY + cmH;
-                if (hovReset) EzUi.roundedRect(g, contextMenuX + 2, contextMenuY + 2, cmW - 4, 22, 4, 0xFF334155);
-                g.text(font, "↺ " + app.ezclient.util.EzI18n.get("ezclient.hud_editor.context.reset_pos"), contextMenuX + 8, contextMenuY + 8, 0xFFFFFFFF);
-            }
+            if (hovToggle) EzUi.roundedRect(g, contextMenuX + 2, contextMenuY + 23, cmW - 4, 19, 4, contextModule.isEnabled() ? 0xFF992222 : 0xFF22C96E);
+            String toggleText = contextModule.isEnabled() ? "✕ Deaktivieren" : "✓ Aktivieren";
+            g.text(font, toggleText, contextMenuX + 8, contextMenuY + 28, 0xFFFFFFFF);
+
+            if (hovReset) EzUi.roundedRect(g, contextMenuX + 2, contextMenuY + 45, cmW - 4, 19, 4, 0xFF334155);
+            g.text(font, "↺ " + app.ezclient.util.EzI18n.get("ezclient.hud_editor.context.reset_pos"), contextMenuX + 8, contextMenuY + 50, 0xFFFFFFFF);
         }
 
         super.extractRenderState(g, mx, my, d);
 
-        // ── 6. Render Modals ──
+        // ── 5. Render Modals ──
         if (showUnsavedModal) {
             g.fill(0, 0, width, height, 0xAA000000);
             int diaW = 276, diaH = 92;
@@ -693,63 +505,6 @@ public final class HudEditorScreen extends Screen {
             boolean hovNo = mx >= diaX + 130 && mx <= diaX + 234 && my >= diaY + 52 && my <= diaY + 74;
             EzUi.roundedRect(g, diaX + 130, diaY + 52, 104, 22, 4, hovNo ? 0xFF475569 : 0xFF334155);
             g.centeredText(font, app.ezclient.util.EzI18n.comp("ezclient.hud_editor.cancel"), diaX + 130 + 52, diaY + 59, 0xFFFFFFFF);
-        }
-    }
-
-    private void renderVanillaElements(GuiGraphicsExtractor g) {
-        // 1. Bossbar
-        int bx = ConfigManager.bossbarX, by = ConfigManager.bossbarY;
-        int bw = getVanillaWidth(VanillaType.BOSSBAR), bh = getVanillaHeight(VanillaType.BOSSBAR);
-        EzUi.roundedRect(g, bx, by, bw, bh, 3, selectedVanilla == VanillaType.BOSSBAR ? 0x6000D2FF : 0x40000000);
-        g.fill(bx + 2, by + 10, bx + bw - 2, by + 15, 0xFF351240);
-        g.fill(bx + 3, by + 11, bx + (int) (bw * 0.78), by + 14, 0xFFD830E8);
-        g.centeredText(font, Component.literal("§d§lEnder Dragon"), bx + bw / 2, by + 1, 0xFFFFFFFF);
-        if (selectedVanilla == VanillaType.BOSSBAR) {
-            g.outline(bx, by, bw, bh, 0xFF00D2FF);
-        }
-
-        // 2. Scoreboard
-        int sx = ConfigManager.scoreboardX, sy = ConfigManager.scoreboardY;
-        int sw = getVanillaWidth(VanillaType.SCOREBOARD), sh = getVanillaHeight(VanillaType.SCOREBOARD);
-        boolean hasLiveScoreboard = false;
-        if (minecraft.level != null) {
-            Scoreboard sb = minecraft.level.getScoreboard();
-            Objective sidebar = sb.getDisplayObjective(net.minecraft.world.scores.DisplaySlot.SIDEBAR);
-            if (sidebar != null) {
-                hasLiveScoreboard = true;
-                EzUi.roundedRect(g, sx, sy, sw, sh, 4, selectedVanilla == VanillaType.SCOREBOARD ? 0x8000D2FF : 0x60000000);
-                if (selectedVanilla == VanillaType.SCOREBOARD) g.outline(sx, sy, sw, sh, 0xFF00D2FF);
-                g.centeredText(font, sidebar.getDisplayName(), sx + sw / 2, sy + 5, 0xFFFFFFFF);
-                g.text(font, "§7[Live Scoreboard]", sx + 6, sy + 18, 0xFF43DD8C);
-            }
-        }
-        if (!hasLiveScoreboard) {
-            EzUi.roundedRect(g, sx, sy, sw, sh, 4, selectedVanilla == VanillaType.SCOREBOARD ? 0x8000D2FF : 0xA00D111A);
-            if (selectedVanilla == VanillaType.SCOREBOARD) g.outline(sx, sy, sw, sh, 0xFF00D2FF);
-            g.centeredText(font, Component.literal("§e§lEzClient §7(v1.8.2)"), sx + sw / 2, sy + 5, 0xFFFFFFFF);
-            g.text(font, "§7-----------------", sx + 6, sy + 16, 0xFF888888);
-            g.text(font, "§fKills: §a12", sx + 6, sy + 27, 0xFFFFFFFF);
-            g.text(font, "§fDeaths: §c2", sx + 6, sy + 38, 0xFFFFFFFF);
-            g.text(font, "§fPing: §a24ms", sx + 6, sy + 49, 0xFFFFFFFF);
-            g.text(font, "§fFPS: §a240", sx + 6, sy + 60, 0xFFFFFFFF);
-            g.text(font, "§eezclient.app", sx + 6, sy + 74, 0xFFFFAA00);
-        }
-
-        // 3. Status Effects (Top Right - 3 Potion Slots)
-        int ex = ConfigManager.effectsX, ey = ConfigManager.effectsY;
-        int ew = getVanillaWidth(VanillaType.EFFECTS), eh = getVanillaHeight(VanillaType.EFFECTS);
-        if (selectedVanilla == VanillaType.EFFECTS) {
-            g.outline(ex, ey, ew, eh, 0xFF00D2FF);
-        }
-        String[] effectIcons = {"STR", "SPD", "HP"};
-        String[] effectTimes = {"8:42", "3:15", "0:45"};
-        int[] effectColors = {0xFFEF4444, 0xFF00D2FF, 0xFFFF69B4};
-        for (int i = 0; i < 3; i++) {
-            int ix = ex + i * 22;
-            EzUi.roundedRect(g, ix, ey, 20, 20, 3, 0x90111419);
-            g.outline(ix, ey, 20, 20, 0x40FFFFFF);
-            g.centeredText(font, Component.literal(effectIcons[i]), ix + 10, ey + 2, effectColors[i]);
-            g.centeredText(font, Component.literal(effectTimes[i]), ix + 10, ey + 11, 0xFFE2E8F0);
         }
     }
 

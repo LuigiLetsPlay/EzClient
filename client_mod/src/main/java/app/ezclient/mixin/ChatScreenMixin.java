@@ -3,6 +3,7 @@ package app.ezclient.mixin;
 import app.ezclient.gui.ConfigManager;
 import app.ezclient.gui.EzUi;
 import net.minecraft.client.Minecraft;
+import app.ezclient.gui.EzScreenBridge;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -58,9 +59,7 @@ public abstract class ChatScreenMixin extends Screen {
                 newScale = Math.round(newScale * 20.0) / 20.0;
                 if (Math.abs(newScale - mc.options.chatScale().get()) > 0.01) {
                     mc.options.chatScale().set(newScale);
-                    if (mc.gui != null && mc.gui.hud != null) {
-                        mc.gui.hud.getChat().rescaleChat();
-                    }
+                    EzScreenBridge.rescaleChat(mc);
                     ConfigManager.chatScale = newScale;
                 }
             } else {
@@ -96,9 +95,7 @@ public abstract class ChatScreenMixin extends Screen {
             if (event.button() == 1) {
                 // Right Click -> Reset to default 100%
                 mc.options.chatScale().set(1.0);
-                if (mc.gui != null && mc.gui.hud != null) {
-                    mc.gui.hud.getChat().rescaleChat();
-                }
+                EzScreenBridge.rescaleChat(mc);
                 ConfigManager.chatScale = 1.0;
                 mc.options.save();
                 ConfigManager.save();

@@ -169,6 +169,7 @@ public class ConfigManager {
                     if (json.has("armorStatusDamageWarning")) armor.setDamageWarning(json.get("armorStatusDamageWarning").getAsBoolean());
                     if (json.has("armorStatusShowItemCount")) armor.setShowItemCount(json.get("armorStatusShowItemCount").getAsBoolean());
                     if (json.has("armorStatusShowHands")) armor.setShowHands(json.get("armorStatusShowHands").getAsBoolean());
+                    if (json.has("armorStatusDynamicBox")) armor.setDynamicBox(json.get("armorStatusDynamicBox").getAsBoolean());
 
                     PotionEffectModule potion = ModuleManager.getInstance().getPotionEffectModule();
                     if (json.has("potionDisplayStyle")) {
@@ -239,11 +240,117 @@ public class ConfigManager {
 
                     ClearGlassModule clearGlass = ModuleManager.getInstance().getClearGlassModule();
                     if (json.has("clearGlassEnabled")) clearGlass.setEnabled(json.get("clearGlassEnabled").getAsBoolean());
-                    if (json.has("clearGlassConnected")) clearGlass.setConnectedGlass(json.get("clearGlassConnected").getAsBoolean());
 
                     DayCounterModule dayCounter = ModuleManager.getInstance().getDayCounterModule();
                     if (json.has("dayCounterShowDay")) dayCounter.setShowDay(json.get("dayCounterShowDay").getAsBoolean());
                     if (json.has("dayCounterShowPlaytime")) dayCounter.setShowPlaytime(json.get("dayCounterShowPlaytime").getAsBoolean());
+
+                    ClockModule clock = ModuleManager.getInstance().getClockModule();
+                    if (json.has("clockFormat")) {
+                        try { clock.setClockFormat(ClockModule.ClockFormat.valueOf(json.get("clockFormat").getAsString())); } catch (Exception ignored) {}
+                    }
+                    if (json.has("clockShowPrefix")) clock.setShowPrefix(json.get("clockShowPrefix").getAsBoolean());
+
+                    MemoryModule memory = ModuleManager.getInstance().getMemoryModule();
+                    if (json.has("memoryFormat")) {
+                        try { memory.setMemoryFormat(MemoryModule.MemoryFormat.valueOf(json.get("memoryFormat").getAsString())); } catch (Exception ignored) {}
+                    }
+                    if (json.has("memoryShowPrefix")) memory.setShowPrefix(json.get("memoryShowPrefix").getAsBoolean());
+
+                    // Ping Module Upgrades
+                    PingModule ping = ModuleManager.getInstance().getPingModule();
+                    if (json.has("pingDisplayLayout")) {
+                        try { ping.setDisplayLayout(PingModule.DisplayLayout.valueOf(json.get("pingDisplayLayout").getAsString())); } catch (Exception ignored) {}
+                    }
+                    if (json.has("pingUpdateInterval")) ping.setUpdateIntervalSeconds(json.get("pingUpdateInterval").getAsInt());
+                    if (json.has("pingAlert")) ping.setPingAlert(json.get("pingAlert").getAsBoolean());
+                    if (json.has("pingShowPlayerCount")) ping.setShowPlayerCount(json.get("pingShowPlayerCount").getAsBoolean());
+
+                    // Reach Display
+                    ReachModule reach = ModuleManager.getInstance().getReachModule();
+                    if (json.has("reachDisplayFormat")) {
+                        try { reach.setDisplayFormat(ReachModule.DisplayFormat.valueOf(json.get("reachDisplayFormat").getAsString())); } catch (Exception ignored) {}
+                    }
+                    if (json.has("reachPrecision")) reach.setPrecision(json.get("reachPrecision").getAsInt());
+                    if (json.has("reachFadeOutDuration")) reach.setFadeOutDurationMs(json.get("reachFadeOutDuration").getAsInt());
+                    if (json.has("reachRaytrace")) reach.setRaytracePrecision(json.get("reachRaytrace").getAsBoolean());
+                    if (json.has("reachColorCoding")) reach.setColorCoding(json.get("reachColorCoding").getAsBoolean());
+
+                    // Combo Counter
+                    ComboCounterModule combo = ModuleManager.getInstance().getComboCounterModule();
+                    if (json.has("comboDisplayFormat")) {
+                        try { combo.setDisplayFormat(ComboCounterModule.DisplayFormat.valueOf(json.get("comboDisplayFormat").getAsString())); } catch (Exception ignored) {}
+                    }
+                    if (json.has("comboResetWindow")) combo.setResetWindowSeconds(json.get("comboResetWindow").getAsFloat());
+                    if (json.has("comboScalePunch")) combo.setScalePunch(json.get("comboScalePunch").getAsBoolean());
+                    if (json.has("comboMilestoneColors")) combo.setMilestoneColors(json.get("comboMilestoneColors").getAsBoolean());
+                    if (json.has("comboSoundFeedback")) combo.setSoundFeedback(json.get("comboSoundFeedback").getAsBoolean());
+
+                    // Scoreboard Customizer
+                    ScoreboardModule scoreboard = ModuleManager.getInstance().getScoreboardModule();
+                    if (json.has("scoreboardEnabled")) scoreboard.setEnabled(json.get("scoreboardEnabled").getAsBoolean());
+                    if (json.has("scoreboardRemoveRedNumbers")) scoreboard.setRemoveRedNumbers(json.get("scoreboardRemoveRedNumbers").getAsBoolean());
+                    if (json.has("scoreboardBackgroundStyle")) {
+                        try { scoreboard.setBackgroundStyle(ScoreboardModule.BackgroundStyle.valueOf(json.get("scoreboardBackgroundStyle").getAsString())); } catch (Exception ignored) {}
+                    }
+                    if (json.has("scoreboardCustomBgColor")) scoreboard.setCustomBackgroundColor(json.get("scoreboardCustomBgColor").getAsInt());
+                    if (json.has("scoreboardTextShadow")) scoreboard.setTextShadow(json.get("scoreboardTextShadow").getAsBoolean());
+                    if (json.has("scoreboardHideServerIp")) scoreboard.setHideServerIpFooter(json.get("scoreboardHideServerIp").getAsBoolean());
+                    if (json.has("scoreboardCustomX")) scoreboard.setPosX(json.get("scoreboardCustomX").getAsInt());
+                    if (json.has("scoreboardCustomY")) scoreboard.setPosY(json.get("scoreboardCustomY").getAsInt());
+                    if (json.has("scoreboardCustomScale")) scoreboard.setScale(json.get("scoreboardCustomScale").getAsDouble());
+
+                    // FOV Changer
+                    FovChangerModule fov = ModuleManager.getInstance().getFovChangerModule();
+                    if (json.has("fovEnabled")) fov.setEnabled(json.get("fovEnabled").getAsBoolean());
+                    if (json.has("fovStaticLock")) fov.setStaticFovLock(json.get("fovStaticLock").getAsBoolean());
+                    if (json.has("fovSprintMultiplier")) fov.setSprintMultiplier(json.get("fovSprintMultiplier").getAsFloat());
+                    if (json.has("fovSpeedMultiplier")) fov.setSpeedPotionMultiplier(json.get("fovSpeedMultiplier").getAsFloat());
+                    if (json.has("fovSlownessMultiplier")) fov.setSlownessPotionMultiplier(json.get("fovSlownessMultiplier").getAsFloat());
+                    if (json.has("fovBowMultiplier")) fov.setBowAimMultiplier(json.get("fovBowMultiplier").getAsFloat());
+                    if (json.has("fovFlyingMultiplier")) fov.setFlyingMultiplier(json.get("fovFlyingMultiplier").getAsFloat());
+                    if (json.has("fovSmoothInterpolation")) fov.setSmoothInterpolation(json.get("fovSmoothInterpolation").getAsBoolean());
+
+                    // Damage Tint
+                    DamageTintModule damageTint = ModuleManager.getInstance().getDamageTintModule();
+                    if (json.has("damageTintEnabled")) damageTint.setEnabled(json.get("damageTintEnabled").getAsBoolean());
+                    if (json.has("damageTintScope")) {
+                        try { damageTint.setTargetScope(DamageTintModule.TargetScope.valueOf(json.get("damageTintScope").getAsString())); } catch (Exception ignored) {}
+                    }
+                    if (json.has("damageTintColor")) damageTint.setCustomColor(json.get("damageTintColor").getAsInt());
+                    if (json.has("damageTintAlpha")) damageTint.setCustomAlpha(json.get("damageTintAlpha").getAsInt());
+                    if (json.has("damageTintChroma")) damageTint.setChromaMode(json.get("damageTintChroma").getAsBoolean());
+                    if (json.has("damageTintFlashDuration")) damageTint.setFlashDurationMultiplier(json.get("damageTintFlashDuration").getAsFloat());
+
+                    // Motion Blur
+                    MotionBlurModule motionBlur = ModuleManager.getInstance().getMotionBlurModule();
+                    if (json.has("motionBlurEnabled")) motionBlur.setEnabled(json.get("motionBlurEnabled").getAsBoolean());
+                    if (json.has("motionBlurStrength")) motionBlur.setBlurStrength(json.get("motionBlurStrength").getAsInt());
+                    if (json.has("motionBlurFpsProtection")) motionBlur.setFpsProtection(json.get("motionBlurFpsProtection").getAsBoolean());
+                    if (json.has("motionBlurFpsThreshold")) motionBlur.setFpsThreshold(json.get("motionBlurFpsThreshold").getAsInt());
+
+                    // Chat Customizer
+                    ChatCustomizerModule chatCustomizer = ModuleManager.getInstance().getChatCustomizerModule();
+                    if (json.has("chatCustomizerEnabled")) chatCustomizer.setEnabled(json.get("chatCustomizerEnabled").getAsBoolean());
+                    if (json.has("chatTimestampFormat")) {
+                        try { chatCustomizer.setTimestampFormat(ChatCustomizerModule.TimestampFormat.valueOf(json.get("chatTimestampFormat").getAsString())); } catch (Exception ignored) {}
+                    }
+                    if (json.has("chatBackgroundOpacity")) chatCustomizer.setBackgroundOpacity(json.get("chatBackgroundOpacity").getAsInt());
+                    if (json.has("chatLineLimit")) chatCustomizer.setLineLimit(json.get("chatLineLimit").getAsInt());
+                    if (json.has("chatCopyOnClick")) chatCustomizer.setCopyOnClick(json.get("chatCopyOnClick").getAsBoolean());
+
+                    // TNT Timer
+                    TntTimerModule tntTimer = ModuleManager.getInstance().getTntTimerModule();
+                    if (json.has("tntTimerEnabled")) tntTimer.setEnabled(json.get("tntTimerEnabled").getAsBoolean());
+                    if (json.has("tntTimerPrecision")) tntTimer.setPrecision(json.get("tntTimerPrecision").getAsInt());
+                    if (json.has("tntTimerColorShift")) tntTimer.setColorShift(json.get("tntTimerColorShift").getAsBoolean());
+                    if (json.has("tntTimerRenderThroughWalls")) tntTimer.setRenderThroughWalls(json.get("tntTimerRenderThroughWalls").getAsBoolean());
+
+                    // AutoGG
+                    AutoGgModule autoGg = ModuleManager.getInstance().getAutoGgModule();
+                    if (json.has("autoGgEnabled")) autoGg.setEnabled(json.get("autoGgEnabled").getAsBoolean());
+                    if (json.has("autoGgMessage")) autoGg.setCustomMessage(json.get("autoGgMessage").getAsString());
+                    if (json.has("autoGgDelay")) autoGg.setDelayMs(json.get("autoGgDelay").getAsInt());
 
                     if (json.has("bossbarX")) bossbarX = json.get("bossbarX").getAsInt();
                     if (json.has("bossbarY")) bossbarY = json.get("bossbarY").getAsInt();
@@ -260,7 +367,7 @@ public class ConfigManager {
                     if (json.has("effectsScale")) effectsScale = json.get("effectsScale").getAsDouble();
                     if (json.has("customVanillaHud")) customVanillaHud = json.get("customVanillaHud").getAsBoolean();
 
-                    for (HudModule hud : ModuleManager.getInstance().getHudModules()) {
+                    for (HudModule hud : ModuleManager.getInstance().getModules().stream().filter(HudModule.class::isInstance).map(HudModule.class::cast).toList()) {
                         String key = "hud" + hud.getName();
                         if (!json.has(key) || !json.get(key).isJsonObject()) continue;
                         JsonObject h = json.getAsJsonObject(key);
@@ -290,6 +397,9 @@ public class ConfigManager {
                     }
 
                     for (Module m : ModuleManager.getInstance().getModules()) {
+                        if (m instanceof FeatureModule feature && json.has("feature_" + m.getName())) {
+                            try { feature.loadFeature(json.getAsJsonObject("feature_" + m.getName())); } catch (RuntimeException ignored) {}
+                        }
                         String key = "keybind_" + m.getName();
                         if (json.has(key)) {
                             m.setKeyBind(json.get(key).getAsInt());
@@ -305,7 +415,7 @@ public class ConfigManager {
     }
 
     public static void save() {
-        if (isSaving || isLoading) return;
+        if (isSaving || isLoading || !ModuleManager.isInitialized()) return;
         isSaving = true;
         try {
             JsonObject json = new JsonObject();
@@ -361,6 +471,7 @@ public class ConfigManager {
             json.addProperty("armorStatusDamageWarning", armor.isDamageWarning());
             json.addProperty("armorStatusShowItemCount", armor.isShowItemCount());
             json.addProperty("armorStatusShowHands", armor.isShowHands());
+            json.addProperty("armorStatusDynamicBox", armor.isDynamicBox());
 
             PotionEffectModule potion = ModuleManager.getInstance().getPotionEffectModule();
             json.addProperty("potionDisplayStyle", potion.getDisplayStyle().name());
@@ -417,11 +528,101 @@ public class ConfigManager {
 
             ClearGlassModule clearGlass = ModuleManager.getInstance().getClearGlassModule();
             json.addProperty("clearGlassEnabled", clearGlass.isEnabled());
-            json.addProperty("clearGlassConnected", clearGlass.isConnectedGlass());
 
             DayCounterModule dayCounter = ModuleManager.getInstance().getDayCounterModule();
             json.addProperty("dayCounterShowDay", dayCounter.isShowDay());
             json.addProperty("dayCounterShowPlaytime", dayCounter.isShowPlaytime());
+
+            ClockModule clock = ModuleManager.getInstance().getClockModule();
+            json.addProperty("clockFormat", clock.getClockFormat().name());
+            json.addProperty("clockShowPrefix", clock.isShowPrefix());
+
+            MemoryModule memory = ModuleManager.getInstance().getMemoryModule();
+            json.addProperty("memoryFormat", memory.getMemoryFormat().name());
+            json.addProperty("memoryShowPrefix", memory.isShowPrefix());
+
+            // Ping Module Upgrades
+            PingModule ping = ModuleManager.getInstance().getPingModule();
+            json.addProperty("pingDisplayLayout", ping.getDisplayLayout().name());
+            json.addProperty("pingUpdateInterval", ping.getUpdateIntervalSeconds());
+            json.addProperty("pingAlert", ping.isPingAlert());
+            json.addProperty("pingShowPlayerCount", ping.isShowPlayerCount());
+
+            // Reach Display
+            ReachModule reach = ModuleManager.getInstance().getReachModule();
+            json.addProperty("reachDisplayFormat", reach.getDisplayFormat().name());
+            json.addProperty("reachPrecision", reach.getPrecision());
+            json.addProperty("reachFadeOutDuration", reach.getFadeOutDurationMs());
+            json.addProperty("reachRaytrace", reach.isRaytracePrecision());
+            json.addProperty("reachColorCoding", reach.isColorCoding());
+
+            // Combo Counter
+            ComboCounterModule combo = ModuleManager.getInstance().getComboCounterModule();
+            json.addProperty("comboDisplayFormat", combo.getDisplayFormat().name());
+            json.addProperty("comboResetWindow", combo.getResetWindowSeconds());
+            json.addProperty("comboScalePunch", combo.isScalePunch());
+            json.addProperty("comboMilestoneColors", combo.isMilestoneColors());
+            json.addProperty("comboSoundFeedback", combo.isSoundFeedback());
+
+            // Scoreboard Customizer
+            ScoreboardModule scoreboard = ModuleManager.getInstance().getScoreboardModule();
+            json.addProperty("scoreboardEnabled", scoreboard.isEnabled());
+            json.addProperty("scoreboardRemoveRedNumbers", scoreboard.isRemoveRedNumbers());
+            json.addProperty("scoreboardBackgroundStyle", scoreboard.getBackgroundStyle().name());
+            json.addProperty("scoreboardCustomBgColor", scoreboard.getCustomBackgroundColor());
+            json.addProperty("scoreboardTextShadow", scoreboard.isTextShadow());
+            json.addProperty("scoreboardHideServerIp", scoreboard.isHideServerIpFooter());
+            json.addProperty("scoreboardCustomX", scoreboard.getPosX());
+            json.addProperty("scoreboardCustomY", scoreboard.getPosY());
+            json.addProperty("scoreboardCustomScale", scoreboard.getScale());
+
+            // FOV Changer
+            FovChangerModule fov = ModuleManager.getInstance().getFovChangerModule();
+            json.addProperty("fovEnabled", fov.isEnabled());
+            json.addProperty("fovStaticLock", fov.isStaticFovLock());
+            json.addProperty("fovSprintMultiplier", fov.getSprintMultiplier());
+            json.addProperty("fovSpeedMultiplier", fov.getSpeedPotionMultiplier());
+            json.addProperty("fovSlownessMultiplier", fov.getSlownessPotionMultiplier());
+            json.addProperty("fovBowMultiplier", fov.getBowAimMultiplier());
+            json.addProperty("fovFlyingMultiplier", fov.getFlyingMultiplier());
+            json.addProperty("fovSmoothInterpolation", fov.isSmoothInterpolation());
+
+            // Damage Tint
+            DamageTintModule damageTint = ModuleManager.getInstance().getDamageTintModule();
+            json.addProperty("damageTintEnabled", damageTint.isEnabled());
+            json.addProperty("damageTintScope", damageTint.getTargetScope().name());
+            json.addProperty("damageTintColor", damageTint.getCustomColor());
+            json.addProperty("damageTintAlpha", damageTint.getCustomAlpha());
+            json.addProperty("damageTintChroma", damageTint.isChromaMode());
+            json.addProperty("damageTintFlashDuration", damageTint.getFlashDurationMultiplier());
+
+            // Motion Blur
+            MotionBlurModule motionBlur = ModuleManager.getInstance().getMotionBlurModule();
+            json.addProperty("motionBlurEnabled", motionBlur.isEnabled());
+            json.addProperty("motionBlurStrength", motionBlur.getBlurStrength());
+            json.addProperty("motionBlurFpsProtection", motionBlur.isFpsProtection());
+            json.addProperty("motionBlurFpsThreshold", motionBlur.getFpsThreshold());
+
+            // Chat Customizer
+            ChatCustomizerModule chatCustomizer = ModuleManager.getInstance().getChatCustomizerModule();
+            json.addProperty("chatCustomizerEnabled", chatCustomizer.isEnabled());
+            json.addProperty("chatTimestampFormat", chatCustomizer.getTimestampFormat().name());
+            json.addProperty("chatBackgroundOpacity", chatCustomizer.getBackgroundOpacity());
+            json.addProperty("chatLineLimit", chatCustomizer.getLineLimit());
+            json.addProperty("chatCopyOnClick", chatCustomizer.isCopyOnClick());
+
+            // TNT Timer
+            TntTimerModule tntTimer = ModuleManager.getInstance().getTntTimerModule();
+            json.addProperty("tntTimerEnabled", tntTimer.isEnabled());
+            json.addProperty("tntTimerPrecision", tntTimer.getPrecision());
+            json.addProperty("tntTimerColorShift", tntTimer.isColorShift());
+            json.addProperty("tntTimerRenderThroughWalls", tntTimer.isRenderThroughWalls());
+
+            // AutoGG
+            AutoGgModule autoGg = ModuleManager.getInstance().getAutoGgModule();
+            json.addProperty("autoGgEnabled", autoGg.isEnabled());
+            json.addProperty("autoGgMessage", autoGg.getCustomMessage());
+            json.addProperty("autoGgDelay", autoGg.getDelayMs());
 
             json.addProperty("bossbarX", bossbarX);
             json.addProperty("bossbarY", bossbarY);
@@ -437,7 +638,7 @@ public class ConfigManager {
             json.addProperty("effectsScale", effectsScale);
             json.addProperty("customVanillaHud", customVanillaHud);
 
-            for (HudModule hud : ModuleManager.getInstance().getHudModules()) {
+            for (HudModule hud : ModuleManager.getInstance().getModules().stream().filter(HudModule.class::isInstance).map(HudModule.class::cast).toList()) {
                 JsonObject h = new JsonObject();
                 h.addProperty("enabled", hud.isEnabled());
                 h.addProperty("x", hud.getX());
@@ -463,26 +664,42 @@ public class ConfigManager {
             }
 
             for (Module m : ModuleManager.getInstance().getModules()) {
+                if (m instanceof FeatureModule feature) json.add("feature_" + m.getName(), feature.saveFeature());
                 json.addProperty("keybind_" + m.getName(), m.getKeyBind());
             }
 
-            Path target = getConfigFile().toPath();
-            Files.createDirectories(target.getParent());
-            Path temporary = Files.createTempFile(target.getParent(), "ezclient-config-", ".tmp");
-            try {
-                Files.writeString(temporary, GSON.toJson(json), StandardCharsets.UTF_8);
-                try {
-                    Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-                } catch (AtomicMoveNotSupportedException ignored) {
-                    Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
-                }
-            } finally {
-                Files.deleteIfExists(temporary);
-            }
+            writeSnapshot(GSON.toJson(json), ++saveGeneration, 0);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
             isSaving = false;
         }
+    }
+
+    private static long saveGeneration;
+
+    // Retry transient Windows locks later without sleeping on the render thread.
+    private static void writeSnapshot(String data, long generation, int attempt) throws java.io.IOException {
+            if (generation != saveGeneration) return;
+            Path target = getConfigFile().toPath();
+            Files.createDirectories(target.getParent());
+            Path temporary = Files.createTempFile(target.getParent(), "ezclient-config-", ".tmp");
+            try {
+                Files.writeString(temporary, data, StandardCharsets.UTF_8);
+                try {
+                    Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                } catch (AtomicMoveNotSupportedException ignored) {
+                    Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+            } catch (java.nio.file.AccessDeniedException locked) {
+                if (attempt >= 3) throw locked;
+                java.util.concurrent.CompletableFuture.delayedExecutor(100L << attempt, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    .execute(() -> net.minecraft.client.Minecraft.getInstance().execute(() -> {
+                        try { writeSnapshot(data, generation, attempt + 1); }
+                        catch (java.io.IOException failure) { failure.printStackTrace(); }
+                    }));
+            } finally {
+                Files.deleteIfExists(temporary);
+            }
     }
 }

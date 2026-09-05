@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import platform
 import threading
 import time
 import urllib.request
@@ -13,21 +14,34 @@ from backend.models.types import ProfileData
 
 VERSION_MANIFEST = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 FABRIC_META = "https://meta.fabricmc.net/v2/versions/loader"
+LEGACY_FABRIC_META = "https://meta.legacyfabric.net/v2/versions/loader"
 ASSET_BASE = "https://resources.download.minecraft.net"
 
 # Parallel download settings
 _LIBRARY_WORKERS = 12
 _ASSET_WORKERS = 24
+_DOWNLOAD_LOCKS: dict[str, threading.Lock] = {}
+_DOWNLOAD_LOCKS_GUARD = threading.Lock()
 
 
 def _json(url: str) -> dict:
-    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/1.8.2"})
+    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/2.0.0"})
     with urllib.request.urlopen(request, timeout=30) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
 def _download(url: str, target: Path, sha1: str = "", expected_size: int = 0) -> bool:
     """Download one file and report whether a network download was necessary."""
+    # ``Path.resolve()`` can return a slightly different spelling on Windows
+    # before and after the file exists. A normalized absolute path stays stable.
+    lock_key = os.path.normcase(os.path.abspath(target))
+    with _DOWNLOAD_LOCKS_GUARD:
+        target_lock = _DOWNLOAD_LOCKS.setdefault(lock_key, threading.Lock())
+    with target_lock:
+        return _download_locked(url, target, sha1, expected_size)
+
+
+def _download_locked(url: str, target: Path, sha1: str = "", expected_size: int = 0) -> bool:
     if target.is_file():
         file_size = target.stat().st_size
         if file_size > 0:
@@ -38,16 +52,20 @@ def _download(url: str, target: Path, sha1: str = "", expected_size: int = 0) ->
             if not sha1 or hashlib.sha1(target.read_bytes()).hexdigest() == sha1:
                 return False
     target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_suffix(target.suffix + ".part")
-    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/1.8.2"})
-    with urllib.request.urlopen(request, timeout=60) as response, temporary.open("wb") as output:
-        while chunk := response.read(1024 * 256):
-            output.write(chunk)
-    if sha1 and hashlib.sha1(temporary.read_bytes()).hexdigest() != sha1:
+    temporary = target.with_name(
+        f"{target.name}.{os.getpid()}.{threading.get_ident()}.part"
+    )
+    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/2.0.0"})
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response, temporary.open("wb") as output:
+            while chunk := response.read(1024 * 256):
+                output.write(chunk)
+        if sha1 and hashlib.sha1(temporary.read_bytes()).hexdigest() != sha1:
+            raise RuntimeError(f"Prüfsumme stimmt nicht: {target.name}")
+        os.replace(temporary, target)
+        return True
+    finally:
         temporary.unlink(missing_ok=True)
-        raise RuntimeError(f"Prüfsumme stimmt nicht: {target.name}")
-    os.replace(temporary, target)
-    return True
 
 
 def _library_artifact(library: dict) -> dict:
@@ -61,7 +79,16 @@ def _library_artifact(library: dict) -> dict:
     if len(parts) < 3 or not base_url:
         return {}
     group, name, version = parts[:3]
-    classifier = f"-{parts[3]}" if len(parts) > 3 else ""
+    classifier_name = parts[3] if len(parts) > 3 else ""
+    natives = library.get("natives", {})
+    if natives:
+        system = {"Windows": "windows", "Darwin": "osx", "Linux": "linux"}.get(
+            platform.system(), platform.system().lower()
+        )
+        classifier_name = str(natives.get(system, classifier_name)).replace(
+            "${arch}", "64" if platform.machine().endswith("64") else "32"
+        )
+    classifier = f"-{classifier_name}" if classifier_name else ""
     path = f"{group.replace('.', '/')}/{name}/{version}/{name}-{version}{classifier}.jar"
     return {"url": f"{base_url}/{path}", "path": path, "sha1": library.get("sha1", "")}
 
@@ -135,6 +162,11 @@ def _download_assets_parallel(
     mc_dir: Path, asset_list: list[dict], notify: Callable[[str], None]
 ) -> None:
     """Download all Minecraft assets using a parallel thread pool."""
+    # Logical asset names can share one content hash. Download each physical
+    # object once so parallel workers cannot race on the same destination.
+    asset_list = list(
+        {item.get("hash", ""): item for item in asset_list if item.get("hash")}.values()
+    )
     total = len(asset_list)
     if total == 0:
         return
@@ -199,7 +231,9 @@ def ensure_game_ready(profile: ProfileData, mc_dir: Path, notify: Callable[[str]
     has_vanilla = vanilla_json.exists() and (vanilla_dir / f"{version}.jar").exists()
     vanilla_data = json.loads(vanilla_json.read_text(encoding="utf-8")) if has_vanilla else {}
     vanilla_libraries_ready = has_vanilla and _libraries_are_ready(mc_dir, vanilla_data.get("libraries", []))
-    loader_files = list((mc_dir / "versions").glob(f"fabric-loader-*-{version}/*.json"))
+    loader_name = profile.loader.lower()
+    loader_pattern = f"fabric-loader-*-{version}/*.json" if loader_name == "fabric" else f"{version}-forge-*/*.json"
+    loader_files = list((mc_dir / "versions").glob(loader_pattern)) if loader_name in ("fabric", "forge") else []
     has_loader = bool(loader_files)
     loader_libraries_ready = False
     if has_loader:
@@ -210,7 +244,7 @@ def ensure_game_ready(profile: ProfileData, mc_dir: Path, notify: Callable[[str]
             pass
     assets_ready = has_vanilla and _assets_are_ready(mc_dir, vanilla_json)
     if has_vanilla and vanilla_libraries_ready and assets_ready and (
-        profile.loader.lower() != "fabric" or (has_loader and loader_libraries_ready)
+        loader_name not in ("fabric", "forge") or (has_loader and loader_libraries_ready)
     ):
         return
 
@@ -240,16 +274,41 @@ def ensure_game_ready(profile: ProfileData, mc_dir: Path, notify: Callable[[str]
         _download_assets_parallel(mc_dir, asset_list, notify)
 
     if profile.loader.lower() == "fabric":
-        notify("Installiere Fabric-Komponenten…")
-        loaders = _json(f"{FABRIC_META}/{version}")
+        try:
+            version_parts = tuple(int(part) for part in version.split("."))
+        except ValueError:
+            version_parts = (999,)
+        legacy_fabric = (1, 3) <= version_parts <= (1, 13, 2)
+        fabric_meta = LEGACY_FABRIC_META if legacy_fabric else FABRIC_META
+        notify("Installiere Legacy-Fabric-Komponenten…" if legacy_fabric else "Installiere Fabric-Komponenten…")
+        loaders = _json(f"{fabric_meta}/{version}")
         loader = next((item for item in loaders if item.get("loader", {}).get("stable")), loaders[0] if loaders else None)
         if not loader:
             raise RuntimeError(f"Kein Fabric-Loader für Minecraft {version} verfügbar.")
         loader_version = loader["loader"]["version"]
-        fabric = _json(f"{FABRIC_META}/{version}/{loader_version}/profile/json")
+        fabric = _json(f"{fabric_meta}/{version}/{loader_version}/profile/json")
         fabric_id = fabric.get("id", f"fabric-loader-{loader_version}-{version}")
         fabric_dir = mc_dir / "versions" / fabric_id
         fabric_dir.mkdir(parents=True, exist_ok=True)
         (fabric_dir / f"{fabric_id}.json").write_text(json.dumps(fabric, indent=2), encoding="utf-8")
         _download_libraries(mc_dir, fabric.get("libraries", []), notify, "Fabric-Bibliotheken")
+    elif profile.loader.lower() == "forge":
+        notify("Installiere Forge und benötigte Bibliotheken …")
+        try:
+            import minecraft_launcher_lib
+            from backend.services.java_runtime import install_required_java
+            from backend.services.minecraft_versions import required_java
+
+            forge_version = minecraft_launcher_lib.forge.find_forge_version(version)
+            if not forge_version:
+                raise RuntimeError(f"Für Minecraft {version} ist keine Forge-Version verfügbar.")
+            java_bin = install_required_java(mc_dir, required_java(version), notify)
+            minecraft_launcher_lib.forge.install_forge_version(
+                forge_version,
+                str(mc_dir),
+                callback={"setStatus": notify, "setProgress": lambda _value: None, "setMax": lambda _value: None},
+                java=str(java_bin),
+            )
+        except ImportError as exc:
+            raise RuntimeError("Forge-Unterstützung fehlt. Bitte minecraft-launcher-lib installieren.") from exc
     notify("Minecraft-Dateien sind vorbereitet.")

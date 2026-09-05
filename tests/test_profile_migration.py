@@ -37,7 +37,10 @@ class ProfileMigrationTests(unittest.TestCase):
         model_types.PROFILES_DIR = self.old_profiles_dir
         store_module.PROFILES_DIR = self.old_store_profiles_dir
         store_module.STATE_PATH = self.old_state_path
-        self.temp.cleanup()
+        try:
+            self.temp.cleanup()
+        except Exception:
+            pass
 
     def test_removes_only_launcher_owned_legacy_jar_and_repairs_core(self) -> None:
         profile = ProfileData(
@@ -129,6 +132,68 @@ class ProfileMigrationTests(unittest.TestCase):
         self.assertEqual({"essential"}, set(managed.user_mods))
         self.assertEqual(set(CORE_IDS) | {"essential"}, {mod.slug for mod in managed.mods})
         self.assertTrue((managed.path / "profile.json").is_file())
+
+    def test_forge_profile_is_always_raw_without_ezclient_mods(self) -> None:
+        store = object.__new__(store_module.ProfileStore)
+        store.settings = {"last_profile": ""}
+        store.profiles = []
+
+        profile = store.create_profile("Forge Test", "1.20.1", loader="Forge", preset="ezclient")
+
+        self.assertEqual("Forge", profile.loader)
+        self.assertEqual("raw", profile.profile_type)
+        self.assertEqual([], profile.mods)
+        self.assertEqual([], profile.managed_core_mods)
+
+    def test_unsupported_ezclient_target_falls_back_to_working_performance_profile(self) -> None:
+        store = object.__new__(store_module.ProfileStore)
+        store.settings = {"last_profile": ""}
+        store.profiles = []
+
+        profile = store.create_profile("Modern", "1.21.11", loader="Fabric", preset="ezclient")
+
+        self.assertEqual("performance", profile.profile_type)
+        self.assertNotIn("ezclient", profile.managed_core_mods)
+        self.assertTrue({"sodium", "lithium", "iris"}.issubset(set(profile.managed_core_mods)))
+
+    def test_duplicate_profile_names_match_unique_folder_names(self) -> None:
+        store = object.__new__(store_module.ProfileStore)
+        store.settings = {"last_profile": ""}
+        store.profiles = []
+
+        first = store.create_profile("Mein Profil", "26.2", preset="raw")
+        second = store.create_profile("Mein Profil", "26.2", preset="raw")
+        third = store.create_profile("Mein Profil", "26.2", preset="raw")
+
+        self.assertEqual(("Mein Profil", "Mein Profil (2)", "Mein Profil (3)"),
+                         (first.name, second.name, third.name))
+        self.assertEqual((first.name, second.name, third.name),
+                         (first.path.name, second.path.name, third.path.name))
+
+    def test_profile_creation_never_reuses_a_stale_deleted_profile_directory(self) -> None:
+        store = object.__new__(store_module.ProfileStore)
+        store.settings = {"last_profile": ""}
+        store.profiles = []
+        stale = store_module.PROFILES_DIR / "Reused"
+        stale.mkdir(parents=True, exist_ok=True)
+        (stale / "mods").mkdir(exist_ok=True)
+        (stale / "mods" / "old-incompatible.jar").write_bytes(b"old")
+
+        profile = store.create_profile("Reused", "1.21.11", loader="Fabric", preset="performance")
+
+        self.assertEqual("Reused (2)", profile.name)
+        self.assertFalse((profile.mods_path / "old-incompatible.jar").exists())
+
+    def test_legacy_profile_does_not_install_ezclient_core_or_modern_renderers(self) -> None:
+        store = object.__new__(store_module.ProfileStore)
+        store.settings = {"last_profile": ""}
+        store.profiles = []
+
+        profile = store.create_profile("Legacy", "1.8.9", loader="Fabric", preset="ezclient")
+
+        self.assertNotIn("ezclient", [mod.slug for mod in profile.mods])
+        self.assertNotIn("sodium", profile.managed_core_mods)
+        self.assertNotIn("iris", profile.managed_core_mods)
 
     def test_sync_never_deletes_unknown_user_jar(self) -> None:
         profile = ProfileData(

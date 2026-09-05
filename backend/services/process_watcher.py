@@ -2,7 +2,7 @@ import os
 import sys
 import time
 import threading
-from typing import Callable
+from typing import Any, Callable
 
 def kill_official_launcher() -> None:
     """Terminates official Minecraft launcher processes."""

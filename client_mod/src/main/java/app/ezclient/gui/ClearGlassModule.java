@@ -1,12 +1,10 @@
 package app.ezclient.gui;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.resources.Identifier;
+import net.minecraft.client.Minecraft;
 
 public final class ClearGlassModule extends Module {
     private static volatile boolean active;
-    private static volatile boolean connected = true;
-    private boolean connectedGlass = true;
 
     public ClearGlassModule() {
         super("Clear Glass", "RENDER", false);
@@ -17,37 +15,40 @@ public final class ClearGlassModule extends Module {
         return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/clearglass.png");
     }
 
-    public boolean isConnectedGlass() { return connectedGlass; }
-    public void setConnectedGlass(boolean connectedGlass) {
-        this.connectedGlass = connectedGlass;
-        connected = connectedGlass;
-        ConfigManager.save();
-        triggerWorldRendererReload();
-    }
-
     @Override
     public void setEnabled(boolean enabled) {
-        super.setEnabled(enabled);
         active = enabled;
-        triggerWorldRendererReload();
+        super.setEnabled(enabled);
     }
 
     /** Hot render-path access without singleton lookups during chunk compilation. */
     public static boolean isConnectedRenderingActive() {
-        return active && connected;
+        return active;
     }
 
-    private void triggerWorldRendererReload() {
+    @Override
+    protected void onToggle() {
+        // Connected-texture decisions are baked into chunk meshes. Without a
+        // renderer invalidation the switch changes state but all visible
+        // chunks keep their old glass geometry until the player moves away.
         Minecraft client = Minecraft.getInstance();
-        if (client.levelRenderer != null && client.level != null && client.gameRenderer != null) {
-            try {
-                client.levelRenderer.invalidateCompiledGeometry(
-                    client.level,
-                    client.options,
-                    client.gameRenderer.mainCamera(),
-                    client.getBlockColors()
-                );
-            } catch (Throwable ignored) {}
-        }
+        client.execute(() -> {
+            if (client.level != null) {
+                //? if >=26.2 {
+                if (client.levelExtractor != null) {
+                    client.levelExtractor.allChanged();
+                }
+                //?} else {
+                /*if (client.levelRenderer != null) {
+                    client.levelRenderer.allChanged();
+                }
+                *///?}
+            }
+        });
+    }
+
+    @Override
+    public boolean hasSettings() {
+        return false;
     }
 }

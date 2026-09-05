@@ -25,6 +25,12 @@ Item {
     function triggerInstall(modItem) {
         if (!modItem) return
         var pType = modItem.project_type || (modrinthController ? modrinthController.projectType : "mod")
+        if (pType === "modpack") {
+            var slug = modItem.slug || modItem.project_id || modItem.id || ""
+            var title = modItem.title || modItem.name || slug
+            profileController.installModpack(slug, title, "")
+            return
+        }
         if (pType === "shader" && profileController && !profileController.isIrisInstalled()) {
             irisPromptModal.open(modItem)
             return
@@ -51,11 +57,17 @@ Item {
     }
 
     Component.onCompleted: {
-        var actVer = (typeof profileController !== "undefined" && profileController && profileController.activeVersion) ? profileController.activeVersion : "26.2"
-        if (actVer) {
-            var idx = versionCombo.find(actVer)
-            if (idx >= 0) versionCombo.currentIndex = idx
-            modrinthController.setMcVersion(actVer)
+        if (modrinthController && modrinthController.projectType === "modpack") {
+            var allIdx = versionCombo.find("All")
+            if (allIdx >= 0) versionCombo.currentIndex = allIdx
+            modrinthController.setMcVersion("All")
+        } else {
+            var actVer = (typeof profileController !== "undefined" && profileController && profileController.activeVersion) ? profileController.activeVersion : "26.2"
+            if (actVer) {
+                var idx = versionCombo.find(actVer)
+                if (idx >= 0) versionCombo.currentIndex = idx
+                modrinthController.setMcVersion(actVer)
+            }
         }
         isInitialized = true
         if (root.curResults.length === 0) {
@@ -66,8 +78,31 @@ Item {
     property var pendingInstalls: []
 
     Connections {
+        target: (typeof modrinthController !== "undefined") ? modrinthController : null
+        function onMcVersionChanged() {
+            if (modrinthController) {
+                var idx = versionCombo.find(modrinthController.mcVersion)
+                if (idx >= 0 && versionCombo.currentIndex !== idx) {
+                    versionCombo.currentIndex = idx
+                }
+            }
+        }
+        function onProjectTypeChanged() {
+            if (modrinthController && modrinthController.projectType === "modpack") {
+                var allIdx = versionCombo.find("All")
+                if (allIdx >= 0 && versionCombo.currentIndex !== allIdx) {
+                    versionCombo.currentIndex = allIdx
+                }
+            }
+        }
+    }
+
+    Connections {
         target: (typeof profileController !== "undefined") ? profileController : null
         function onActiveProfileChanged() {
+            if (modrinthController && modrinthController.projectType === "modpack") {
+                return
+            }
             if (profileController && profileController.activeVersion) {
                 var idx = versionCombo.find(profileController.activeVersion)
                 if (idx >= 0) versionCombo.currentIndex = idx
@@ -169,6 +204,7 @@ Item {
                     Repeater {
                         model: [
                             { id: "mod",          label: "Mods",           icon: "icons/package.svg" },
+                            { id: "modpack",      label: "Modpacks",       icon: "icons/modpack-stack.svg" },
                             { id: "shader",       label: "Shader",         icon: "icons/sparkles.svg" },
                             { id: "resourcepack", label: "Resource Packs", icon: "icons/palette.svg" }
                         ]
@@ -316,7 +352,7 @@ Item {
                     Layout.preferredWidth: 110
                     Layout.preferredHeight: 32
                     onCurrentTextChanged: {
-                        if (root.isInitialized) {
+                        if (root.isInitialized && modrinthController && modrinthController.mcVersion !== currentText) {
                             modrinthController.setMcVersion(currentText)
                             modrinthController.search()
                         }
@@ -458,6 +494,56 @@ Item {
                         spacing: 1
                         model: root.curResults
 
+                        onContentYChanged: {
+                            if (!root.curLoading && root.curResults.length > 0 && root.curResults.length < root.curTotalHits) {
+                                var remaining = contentHeight - (contentY + height)
+                                if (remaining < 250) {
+                                    if (modrinthController) modrinthController.loadMore()
+                                }
+                            }
+                        }
+
+                        footer: Item {
+                            id: listFooter
+                            width: resultsList.width
+                            height: (root.curResults.length > 0 && root.curResults.length < root.curTotalHits) ? 48 : 0
+                            visible: height > 0
+
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 10
+
+                                Rectangle {
+                                    width: 8; height: 8; radius: 4
+                                    color: EzTheme.accent
+                                    SequentialAnimation on opacity {
+                                        loops: Animation.Infinite
+                                        running: root.curLoading
+                                        NumberAnimation { to: 0.2; duration: 400; easing.type: Easing.InOutQuad }
+                                        NumberAnimation { to: 1.0; duration: 400; easing.type: Easing.InOutQuad }
+                                    }
+                                }
+
+                                Text {
+                                    text: root.curLoading ? "Lade weitere Inhalte…" : "Mehr laden…"
+                                    font.family: EzTheme.mcFontFamily
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                    color: EzTheme.textMuted
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (!root.curLoading && modrinthController) {
+                                        modrinthController.loadMore()
+                                    }
+                                }
+                            }
+                        }
+
                         delegate: Rectangle {
                             id: resultItem
                             width: resultsList.width
@@ -490,6 +576,14 @@ Item {
 
                             Behavior on color { ColorAnimation { duration: 100 } }
                             Behavior on border.color { ColorAnimation { duration: 100 } }
+
+                            MouseArea {
+                                id: rowMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.ArrowCursor
+                                onClicked: modrinthController.selectMod(modelData)
+                            }
 
                             RowLayout {
                                 anchors.fill: parent
@@ -616,7 +710,7 @@ Item {
                                     Text {
                                         id: cInstText
                                         anchors.centerIn: parent
-                                        text: resultItem.isPending ? "Lädt..." : (resultItem.isInstalled ? (window.integratedMods && window.integratedMods.indexOf(modelData.slug) !== -1 ? "Integriert" : "Installiert") : "Installieren")
+                                        text: resultItem.isPending ? "Lädt…" : (resultItem.isInstalled ? (window.integratedMods && window.integratedMods.indexOf(modelData.slug) !== -1 ? "Integriert" : "Installiert") : ((modelData.project_type || modrinthController.projectType) === "modpack" ? "Profil erstellen" : "Installieren"))
                                         font.family: EzTheme.mcFontFamily
                                         font.pixelSize: 11
                                         font.bold: true
@@ -635,31 +729,6 @@ Item {
                                     }
                                 }
                             }
-
-                            MouseArea {
-                                id: rowMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: modrinthController.selectMod(modelData)
-                            }
-                        }
-                    }
-
-                    // Load More Footer
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 38
-                        color: EzTheme.surface
-                        border.color: EzTheme.border
-                        border.width: 1
-                        visible: root.curResults.length > 0 && root.curResults.length < root.curTotalHits
-
-                        EzButton {
-                            anchors.centerIn: parent
-                            text: "Mehr"
-                            Layout.preferredHeight: 26
-                            onClicked: modrinthController.loadMore()
                         }
                     }
                 }

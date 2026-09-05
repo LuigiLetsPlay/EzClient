@@ -17,6 +17,48 @@ ApplicationWindow {
         globalSkinModal.open()
     }
 
+    property var profilesPageRef: profilesPage
+
+    function openCreationHub() {
+        globalCreationHubModal.open("choices")
+    }
+
+    function openCreationHubView(initialView) {
+        globalCreationHubModal.open(initialView || "choices")
+    }
+
+    function openProfileIconPicker(profileId, currentIcon, name) {
+        globalProfileIconPickerModal.open(profileId, currentIcon, name)
+    }
+
+    function confirmDeleteProfile(profileId, profileName, callback) {
+        globalDeleteProfileModal.open(profileId, profileName, callback)
+    }
+
+    function openLiveLogs() {
+        globalLiveLogsWindow.show()
+        globalLiveLogsWindow.showNormal()
+        globalLiveLogsWindow.raise()
+        globalLiveLogsWindow.requestActivate()
+    }
+
+    function handleClose() {
+        if (typeof profileController !== "undefined" && profileController && profileController.minimizeToTray) {
+            window.hide()
+        } else {
+            Qt.quit()
+        }
+    }
+
+    onClosing: function(close) {
+        if (typeof profileController !== "undefined" && profileController && profileController.minimizeToTray) {
+            close.accepted = false
+            window.hide()
+        } else {
+            Qt.quit()
+        }
+    }
+
     // Load authentic Minecraft TrueType Fonts into QML
     FontLoader {
         id: mcRegularFont
@@ -29,6 +71,11 @@ ApplicationWindow {
 
     // Determine if we need onboarding (no profiles yet)
     property bool needsOnboarding: typeof profileController !== "undefined" && profileController ? !profileController.hasProfiles : false
+    onNeedsOnboardingChanged: {
+        if (window.needsOnboarding && typeof onboardingPage !== "undefined" && onboardingPage) {
+            onboardingPage.reset()
+        }
+    }
     
     // List of integrated mods
     property var integratedMods: typeof profileController !== "undefined" && profileController ? profileController.integratedMods : []
@@ -54,31 +101,52 @@ ApplicationWindow {
     Binding { target: EzTheme; property: "accentGlow"; value: EzTheme.accent + "25" }
     Binding { target: EzTheme; property: "accentSoft"; value: EzTheme.accent + "12" }
 
-    ColumnLayout {
+    RowLayout {
         anchors.fill: parent
         spacing: 0
 
-        // ─── TOP BAR NAVIGATION (Full-width modern game launcher bar) ───
-        TopBar {
-            id: topbar
-            Layout.fillWidth: true
-            Layout.preferredHeight: 56
+        // ─── LEFT SIDEBAR (Modern Navigation Rail) ───
+        NavigationRail {
+            id: navRail
+            Layout.fillHeight: true
+            Layout.preferredWidth: 88
             currentRoute: navController.currentRoute
-            windowRef: window
-            skinModalRef: globalSkinModal
             visible: !window.needsOnboarding
             onNavigate: function(route) {
                 navController.navigate(route)
             }
+            onCreateProfileClicked: function() {
+                window.openCreationHub()
+            }
         }
 
-        // Minimal titlebar for onboarding if needed
-        TitleBar {
+        // ─── MAIN RIGHT CONTAINER (TopBar + Content) ───
+        ColumnLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 40
-            windowRef: window
-            visible: window.needsOnboarding
-        }
+            Layout.fillHeight: true
+            spacing: 0
+
+            // ─── TOP BAR (Minimal Header & Controls) ───
+            MinimalTopBar {
+                id: topbar
+                Layout.fillWidth: true
+                Layout.preferredHeight: 56
+                currentRoute: navController.currentRoute
+                windowRef: window
+                skinModalRef: globalSkinModal
+                visible: !window.needsOnboarding
+                onNavigate: function(route) {
+                    navController.navigate(route)
+                }
+            }
+
+            // Minimal titlebar for onboarding if needed
+            TitleBar {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 40
+                windowRef: window
+                visible: window.needsOnboarding
+            }
 
         // ─── MAIN CONTENT AREA (Full Width) ───
         Item {
@@ -87,6 +155,8 @@ ApplicationWindow {
 
             // ONBOARDING – shown when no profiles exist
             OnboardingPage {
+                id: onboardingPage
+                objectName: "onboardingPage"
                 anchors.fill: parent
                 visible: window.needsOnboarding
                 onProfileCreated: {
@@ -116,6 +186,7 @@ ApplicationWindow {
                         Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                     }
                     ProfilesPage {
+                        id: profilesPage
                         anchors.fill: parent
                         visible: opacity > 0.001
                         opacity: pageContainer.activePage === 1 ? 1.0 : 0.0
@@ -180,10 +251,20 @@ ApplicationWindow {
                         Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
                         Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                     }
+                    VersionsPage {
+                        anchors.fill: parent
+                        visible: opacity > 0.001
+                        opacity: pageContainer.activePage === 8 ? 1.0 : 0.0
+                        y: pageContainer.activePage === 8 ? 0 : 8
+                        enabled: pageContainer.activePage === 8
+                        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+                        Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
                 }
             }
         }
     }
+}
 
     // ─────────────────────────────────────────
     // GLOBAL AUTO-SAVE TOAST NOTIFICATION
@@ -237,7 +318,14 @@ ApplicationWindow {
         target: (typeof profileController !== "undefined") ? profileController : null
         function onProfilesChanged() {
             if (profileController) {
-                window.needsOnboarding = !profileController.hasProfiles
+                var needs = !profileController.hasProfiles
+                window.needsOnboarding = needs
+                if (needs) {
+                    navController.navigate("home")
+                    if (typeof onboardingPage !== "undefined" && onboardingPage) {
+                        onboardingPage.reset()
+                    }
+                }
             }
         }
         function onSettingSaved(msg) {
@@ -247,13 +335,24 @@ ApplicationWindow {
         }
         function onLaunchStatusChanged(statusText, isError) {
             if (!isError) {
-                if (statusText.indexOf("wird vorbereitet") >= 0 || statusText.indexOf("Minecraft läuft") >= 0 || statusText.indexOf("Launcher wird gestartet") >= 0 || statusText.indexOf("Spiel gestartet") >= 0) {
+                // Open live logs window as early as preparation starts!
+                var isStarting = statusText.indexOf("Vorbereitung") >= 0 ||
+                                 statusText.indexOf("wird vorbereitet") >= 0 ||
+                                 statusText.indexOf("Synchronisiere") >= 0 ||
+                                 statusText.indexOf("Minecraft läuft") >= 0 ||
+                                 statusText.indexOf("Launcher wird gestartet") >= 0 ||
+                                 statusText.indexOf("Spiel gestartet") >= 0 ||
+                                 statusText.indexOf("Starte") >= 0 ||
+                                 statusText.indexOf("gestartet") >= 0
+                if (isStarting) {
                     if (profileController && profileController.showLiveLogs) {
                         globalLiveLogsWindow.show()
                         globalLiveLogsWindow.showNormal()
                         globalLiveLogsWindow.raise()
                         globalLiveLogsWindow.requestActivate()
-                        window.hide()
+                        if (profileController.closeOnLaunch) {
+                            window.hide()
+                        }
                     } else if (profileController && profileController.closeOnLaunch) {
                         window.showMinimized()
                     }
@@ -288,6 +387,10 @@ ApplicationWindow {
         property string currentRoute: "home"
 
         function navigate(route) {
+            if (route === "create_profile") {
+                window.openCreationHub()
+                return
+            }
             currentRoute = route
             var indexMap = {
                 "home":           0,
@@ -300,7 +403,8 @@ ApplicationWindow {
                 "store":          4,
                 "cape":           5,
                 "cape_editor":    6,
-                "settings":       7
+                "settings":       7,
+                "versions":       8
             }
             if (indexMap[route] !== undefined) {
                 pageContainer.activePage = indexMap[route]
@@ -541,6 +645,32 @@ ApplicationWindow {
     }
 
     // ─────────────────────────────────────────
+    // GLOBAL CREATION HUB MODAL (Neues Profil & NoRisk Import)
+    // ─────────────────────────────────────────
+    CreationHubModal {
+        id: globalCreationHubModal
+        objectName: "globalCreationHubModal"
+        windowRef: window
+        z: 99990
+    }
+
+    // ─────────────────────────────────────────
+    // GLOBAL PROFILE ICON PICKER MODAL
+    // ─────────────────────────────────────────
+    ProfileIconPickerModal {
+        id: globalProfileIconPickerModal
+        objectName: "globalProfileIconPickerModal"
+    }
+
+    // ─────────────────────────────────────────
+    // GLOBAL DELETE PROFILE CONFIRMATION MODAL
+    // ─────────────────────────────────────────
+    DeleteProfileModal {
+        id: globalDeleteProfileModal
+        objectName: "globalDeleteProfileModal"
+    }
+
+    // ─────────────────────────────────────────
     // GLOBAL SKIN CHANGER MODAL
     // ─────────────────────────────────────────
     SkinModal {
@@ -552,6 +682,7 @@ ApplicationWindow {
     // ─────────────────────────────────────────
     LiveLogsWindow {
         id: globalLiveLogsWindow
+        objectName: "globalLiveLogsWindow"
     }
 
     // ─────────────────────────────────────────

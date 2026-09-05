@@ -9,6 +9,10 @@ public final class HudRenderer {
     public static void draw(GuiGraphicsExtractor graphics, HudModule module, boolean editor) {
         Minecraft client = Minecraft.getInstance();
         if (!module.isEnabled() && !editor) return;
+        if (!editor && EzScreenBridge.hudHidden(client)) return;
+        if (module instanceof FeatureModule feature) {
+            feature.renderFeature(graphics, client, editor); return;
+        }
 
         if (module instanceof KeystrokesModule keystrokes) {
             keystrokes.renderCustom(graphics, client, editor);
@@ -51,7 +55,7 @@ public final class HudRenderer {
         }
 
         // Generic HudModule rendering with systemwide Badlion styling
-        String text = module.displayText(client);
+        String text = module.displayText(client, editor);
         float scale = (float) module.getScale();
         graphics.pose().pushMatrix();
         graphics.pose().translate(module.getX(), module.getY());
@@ -61,7 +65,7 @@ public final class HudRenderer {
         int h = module.getHeight(client);
 
         module.renderBackgroundAndBorder(graphics, 0, 0, w, h);
-        graphics.text(client.font, text, 4, 3, module.color());
+        graphics.text(client.font, module.styledText(text), 4, 3, module.color(), module.isTextShadow());
 
         graphics.pose().popMatrix();
     }

@@ -21,7 +21,7 @@ public abstract class HudModule extends Module {
     private boolean background = true;
     private int textColor = 0xFFFFFFFF;     // Color 1 (Solid / Wave Primary)
     private int waveColor2 = 0xFF22C96E;    // Color 2 (Wave Secondary)
-    private int backgroundColor = 0xA8111419;
+    private int backgroundColor = 0x80000000;
     private int borderColor = 0xFF35414D;
     private boolean border = false;
 
@@ -34,20 +34,37 @@ public abstract class HudModule extends Module {
     private float rainbowSaturation = 0.85f;
     private boolean rainbowBorder = false;
 
+    private final int defaultX;
+    private final int defaultY;
+
     protected HudModule(String name, String category, boolean enabled, int x, int y, String prefix, String suffix) {
         super(name, category, enabled);
+        this.defaultX = x;
+        this.defaultY = y;
         this.x = x;
         this.y = y;
         this.prefix = prefix;
         this.suffix = suffix;
     }
 
+    public void resetToDefaults() {
+        setPosition(defaultX, defaultY);
+        setScale(1.0);
+        resetSettings();
+    }
+
     protected abstract String value(Minecraft client);
     public String displayText(Minecraft client) { return prefix + value(client) + suffix; }
+    public String displayText(Minecraft client, boolean editor) { return displayText(client); }
 
     public int getWidth(Minecraft client) {
         if (client == null || client.font == null) return 40;
         return client.font.width(displayText(client)) + 8;
+    }
+
+    public int getWidth(Minecraft client, boolean editor) {
+        if (client == null || client.font == null) return 40;
+        return client.font.width(displayText(client, editor)) + 8;
     }
 
     public int getHeight(Minecraft client) {
@@ -100,7 +117,9 @@ public abstract class HudModule extends Module {
     public void setRainbowBorder(boolean rainbowBorder) { this.rainbowBorder = rainbowBorder; ConfigManager.save(); }
 
     public void setPosition(int x, int y) { this.x = Math.max(0, x); this.y = Math.max(0, y); ConfigManager.save(); }
-    public void setScale(double scale) { this.scale = Math.max(0.5, Math.min(2.5, scale)); ConfigManager.save(); }
+    public void setX(int x) { this.x = x; ConfigManager.save(); }
+    public void setY(int y) { this.y = y; ConfigManager.save(); }
+    public void setScale(double scale) { this.scale = Double.isFinite(scale) ? Math.max(0.5, Math.min(2.0, scale)) : 1.0; ConfigManager.save(); }
     public void setPrefix(String prefix) { this.prefix = prefix == null ? "" : prefix; ConfigManager.save(); }
     public void setSuffix(String suffix) { this.suffix = suffix == null ? "" : suffix; ConfigManager.save(); }
     public void setBackground(boolean background) { this.background = background; ConfigManager.save(); }
@@ -119,7 +138,7 @@ public abstract class HudModule extends Module {
         if (colorMode == ColorMode.RAINBOW) {
             long period = (long) (4000L / Math.max(0.1f, rainbowSpeed));
             float hue = ((now + offsetMs) % period) / (float) period;
-            return 0xFF000000 | (java.awt.Color.HSBtoRGB(hue, rainbowSaturation, 1.0f) & 0xFFFFFF);
+            return (textColor & 0xFF000000) | (java.awt.Color.HSBtoRGB(hue, rainbowSaturation, 1.0f) & 0xFFFFFF);
         } else if (colorMode == ColorMode.WAVE) {
             double time = ((now + offsetMs) % 3000L) / 3000.0;
             float factor = (float) ((Math.sin(time * Math.PI * 2.0) + 1.0) / 2.0);
@@ -137,47 +156,52 @@ public abstract class HudModule extends Module {
     }
 
     public int currentBorderColor() {
-        if (rainbowBorder || colorMode == ColorMode.RAINBOW) {
-            return color();
+        if (rainbowBorder) {
+            float hue = (renderFrameTimeMillis() % 100000L) * rainbowSpeed / 4000f % 1f;
+            return (borderColor & 0xff000000) | (java.awt.Color.HSBtoRGB(hue, rainbowSaturation, 1) & 0xffffff);
         }
         return borderColor;
     }
 
     public void renderBackgroundAndBorder(GuiGraphicsExtractor graphics, int x, int y, int w, int h) {
         if (background) {
-            if (cornerRadius > 0) {
-                renderRoundedBox(graphics, x, y, w, h, cornerRadius, backgroundColor);
-            } else {
-                graphics.fill(x, y, x + w, y + h, backgroundColor);
-            }
+            renderRoundedBox(graphics, x, y, w, h, cornerRadius, backgroundColor);
         }
         if (border) {
             int bCol = currentBorderColor();
-            for (int i = 0; i < borderWidth; i++) {
-                graphics.outline(x + i, y + i, Math.max(1, w - i * 2), Math.max(1, h - i * 2), bCol);
+            int radius = Math.min(cornerRadius, Math.min(w, h) / 2);
+            for (int row = 0; row < h; row++) {
+                int outer = roundedInset(row, h, radius);
+                if (row < borderWidth || row >= h - borderWidth) graphics.fill(x + outer, y + row, x + w - outer, y + row + 1, bCol);
+                else {
+                    int inner = borderWidth + roundedInset(row - borderWidth, h - 2 * borderWidth, Math.max(0, radius - borderWidth));
+                    graphics.fill(x + outer, y + row, x + inner, y + row + 1, bCol);
+                    graphics.fill(x + w - inner, y + row, x + w - outer, y + row + 1, bCol);
+                }
             }
         }
     }
 
+    private static int roundedInset(int row, int height, int radius) {
+        int edge = Math.min(row, height - 1 - row);
+        return edge >= radius ? 0 : (int)Math.ceil(radius - Math.sqrt(radius * radius - Math.pow(radius - edge - .5, 2)));
+    }
+
     public static void renderRoundedBox(GuiGraphicsExtractor graphics, int x, int y, int w, int h, int radius, int color) {
-        if (radius <= 0) {
-            graphics.fill(x, y, x + w, y + h, color);
-            return;
+        int r = Math.min(Math.max(0, radius), Math.min(w, h) / 2);
+        if (r == 0) { graphics.fill(x, y, x + w, y + h, color); return; }
+        graphics.fill(x, y + r, x + w, y + h - r, color);
+        for (int row = 0; row < r; row++) {
+            int inset = (int)Math.ceil(r - Math.sqrt(r * r - Math.pow(r - row - 0.5, 2)));
+            graphics.fill(x + inset, y + row, x + w - inset, y + row + 1, color);
+            graphics.fill(x + inset, y + h - row - 1, x + w - inset, y + h - row, color);
         }
-        int r = Math.min(radius, Math.min(w / 2, h / 2));
-        // Center rectangle
-        graphics.fill(x + r, y, x + w - r, y + h, color);
-        // Left & right side strips
-        graphics.fill(x, y + r, x + r, y + h - r, color);
-        graphics.fill(x + w - r, y + r, x + w, y + h - r, color);
-        // One span per scanline produces the same rounded silhouette with two
-        // draw calls instead of four per row.
-        for (int i = 1; i < r; i++) {
-            int cx = (int) Math.round(Math.sqrt(r * r - (r - i) * (r - i)));
-            int span = r - cx;
-            graphics.fill(x + span, y + i, x + w - span, y + i + 1, color);
-            graphics.fill(x + span, y + h - i - 1, x + w - span, y + h - i, color);
-        }
+    }
+
+    public net.minecraft.network.chat.Component styledText(String text) {
+        var component = net.minecraft.network.chat.Component.literal(text);
+        return customFont ? component.withStyle(style -> style.withFont(new net.minecraft.network.chat.FontDescription.Resource(
+                net.minecraft.resources.Identifier.fromNamespaceAndPath("ezclient", "smooth")))) : component;
     }
 
     public void resetSettings() {
@@ -259,6 +283,11 @@ public abstract class HudModule extends Module {
             crosshair.setTargetNeutralScale(1.10f);
         }
         ConfigManager.save();
+    }
+
+    @Override
+    public boolean hasSettings() {
+        return true;
     }
 
     public static int interpolateColor(int c1, int c2, float factor) {

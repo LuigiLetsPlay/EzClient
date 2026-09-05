@@ -12,9 +12,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -59,7 +57,7 @@ public final class EzVisibilityEngine implements AutoCloseable {
     });
 
     // Accessed exclusively during LevelExtractor.extract on the client thread.
-    private final ArrayList<Target> frameTargets = new ArrayList<>(512);
+    private final TargetBuffer frameTargets = new TargetBuffer(512);
     private Vec3 frameCamera = Vec3.ZERO;
     private volatile ClientLevel activeLevel;
     private boolean collecting;
@@ -90,7 +88,7 @@ public final class EzVisibilityEngine implements AutoCloseable {
         }
 
         Vec3 camera = frameCamera;
-        List<Target> targets = List.copyOf(frameTargets);
+        TargetSnapshot targets = frameTargets.snapshot();
         VisibilitySnapshot previous = published.get();
         worker.execute(() -> evaluate(camera, targets, previous));
     }
@@ -107,8 +105,7 @@ public final class EzVisibilityEngine implements AutoCloseable {
 
         long key = entityKey(entity.getId());
         if (collecting) {
-            AABB bounds = expandedBounds(entity.getBoundingBox());
-            register(new Target(key, bounds));
+            registerEntity(key, entity.getBoundingBox());
         }
         return !snapshot.culled().contains(key);
     }
@@ -121,37 +118,35 @@ public final class EzVisibilityEngine implements AutoCloseable {
 
         BlockPos pos = blockEntity.getBlockPos();
         long key = blockEntityKey(pos.asLong());
-        if (collecting) {
-            register(new Target(key, new AABB(pos).inflate(0.0625)));
+        if (collecting && frameTargets.size() < MAX_TARGETS_PER_FRAME) {
+            frameTargets.add(key,
+                    pos.getX() - 0.0625, pos.getY() - 0.0625, pos.getZ() - 0.0625,
+                    pos.getX() + 1.0625, pos.getY() + 1.0625, pos.getZ() + 1.0625);
         }
         return !published.get().culled().contains(key);
     }
 
-    private void register(Target target) {
-        if (collecting && frameTargets.size() < MAX_TARGETS_PER_FRAME) {
-            frameTargets.add(target);
-        }
-    }
-
     private static boolean isEntityExempt(Entity entity) {
         Minecraft minecraft = Minecraft.getInstance();
-        return entity == minecraft.getCameraEntity()
-                || entity instanceof Display.TextDisplay
-                || entity.getCustomName() != null
+        Entity camera = minecraft.getCameraEntity();
+        if (camera != null && (entity == camera || entity.hasPassenger(camera) || camera.getVehicle() == entity)) {
+            return true;
+        }
+        return entity instanceof Display.TextDisplay
                 || entity.isCurrentlyGlowing()
                 || minecraft.shouldEntityAppearGlowing(entity);
     }
 
-    private static AABB expandedBounds(AABB box) {
+    private void registerEntity(long key, AABB box) {
+        if (frameTargets.size() >= MAX_TARGETS_PER_FRAME) return;
         double largest = Math.max(box.getXsize(), Math.max(box.getYsize(), box.getZsize()));
-        if (largest <= 4.0) {
-            return box.inflate(0.10);
-        }
         // Large/custom entities receive both proportional and fixed padding at screen edges.
-        return box.inflate(Math.max(1.5, largest * 0.15));
+        double padding = largest <= 4.0 ? 0.10 : Math.max(1.5, largest * 0.15);
+        frameTargets.add(key, box.minX - padding, box.minY - padding, box.minZ - padding,
+                box.maxX + padding, box.maxY + padding, box.maxZ + padding);
     }
 
-    private void evaluate(Vec3 camera, List<Target> targets, VisibilitySnapshot previous) {
+    private void evaluate(Vec3 camera, TargetSnapshot targets, VisibilitySnapshot previous) {
         try {
             pruneDistantSections(camera);
             long[] occluded = new long[targets.size()];
@@ -159,11 +154,13 @@ public final class EzVisibilityEngine implements AutoCloseable {
             int occludedCount = 0;
             int culledCount = 0;
 
-            for (Target target : targets) {
-                if (isOccluded(camera, target.bounds())) {
-                    occluded[occludedCount++] = target.key();
-                    if (previous.occluded().contains(target.key())) {
-                        culled[culledCount++] = target.key();
+            for (int index = 0; index < targets.size(); index++) {
+                long key = targets.keys()[index];
+                int offset = index * 6;
+                if (isOccluded(camera, targets.packedBounds(), offset)) {
+                    occluded[occludedCount++] = key;
+                    if (previous.occluded().contains(key)) {
+                        culled[culledCount++] = key;
                     }
                 }
             }
@@ -179,10 +176,16 @@ public final class EzVisibilityEngine implements AutoCloseable {
         }
     }
 
-    private boolean isOccluded(Vec3 camera, AABB box) {
-        double centerX = (box.minX + box.maxX) * 0.5;
-        double centerY = (box.minY + box.maxY) * 0.5;
-        double centerZ = (box.minZ + box.maxZ) * 0.5;
+    private boolean isOccluded(Vec3 camera, double[] box, int offset) {
+        double minX = box[offset];
+        double minY = box[offset + 1];
+        double minZ = box[offset + 2];
+        double maxX = box[offset + 3];
+        double maxY = box[offset + 4];
+        double maxZ = box[offset + 5];
+        double centerX = (minX + maxX) * 0.5;
+        double centerY = (minY + maxY) * 0.5;
+        double centerZ = (minZ + maxZ) * 0.5;
         double dx = centerX - camera.x;
         double dy = centerY - camera.y;
         double dz = centerZ - camera.z;
@@ -196,9 +199,9 @@ public final class EzVisibilityEngine implements AutoCloseable {
             return false;
         }
         for (int corner = 0; corner < 8; corner++) {
-            double x = (corner & 1) == 0 ? box.minX : box.maxX;
-            double y = (corner & 2) == 0 ? box.minY : box.maxY;
-            double z = (corner & 4) == 0 ? box.minZ : box.maxZ;
+            double x = (corner & 1) == 0 ? minX : maxX;
+            double y = (corner & 2) == 0 ? minY : maxY;
+            double z = (corner & 4) == 0 ? minZ : maxZ;
             if (!rayBlocked(camera.x, camera.y, camera.z, x, y, z)) {
                 return false;
             }
@@ -230,6 +233,8 @@ public final class EzVisibilityEngine implements AutoCloseable {
         double tMaxZ = initialT(startZ, z, stepZ, dz);
         int maximumSteps = Math.abs(endCellX - x) + Math.abs(endCellY - y)
                 + Math.abs(endCellZ - z) + 3;
+        long cachedSectionKey = Long.MIN_VALUE;
+        long[] cachedMask = null;
 
         // Do not test the camera voxel or the target voxel.
         for (int traversed = 0; traversed < maximumSteps; traversed++) {
@@ -251,12 +256,15 @@ public final class EzVisibilityEngine implements AutoCloseable {
                     SectionPos.blockToSectionCoord(x),
                     SectionPos.blockToSectionCoord(y),
                     SectionPos.blockToSectionCoord(z));
-            long[] mask = opaqueSections.get(sectionKey);
-            if (mask == null) {
+            if (sectionKey != cachedSectionKey) {
+                cachedSectionKey = sectionKey;
+                cachedMask = opaqueSections.get(sectionKey);
+            }
+            if (cachedMask == null) {
                 return false;
             }
             int bit = ((y & 15) << 8) | ((z & 15) << 4) | (x & 15);
-            if ((mask[bit >>> 6] & (1L << (bit & 63))) != 0L) {
+            if ((cachedMask[bit >>> 6] & (1L << (bit & 63))) != 0L) {
                 return true;
             }
         }
@@ -387,7 +395,61 @@ public final class EzVisibilityEngine implements AutoCloseable {
         return value ^ (value >>> 31);
     }
 
-    private record Target(long key, AABB bounds) {
+    /** Reusable structure-of-arrays collector: the render thread creates no Target objects. */
+    private static final class TargetBuffer {
+        private long[] keys;
+        private double[] bounds;
+        private int size;
+
+        private TargetBuffer(int initialCapacity) {
+            keys = new long[initialCapacity];
+            bounds = new double[initialCapacity * 6];
+        }
+
+        private void add(long key, double minX, double minY, double minZ,
+                         double maxX, double maxY, double maxZ) {
+            ensureCapacity(size + 1);
+            keys[size] = key;
+            int offset = size * 6;
+            bounds[offset] = minX;
+            bounds[offset + 1] = minY;
+            bounds[offset + 2] = minZ;
+            bounds[offset + 3] = maxX;
+            bounds[offset + 4] = maxY;
+            bounds[offset + 5] = maxZ;
+            size++;
+        }
+
+        private void ensureCapacity(int wanted) {
+            if (wanted <= keys.length) return;
+            int capacity = Math.min(MAX_TARGETS_PER_FRAME, Math.max(wanted, keys.length * 2));
+            keys = Arrays.copyOf(keys, capacity);
+            bounds = Arrays.copyOf(bounds, capacity * 6);
+        }
+
+        private TargetSnapshot snapshot() {
+            return new TargetSnapshot(
+                    Arrays.copyOf(keys, size),
+                    Arrays.copyOf(bounds, size * 6));
+        }
+
+        private int size() {
+            return size;
+        }
+
+        private boolean isEmpty() {
+            return size == 0;
+        }
+
+        private void clear() {
+            size = 0;
+        }
+    }
+
+    private record TargetSnapshot(long[] keys, double[] packedBounds) {
+        private int size() {
+            return keys.length;
+        }
     }
 
     private record VisibilitySnapshot(LongSetSnapshot culled, LongSetSnapshot occluded) {

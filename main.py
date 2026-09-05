@@ -91,6 +91,7 @@ def main() -> None:
 
     # ── 2. Create Application & Show Splash Screen Immediately (<20ms) ──
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
     app.setApplicationName("EzClient")
     app.setApplicationDisplayName("EzClient Launcher")
     app.setOrganizationName("EzClient")
@@ -200,64 +201,63 @@ def main() -> None:
     window.requestActivate()
     splash.close()
 
-    # ── 9. Deferred Non-Critical Setup (System Tray & Discord RPC) ──
+    # ── 9. Setup System Tray Immediately ──
+    try:
+        from PySide6.QtWidgets import QSystemTrayIcon, QMenu
+        tray_icon = QSystemTrayIcon(app_icon, app)
+        tray_icon.setToolTip("EzClient Launcher")
+
+        tray_menu = QMenu()
+        act_restore = tray_menu.addAction("EzClient anzeigen")
+        act_play = tray_menu.addAction("Minecraft spielen")
+        tray_menu.addSeparator()
+        act_quit = tray_menu.addAction("Beenden")
+
+        def restore_window():
+            window.show()
+            window.showNormal()
+            window.raise_()
+            window.requestActivate()
+            if sys.platform == "win32":
+                try:
+                    hwnd = int(window.winId())
+                    force_window_to_front(hwnd)
+                except Exception:
+                    pass
+
+        def hide_window_to_tray():
+            window.hide()
+
+        act_restore.triggered.connect(restore_window)
+        act_play.triggered.connect(profile_controller.launchActiveProfile)
+        act_quit.triggered.connect(app.quit)
+
+        def on_tray_activated(reason):
+            if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
+                restore_window()
+
+        tray_icon.activated.connect(on_tray_activated)
+        tray_icon.setContextMenu(tray_menu)
+        tray_icon.show()
+
+        # Connect launcher lifecycle to system tray & window
+        profile_controller.hideToTrayRequested.connect(hide_window_to_tray)
+        profile_controller.restoreFromTrayRequested.connect(restore_window)
+
+        # Store reference on app to prevent garbage collection
+        app._tray_icon = tray_icon
+    except Exception as e:
+        print(f"[Tray] Init error: {e}")
+
+    # Deferred Discord RPC initialization
     def setup_deferred_services():
-        try:
-            from PySide6.QtWidgets import QSystemTrayIcon, QMenu
-            tray_icon = QSystemTrayIcon(app_icon, app)
-            tray_icon.setToolTip("EzClient Launcher")
-
-            tray_menu = QMenu()
-            act_restore = tray_menu.addAction("EzClient anzeigen")
-            act_play = tray_menu.addAction("Minecraft spielen")
-            tray_menu.addSeparator()
-            act_quit = tray_menu.addAction("Beenden")
-
-            def restore_window():
-                window.show()
-                window.showNormal()
-                window.raise_()
-                window.requestActivate()
-                if sys.platform == "win32":
-                    try:
-                        hwnd = int(window.winId())
-                        force_window_to_front(hwnd)
-                    except Exception:
-                        pass
-
-            def hide_window_to_tray():
-                window.hide()
-
-            act_restore.triggered.connect(restore_window)
-            act_play.triggered.connect(profile_controller.launchActiveProfile)
-            act_quit.triggered.connect(app.quit)
-
-            def on_tray_activated(reason):
-                if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
-                    restore_window()
-
-            tray_icon.activated.connect(on_tray_activated)
-            tray_icon.setContextMenu(tray_menu)
-            tray_icon.show()
-
-            # Connect launcher lifecycle to system tray & window
-            profile_controller.hideToTrayRequested.connect(hide_window_to_tray)
-            profile_controller.restoreFromTrayRequested.connect(restore_window)
-
-            # Store reference on app to prevent garbage collection
-            app._tray_icon = tray_icon
-        except Exception as e:
-            print(f"[Tray] Init error: {e}")
-
-        # Initialize Discord RPC in background
         try:
             from backend.services import discord_service
             discord_service.init_rpc()
         except Exception as e:
             print(f"[Main] Discord RPC init failed: {e}")
 
-    # Run deferred setup after main window is rendered and active
-    QTimer.singleShot(250, setup_deferred_services)
+    QTimer.singleShot(500, setup_deferred_services)
 
     sys.exit(app.exec())
 

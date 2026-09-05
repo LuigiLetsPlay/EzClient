@@ -1984,8 +1984,8 @@ float depth=unpackRGBAToDepth(texture2D(shadow_pass,(gl_FragCoord.xy+vec2(0.0,uv
 #ifndef FXAA_DISCARD
 #define FXAA_DISCARD 0
 #endif
-#define FxaaTexTop(t,p)texture2D(t,p,-100.0)
-#define FxaaTexOff(t,p,o,r)texture2D(t,p+(o*r),-100.0)
+#define FxaaTexTop(t,p)texture2D(t,p,-16.0)
+#define FxaaTexOff(t,p,o,r)texture2D(t,p+(o*r),-16.0)
 #define NUM_SAMPLES 5
 float contrast(vec4 a,vec4 b){vec4 diff=abs(a-b);return max(max(max(diff.r,diff.g),diff.b),diff.a);}vec4 FxaaPixelShader(vec2 posM,sampler2D tex,vec2 fxaaQualityRcpFrame,float fxaaQualityEdgeThreshold,float fxaaQualityinvEdgeThreshold){vec4 rgbaM=FxaaTexTop(tex,posM);vec4 rgbaS=FxaaTexOff(tex,posM,vec2(0.0,1.0),fxaaQualityRcpFrame.xy);vec4 rgbaE=FxaaTexOff(tex,posM,vec2(1.0,0.0),fxaaQualityRcpFrame.xy);vec4 rgbaN=FxaaTexOff(tex,posM,vec2(0.0,-1.0),fxaaQualityRcpFrame.xy);vec4 rgbaW=FxaaTexOff(tex,posM,vec2(-1.0,0.0),fxaaQualityRcpFrame.xy);bool earlyExit=max(max(max(contrast(rgbaM,rgbaN),contrast(rgbaM,rgbaS)),contrast(rgbaM,rgbaE)),contrast(rgbaM,rgbaW))<fxaaQualityEdgeThreshold;
 #if (FXAA_DISCARD==1)

@@ -6,11 +6,11 @@ import ".."
 ComboBox {
     id: control
     font.family: EzTheme.fontFamily
-    font.pixelSize: 11
-    implicitHeight: 32
+    font.pixelSize: 12
+    implicitHeight: 38
 
     background: Rectangle {
-        radius: 5
+        radius: 8
         color: control.popup.visible ? EzTheme.surface3 : (control.hovered ? EzTheme.surfaceHover : EzTheme.surface2)
         border.color: control.popup.visible ? EzTheme.accent : (control.hovered ? EzTheme.borderLight : EzTheme.border)
         border.width: 1
@@ -44,7 +44,7 @@ ComboBox {
     popup: Popup {
         y: control.height + 2
         width: Math.max(control.width, 160)
-        height: Math.min(listView.contentHeight + 10, 220)
+        height: Math.min(listView.contentHeight + 10, 280)
         padding: 4
 
         background: Rectangle {
@@ -74,6 +74,7 @@ ComboBox {
 
     delegate: ItemDelegate {
         width: parent ? parent.width : 0
+        height: 38
         highlighted: control.highlightedIndex === index
 
         background: Rectangle {
@@ -84,7 +85,7 @@ ComboBox {
         contentItem: Text {
             text: modelData
             font.family: EzTheme.fontFamily
-            font.pixelSize: 11
+            font.pixelSize: 12
             color: parent.highlighted ? EzTheme.text : EzTheme.textSecondary
             verticalAlignment: Text.AlignVCenter
             leftPadding: 8

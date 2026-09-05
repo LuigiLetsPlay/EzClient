@@ -20,6 +20,16 @@ def maven_to_path(name: str) -> str:
     group_path = group.replace(".", "/")
     return f"{group_path}/{artifact}/{version}/{artifact}-{version}{classifier}.jar"
 
+
+def maven_module_key(name: str) -> str:
+    """Return the conflict-resolution key for Maven coordinates."""
+    parts = str(name).split(":")
+    if len(parts) >= 4:
+        return f"{parts[0]}:{parts[1]}:{parts[3]}".lower()
+    if len(parts) >= 2:
+        return f"{parts[0]}:{parts[1]}".lower()
+    return str(name).lower()
+
 def _java_major(java_path: str) -> int | None:
     try:
         result = subprocess.run(
@@ -31,7 +41,9 @@ def _java_major(java_path: str) -> int | None:
         )
         for line in (result.stdout + result.stderr).splitlines():
             if line.strip().startswith("java.version"):
-                return int(line.split("=", 1)[1].strip().split(".", 1)[0])
+                value = line.split("=", 1)[1].strip()
+                parts = value.split(".")
+                return int(parts[1] if parts[0] == "1" and len(parts) > 1 else parts[0])
     except (OSError, subprocess.SubprocessError, ValueError):
         pass
     return None
@@ -171,6 +183,15 @@ def extract_natives(mc_dir: Path, libraries: list[dict[str, Any]], natives_dir: 
 
         # Look for native library markers
         is_native = False
+        native_artifact = None
+        native_map = lib.get("natives", {})
+        if native_map:
+            from backend.services.game_bootstrap import _library_artifact
+
+            platform_key = "windows" if is_win else ("osx" if sys.platform == "darwin" else "linux")
+            if native_map.get(platform_key):
+                is_native = True
+                native_artifact = _library_artifact(lib)
         if is_win:
             if ":natives-windows" in name:
                 if "-arm64" not in name and not (name.endswith("-x86") or ":natives-windows-x86:" in name):
@@ -181,7 +202,9 @@ def extract_natives(mc_dir: Path, libraries: list[dict[str, Any]], natives_dir: 
             is_native = True
 
         if is_native:
-            rel = lib.get("downloads", {}).get("artifact", {}).get("path")
+            rel = (native_artifact or {}).get("path")
+            if not rel:
+                rel = lib.get("downloads", {}).get("artifact", {}).get("path")
             if not rel:
                 rel = maven_to_path(name)
             jar_p = mc_dir / "libraries" / rel
@@ -213,7 +236,7 @@ def ensure_profile_defaults(
         "narrator": "0",
         "tutorialStep": "none",
         "skipRealmsNotification": "true",
-        "maxFps": "260",
+        "maxFps": "120",
         "enableVsync": "false",
         "graphicsMode": "1",
         "renderDistance": "8",
@@ -254,7 +277,8 @@ def ensure_profile_defaults(
 
 def launch_minecraft_direct(
     profile: ProfileData,
-    status_callback: Optional[Callable[[str], None]] = None
+    status_callback: Optional[Callable[[str], None]] = None,
+    log_file_path: Optional[Path] = None,
 ) -> Optional[subprocess.Popen]:
     """
     Launches Minecraft standalone directly using Java & Knot/Fabric.
@@ -264,6 +288,30 @@ def launch_minecraft_direct(
         if status_callback:
             status_callback(msg)
         print(f"[DirectLaunch] {msg}")
+
+    # Deleted profiles may leave their isolated directory behind to protect
+    # saves. If the same visible name is later reused, an old managed JAR must
+    # never be allowed to leak into a newly-created target.
+    from backend.services.store import has_ezclient_asset
+    if not has_ezclient_asset(profile.minecraft_version):
+        removed_core = False
+        for candidate in profile.mods_path.glob("*EzClient*.jar"):
+            candidate.unlink(missing_ok=True)
+            removed_core = True
+        retained = []
+        for mod in profile.mods:
+            identity = f"{mod.slug} {mod.project_id} {mod.name} {mod.filename}".lower()
+            if "ezclient" in identity:
+                removed_core = True
+                continue
+            retained.append(mod)
+        profile.mods = retained
+        profile.managed_core_mods = [value for value in profile.managed_core_mods if "ezclient" not in value.lower()]
+        profile.integrated_mods = [value for value in profile.integrated_mods if "ezclient" not in value.lower()]
+        if profile.profile_type == "ezclient":
+            profile.profile_type = "performance"
+        if removed_core:
+            notify(f"Inkompatibler EzClient Core für Minecraft {profile.minecraft_version} wurde vor dem Start entfernt.")
 
     # Configure optimal audio/accessibility defaults (10% music, skip narrator)
     try:
@@ -280,6 +328,51 @@ def launch_minecraft_direct(
     except Exception as exc:
         notify(f"Fehler beim Minecraft-Erststart: {exc}")
         return None
+
+    if profile.loader.lower() == "forge":
+        try:
+            from backend.services.mod_downloader import sync_profile_mods
+            sync_profile_mods(profile, status_callback=notify)
+            import minecraft_launcher_lib
+            from backend.services.java_runtime import install_required_java
+            from backend.services.minecraft_versions import required_java
+
+            session: MinecraftSession = get_minecraft_session()
+            if not session.is_online:
+                notify("Microsoft-Anmeldung mit einer Minecraft-Java-Lizenz ist zum Starten erforderlich.")
+                return None
+            forge_versions = list((mc / "versions").glob(f"{profile.minecraft_version}-forge-*"))
+            if not forge_versions:
+                notify("Forge wurde nicht vollständig installiert.")
+                return None
+            installed_version = max(forge_versions, key=lambda path: path.stat().st_mtime).name
+            java_bin = install_required_java(mc, required_java(profile.minecraft_version), notify)
+            command = minecraft_launcher_lib.command.get_minecraft_command(
+                installed_version,
+                str(mc),
+                {
+                    "username": session.username,
+                    "uuid": session.uuid.replace("-", ""),
+                    "token": session.access_token,
+                    "executablePath": str(java_bin),
+                    "jvmArguments": [f"-Xmx{getattr(profile, 'ram_mb', 4096) or 4096}M", "-Xms512M"],
+                    "launcherName": "EzClient",
+                    "launcherVersion": "2.0.0",
+                    "gameDirectory": str(profile.path),
+                },
+            )
+            log_file = log_file_path or (profile.path / "ezclient_latest_run.log")
+            log_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(log_file, "w", encoding="utf-8") as log_handle:
+                process = subprocess.Popen(
+                    command, cwd=str(profile.path), stdout=log_handle,
+                    stderr=subprocess.STDOUT, env=os.environ.copy(),
+                )
+            notify("Minecraft Forge wurde erfolgreich gestartet!")
+            return process
+        except Exception as exc:
+            notify(f"Forge konnte nicht gestartet werden: {exc}")
+            return None
 
     # 0. Sync and verify all profile mods and dependencies
     notify("Verifiziere & synchronisiere Mods und Bibliotheken…")
@@ -301,8 +394,9 @@ def launch_minecraft_direct(
 
     inherits = fabric_data.get("inheritsFrom", profile.minecraft_version) if fabric_data else profile.minecraft_version
     required_java_major = int(vanilla_data.get("javaVersion", {}).get("majorVersion") or 0)
-    if not required_java_major and inherits.startswith(("26.1", "26.2")):
-        required_java_major = 25
+    if not required_java_major:
+        from backend.services.minecraft_versions import required_java
+        required_java_major = required_java(inherits)
     client_jar = mc / f"versions/{inherits}/{inherits}.jar"
     if not client_jar.exists():
         notify(f"Fehler: Minecraft Basis-JAR fehlt ({inherits}.jar). Bitte einmalig im Launcher starten.")
@@ -316,9 +410,22 @@ def launch_minecraft_direct(
 
     cp_jars: List[Path] = []
     seen = set()
+    seen_modules: set[str] = set()
 
     for lib in all_libs:
         if not is_rule_allowed(lib):
+            continue
+
+        name = lib.get("name", "")
+
+        # Native-only entries belong in java.library.path, not on the Java classpath.
+        if ":natives-" in name or lib.get("natives"):
+            continue
+
+        # Fabric metadata comes first. Keep its replacement when both metadata
+        # sets declare the same module, such as patched and vanilla LWJGL.
+        module_key = maven_module_key(name)
+        if module_key and module_key in seen_modules:
             continue
 
         rel = lib.get("downloads", {}).get("artifact", {}).get("path")
@@ -327,6 +434,8 @@ def launch_minecraft_direct(
         if rel:
             jar_path = mc / "libraries" / rel
             if jar_path.exists() and jar_path not in seen:
+                if module_key:
+                    seen_modules.add(module_key)
                 seen.add(jar_path)
                 cp_jars.append(jar_path)
 
@@ -347,16 +456,13 @@ def launch_minecraft_direct(
         return None
 
     # 4. Assemble JVM & Game Arguments
-    if required_java_major >= 25:
-        notify(f"Prüfe und installiere Java {required_java_major}, falls erforderlich…")
-        try:
-            from backend.services.java_runtime import install_required_java
-            java_bin = str(install_required_java(mc, required_java_major, notify))
-        except Exception as exc:
-            notify(f"Fehler bei der automatischen Java-Installation: {exc}")
-            return None
-    else:
-        java_bin = find_best_java(mc)
+    notify(f"Prüfe und installiere Java {required_java_major}, falls erforderlich…")
+    try:
+        from backend.services.java_runtime import install_required_java
+        java_bin = str(install_required_java(mc, required_java_major, notify))
+    except Exception as exc:
+        notify(f"Fehler bei der automatischen Java-Installation: {exc}")
+        return None
     ram = getattr(profile, "ram_mb", 4096) or 4096
     sep = ";" if sys.platform.startswith("win") else ":"
     classpath_str = sep.join(str(p) for p in cp_jars)
@@ -384,10 +490,12 @@ def launch_minecraft_direct(
         "-XX:+DisableExplicitGC",
         "-Djava.lang.invoke.stringConcat=BC_SB",
         "-Dlog4j2.formatMsgNoLookups=true",
-        "--enable-native-access=ALL-UNNAMED",
         f"-Dfabric.modsFolder={profile.mods_path}",
         f"-Dfabric.gameVersion={profile.minecraft_version}",
         "-Dfabric.development=false",
+        "-Dfabric.disableGui=true",
+        "-Dfabric.system.disableGui=true",
+        "-Dfabric.gui.disabled=true",
         f"-Djava.library.path={natives_dir}",
         f"-Dorg.lwjgl.system.SharedLibraryExtractPath={natives_dir}",
         f"-Dorg.lwjgl.librarypath={natives_dir}",
@@ -396,6 +504,8 @@ def launch_minecraft_direct(
         "-cp", classpath_str,
         main_class,
     ]
+    if required_java_major >= 17:
+        jvm_args.insert(17, "--enable-native-access=ALL-UNNAMED")
 
     game_args = [
         "--username", session.username,
@@ -418,20 +528,21 @@ def launch_minecraft_direct(
     env = os.environ.copy()
     env["PATH"] = f"{natives_dir};{env.get('PATH', '')}"
 
-    log_file = profile.path / "ezclient_latest_run.log"
+    log_file = log_file_path or (profile.path / "ezclient_latest_run.log")
+    log_file.parent.mkdir(parents=True, exist_ok=True)
     try:
-        log_f = open(log_file, "w", encoding="utf-8")
-    except Exception:
-        log_f = subprocess.DEVNULL
-
-    proc = subprocess.Popen(
-        full_cmd,
-        cwd=str(profile.path),
-        stdout=log_f,
-        stderr=subprocess.STDOUT,
-        creationflags=creationflags,
-        env=env
-    )
+        with open(log_file, "w", encoding="utf-8") as log_f:
+            proc = subprocess.Popen(
+                full_cmd,
+                cwd=str(profile.path),
+                stdout=log_f,
+                stderr=subprocess.STDOUT,
+                creationflags=creationflags,
+                env=env,
+            )
+    except OSError as exc:
+        notify(f"Minecraft-Prozess konnte nicht gestartet werden: {exc}")
+        return None
 
     notify("Minecraft wurde erfolgreich gestartet!")
     return proc

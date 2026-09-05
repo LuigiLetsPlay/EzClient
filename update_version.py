@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 EzClient Version Updater
-Updates version strings across the entire EzClient project (Client Mod, Lite Mod, Backend, Launcher, UI, Installer, Build Scripts).
+Updates version strings across the entire EzClient project (Client Mod, Backend, Launcher, UI, Installer, Build Scripts).
 
 Usage:
     python update_version.py <new_version>
     python update_version.py <old_version> <new_version>
 Example:
-    python update_version.py 1.8.0
+    python update_version.py 1.9.0
 """
 
 import sys
@@ -19,16 +19,13 @@ REPO_ROOT = Path(__file__).resolve().parent
 RELATIVE_FILES = [
     # Java Client Mod
     "client_mod/src/main/java/app/ezclient/EzClientMod.java",
+    "client_mod/src/main/java/app/ezclient/legacy/LegacyEzClientMod.java",
     "client_mod/src/main/java/app/ezclient/gui/EzHubScreen.java",
     "client_mod/src/main/java/app/ezclient/gui/HudEditorScreen.java",
     "client_mod/src/main/java/app/ezclient/cosmetics/CommunityPresence.java",
-    "client_mod/src/main/resources/fabric.mod.json",
+    # Global/current build version. Frozen 1.8.9-1.21.x builds are pinned by
+    # client_mod/build_mod.py and must not inherit future launcher versions.
     "client_mod/gradle.properties",
-
-    # Java Lite Mod
-    "client_mod_lite/src/main/java/app/ezclient/lite/EzClientLiteMod.java",
-    "client_mod_lite/src/main/resources/fabric.mod.json",
-    "client_mod_lite/build.gradle",
 
     # Python Backend & Wrapper
     "backend/models/types.py",
@@ -39,6 +36,7 @@ RELATIVE_FILES = [
     "minecraft_wrapper/launcher_wrapper.py",
 
     # Installer & Build Scripts
+    "installer/EzClient.iss",
     "installer/installer_gui.py",
     "build_installer.py",
     "build_release.py",
@@ -48,6 +46,11 @@ RELATIVE_FILES = [
     "ui/HomePage.qml",
     "ui/TopBar.qml",
 ]
+
+# Old versions in changelogs, release notes, tests and archived JARs are
+# historical data. Everything listed above is active product metadata and is
+# updated together by this script.
+VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 
 
 def detect_current_version() -> str:
@@ -96,6 +99,15 @@ def update_version(old_ver: str, new_ver: str) -> None:
 
     print(f"\nCompleted: {updated_count} files updated to version {new_ver}.")
 
+    stale = []
+    for rel_path in RELATIVE_FILES:
+        target_path = REPO_ROOT / rel_path
+        if target_path.exists() and old_ver in target_path.read_text(encoding="utf-8"):
+            stale.append(rel_path)
+    if stale:
+        joined = "\n  ".join(stale)
+        raise RuntimeError(f"Old version {old_ver} remains in active files:\n  {joined}")
+
 
 def main():
     if len(sys.argv) == 2:
@@ -111,6 +123,10 @@ def main():
     if old_ver == new_ver:
         print(f"Current version is already {new_ver}.")
         return
+
+    if not VERSION_PATTERN.fullmatch(new_ver):
+        print(f"Invalid semantic version: {new_ver}")
+        sys.exit(2)
 
     update_version(old_ver, new_ver)
 

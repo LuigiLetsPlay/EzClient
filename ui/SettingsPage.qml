@@ -399,14 +399,15 @@ Item {
                         spacing: 8
 
                         EzButton {
-                            text: EzI18n.t("settings_login_btn", "Konto anmelden")
+                            text: (typeof accountController !== "undefined" && accountController && accountController.hasAccount) ? "Account wechseln" : EzI18n.t("settings_login_btn", "Konto anmelden")
                             mcFont: true
                             Layout.preferredHeight: 32
                             onClicked: if (typeof accountController !== "undefined" && accountController) accountController.openLoginDialog()
                         }
 
                         EzButton {
-                            text: EzI18n.t("settings_sync_btn", "Sync")
+                            text: "Sitzung aktualisieren"
+                            visible: typeof accountController !== "undefined" && accountController && accountController.hasAccount
                             Layout.preferredHeight: 32
                             onClicked: if (typeof accountController !== "undefined" && accountController) accountController.refresh()
                         }
@@ -798,33 +799,54 @@ Item {
             Text { text: EzI18n.t("settings_java_title", "JAVA LAUFZEITUMGEBUNG"); font.family: EzTheme.mcFontFamily; font.pixelSize: 11; color: EzTheme.textSecondary }
             Item { height: 8 }
 
-            EzSurface {
+            Text {
+                text: "EzClient verwaltet nur die Laufzeiten, die Minecraft 1.8 bis 26.2 tatsächlich benötigt. Beim Spielstart wird automatisch die passende Version gewählt."
+                font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted
+                wrapMode: Text.WordWrap; Layout.fillWidth: true
+            }
+            Item { height: 8 }
+
+            ColumnLayout {
                 Layout.fillWidth: true
-                implicitHeight: 70
+                spacing: 8
 
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: 16
-                    spacing: 14
-
-                    ColumnLayout {
+                Repeater {
+                    model: profileController ? profileController.javaRuntimes : []
+                    EzSurface {
                         Layout.fillWidth: true
-                        spacing: 2
-                        Text { text: EzI18n.t("settings_java_path", "Java Runtime Pfad"); font.family: EzTheme.mcFontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
-                        Text { text: profileController ? profileController.javaRuntime : ""; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted; elide: Text.ElideMiddle; Layout.fillWidth: true }
-                    }
+                        implicitHeight: 74
 
-                    EzButton {
-                        text: EzI18n.t("settings_java_detect", "Erkennen")
-                        mcFont: true
-                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                        Layout.preferredHeight: 30
-                        Layout.preferredWidth: 90
-                        onClicked: {
-                            if (profileController) profileController.detectJava()
+                        RowLayout {
+                            anchors.fill: parent; anchors.margins: 14; spacing: 12
+                            Rectangle {
+                                width: 42; height: 42; radius: 10
+                                color: modelData.installed ? EzTheme.surfaceActive : EzTheme.surface2
+                                border.color: modelData.installed ? EzTheme.accent : EzTheme.border
+                                Text { text: String(modelData.major); anchors.centerIn: parent; font.family: EzTheme.mcFontFamily; font.pixelSize: 15; font.bold: true; color: modelData.installed ? EzTheme.accentLight : EzTheme.textMuted }
+                            }
+                            ColumnLayout {
+                                Layout.fillWidth: true; spacing: 3
+                                RowLayout {
+                                    Text { text: modelData.label; font.family: EzTheme.fontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
+                                    Rectangle { width: statusText.implicitWidth + 12; height: 18; radius: 9; color: modelData.installed ? "#183C2A" : EzTheme.surface3
+                                        Text { id: statusText; anchors.centerIn: parent; text: modelData.installed ? "INSTALLIERT" : "NICHT INSTALLIERT"; font.family: EzTheme.fontFamily; font.pixelSize: 8; font.bold: true; color: modelData.installed ? EzTheme.accentLight : EzTheme.textSubtle }
+                                    }
+                                }
+                                Text { text: modelData.path; font.family: EzTheme.fontFamily; font.pixelSize: 9; color: EzTheme.textMuted; elide: Text.ElideMiddle; Layout.fillWidth: true }
+                            }
+                            EzButton { text: "Ordner"; Layout.preferredWidth: 72; Layout.preferredHeight: 30; onClicked: profileController.openJavaLocation(modelData.major) }
+                            EzButton { text: modelData.installed ? "Neu installieren" : "Installieren"; Layout.preferredWidth: 142; Layout.minimumWidth: 142; Layout.preferredHeight: 32; primary: !modelData.installed; onClicked: modelData.installed ? profileController.reinstallJava(modelData.major) : profileController.installJava(modelData.major) }
+                            EzButton { visible: modelData.managed; text: "Löschen"; Layout.preferredWidth: 72; Layout.preferredHeight: 30; onClicked: profileController.deleteJava(modelData.major) }
                         }
                     }
                 }
+            }
+
+            Item { height: 8 }
+            EzButton {
+                text: EzI18n.t("settings_java_detect", "Alle erkennen")
+                mcFont: true; Layout.preferredHeight: 32; Layout.preferredWidth: 120
+                onClicked: if (profileController) profileController.detectJava()
             }
 
             Item { height: 20 }

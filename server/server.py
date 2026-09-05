@@ -47,7 +47,7 @@ TOKENS_DATABASE = ROOT / "tokens.json"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 RATE_LIMITS: dict[str, list[float]] = {}
-PRESENCE: dict[str, tuple[float, str]] = {}  # player_uuid -> (timestamp, username)
+PRESENCE: dict[str, tuple[float, str, str]] = {}  # uuid -> (timestamp, username, verified client)
 MOJANG_VERIFIED_CACHE: dict[str, tuple[str, float]] = {}
 STATE_LOCK = threading.Lock()
 REPORTS_LOCK = threading.Lock()
@@ -84,7 +84,8 @@ def online_players(requested: set[str] | None = None) -> list[dict]:
             if requested is not None and player_id not in requested:
                 continue
             name = data[1] if isinstance(data, tuple) else "Spieler"
-            result.append({"uuid": player_id, "username": name})
+            client = data[2] if isinstance(data, tuple) and len(data) > 2 else "ezclient"
+            result.append({"uuid": player_id, "username": name, "client": client})
     return result
 
 
@@ -369,7 +370,7 @@ class CapeHandler(BaseHTTPRequestHandler):
             requested = {value for value in urlparse(self.path).query.removeprefix("players=").split(",")
                          if re.fullmatch(r"[a-f0-9-]{36}", value)}
             self.send_json(HTTPStatus.OK, {
-                "players": [p["uuid"] for p in online_players(requested or None)],
+                "players": online_players(requested or None),
                 "ttl": PRESENCE_TTL_SECONDS
             })
             return
@@ -566,10 +567,19 @@ class CapeHandler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             player_id = clean_text(str(payload.get("player_uuid", "")), 36).lower()
             username = clean_text(str(payload.get("username", "")), 32) or "Spieler"
+            client = clean_text(str(payload.get("client", "ezclient")), 24).lower()
             if not re.fullmatch(r"[a-f0-9-]{36}", player_id):
                 raise ValueError
+            if client not in {"ezclient", "norisk", "labymod", "lunar", "badlion"}:
+                raise ValueError
+            if client != "ezclient":
+                expected = os.environ.get("EZCLIENT_DETECTOR_TOKEN", "")
+                supplied = self.headers.get("X-EzClient-Detector-Token", "")
+                if not expected or not hmac.compare_digest(expected, supplied):
+                    self.send_json(HTTPStatus.FORBIDDEN, {"error": "Nicht autorisierte Client-Erkennung"})
+                    return
             with STATE_LOCK:
-                PRESENCE[player_id] = (time.monotonic(), username)
+                PRESENCE[player_id] = (time.monotonic(), username, client)
             self.send_json(HTTPStatus.OK, {"ok": True, "expires_in": PRESENCE_TTL_SECONDS})
         except (ValueError, json.JSONDecodeError):
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Ungültige Präsenz"})

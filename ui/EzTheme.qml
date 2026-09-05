@@ -55,12 +55,12 @@ QtObject {
     readonly property string fontFamily: fontMode === "minecraft" ? "Minecraft" : "Segoe UI"
 
     // ── DIMENSIONS ────────────────────────────────────────────────
-    readonly property int sidebarWidth: 224
-    readonly property int titlebarHeight: 40
+    readonly property int sidebarWidth: 88
+    readonly property int titlebarHeight: 58
     readonly property int statusbarHeight: 28
-    readonly property int radius: 12
-    readonly property int radiusSm: 6
-    readonly property int radiusLg: 16
+    readonly property int radius: 14
+    readonly property int radiusSm: 8
+    readonly property int radiusLg: 18
 
     // ── ANIMATION DURATIONS ──────────────────────────────────────
     readonly property int animFast: 100

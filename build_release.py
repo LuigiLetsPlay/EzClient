@@ -1,4 +1,4 @@
-"""Build the complete EzClient 1.8.2 Windows release."""
+"""Build the complete EzClient 2.0.0 Windows release."""
 import subprocess
 import sys
 from pathlib import Path
@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parent
 def build() -> None:
     for script in ("build_exe.py", "build_installer.py"):
         print(f"[Release] Running {script} ...")
-        subprocess.run([sys.executable, str(ROOT / script)], cwd=ROOT, check=True)
+        subprocess.run([sys.executable, str(ROOT / script)], cwd=ROOT, stdin=subprocess.DEVNULL, check=True)
 
     for filename in ("EzClient.exe", "EzClient-Setup.exe"):
         artifact = ROOT / "dist" / filename

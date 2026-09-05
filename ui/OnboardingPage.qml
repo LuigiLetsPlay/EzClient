@@ -7,28 +7,111 @@ Item {
     id: root
     signal profileCreated
 
-    // Wizard steps: "welcome" → "create" → "preset" → "downloading"
+    // Wizard steps: "welcome" → "account" → "norisk_detected" (optional) → "create" → "preset" → "mod_selection" → "downloading"
     property string step: "welcome"
 
     // Form state
     property string newName: ""
     property string newVersion: "26.2"
     property string newLoader: "Fabric"
-    property string selectedPreset: "ezclient" // "ezclient" | "raw"
+    property string selectedPreset: "ezclient" // "ezclient" | "raw" | "performance"
+    property string selectedIcon: "ezclient"
+
+    function allMinecraftVersions() {
+        var result = []
+        var families = profileController ? profileController.gameVersionFamilies : []
+        for (var familyIndex = 0; familyIndex < families.length; familyIndex++) {
+            var releases = families[familyIndex].releases
+            for (var releaseIndex = 0; releaseIndex < releases.length; releaseIndex++) result.push(releases[releaseIndex].version)
+        }
+        return result
+    }
+
+    function hasEzClient(version) {
+        var families = profileController ? profileController.gameVersionFamilies : []
+        for (var familyIndex = 0; familyIndex < families.length; familyIndex++) {
+            var releases = families[familyIndex].releases
+            for (var releaseIndex = 0; releaseIndex < releases.length; releaseIndex++) {
+                if (releases[releaseIndex].version === version) return releases[releaseIndex].hasEzClient
+            }
+        }
+        return false
+    }
+
+    function hasFabric(version) {
+        var families = profileController ? profileController.gameVersionFamilies : []
+        for (var familyIndex = 0; familyIndex < families.length; familyIndex++) {
+            var releases = families[familyIndex].releases
+            for (var releaseIndex = 0; releaseIndex < releases.length; releaseIndex++) {
+                if (releases[releaseIndex].version === version) return releases[releaseIndex].hasFabric
+            }
+        }
+        return false
+    }
 
     // Download / loading state from backend
     property real downloadProgress: 0.0
     property string downloadStatus: "Bereite Profil vor…"
+    property bool setupFailed: false
+    property bool noriskAddPerformance: true
+
+    function reset() {
+        if (typeof completeTimer !== "undefined" && completeTimer) {
+            completeTimer.stop()
+        }
+        step = "welcome"
+        newName = ""
+        newVersion = "26.2"
+        newLoader = "Fabric"
+        selectedPreset = "ezclient"
+        selectedIcon = "ezclient"
+        downloadProgress = 0.0
+        downloadStatus = EzI18n.currentLanguage === "en" ? "Preparing profile…" : "Bereite Profil vor…"
+        setupFailed = false
+        noriskAddPerformance = true
+        if (typeof nameInput !== "undefined" && nameInput) {
+            nameInput.text = ""
+        }
+        if (typeof modSelectionItem !== "undefined" && modSelectionItem) {
+            modSelectionItem.selectedMods = []
+        }
+        if (typeof profileController !== "undefined" && profileController) {
+            profileController.scanNoRiskProfiles()
+        }
+    }
+
+    onVisibleChanged: {
+        if (visible) {
+            root.reset()
+        }
+    }
+
+    Component.onCompleted: {
+        if (typeof profileController !== "undefined" && profileController) {
+            profileController.scanNoRiskProfiles()
+        }
+    }
 
     function beginProfileSetup(optionalMods) {
         root.step = "downloading"
         root.downloadProgress = 0.0
+        root.setupFailed = false
         root.downloadStatus = EzI18n.currentLanguage === "en" ? "Initializing profile…" : "Initialisiere Profil…"
         if (typeof profileController !== "undefined" && profileController) {
             profileController.createAndOnboard(
                 root.newName.trim(), root.newVersion, root.newLoader,
-                root.selectedPreset, optionalMods
+                root.selectedPreset, optionalMods, root.selectedIcon
             )
+        }
+    }
+
+    function importNoRisk(profileId) {
+        root.step = "downloading"
+        root.downloadProgress = 0.05
+        root.setupFailed = false
+        root.downloadStatus = "Importiere NoRisk-Profil…"
+        if (typeof profileController !== "undefined" && profileController) {
+            profileController.importNoRiskProfile(profileId, root.noriskAddPerformance)
         }
     }
 
@@ -37,11 +120,26 @@ Item {
         function onOnboardingStepProgress(progress, modName, statusText) {
             root.downloadProgress = progress
             root.downloadStatus = statusText
+            if (modName === "Fehler") root.setupFailed = true
         }
         function onOnboardingFinished(profileId) {
             root.downloadProgress = 1.0
             root.downloadStatus = "Profil erfolgreich eingerichtet & optimiert!"
             completeTimer.start()
+        }
+        function onNoriskImportProgress(progress, statusText) {
+            root.downloadProgress = progress
+            root.downloadStatus = statusText
+        }
+        function onNoriskImportFinished(profileId, success, message) {
+            if (success) {
+                root.downloadProgress = 1.0
+                root.downloadStatus = "NoRisk-Profil erfolgreich übernommen!"
+                completeTimer.start()
+            } else {
+                root.downloadStatus = message
+                root.setupFailed = true
+            }
         }
     }
 
@@ -51,6 +149,7 @@ Item {
         repeat: false
         onTriggered: {
             root.profileCreated()
+            root.reset()
         }
     }
 
@@ -68,9 +167,9 @@ Item {
         Rectangle {
             anchors.centerIn: parent
             anchors.verticalCenterOffset: root.step === "welcome" ? -140 : -80
-            width: 520
-            height: 520
-            radius: 260
+            width: 540
+            height: 540
+            radius: 270
             color: EzTheme.accentGlow
             opacity: 0.4
             Behavior on anchors.verticalCenterOffset { NumberAnimation { duration: 280; easing.type: Easing.OutQuad } }
@@ -81,8 +180,8 @@ Item {
         // ──────────────────────────────────────────
         Item {
             anchors.centerIn: parent
-            width: 460
-            height: 420
+            width: 520
+            height: 440
             visible: opacity > 0.001
             opacity: root.step === "welcome" ? 1.0 : 0.0
             scale: root.step === "welcome" ? 1.0 : 0.95
@@ -113,6 +212,7 @@ Item {
                     font.bold: true
                     color: EzTheme.text
                     Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
                 Item { height: 6 }
@@ -123,6 +223,7 @@ Item {
                     font.pixelSize: 13
                     color: EzTheme.textSecondary
                     Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
                 Item { height: 24 }
@@ -203,7 +304,7 @@ Item {
 
                 Rectangle {
                     Layout.alignment: Qt.AlignHCenter
-                    width: 250; height: 44
+                    width: 260; height: 44
                     radius: EzTheme.radius
                     scale: ctaMouse.containsMouse ? 1.03 : 1.0
                     gradient: Gradient {
@@ -241,6 +342,7 @@ Item {
                     font.pixelSize: 11
                     color: EzTheme.textSubtle
                     Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
                 }
             }
         }
@@ -250,7 +352,7 @@ Item {
         // ──────────────────────────────────────────
         Item {
             anchors.centerIn: parent
-            width: 460
+            width: 520
             height: 440
             visible: opacity > 0.001
             opacity: root.step === "account" ? 1.0 : 0.0
@@ -263,7 +365,7 @@ Item {
                 anchors.fill: parent
                 spacing: 0
 
-                // Back button & Step indicator
+                // Top Navigation Bar
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
@@ -287,22 +389,26 @@ Item {
                         }
                     }
 
+                    Item { Layout.fillWidth: true }
+
                     Text {
-                        text: EzI18n.currentLanguage === "en" ? "Step 1 of 3: Minecraft Account" : "Schritt 1 von 3: Minecraft Konto"
+                        text: EzI18n.currentLanguage === "en" ? "Step 1 of 3 · Minecraft Account" : "Schritt 1 von 3 · Minecraft Konto"
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
                         color: EzTheme.textMuted
                     }
                 }
 
-                Item { height: 24 }
+                Item { height: 20 }
 
                 Text {
                     text: EzI18n.currentLanguage === "en" ? "Connect Minecraft Account" : "Minecraft-Konto verbinden"
-                    font.family: EzTheme.fontFamily
+                    font.family: EzTheme.mcFontFamily
                     font.pixelSize: 24
                     font.bold: true
                     color: EzTheme.text
+                    Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
                 Item { height: 6 }
@@ -312,6 +418,10 @@ Item {
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 13
                     color: EzTheme.textSecondary
+                    Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
                 }
 
                 Item { height: 24 }
@@ -383,6 +493,7 @@ Item {
 
                 // Continue button
                 Rectangle {
+                    Layout.alignment: Qt.AlignHCenter
                     Layout.fillWidth: true
                     height: 44
                     radius: EzTheme.radius
@@ -405,10 +516,294 @@ Item {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            root.step = "create"
-                            nameInput.forceActiveFocus()
+                            if (typeof profileController !== "undefined" && profileController && profileController.noriskProfiles && profileController.noriskProfiles.length > 0) {
+                                root.step = "norisk_detected"
+                            } else {
+                                root.step = "create"
+                                nameInput.forceActiveFocus()
+                            }
                         }
                     }
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────
+        //  STEP 1.8: NORISK DETECTED FLOW
+        // ──────────────────────────────────────────
+        Item {
+            anchors.centerIn: parent
+            width: Math.min(760, Math.max(520, root.width - 80))
+            height: Math.min(620, Math.max(500, root.height - 72))
+            visible: opacity > 0.001
+            opacity: root.step === "norisk_detected" ? 1.0 : 0.0
+            scale: root.step === "norisk_detected" ? 1.0 : 0.95
+
+            Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+            Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 0
+
+                // Top Navigation Bar
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Rectangle {
+                        width: 30; height: 30; radius: 6
+                        color: backMouseNr.containsMouse ? EzTheme.surface3 : EzTheme.surface2
+                        border.color: EzTheme.border; border.width: 1
+                        Behavior on color { ColorAnimation { duration: 100 } }
+
+                        Text { text: "←"; font.family: EzTheme.fontFamily; font.pixelSize: 13; color: EzTheme.text; anchors.centerIn: parent }
+                        MouseArea {
+                            id: backMouseNr
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                root.forceActiveFocus()
+                                root.step = "account"
+                            }
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Rectangle {
+                        height: 22; radius: 11; color: "#FF553315"; border.color: "#FF5533"; border.width: 1
+                        Layout.preferredWidth: nrBadgeText.implicitWidth + 16
+                        Text { id: nrBadgeText; text: "⚡ NoRiskClient erkannt"; font.family: EzTheme.fontFamily; font.pixelSize: 10; font.bold: true; color: "#FF7744"; anchors.centerIn: parent }
+                    }
+                }
+
+                Item { Layout.preferredHeight: 14 }
+
+                Text {
+                    text: "NoRisk-Profile übernehmen?"
+                    font.family: EzTheme.mcFontFamily
+                    font.pixelSize: 24
+                    font.bold: true
+                    color: EzTheme.text
+                    Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Item { Layout.preferredHeight: 6 }
+
+                Text {
+                    text: "Wähle ein vorhandenes Profil. Spielstände, Einstellungen und Mods werden in ein neues EzClient-Profil kopiert."
+                    font.family: EzTheme.fontFamily
+                    font.pixelSize: 12
+                    color: EzTheme.textSecondary
+                    Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                }
+
+                Item { Layout.preferredHeight: 16 }
+
+                // Performance toggle checkbox
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 44
+                    radius: 8
+                    color: optCheckMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
+                    border.color: root.noriskAddPerformance ? EzTheme.accent : EzTheme.border
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 8
+
+                        Rectangle {
+                            width: 16; height: 16; radius: 4
+                            color: root.noriskAddPerformance ? EzTheme.accent : "transparent"
+                            border.color: root.noriskAddPerformance ? EzTheme.accent : EzTheme.borderLight
+                            border.width: 1
+                            Image { source: "icons/check.svg"; width: 10; height: 10; anchors.centerIn: parent; visible: root.noriskAddPerformance }
+                        }
+
+                        Text {
+                            text: "✨ EzClient Performance & Core Mod hinzufügen (Empfohlen)"
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 11
+                            font.bold: true
+                            color: root.noriskAddPerformance ? EzTheme.accentLight : EzTheme.textSecondary
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    MouseArea {
+                        id: optCheckMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.noriskAddPerformance = !root.noriskAddPerformance
+                    }
+                }
+
+                Item { Layout.preferredHeight: 14 }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 22
+
+                    Text {
+                        text: "Gefundene Profile"
+                        font.family: EzTheme.fontFamily
+                        font.pixelSize: 11
+                        font.bold: true
+                        color: EzTheme.textSecondary
+                    }
+                    Item { Layout.fillWidth: true }
+                    Text {
+                        text: ((typeof profileController !== "undefined" && profileController) ? profileController.noriskProfiles.length : 0) + " Profile"
+                        font.family: EzTheme.fontFamily
+                        font.pixelSize: 10
+                        color: EzTheme.textMuted
+                    }
+                }
+
+                Item { Layout.preferredHeight: 6 }
+
+                // Profile list
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    color: EzTheme.surface2
+                    radius: EzTheme.radiusSm
+                    border.color: EzTheme.border
+                    border.width: 1
+                    clip: true
+
+                    ListView {
+                        id: noriskProfileList
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        anchors.rightMargin: 14
+                        spacing: 8
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        model: (typeof profileController !== "undefined" && profileController) ? profileController.noriskProfiles : []
+                        ScrollBar.vertical: ScrollBar {
+                            policy: ScrollBar.AsNeeded
+                            width: 6
+                        }
+
+                        delegate: Rectangle {
+                            width: ListView.view.width
+                            height: 74
+                            radius: 10
+                            color: pItemMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface
+                            border.color: pItemMouse.containsMouse ? EzTheme.borderLight : EzTheme.border
+                            border.width: 1
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 10
+                                anchors.topMargin: 9
+                                anchors.bottomMargin: 9
+                                spacing: 12
+
+                                Rectangle {
+                                    Layout.preferredWidth: 44
+                                    Layout.preferredHeight: 44
+                                    radius: 10
+                                    color: "#171B24"
+                                    border.color: "#343B49"
+                                    border.width: 1
+
+                                    Image {
+                                        source: "icons/client-norisk.png"
+                                        width: 24; height: 24
+                                        anchors.centerIn: parent
+                                        fillMode: Image.PreserveAspectFit
+                                        smooth: true
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    Layout.minimumWidth: 0
+                                    spacing: 2
+                                    Text {
+                                        text: modelData.name || "Unbenanntes NoRisk-Profil"
+                                        font.family: EzTheme.mcFontFamily
+                                        font.pixelSize: 13
+                                        font.bold: true
+                                        color: EzTheme.text
+                                        Layout.fillWidth: true
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                    }
+                                    Text {
+                                        text: "Minecraft " + (modelData.version || "Unbekannt") + "  ·  " + (modelData.loader || "Vanilla") + "  ·  " + (modelData.modCount || 0) + " Mods"
+                                        font.family: EzTheme.fontFamily
+                                        font.pixelSize: 10
+                                        color: EzTheme.textMuted
+                                        Layout.fillWidth: true
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                    }
+                                    Text {
+                                        text: ((modelData.ramMb || 4096) / 1024).toFixed(1).replace(".0", "") + " GB RAM"
+                                        font.family: EzTheme.fontFamily
+                                        font.pixelSize: 9
+                                        color: EzTheme.textSubtle
+                                    }
+                                }
+
+                                EzButton {
+                                    text: "Importieren"
+                                    primary: true
+                                    mcFont: true
+                                    Layout.preferredHeight: 36
+                                    Layout.preferredWidth: 112
+                                    onClicked: root.importNoRisk(modelData.id)
+                                }
+                            }
+
+                            MouseArea {
+                                id: pItemMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                acceptedButtons: Qt.NoButton
+                            }
+                        }
+                    }
+                }
+
+                Item { Layout.preferredHeight: 16 }
+
+                // Bottom skip button
+                RowLayout {
+                    Layout.fillWidth: true
+                    Item { Layout.fillWidth: true }
+                    Text {
+                        text: "Neues Standard-Profil erstellen →"
+                        font.family: EzTheme.fontFamily
+                        font.pixelSize: 12
+                        font.bold: true
+                        color: EzTheme.accent
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -4
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                root.step = "create"
+                                nameInput.forceActiveFocus()
+                            }
+                        }
+                    }
+                    Item { Layout.fillWidth: true }
                 }
             }
         }
@@ -418,8 +813,8 @@ Item {
         // ──────────────────────────────────────────
         Item {
             anchors.centerIn: parent
-            width: 440
-            height: 440
+            width: 520
+            height: 580
             visible: opacity > 0.001
             opacity: root.step === "create" ? 1.0 : 0.0
             scale: root.step === "create" ? 1.0 : 0.95
@@ -431,7 +826,7 @@ Item {
                 anchors.fill: parent
                 spacing: 0
 
-                // Back button & Step indicator
+                // Top Navigation Bar
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
@@ -450,27 +845,35 @@ Item {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 root.forceActiveFocus()
-                                root.step = "account"
+                                if (typeof profileController !== "undefined" && profileController && profileController.noriskProfiles && profileController.noriskProfiles.length > 0) {
+                                    root.step = "norisk_detected"
+                                } else {
+                                    root.step = "account"
+                                }
                             }
                         }
                     }
 
+                    Item { Layout.fillWidth: true }
+
                     Text {
-                        text: EzI18n.currentLanguage === "en" ? "Step 2 of 3: Basic Settings" : "Schritt 2 von 3: Basis-Einstellungen"
+                        text: EzI18n.currentLanguage === "en" ? "Step 2 of 3 · Basic Settings" : "Schritt 2 von 3 · Basis-Einstellungen"
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
                         color: EzTheme.textMuted
                     }
                 }
 
-                Item { height: 24 }
+                Item { height: 18 }
 
                 Text {
                     text: EzI18n.t("onboard_step2_profile", "Erstes Profil erstellen")
-                    font.family: EzTheme.fontFamily
+                    font.family: EzTheme.mcFontFamily
                     font.pixelSize: 24
                     font.bold: true
                     color: EzTheme.text
+                    Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
                 Item { height: 6 }
@@ -480,9 +883,11 @@ Item {
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 13
                     color: EzTheme.textSecondary
+                    Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
-                Item { height: 26 }
+                Item { height: 22 }
 
                 // Profile name input
                 Rectangle {
@@ -531,7 +936,115 @@ Item {
                     }
                 }
 
-                Item { height: 18 }
+                Item { height: 12 }
+
+                // Profile Icon Selector
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 5
+
+                    RowLayout {
+                        spacing: 6
+                        Text {
+                            text: EzI18n.currentLanguage === "en" ? "Profile Icon" : "Profil-Icon"
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 11
+                            font.bold: true
+                            color: EzTheme.textSecondary
+                        }
+                        Text {
+                            text: EzI18n.currentLanguage === "en" ? "(Preset or custom PNG)" : "(Preset oder eigenes PNG)"
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 10
+                            color: EzTheme.textSubtle
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        ProfileIcon {
+                            Layout.preferredWidth: 32
+                            Layout.preferredHeight: 32
+                            radius: 7
+                            iconNameOrPath: root.selectedIcon
+                            fallbackName: root.newName.trim() || "EZ"
+                        }
+
+                        Row {
+                            spacing: 5
+                            Repeater {
+                                model: ["ezclient", "norisk", "box", "tnt", "potion", "clock", "flame", "sparkles", "shield", "compass", "zap"]
+                                Rectangle {
+                                    width: 30
+                                    height: 30
+                                    radius: 6
+                                    color: (root.selectedIcon === modelData) ? EzTheme.surfaceActive : (obIconMouse.containsMouse ? EzTheme.surfaceHover : EzTheme.surface2)
+                                    border.color: (root.selectedIcon === modelData) ? EzTheme.accent : EzTheme.borderLight
+                                    border.width: (root.selectedIcon === modelData) ? 1.5 : 1
+
+                                    ProfileIcon {
+                                        anchors.fill: parent
+                                        anchors.margins: 2
+                                        iconNameOrPath: modelData
+                                        radius: 5
+                                        bgColor: "transparent"
+                                        borderColor: "transparent"
+                                        borderWidth: 0
+                                    }
+
+                                    MouseArea {
+                                        id: obIconMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.selectedIcon = modelData
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: 30
+                            width: obCustomPngTxt.implicitWidth + 14
+                            radius: 6
+                            color: obUploadMouse.containsMouse ? EzTheme.surfaceHover : EzTheme.surface2
+                            border.color: obUploadMouse.containsMouse ? EzTheme.accent : EzTheme.borderLight
+                            border.width: 1
+
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 4
+                                Text {
+                                    id: obCustomPngTxt
+                                    text: "+ PNG"
+                                    font.family: EzTheme.fontFamily
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    color: EzTheme.accentLight
+                                }
+                            }
+
+                            MouseArea {
+                                id: obUploadMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (typeof profileController !== "undefined" && profileController) {
+                                        var path = profileController.pickProfileIconImage()
+                                        if (path && path !== "") {
+                                            root.selectedIcon = path
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Item { height: 14 }
 
                 // Version dropdown
                 ColumnLayout {
@@ -544,16 +1057,21 @@ Item {
                         id: versionPicker
                         Layout.fillWidth: true
                         currentIndex: 0
-                        choices: ["26.2", "26.1", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5", "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21"]
+                        choices: root.allMinecraftVersions()
                         formatEzClientSupported: true
                         onChoiceChanged: {
                             root.newVersion = choices[currentIndex]
-                            
-                            // Reset selected preset to raw if not supported to avoid invisible preset selection
-                            if (!versionPicker.isEzClientSupported(root.newVersion) && root.selectedPreset === "ezclient") {
-                                root.selectedPreset = "raw"
-                            } else if (versionPicker.isEzClientSupported(root.newVersion) && root.selectedPreset !== "raw") {
+                            if (root.hasEzClient(root.newVersion)) {
+                                root.newLoader = "Fabric"
                                 root.selectedPreset = "ezclient"
+                            } else if (root.hasFabric(root.newVersion)) {
+                                root.newLoader = "Fabric"
+                                if (root.selectedPreset === "ezclient") {
+                                    root.selectedPreset = "performance"
+                                }
+                            } else {
+                                root.newLoader = "Vanilla"
+                                root.selectedPreset = "raw"
                             }
                         }
                     }
@@ -561,26 +1079,32 @@ Item {
 
                 Item { height: 16 }
 
-                // Mod-Loader Tactile Cards (Fabric vs Forge)
+                // Mod-Loader / Game Variant Cards (EzClient vs Fabric vs Vanilla vs Forge)
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 6
 
-                    Text { text: EzI18n.t("onboard_profile_loader", "Mod-Loader auswählen"); font.family: EzTheme.fontFamily; font.pixelSize: 11; font.bold: true; color: EzTheme.textSecondary }
+                    Text { text: EzI18n.currentLanguage === "en" ? "Game Variant & Mod-Loader" : "Spielvariante & Mod-Loader"; font.family: EzTheme.fontFamily; font.pixelSize: 11; font.bold: true; color: EzTheme.textSecondary }
 
-                    RowLayout {
+                    GridLayout {
                         Layout.fillWidth: true
-                        spacing: 12
+                        columns: 2
+                        columnSpacing: 10
+                        rowSpacing: 10
 
-                        // Fabric Card
+                        // EzClient Card (Recommended / Default)
                         Rectangle {
+                            id: ezClientPresetCard
                             Layout.fillWidth: true
                             height: 56
                             radius: EzTheme.radiusSm
-                            color: root.newLoader === "Fabric" ? EzTheme.surfaceActive : (fabMouse.containsMouse ? EzTheme.surface2 : EzTheme.surface)
-                            border.color: root.newLoader === "Fabric" ? EzTheme.accent : (fabMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)
-                            border.width: root.newLoader === "Fabric" ? 1.5 : 1
-                            scale: fabMouse.containsMouse ? 1.02 : 1.0
+                            readonly property bool isSelected: root.selectedPreset === "ezclient" && root.newLoader === "Fabric"
+                            readonly property bool isAvailable: root.hasEzClient(root.newVersion)
+                            color: isSelected ? EzTheme.surfaceActive : (ezMouse.containsMouse ? EzTheme.surface2 : EzTheme.surface)
+                            border.color: isSelected ? EzTheme.accent : (ezMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)
+                            border.width: isSelected ? 1.5 : 1
+                            scale: ezMouse.containsMouse && isAvailable ? 1.02 : 1.0
+                            opacity: isAvailable ? 1.0 : 0.4
 
                             Behavior on color { ColorAnimation { duration: 110 } }
                             Behavior on border.color { ColorAnimation { duration: 110 } }
@@ -591,18 +1115,93 @@ Item {
                                 anchors.margins: 10
                                 spacing: 10
 
-                                Rectangle {
-                                    width: 16; height: 16; radius: 8
-                                    color: root.newLoader === "Fabric" ? EzTheme.accent : "transparent"
-                                    border.color: root.newLoader === "Fabric" ? EzTheme.accent : EzTheme.borderLight
-                                    border.width: 1.5
-                                    Rectangle { width: 6; height: 6; radius: 3; color: "#000"; anchors.centerIn: parent; visible: root.newLoader === "Fabric" }
+                                Image {
+                                    source: "assets/logo.svg"
+                                    Layout.preferredWidth: 22
+                                    Layout.preferredHeight: 22
+                                    fillMode: Image.PreserveAspectFit
                                 }
 
                                 ColumnLayout {
                                     Layout.fillWidth: true
-                                    Text { text: "Fabric"; font.family: EzTheme.fontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text; Layout.alignment: Qt.AlignLeft; Layout.fillWidth: true; wrapMode: Text.WordWrap }
-                                    Text { text: EzI18n.currentLanguage === "en" ? "Lightweight & Ultra FPS" : "Leicht & Ultra-FPS"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.accentLight; Layout.alignment: Qt.AlignLeft; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                                    spacing: 2
+                                    RowLayout {
+                                        spacing: 6
+                                        Text { text: "EzClient"; font.family: EzTheme.fontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
+                                        Rectangle {
+                                            height: 14; width: recText.implicitWidth + 6; radius: 3; color: EzTheme.accent
+                                            Text { id: recText; text: EzI18n.currentLanguage === "en" ? "REC" : "EMPFOHLEN"; font.family: EzTheme.fontFamily; font.pixelSize: 8; font.bold: true; color: "#000000"; anchors.centerIn: parent }
+                                        }
+                                    }
+                                    Text { text: EzI18n.currentLanguage === "en" ? "Full client · Ultra FPS & features" : "Vollversion · Ultra-FPS & Features"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.accentLight; Layout.fillWidth: true; elide: Text.ElideRight }
+                                }
+
+                                Rectangle {
+                                    width: 16; height: 16; radius: 8
+                                    color: ezClientPresetCard.isSelected ? EzTheme.accent : "transparent"
+                                    border.color: ezClientPresetCard.isSelected ? EzTheme.accent : EzTheme.borderLight
+                                    border.width: 1.5
+                                    Rectangle { width: 6; height: 6; radius: 3; color: "#000"; anchors.centerIn: parent; visible: ezClientPresetCard.isSelected }
+                                }
+                            }
+
+                            MouseArea {
+                                id: ezMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: parent.isAvailable ? Qt.PointingHandCursor : Qt.ForbiddenCursor
+                                onClicked: {
+                                    if (parent.isAvailable) {
+                                        root.newLoader = "Fabric"
+                                        root.selectedPreset = "ezclient"
+                                    }
+                                }
+                            }
+                        }
+
+                        // Fabric Card
+                        Rectangle {
+                            id: fabricPresetCard
+                            Layout.fillWidth: true
+                            height: 56
+                            radius: EzTheme.radiusSm
+                            readonly property bool isSelected: root.selectedPreset === "performance" && root.newLoader === "Fabric"
+                            readonly property bool isAvailable: root.hasFabric(root.newVersion)
+                            color: isSelected ? EzTheme.surfaceActive : (fabMouse.containsMouse ? EzTheme.surface2 : EzTheme.surface)
+                            border.color: isSelected ? EzTheme.accent : (fabMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)
+                            border.width: isSelected ? 1.5 : 1
+                            scale: fabMouse.containsMouse && isAvailable ? 1.02 : 1.0
+                            opacity: isAvailable ? 1.0 : 0.4
+
+                            Behavior on color { ColorAnimation { duration: 110 } }
+                            Behavior on border.color { ColorAnimation { duration: 110 } }
+                            Behavior on scale { NumberAnimation { duration: 110 } }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: 10
+                                spacing: 10
+
+                                Image {
+                                    source: "assets/fabric-logo.png"
+                                    Layout.preferredWidth: 22
+                                    Layout.preferredHeight: 22
+                                    fillMode: Image.PreserveAspectFit
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 2
+                                    Text { text: "Fabric"; font.family: EzTheme.fontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
+                                    Text { text: EzI18n.currentLanguage === "en" ? "Lightweight & FPS · without EzClient" : "Leicht & FPS · ohne EzClient"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted; Layout.fillWidth: true; elide: Text.ElideRight }
+                                }
+
+                                Rectangle {
+                                    width: 16; height: 16; radius: 8
+                                    color: fabricPresetCard.isSelected ? EzTheme.accent : "transparent"
+                                    border.color: fabricPresetCard.isSelected ? EzTheme.accent : EzTheme.borderLight
+                                    border.width: 1.5
+                                    Rectangle { width: 6; height: 6; radius: 3; color: "#000"; anchors.centerIn: parent; visible: fabricPresetCard.isSelected }
                                 }
                             }
 
@@ -610,19 +1209,26 @@ Item {
                                 id: fabMouse
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.newLoader = "Fabric"
+                                cursorShape: parent.isAvailable ? Qt.PointingHandCursor : Qt.ForbiddenCursor
+                                onClicked: {
+                                    if (parent.isAvailable) {
+                                        root.newLoader = "Fabric"
+                                        root.selectedPreset = "performance"
+                                    }
+                                }
                             }
                         }
 
-                        // Forge Card
+                        // Vanilla Card
                         Rectangle {
+                            id: vanillaPresetCard
                             Layout.fillWidth: true
                             height: 56
                             radius: EzTheme.radiusSm
-                            color: root.newLoader === "Forge" ? EzTheme.surfaceActive : (forgeMouse.containsMouse ? EzTheme.surface2 : EzTheme.surface)
-                            border.color: root.newLoader === "Forge" ? EzTheme.accent : (forgeMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)
-                            border.width: root.newLoader === "Forge" ? 1.5 : 1
+                            readonly property bool isSelected: root.newLoader === "Vanilla"
+                            color: isSelected ? EzTheme.surfaceActive : (forgeMouse.containsMouse ? EzTheme.surface2 : EzTheme.surface)
+                            border.color: isSelected ? EzTheme.accent : (forgeMouse.containsMouse ? EzTheme.borderLight : EzTheme.border)
+                            border.width: isSelected ? 1.5 : 1
                             scale: forgeMouse.containsMouse ? 1.02 : 1.0
 
                             Behavior on color { ColorAnimation { duration: 110 } }
@@ -634,18 +1240,26 @@ Item {
                                 anchors.margins: 10
                                 spacing: 10
 
-                                Rectangle {
-                                    width: 16; height: 16; radius: 8
-                                    color: root.newLoader === "Forge" ? EzTheme.accent : "transparent"
-                                    border.color: root.newLoader === "Forge" ? EzTheme.accent : EzTheme.borderLight
-                                    border.width: 1.5
-                                    Rectangle { width: 6; height: 6; radius: 3; color: "#000"; anchors.centerIn: parent; visible: root.newLoader === "Forge" }
+                                Image {
+                                    source: "icons/loader-vanilla.svg"
+                                    Layout.preferredWidth: 22
+                                    Layout.preferredHeight: 22
+                                    fillMode: Image.PreserveAspectFit
                                 }
 
                                 ColumnLayout {
                                     Layout.fillWidth: true
-                                    Text { text: "Forge"; font.family: EzTheme.fontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text; Layout.alignment: Qt.AlignLeft; Layout.fillWidth: true; wrapMode: Text.WordWrap }
-                                    Text { text: EzI18n.currentLanguage === "en" ? "Classic Mod Ecosystem" : "Klassisches Ökosystem"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted; Layout.alignment: Qt.AlignLeft; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                                    spacing: 2
+                                    Text { text: "Vanilla"; font.family: EzTheme.fontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
+                                    Text { text: EzI18n.currentLanguage === "en" ? "Original game without loader" : "Originalspiel ohne Mod-Loader"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted; Layout.fillWidth: true; elide: Text.ElideRight }
+                                }
+
+                                Rectangle {
+                                    width: 16; height: 16; radius: 8
+                                    color: vanillaPresetCard.isSelected ? EzTheme.accent : "transparent"
+                                    border.color: vanillaPresetCard.isSelected ? EzTheme.accent : EzTheme.borderLight
+                                    border.width: 1.5
+                                    Rectangle { width: 6; height: 6; radius: 3; color: "#000"; anchors.centerIn: parent; visible: vanillaPresetCard.isSelected }
                                 }
                             }
 
@@ -654,13 +1268,72 @@ Item {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: root.newLoader = "Forge"
+                                onClicked: {
+                                    root.newLoader = "Vanilla"
+                                    root.selectedPreset = "raw"
+                                }
+                            }
+                        }
+
+                        // Forge Card
+                        Rectangle {
+                            id: forgePresetCard
+                            Layout.fillWidth: true
+                            height: 56
+                            radius: EzTheme.radiusSm
+                            readonly property bool isSelected: root.newLoader === "Forge"
+                            color: isSelected ? EzTheme.surfaceActive : (forgeLoaderMouse.containsMouse ? EzTheme.surface2 : EzTheme.surface)
+                            border.color: isSelected ? EzTheme.accent : EzTheme.border
+                            border.width: isSelected ? 1.5 : 1
+                            scale: forgeLoaderMouse.containsMouse ? 1.02 : 1.0
+
+                            Behavior on color { ColorAnimation { duration: 110 } }
+                            Behavior on border.color { ColorAnimation { duration: 110 } }
+                            Behavior on scale { NumberAnimation { duration: 110 } }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: 10
+                                spacing: 10
+
+                                Image {
+                                    source: "icons/forge.svg"
+                                    Layout.preferredWidth: 22
+                                    Layout.preferredHeight: 22
+                                    fillMode: Image.PreserveAspectFit
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 2
+                                    Text { text: "Forge"; font.family: EzTheme.fontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
+                                    Text { text: EzI18n.currentLanguage === "en" ? "Forge mods · without EzClient" : "Forge-Mods · ohne EzClient"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted; Layout.fillWidth: true; elide: Text.ElideRight }
+                                }
+
+                                Rectangle {
+                                    width: 16; height: 16; radius: 8
+                                    color: forgePresetCard.isSelected ? EzTheme.accent : "transparent"
+                                    border.color: forgePresetCard.isSelected ? EzTheme.accent : EzTheme.borderLight
+                                    border.width: 1.5
+                                    Rectangle { width: 6; height: 6; radius: 3; color: "#000"; anchors.centerIn: parent; visible: forgePresetCard.isSelected }
+                                }
+                            }
+
+                            MouseArea {
+                                id: forgeLoaderMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.newLoader = "Forge"
+                                    root.selectedPreset = "raw"
+                                }
                             }
                         }
                     }
                 }
 
-                Item { height: 28 }
+                Item { height: 26 }
 
                 // Continue to Preset Selection
                 Rectangle {
@@ -679,8 +1352,8 @@ Item {
 
                     Text {
                         text: EzI18n.t("onboard_btn_next", "Weiter")
-                        font.family: EzTheme.fontFamily
-                        font.pixelSize: 13
+                        font.family: EzTheme.mcFontFamily
+                        font.pixelSize: 12
                         font.bold: true
                         color: root.newName.trim() !== "" ? "#000000" : EzTheme.textSubtle
                         anchors.centerIn: parent
@@ -705,8 +1378,8 @@ Item {
         // ──────────────────────────────────────────
         Item {
             anchors.centerIn: parent
-            width: 580
-            height: 520
+            width: 520
+            height: 490
             visible: opacity > 0.001
             opacity: root.step === "preset" ? 1.0 : 0.0
             scale: root.step === "preset" ? 1.0 : 0.95
@@ -718,7 +1391,7 @@ Item {
                 anchors.fill: parent
                 spacing: 0
 
-                // Back button & Step indicator
+                // Top Navigation Bar
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
@@ -741,8 +1414,10 @@ Item {
                         }
                     }
 
+                    Item { Layout.fillWidth: true }
+
                     Text {
-                        text: EzI18n.currentLanguage === "en" ? "Step 2 of 2: Optimization Setup" : "Schritt 2 von 2: Optimierungs-Paket"
+                        text: EzI18n.currentLanguage === "en" ? "Step 3 of 3 · Optimization Setup" : "Schritt 3 von 3 · Optimierungs-Paket"
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
                         color: EzTheme.textMuted
@@ -753,22 +1428,26 @@ Item {
 
                 Text {
                     text: EzI18n.t("onboard_profile_preset", "Wähle deine Ausstattung")
-                    font.family: EzTheme.fontFamily
-                    font.pixelSize: 22
+                    font.family: EzTheme.mcFontFamily
+                    font.pixelSize: 24
                     font.bold: true
                     color: EzTheme.text
+                    Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
-                Item { height: 4 }
+                Item { height: 6 }
 
                 Text {
                     text: EzI18n.currentLanguage === "en" ? "Choose an optimized EzClient environment or a clean Raw profile." : "Wähle eine optimierte EzClient-Umgebung oder ein sauberes Raw-Profil."
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 12
                     color: EzTheme.textSecondary
+                    Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
-                Item { height: 16 }
+                Item { height: 18 }
 
                 // Preset Cards Stack
                 ColumnLayout {
@@ -777,16 +1456,35 @@ Item {
 
                     // Option 1: EzClient (recommended)
                     EzPresetCard {
-                        visible: versionPicker.isEzClientSupported(root.newVersion)
+                        visible: root.hasEzClient(root.newVersion)
                         presetKey: "ezclient"
                         title: "EzClient"
                         tag: EzI18n.currentLanguage === "en" ? "RECOMMENDED" : "EMPFOHLEN"
                         tagColor: EzTheme.accent
                         tagTextColor: "#000000"
                         sub: EzI18n.currentLanguage === "en" ? "Optimized client environment with the managed core stack" : "Optimierte Client-Umgebung mit verwaltetem Core-Stack"
-                        mods: "EzClient.jar · Sodium · Lithium · Iris Shaders"
+                        mods: "EzClient Vollversion · Sodium · Lithium · Iris Shaders"
                         selected: root.selectedPreset === "ezclient"
-                        onClicked: root.selectedPreset = "ezclient"
+                        onClicked: {
+                            root.newLoader = "Fabric"
+                            root.selectedPreset = "ezclient"
+                        }
+                    }
+
+                    EzPresetCard {
+                        visible: root.newLoader === "Fabric"
+                        presetKey: "performance"
+                        title: "Fabric Performance"
+                        tag: "EMPFOHLEN"
+                        tagColor: EzTheme.surface3
+                        tagTextColor: EzTheme.text
+                        sub: "Stabiles Fabric-Profil ohne EzClient Core"
+                        mods: "Sodium · Lithium · Iris Shaders"
+                        selected: root.selectedPreset === "performance"
+                        onClicked: {
+                            root.newLoader = "Fabric"
+                            root.selectedPreset = "performance"
+                        }
                     }
 
                     // Always Available Presets
@@ -818,9 +1516,9 @@ Item {
                     Behavior on scale { NumberAnimation { duration: 120 } }
 
                     Text {
-                        text: EzI18n.t("onboard_btn_create", "Client-Profil erstellen & starten")
-                        font.family: EzTheme.fontFamily
-                        font.pixelSize: 13
+                        text: EzI18n.t("onboard_btn_create", "Weiter zur Mod-Auswahl →")
+                        font.family: EzTheme.mcFontFamily
+                        font.pixelSize: 12
                         font.bold: true
                         color: "#000000"
                         anchors.centerIn: parent
@@ -843,7 +1541,7 @@ Item {
         Item {
             id: modSelectionItem
             anchors.centerIn: parent
-            width: 460
+            width: 520
             height: 480
             visible: opacity > 0.001
             opacity: root.step === "mod_selection" ? 1.0 : 0.0
@@ -862,22 +1560,34 @@ Item {
                 anchors.fill: parent
                 spacing: 0
 
-                // Back Button
-                Item {
+                // Top Navigation Bar
+                RowLayout {
                     Layout.fillWidth: true
-                    height: 24
-                    RowLayout {
-                        anchors.fill: parent
-                        spacing: 8
-                        Text { text: "←"; font.pixelSize: 18; color: EzTheme.textMuted }
-                        Text { text: EzI18n.currentLanguage === "en" ? "Back" : "Zurück"; font.family: EzTheme.fontFamily; font.pixelSize: 13; color: EzTheme.textMuted }
+                    spacing: 8
+
+                    Rectangle {
+                        width: 30; height: 30; radius: 6
+                        color: backMouseMods.containsMouse ? EzTheme.surface3 : EzTheme.surface2
+                        border.color: EzTheme.border; border.width: 1
+                        Behavior on color { ColorAnimation { duration: 100 } }
+
+                        Text { text: "←"; font.family: EzTheme.fontFamily; font.pixelSize: 13; color: EzTheme.text; anchors.centerIn: parent }
+                        MouseArea {
+                            id: backMouseMods
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.step = "preset"
+                        }
                     }
-                    MouseArea {
-                        anchors.fill: parent
-                        anchors.margins: -10
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.step = "preset"
+
+                    Item { Layout.fillWidth: true }
+
+                    Text {
+                        text: EzI18n.currentLanguage === "en" ? "Optional Mods" : "Optionale Mods"
+                        font.family: EzTheme.fontFamily
+                        font.pixelSize: 11
+                        color: EzTheme.textMuted
                     }
                 }
 
@@ -885,19 +1595,23 @@ Item {
 
                 Text {
                     text: EzI18n.currentLanguage === "en" ? "Recommended mods" : "Empfohlene Mods"
-                    font.family: EzTheme.fontFamily
-                    font.pixelSize: 22
+                    font.family: EzTheme.mcFontFamily
+                    font.pixelSize: 24
                     font.bold: true
                     color: EzTheme.text
+                    Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
-                Item { height: 4 }
+                Item { height: 6 }
 
                 Text {
                     text: EzI18n.currentLanguage === "en" ? "Optional additions—nothing is selected by default." : "Optionale Ergänzungen – standardmäßig ist nichts ausgewählt."
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 12
                     color: EzTheme.textSecondary
+                    Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
                 Item { height: 16 }
@@ -918,7 +1632,7 @@ Item {
                         model: modSelectionItem.optionalMods
                         delegate: Rectangle {
                             width: ListView.view.width
-                            height: 48
+                            height: 52
                             color: modMouse.containsMouse ? EzTheme.surface3 : "transparent"
                             radius: 6
                             
@@ -965,9 +1679,9 @@ Item {
                                     Text {
                                         text: modelData.name
                                         color: EzTheme.text
-                                        font.pixelSize: 14
+                                        font.pixelSize: 13
                                         font.bold: true
-                                        font.family: EzTheme.fontFamily
+                                        font.family: EzTheme.mcFontFamily
                                         Layout.alignment: Qt.AlignLeft
                                         Layout.fillWidth: true
                                         wrapMode: Text.WordWrap
@@ -1009,10 +1723,10 @@ Item {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 10
+                    spacing: 12
 
                     Rectangle {
-                        Layout.preferredWidth: 130
+                        Layout.preferredWidth: 140
                         height: 44
                         radius: EzTheme.radius
                         color: skipModsMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
@@ -1021,8 +1735,8 @@ Item {
 
                         Text {
                             text: EzI18n.currentLanguage === "en" ? "Skip" : "Überspringen"
-                            font.family: EzTheme.fontFamily
-                            font.pixelSize: 12
+                            font.family: EzTheme.mcFontFamily
+                            font.pixelSize: 11
                             font.bold: true
                             color: EzTheme.text
                             anchors.centerIn: parent
@@ -1045,8 +1759,8 @@ Item {
 
                         Text {
                             text: EzI18n.currentLanguage === "en" ? "Install selected →" : "Ausgewählte installieren →"
-                            font.family: EzTheme.fontFamily
-                            font.pixelSize: 12
+                            font.family: EzTheme.mcFontFamily
+                            font.pixelSize: 11
                             font.bold: true
                             color: "#000000"
                             anchors.centerIn: parent
@@ -1075,8 +1789,8 @@ Item {
         // ──────────────────────────────────────────
         Item {
             anchors.centerIn: parent
-            width: 460
-            height: 320
+            width: 520
+            height: 340
             visible: opacity > 0.001
             opacity: root.step === "downloading" ? 1.0 : 0.0
             scale: root.step === "downloading" ? 1.0 : 0.95
@@ -1105,8 +1819,10 @@ Item {
                         border.color: EzTheme.accentGlow
                         border.width: 2
                         opacity: root.downloadProgress < 1.0 ? 0.8 : 0.0
+                    }
+
                     Image {
-                        source: root.downloadProgress >= 1.0 ? "icons/check.svg" : "icons/zap.svg"
+                        source: root.setupFailed ? "icons/x.svg" : (root.downloadProgress >= 1.0 ? "icons/check.svg" : "icons/zap.svg")
                         width: 28
                         height: 28
                         anchors.centerIn: parent
@@ -1117,12 +1833,13 @@ Item {
                 Item { height: 26 }
 
                 Text {
-                    text: root.downloadProgress >= 1.0 ? "Profil fertiggestellt!" : "Richte " + root.newName + " ein…"
-                    font.family: EzTheme.fontFamily
-                    font.pixelSize: 20
+                    text: root.setupFailed ? "Profil konnte nicht eingerichtet werden" : (root.downloadProgress >= 1.0 ? "Profil fertiggestellt!" : "Richte " + root.newName + " ein…")
+                    font.family: EzTheme.mcFontFamily
+                    font.pixelSize: 22
                     font.bold: true
                     color: EzTheme.text
                     Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
                 Item { height: 8 }
@@ -1133,6 +1850,7 @@ Item {
                     font.pixelSize: 12
                     color: EzTheme.textSecondary
                     Layout.alignment: Qt.AlignHCenter
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
                 Item { height: 24 }
@@ -1164,7 +1882,7 @@ Item {
                 RowLayout {
                     Layout.fillWidth: true
                     Text {
-                        text: root.newLoader + " " + root.newVersion
+                        text: (root.selectedPreset === "ezclient" ? "EzClient" : root.newLoader) + " " + root.newVersion
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
                         color: EzTheme.textSubtle
@@ -1172,16 +1890,40 @@ Item {
                     Item { Layout.fillWidth: true }
                     Text {
                         text: Math.round(root.downloadProgress * 100) + "%"
-                        font.family: EzTheme.fontFamily
+                        font.family: EzTheme.mcFontFamily
                         font.pixelSize: 12
                         font.bold: true
                         color: EzTheme.accentLight
                     }
                 }
+
+                Item { height: root.setupFailed ? 18 : 0 }
+
+                Rectangle {
+                    visible: root.setupFailed
+                    Layout.alignment: Qt.AlignHCenter
+                    width: 150
+                    height: visible ? 38 : 0
+                    radius: EzTheme.radiusSm
+                    color: retryMouse.containsMouse ? EzTheme.surface3 : EzTheme.surface2
+                    border.color: EzTheme.border
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Zurück"
+                        color: EzTheme.text
+                        font.family: EzTheme.mcFontFamily
+                        font.pixelSize: 12
+                        font.bold: true
+                    }
+                    MouseArea {
+                        id: retryMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.step = "create"
+                    }
+                }
             }
         }
     }
-}
-
-
 }

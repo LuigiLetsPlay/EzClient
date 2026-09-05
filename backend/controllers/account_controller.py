@@ -18,6 +18,9 @@ from backend.services.msa_auth import (
     get_minecraft_session,
     authenticate_with_authorization_code,
     logout_account,
+    list_saved_accounts,
+    activate_saved_account,
+    remove_saved_account,
     MinecraftSession,
     MICROSOFT_AUTH_URL
 )
@@ -286,6 +289,54 @@ class AccountController(QObject):
     def isOnline(self) -> bool:
         return self._is_online
 
+    @Property(bool, notify=accountChanged)
+    def hasAccount(self) -> bool:
+        return bool(self._uuid and self._username and self._username != "Player")
+
+    @Property("QVariantList", notify=accountChanged)
+    def accounts(self) -> list[dict]:
+        accounts = list_saved_accounts()
+        for account in accounts:
+            account["avatarUrl"] = f"https://minotar.net/helm/{account['username']}/64.png"
+        return accounts
+
+    @Slot(str, result=bool)
+    def switchAccount(self, uuid_value: str) -> bool:
+        session = activate_saved_account(uuid_value)
+        if not session:
+            self.loginStatusChanged.emit("Account konnte nicht gewechselt werden.", True)
+            return False
+        self._username = session.username
+        self._uuid = session.uuid
+        self._skin_url = session.skin_url
+        self._active_custom_path = ""
+        self._active_custom_name = ""
+        self._active_custom_avatar = ""
+        self._active_custom_body = ""
+        self._is_online = session.is_online
+        self._account_type = "Microsoft Account (Online Verifiziert)" if session.is_online else "Microsoft Account (Lokal)"
+        self._skin_version = int(time.time())
+        self.accountChanged.emit()
+        self.loginStatusChanged.emit(f"Gewechselt zu {session.username}.", False)
+        return True
+
+    @Slot(str, result=bool)
+    def removeAccount(self, uuid_value: str) -> bool:
+        was_active = uuid_value == self._uuid
+        if not remove_saved_account(uuid_value):
+            return False
+        if was_active:
+            remaining = list_saved_accounts()
+            if remaining:
+                return self.switchAccount(str(remaining[0].get("uuid", "")))
+            self._username = "Player"
+            self._uuid = ""
+            self._skin_url = ""
+            self._is_online = False
+            self._account_type = "Offline"
+        self.accountChanged.emit()
+        return True
+
     @Property(bool, notify=loginStatusChanged)
     def isLoggingIn(self) -> bool:
         return self._is_logging_in
@@ -383,15 +434,17 @@ class AccountController(QObject):
 
     @Property(str, notify=accountChanged)
     def capeTextureUrl(self) -> str:
-        """Persistent local EzClient cape used by the launcher preview."""
+        """Local EzClient cape, falling back to the active Mojang cape."""
         import base64
         cape = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
         if not cape.exists():
-            return ""
+            session = get_minecraft_session()
+            return session.cape_url if session and session.is_online else ""
         try:
             return f"data:image/png;base64,{base64.b64encode(cape.read_bytes()).decode('ascii')}"
         except OSError:
-            return ""
+            session = get_minecraft_session()
+            return session.cape_url if session and session.is_online else ""
 
     @Property(str, notify=accountChanged)
     def capePreviewTextureUrl(self) -> str:

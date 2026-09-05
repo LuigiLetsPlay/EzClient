@@ -4,14 +4,16 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.input.InputWithModifiers;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
 
 import java.util.function.Consumer;
 
-/** Modern, clean button with crisp typography and high-contrast readable text. */
+/** Modern, clean button with crisp typography, stepper arrows, and right-click support. */
 public final class EzButton extends AbstractButton {
     private final Consumer<EzButton> action;
+    private Consumer<EzButton> rightClickAction = null;
     private final boolean accent;
     private final net.minecraft.resources.Identifier icon;
 
@@ -24,6 +26,31 @@ public final class EzButton extends AbstractButton {
         this.action = action;
         this.accent = accent;
         this.icon = icon;
+    }
+
+    public EzButton withRightClick(Consumer<EzButton> rightClickAction) {
+        this.rightClickAction = rightClickAction;
+        return this;
+    }
+
+    @Override
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        if (active && visible && isHovered()) {
+            if (event.button() == 1 && rightClickAction != null) {
+                playDownSound(Minecraft.getInstance().getSoundManager());
+                rightClickAction.accept(this);
+                return true;
+            }
+            if (event.button() == 0 && rightClickAction != null) {
+                // If clicked on left 25% of button (where left arrow ‹ is), step backwards
+                if (event.x() < getX() + (getWidth() * 0.28)) {
+                    playDownSound(Minecraft.getInstance().getSoundManager());
+                    rightClickAction.accept(this);
+                    return true;
+                }
+            }
+        }
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override

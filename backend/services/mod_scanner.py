@@ -92,10 +92,18 @@ def extract_jar_metadata(jar_path: Path, cache_data: dict[str, Any] = None) -> d
             if cached_entry.get("_cache_key") == cache_key:
                 return cached_entry
 
-        # Compute file hashes
-        raw_bytes = jar_path.read_bytes()
-        meta["sha1"] = hashlib.sha1(raw_bytes).hexdigest()
-        meta["murmur2"] = curseforge_murmur2(raw_bytes)
+        # Compute file hashes (cap murmur2 at 16MB to avoid CPU lockup on giant mod jars like Dreamshift 364MB)
+        if stat.st_size <= 16 * 1024 * 1024:
+            raw_bytes = jar_path.read_bytes()
+            meta["sha1"] = hashlib.sha1(raw_bytes).hexdigest()
+            meta["murmur2"] = curseforge_murmur2(raw_bytes)
+        else:
+            h = hashlib.sha1()
+            with jar_path.open("rb") as f:
+                while chunk := f.read(1024 * 1024):
+                    h.update(chunk)
+            meta["sha1"] = h.hexdigest()
+            meta["murmur2"] = 0
 
         icon_field = None
         # Inspect ZIP archive contents

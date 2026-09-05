@@ -5,109 +5,68 @@
 </p>
 
 <p align="center">
-  <strong>The Ultimate Next-Gen Minecraft Client & High-Performance Launcher</strong><br>
-  Built with PySide6 (Qt Quick / QML) · Standalone Fabric Client Mod · 100% German & English Localization
+  <strong>Der ultimative moderne Minecraft Client & High-Performance Launcher</strong><br>
+  Blitzschneller nativer Spielstart · Nahtlose Mod- & Modpack-Bibliothek · Animierte Capes · Connected Glass · Ingame-Module
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Minecraft-1.21.4%20%7C%20Fabric-24D677?style=flat-square" alt="Minecraft" />
-  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python" />
-  <img src="https://img.shields.io/badge/UI-PySide6%20%2F%20QML-41CD52?style=flat-square&logo=qt&logoColor=white" alt="Qt" />
-  <img src="https://img.shields.io/badge/License-EzClient%20License-purple?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/badge/Minecraft-26.x%20%7C%20Fabric-24D677?style=flat-square" alt="Minecraft" />
+  <img src="https://img.shields.io/badge/Version-2.0.0-gold?style=flat-square" alt="Version 2.0.0" />
+  <img src="https://img.shields.io/badge/Sprache-Deutsch%20%2F%20English-blue?style=flat-square" alt="Sprache" />
+  <img src="https://img.shields.io/badge/Plattform-Windows-0078D6?style=flat-square" alt="Plattform" />
+  <img src="https://img.shields.io/badge/Lizenz-EzClient%20License-purple?style=flat-square" alt="Lizenz" />
 </p>
 
 ---
 
-## ✨ Features
+## ✨ Features & Highlights
 
-- 🚀 **Maximum FPS & Ultra-Low Latency**: EzClient's native culling/memory/UI pipeline plus Sodium and Lithium.
-- ⚡ **Standalone Ingame Client (`EzClient.jar`)**:
-  - Sets GLFW window title dynamically to **`EzClient`** with custom icon.
-  - Automatically bypasses narrator & accessibility onboarding prompts.
-  - Auto-configures optimal PvP & Sodium graphics presets.
-  - Synchronizes with unified `%APPDATA%\.ezclient` client storage.
-- 🎨 **Modern Dark UI (QML & PySide6)**: Fluid animations, glassmorphism, responsive sidebar navigation, and Minecraft-styled typography.
-- 📦 **Modrinth Marketplace Integration**: Search, inspect, install, toggle, and update mods with one click.
-- 🌍 **100% Multilingual**: Seamless, instant switching between **German (🇩🇪)** and **English (🇬🇧)**.
-- 🎮 **Direct Launch & Official Launcher Integration**: Launch profiles directly into Minecraft or patch them into the official Minecraft Launcher.
-- 💾 **Microsoft / Minecraft Account Management**: Seamless Xbox Live / Microsoft OAuth authentication.
+### ⚡ High-Performance Direct Launch
+- **Nativer Schnellstart:** Startet Minecraft ohne Umwege direkt über die interne Java-Engine – spürbar schneller als herkömmliche Launcher.
+- **FPS- & Speicher-Optimierung:** Maßgeschneiderte Java-Flags, GC-Tuning und moderne Speicherverwaltung für maximale FPS und minimale Latenzen.
 
----
+### 🎮 Aktive Minecraft 26.x Unterstützung
+- **Maßgeschneiderte Client-Engine:** Volle, dedizierte Entwicklung für die moderne Minecraft **`26.x`** Familie (`26.1`, `26.1.1` und `26.2`).
+- **Umfassender Launcher-Support:** Unterstützt darüber hinaus alle Versionen von `1.8.9` bis `26.x` für **Vanilla**, **Fabric** und **Forge**.
 
-## 🛠️ Tech Stack
+### 🪟 Clear Glass (Connected Textures)
+- **Makellose Glasflächen:** Zusammenhängende Glasblöcke blenden Innenkanten vollautomatisch aus.
+- **Präzise Kanten:** Dynamische Kantenerkennung sorgt dafür, dass auch bei gestapelten Glasblöcken keine Pixellücken oder Risse an den Außenrändern entstehen.
+- **Sofortige Aktivierung:** Das Umschalten im Menü lädt Chunks sofort in Echtzeit neu – kein manuelles F3+A nötig!
 
-| Component | Technology |
-|---|---|
-| **Frontend UI** | PySide6 (Qt Quick, QML, JavaScript) |
-| **Backend & Controllers** | Python 3.11+ (Threading, PySide6 Signals/Slots) |
-| **Ingame Client Mod** | Java 17/21 (Fabric Mod Loader) |
-| **Mod Ecosystem** | Modrinth REST API v2 |
-| **Packaging** | PyInstaller (Standalone Windows `.exe`) |
+### 📦 Integrierte Mod- & Modpack-Bibliothek
+- **Modrinth & CurseForge vereint:** Riesige Auswahl an Mods, Shadern und Resource Packs direkt durchsuchbar.
+- **1-Klick-Installation:** Mods mit einem Klick installieren, umschalten oder aktualisieren.
+- **Modpack-Unterstützung:** Bei Modpacks wird vollautomatisch ein neues, vorkonfiguriertes Profil mit allen benötigten Mods und Versionen angelegt.
+- **Infinite Scrolling & smarte Filter:** Flüssiges Nachladen mit pulsierender Animation und automatischer Erkennung fehlender Shader-Loader (z. B. Iris).
 
----
+### 🎭 Capes, Skins & 3D-Vorschau
+- **Animierte Capes:** Unterstützt animierte Capes (GIF/PNG) mit Live-Wiedergabe im Launcher und im Spiel über den Community-Server.
+- **Integrierter Cape-Editor:** Eigenes Cape pixelgenau zuschneiden, skalieren, positionieren und direkt anwenden.
+- **Interaktive 3D-Vorschau:** Betrachte deinen Skin und dein Cape vor dem Spielstart aus jedem Blickwinkel.
 
-## 🚀 Quick Start (Running from Source)
+### 🛡️ Integrierte Ingame-Module & HUDs
+- **Umfangreiche PvP- & QoL-Module:** ArmorStatus, Keystrokes, Coordinates, CPS- & FPS-Counter, Ping, DayCounter, Fullbright, MotionBlur, TimeWeather, AutoGG, Hitboxen, ItemPhysics, DamageTint, Reach, ComboCounter, BossBar, FovChanger, Custom Crosshair und Waypoints.
+- **Ingame-HUD-Editor:** Öffne das Menü im Spiel einfach mit **`RSHIFT`** (Rechte Shift-Taste), um alle Module frei zu verschieben und anzupassen.
 
-### 1. Prerequisites
-- **Python 3.11+**
-- **Java JDK 17+** (for building the client mod)
+### 🩺 Crash Doctor & Live Logs
+- **Intelligente Diagnose:** Bei Abstürzen oder inkompatiblen Mods schlägt der Crash Doctor sofort die Ursache vor und bietet 1-Klick-Lösungen an.
+- **Live-Logs-Fenster:** Behalte Minecraft-Logs in Echtzeit im Blick – mit praktischer Farbkodierung und Suchfunktion.
 
-### 2. Clone the Repository
-```bash
-git clone https://github.com/LuigiLetsPlay/EzClient.git
-cd EzClient
-```
-
-### 3. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Launch EzClient
-```bash
-python main.py
-```
+### 📥 Profile Creation Hub
+- **Schneller Einstieg:** Wähle zwischen dem Schnell-Assistenten, eigenen Profilen, Modpacks oder importiere bestehende Profile aus dem NoRiskClient mit allen Mods und Einstellungen.
 
 ---
 
-## 🔨 Building Standalone `EzClient.exe`
+## 📥 Download & Installation
 
-To build the single-file executable for Windows:
-
-```bash
-python build_exe.py
-```
-
-The resulting binary will be in `dist/EzClient.exe`.
+1. Lade dir die neueste **`EzClient-Setup.exe`** aus den [Releases](https://github.com/LuigiLetsPlay/EzClient/releases) herunter.
+2. Starte das Setup und folge den Anweisungen.
+3. **Hinweis zu Windows Smart App Control / SmartScreen:**  
+   EzClient ist ein unabhängiges Open-Source-Projekt. Das Setup registriert das digitale Entwicklerzertifikat (*"Luigi / EzClient"*) automatisch als vertrauenswürdigen Herausgeber. Bestätige beim Setup die Abfrage für das Zertifikat, damit Windows die Ausführung dauerhaft uneingeschränkt erlaubt.
 
 ---
 
-## 📂 Project Structure
+## 📜 Lizenz
 
-```
-EzClient/
-├── backend/                  # Python backend controllers & services
-│   ├── assets/               # Built-in EzClient.jar and assets
-│   ├── controllers/          # QML-exposed PySide6 controllers
-│   ├── models/               # Data structures and QAbstractListModels
-│   └── services/             # Minecraft launcher, direct launch, Modrinth API
-├── client_mod/               # Java source code for EzClient.jar Fabric mod
-├── ui/                       # Modern QML user interface
-│   ├── assets/               # Branding logos and icons
-│   ├── components/           # Reusable QML widgets (Buttons, Dropdowns, Cards)
-│   ├── fonts/                # Authentic Minecraft fonts
-│   ├── App.qml               # Main QML application entry point
-│   ├── EzI18n.qml            # Complete DE/EN translation dictionaries
-│   └── EzTheme.qml           # Central theme tokens and color palette
-├── build_exe.py              # PyInstaller build automation script
-├── main.py                   # Desktop application entry point
-└── requirements.txt          # Python dependencies
-```
-
----
-
-## 📜 License
-
-This project is licensed under the **EzClient License** (Personal, non-commercial use only). See the [LICENSE](LICENSE) file for details.
-
-Contributions, feature suggestions and issue reports are welcome!
+EzClient ist lizenziert unter der **EzClient License** (persönliche, nicht-kommerzielle Nutzung). Details siehe [LICENSE](LICENSE).

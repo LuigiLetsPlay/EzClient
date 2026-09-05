@@ -7,7 +7,7 @@ from typing import Any
 from backend.models.types import ProfileData, ModData
 
 MODRINTH_API = "https://api.modrinth.com/v2"
-USER_AGENT = "EzClient/1.8.2 (desktop launcher)"
+USER_AGENT = "EzClient/2.0.0 (desktop launcher)"
 
 
 def select_preferred_version(versions: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -24,7 +24,7 @@ def select_preferred_version(versions: list[dict[str, Any]]) -> dict[str, Any] |
     return versions[0] if versions else None
 
 FALLBACK_VERSIONS = [
-    "26.2", "26.1", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5",
+    "26.2", "26.1.1", "26.1", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5",
     "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21"
 ]
 

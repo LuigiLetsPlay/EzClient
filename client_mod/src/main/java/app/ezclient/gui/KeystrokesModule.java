@@ -1,5 +1,6 @@
 package app.ezclient.gui;
 
+import app.ezclient.shared.ClickRateTracker;
 import net.minecraft.resources.Identifier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -26,7 +27,7 @@ public final class KeystrokesModule extends HudModule {
     private LayoutPreset layoutPreset = LayoutPreset.WASD_MOUSE_SPACE_CPS;
     private SpaceStyle spaceStyle = SpaceStyle.LINE;
     private int fadeTimeMs = 150;
-    private int normalBoxColor = 0xA8111419;
+    private int normalBoxColor = 0x80000000;
     private int pressedBoxColor = 0x70FFFFFF;
     private int keyTextColor = 0xFFFFFFFF;
     private int pressedTextColor = 0xFF000000;
@@ -41,10 +42,8 @@ public final class KeystrokesModule extends HudModule {
     private static boolean wasSpace = false, wasLmb = false, wasRmb = false;
     private static boolean wasSneak = false, wasSprint = false;
 
-    private static final int CLICK_BUFFER_SIZE = 128;
-    private static final long[] leftClicks = new long[CLICK_BUFFER_SIZE];
-    private static final long[] rightClicks = new long[CLICK_BUFFER_SIZE];
-    private static int leftWriteIndex, rightWriteIndex, leftClickCount, rightClickCount;
+    private static final ClickRateTracker leftClicks = new ClickRateTracker(128);
+    private static final ClickRateTracker rightClicks = new ClickRateTracker(128);
     private long currentRenderTime;
 
     public KeystrokesModule() {
@@ -62,18 +61,14 @@ public final class KeystrokesModule extends HudModule {
 
         boolean left = client.options.keyAttack.isDown();
         if (left && !wasLmb) {
-            leftClicks[leftWriteIndex] = now;
-            leftWriteIndex = (leftWriteIndex + 1) % CLICK_BUFFER_SIZE;
-            leftClickCount = Math.min(CLICK_BUFFER_SIZE, leftClickCount + 1);
+            leftClicks.record(now);
         }
         if (!left && wasLmb) lmbReleaseTime = now;
         wasLmb = left;
 
         boolean right = client.options.keyUse.isDown();
         if (right && !wasRmb) {
-            rightClicks[rightWriteIndex] = now;
-            rightWriteIndex = (rightWriteIndex + 1) % CLICK_BUFFER_SIZE;
-            rightClickCount = Math.min(CLICK_BUFFER_SIZE, rightClickCount + 1);
+            rightClicks.record(now);
         }
         if (!right && wasRmb) rmbReleaseTime = now;
         wasRmb = right;
@@ -106,21 +101,12 @@ public final class KeystrokesModule extends HudModule {
         if (!sprint && wasSprint) sprintReleaseTime = now;
         wasSprint = sprint;
 
-        leftClickCount = pruneClicks(leftClicks, leftWriteIndex, leftClickCount, now);
-        rightClickCount = pruneClicks(rightClicks, rightWriteIndex, rightClickCount, now);
+        leftClicks.count(now);
+        rightClicks.count(now);
     }
 
-    private static int pruneClicks(long[] clicks, int writeIndex, int count, long now) {
-        while (count > 0) {
-            int oldest = (writeIndex - count + CLICK_BUFFER_SIZE) % CLICK_BUFFER_SIZE;
-            if (now - clicks[oldest] <= 1000L) break;
-            count--;
-        }
-        return count;
-    }
-
-    public static int getLeftCps() { return leftClickCount; }
-    public static int getRightCps() { return rightClickCount; }
+    public static int getLeftCps() { return leftClicks.count(System.currentTimeMillis()); }
+    public static int getRightCps() { return rightClicks.count(System.currentTimeMillis()); }
 
     public LayoutPreset getLayoutPreset() { return layoutPreset; }
     public void setLayoutPreset(LayoutPreset layoutPreset) { this.layoutPreset = layoutPreset; ConfigManager.save(); }

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import platform
+import os
 import shutil
 import subprocess
 import sys
@@ -10,6 +11,8 @@ import urllib.request
 import zipfile
 from pathlib import Path
 from typing import Callable
+
+SUPPORTED_JAVA_MAJORS = (8, 16, 17, 21, 25)
 
 
 def _machine() -> str:
@@ -41,7 +44,8 @@ def _runtime_major(java_exe: Path) -> int | None:
         for line in (result.stdout + result.stderr).splitlines():
             if line.strip().startswith("java.version"):
                 value = line.split("=", 1)[1].strip()
-                return int(value.split(".", 1)[0])
+                parts = value.split(".")
+                return int(parts[1] if parts[0] == "1" and len(parts) > 1 else parts[0])
     except (OSError, subprocess.SubprocessError, ValueError):
         pass
     return None
@@ -84,7 +88,9 @@ def install_required_java(
                 output.write(chunk)
                 downloaded += len(chunk)
                 if total and downloaded % (20 * 1024 * 1024) < 1024 * 1024:
-                    notify(f"Java {major_version}: {downloaded / 1024 / 1024:.0f} MB")
+                    downloaded_mb = downloaded / 1024 / 1024
+                    total_mb = total / 1024 / 1024
+                    notify(f"Java {major_version}: {downloaded_mb:.0f}/{total_mb:.0f} MB")
 
         notify(f"Entpacke Java {major_version}…")
         if archive_path.suffix == ".zip":
@@ -111,3 +117,55 @@ def install_required_java(
         raise RuntimeError(f"Java {major_version} konnte nicht installiert werden.")
     notify(f"Java {major_version} wurde installiert.")
     return java_exe
+
+
+def managed_runtime_root(mc_dir: Path, major_version: int) -> Path:
+    return mc_dir / "runtime" / f"ezclient-jdk-{major_version}"
+
+
+def runtime_statuses(mc_dir: Path) -> list[dict]:
+    detected: dict[int, Path] = {}
+    path_java = shutil.which("javaw") or shutil.which("java")
+    candidates = [Path(path_java)] if path_java else []
+    if sys.platform.startswith("win"):
+        for environment_name in ("ProgramFiles", "ProgramFiles(x86)"):
+            base_value = os.environ.get(environment_name)
+            if not base_value:
+                continue
+            base = Path(base_value)
+            for vendor in ("Eclipse Adoptium", "Java", "Microsoft", "Zulu"):
+                vendor_dir = base / vendor
+                if vendor_dir.is_dir():
+                    candidates.extend(vendor_dir.glob("*/bin/javaw.exe"))
+    for candidate in candidates:
+        major = _runtime_major(candidate)
+        if major in SUPPORTED_JAVA_MAJORS and major not in detected:
+            detected[major] = candidate
+
+    statuses = []
+    for major in SUPPORTED_JAVA_MAJORS:
+        root = managed_runtime_root(mc_dir, major)
+        executable = _java_executable(root) if root.exists() else None
+        managed = bool(executable and _runtime_major(executable) == major)
+        selected = executable if managed else detected.get(major)
+        statuses.append({
+            "major": major,
+            "installed": bool(selected),
+            "managed": managed,
+            "path": str(selected or root),
+            "label": f"Java {major}",
+        })
+    return statuses
+
+
+def delete_managed_java(mc_dir: Path, major_version: int) -> bool:
+    if major_version not in SUPPORTED_JAVA_MAJORS:
+        raise ValueError(f"Unsupported Java runtime: {major_version}")
+    root = managed_runtime_root(mc_dir, major_version).resolve()
+    runtime_parent = (mc_dir / "runtime").resolve()
+    if root.parent != runtime_parent or root.name != f"ezclient-jdk-{major_version}":
+        raise RuntimeError("Unsafe Java runtime path")
+    if not root.exists():
+        return False
+    shutil.rmtree(root)
+    return True

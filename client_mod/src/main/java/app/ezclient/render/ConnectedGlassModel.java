@@ -103,22 +103,43 @@ public final class ConnectedGlassModel implements BlockStateModel {
                                   BlockAndTintGetter level, BlockPos pos, BlockState state) {
         for (BakedQuad quad : quads) {
             QuadGeometry geometry = QuadGeometry.of(quad);
-            emitBorderStrip(quad, geometry, cullFace, ambientOcclusion, emitter, level, pos, state, 0.0f, 0.0f, BORDER, 1.0f);
-            emitBorderStrip(quad, geometry, cullFace, ambientOcclusion, emitter, level, pos, state, 1.0f - BORDER, 0.0f, 1.0f, 1.0f);
-            emitBorderStrip(quad, geometry, cullFace, ambientOcclusion, emitter, level, pos, state, BORDER, 0.0f, 1.0f - BORDER, BORDER);
-            emitBorderStrip(quad, geometry, cullFace, ambientOcclusion, emitter, level, pos, state, BORDER, 1.0f - BORDER, 1.0f - BORDER, 1.0f);
+
+            Direction edgeUmin = geometry.edgeDirection(quad.direction(), 0.5f * BORDER, 0.5f);
+            Direction edgeUmax = geometry.edgeDirection(quad.direction(), 1.0f - 0.5f * BORDER, 0.5f);
+            Direction edgeVmin = geometry.edgeDirection(quad.direction(), 0.5f, 0.5f * BORDER);
+            Direction edgeVmax = geometry.edgeDirection(quad.direction(), 0.5f, 1.0f - 0.5f * BORDER);
+
+            boolean hasGlassUmin = edgeUmin != null && level.getBlockState(pos.relative(edgeUmin)).is(state.getBlock());
+            boolean hasGlassUmax = edgeUmax != null && level.getBlockState(pos.relative(edgeUmax)).is(state.getBlock());
+            boolean hasGlassVmin = edgeVmin != null && level.getBlockState(pos.relative(edgeVmin)).is(state.getBlock());
+            boolean hasGlassVmax = edgeVmax != null && level.getBlockState(pos.relative(edgeVmax)).is(state.getBlock());
+
+            // Vertical strips: if neighbor in V direction is glass, horizontal strip is culled,
+            // so vertical strip must extend to the full edge (0.0f or 1.0f) to prevent gaps at the seam.
+            if (!hasGlassUmin) {
+                float v0 = hasGlassVmin ? 0.0f : BORDER;
+                float v1 = hasGlassVmax ? 1.0f : (1.0f - BORDER);
+                emitBorderStrip(quad, geometry, cullFace, ambientOcclusion, emitter, 0.0f, v0, BORDER, v1);
+            }
+            if (!hasGlassUmax) {
+                float v0 = hasGlassVmin ? 0.0f : BORDER;
+                float v1 = hasGlassVmax ? 1.0f : (1.0f - BORDER);
+                emitBorderStrip(quad, geometry, cullFace, ambientOcclusion, emitter, 1.0f - BORDER, v0, 1.0f, v1);
+            }
+
+            // Horizontal strips own the corner pixels when their neighbor is not glass
+            if (!hasGlassVmin) {
+                emitBorderStrip(quad, geometry, cullFace, ambientOcclusion, emitter, 0.0f, 0.0f, 1.0f, BORDER);
+            }
+            if (!hasGlassVmax) {
+                emitBorderStrip(quad, geometry, cullFace, ambientOcclusion, emitter, 0.0f, 1.0f - BORDER, 1.0f, 1.0f);
+            }
         }
     }
 
     private static void emitBorderStrip(BakedQuad quad, QuadGeometry geometry, Direction cullFace,
                                         TriState ambientOcclusion, QuadEmitter emitter,
-                                        BlockAndTintGetter level, BlockPos pos, BlockState state,
                                         float u0, float v0, float u1, float v1) {
-        Direction edge = geometry.edgeDirection(quad.direction(), (u0 + u1) * 0.5f, (v0 + v1) * 0.5f);
-        if (edge != null && level.getBlockState(pos.relative(edge)).is(state.getBlock())) {
-            return;
-        }
-
         emitter.cullFace(cullFace);
         emitter.fromBakedQuad(quad);
         for (int vertex = 0; vertex < 4; vertex++) {

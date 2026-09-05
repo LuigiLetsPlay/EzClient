@@ -51,10 +51,15 @@ def download_file(url: str, dest_path: Path, use_cache: bool = True) -> bool:
         print(f"[ModDownloader] Failed to download {url}: {e}")
         return False
 
-def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = None, status_callback: Callable[[str], None] | None = None) -> None:
+def _sync_profile_mods(
+    profile: ProfileData,
+    service: ModrinthService | None = None,
+    status_callback: Callable[[str], None] | None = None,
+    progress_callback: Callable[[float, str], None] | None = None
+) -> dict[str, str]:
     """Synchronize all enabled mod jar files into profile.mods_path including all required dependencies."""
     if not profile:
-        return
+        return {}
     
     mods_dir = profile.mods_path
     mods_dir.mkdir(parents=True, exist_ok=True)
@@ -72,6 +77,7 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
     shaderpacks_dir.mkdir(parents=True, exist_ok=True)
     resourcepacks_dir.mkdir(parents=True, exist_ok=True)
     pending_dep_pids: set[str] = set()
+    failures: dict[str, str] = {}
     owned_ids = {
         str(value).lower() for value in (profile.managed_core_mods + profile.user_mods)
     }
@@ -81,7 +87,10 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
         if (m.slug or m.project_id or "").lower() in owned_ids and m.filename
     }
 
-    for m in list(profile.mods):
+    total_mods = max(1, len(profile.mods))
+    for idx, m in enumerate(list(profile.mods)):
+        if progress_callback:
+            progress_callback(min(0.95, (idx + 1) / total_mods), m.name or "Mod")
         slug_or_id = m.slug or m.project_id or m.name
         is_essential = getattr(m, 'essential', False) or (m.slug and m.slug.lower() in profile.managed_core_mods)
         enabled = m.enabled or is_essential
@@ -114,16 +123,29 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
                     pass
             continue
 
+        # Files imported by the user are unmanaged.  They must be displayed
+        # and preserved, but never silently replaced with a similarly named
+        # project from a remote catalogue.
+        if (getattr(m, "source", "") or "").lower() == "local":
+            if target_jar.is_file() or target_jar.is_dir():
+                active_set.add(target_jar.name)
+            else:
+                failures[slug_or_id] = "Lokale Datei fehlt"
+            continue
+
         if disabled_jar.exists() and not target_jar.exists():
             try:
                 disabled_jar.replace(target_jar)
             except Exception:
                 pass
 
-        target_filename = m.filename if m.filename else "EzClient.jar"
-        is_ezclient = (m.slug and m.slug.lower() in ("ezclient", "ezclient-core")) or (m.filename and m.filename.lower() in ("ezclient.jar", "ezclient-lite.jar")) or ("ezclient" in m.name.lower())
+        target_filename = m.filename
+        is_ezclient = (m.slug and m.slug.lower() in ("ezclient", "ezclient-core")) or (m.filename and m.filename.lower().startswith("ezclient-")) or ("ezclient" in m.name.lower())
         
         if is_ezclient:
+            if not target_filename:
+                print(f"[ModDownloader] Missing versioned EzClient asset name for {profile.minecraft_version}")
+                continue
             candidates = [
                 Path(sys._MEIPASS) / "backend" / "assets" / target_filename if hasattr(sys, "_MEIPASS") else None,
                 Path(__file__).resolve().parent.parent / "assets" / target_filename,
@@ -145,15 +167,16 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
 
         # A "Latest" request deliberately replaces an already-downloaded JAR.
         requested_version = (getattr(m, "version", "") or "").strip()
-        if target_jar.exists() and target_jar.stat().st_size > 1024:
+        force_download = bool(getattr(m, "_force_download", False))
+        if target_jar.exists() and target_jar.stat().st_size > 1024 and requested_version.lower() != "latest" and not force_download:
             # Keep the known-good file active unless a replacement completes.
             active_set.add(target_jar.name)
-        if requested_version.lower() != "latest" and target_jar.exists() and target_jar.stat().st_size > 1024:
+        if requested_version.lower() != "latest" and target_jar.exists() and target_jar.stat().st_size > 1024 and not force_download:
             continue
 
         # Check cache
         cached = MODS_CACHE_DIR / base_name
-        if requested_version.lower() != "latest" and cached.exists() and cached.stat().st_size > 1024:
+        if requested_version.lower() != "latest" and not force_download and cached.exists() and cached.stat().st_size > 1024:
             try:
                 shutil.copy2(cached, target_jar)
                 active_set.add(target_jar.name)
@@ -173,15 +196,21 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
             if not versions:
                 versions = svc.get_project_versions(slug_or_id, mc_version=profile.minecraft_version, loader=profile.loader)
             if not versions:
-                versions = svc.get_project_versions(slug_or_id, loader=profile.loader)
-            if not versions:
-                versions = svc.get_project_versions(slug_or_id)
-            if not versions:
                 from backend.services.curseforge import CurseForgeService
                 cf_svc = CurseForgeService()
                 versions = cf_svc.get_project_versions(slug_or_id, mc_version=profile.minecraft_version, loader=profile.loader)
             
             if versions:
+                if (slug_or_id or "").lower() == "sodium":
+                    has_iris = any((mod.slug or "").lower() == "iris" for mod in profile.mods)
+                    if has_iris:
+                        compat_versions = [
+                            v for v in versions 
+                            if not any(bad in v.get("version_number", "") for bad in ("0.8.14", "0.8.13"))
+                        ]
+                        if compat_versions:
+                            versions = compat_versions
+
                 best_ver = next(
                     (v for v in versions if requested_version and requested_version.lower() != "latest"
                      and v.get("version_number") == requested_version),
@@ -190,18 +219,22 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
                 if best_ver is None:
                     best_ver = select_preferred_version(versions)
                 if best_ver is None:
+                    failures[slug_or_id] = f"Keine kompatible Version für Minecraft {profile.minecraft_version}"
                     continue
                 files = best_ver.get("files", [])
                 primary = next((f for f in files if f.get("primary")), files[0] if files else None)
                 if primary and primary.get("url"):
                     real_filename = primary.get("filename", base_name)
                     dest = target_dir / real_filename
-                    if download_file(primary["url"], dest, use_cache=requested_version.lower() != "latest"):
+                    if download_file(primary["url"], dest, use_cache=requested_version.lower() != "latest" and not force_download):
                         m.filename = real_filename
                         m.version = best_ver.get("version_number", m.version)
+                        m.version_id = best_ver.get("id", m.version_id)
                         active_set.add(real_filename)
                         if real_filename != target_jar.name:
                             active_set.discard(target_jar.name)
+                    else:
+                        failures[slug_or_id] = "Download fehlgeschlagen"
 
                 # Collect dependencies
                 for dep in best_ver.get("dependencies", []):
@@ -213,17 +246,28 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
                                 if _legacy_id(pid):
                                     continue
                             pending_dep_pids.add(pid)
-
+            else:
+                failures[slug_or_id] = f"Keine kompatible Version für Minecraft {profile.minecraft_version} und {profile.loader}"
         except Exception as exc:
             print(f"[ModDownloader] Error resolving mod {m.name}: {exc}")
+            failures[slug_or_id] = str(exc)
+        finally:
+            if hasattr(m, "_force_download"):
+                delattr(m, "_force_download")
 
     # Recursive resolution for missing dependencies
-    existing_slugs = {m.slug.lower() for m in profile.mods if m.slug} | {m.project_id.lower() for m in profile.mods if m.project_id}
+    existing_slugs = {
+        m.slug.lower() for m in profile.mods if m.slug
+    } | {
+        m.project_id.lower() for m in profile.mods if m.project_id
+    } | {
+        (m.name or "").lower() for m in profile.mods if m.name
+    }
     resolved_deps: set[str] = set()
 
     while pending_dep_pids:
         dep_id = pending_dep_pids.pop()
-        if dep_id in resolved_deps:
+        if not dep_id or dep_id in resolved_deps or dep_id.lower() in existing_slugs:
             continue
         resolved_deps.add(dep_id)
         if profile.profile_type == "ezclient":
@@ -237,6 +281,13 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
                 versions = svc.get_project_versions(dep_id, loader=profile.loader)
             if not versions:
                 continue
+
+            if dep_id.lower() in ("sodium", "aanobbmi"):
+                has_iris = any((mod.slug or "").lower() == "iris" or (mod.project_id or "").lower() == "yl57xq9u" for mod in profile.mods)
+                if has_iris:
+                    compat_v = [v for v in versions if not any(bad in v.get("version_number", "") for bad in ("0.8.14", "0.8.13"))]
+                    if compat_v:
+                        versions = compat_v
 
             best_ver = select_preferred_version(versions)
             if best_ver is None:
@@ -260,7 +311,7 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
             for sub_dep in best_ver.get("dependencies", []):
                 if sub_dep.get("dependency_type") == "required":
                     sub_pid = sub_dep.get("project_id")
-                    if sub_pid and sub_pid not in resolved_deps:
+                    if sub_pid and sub_pid not in resolved_deps and sub_pid.lower() not in existing_slugs:
                         if profile.profile_type == "ezclient":
                             from backend.services.profile_migration import _legacy_id
                             if _legacy_id(sub_pid):
@@ -269,6 +320,20 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
 
         except Exception as e:
             print(f"[ModDownloader] Error downloading dependency {dep_id}: {e}")
+
+    # Remove stale conflicting mod duplicates for active profile mods
+    for mod in profile.mods:
+        if mod.filename and mod.enabled:
+            current_dest = mods_dir / mod.filename
+            if current_dest.is_file():
+                prefix = (mod.slug or mod.name or "").lower().split("-")[0]
+                if len(prefix) >= 3:
+                    for old_file in mods_dir.glob(f"*{prefix}*.jar"):
+                        if old_file != current_dest and not old_file.name.endswith(".disabled"):
+                            try:
+                                old_file.unlink()
+                            except OSError:
+                                pass
 
     # Remove only inactive files explicitly owned by this profile manifest.
     # Unknown JARs are user content and must never be treated as orphans.
@@ -287,6 +352,8 @@ def _sync_profile_mods(profile: ProfileData, service: ModrinthService | None = N
                 except Exception: pass
     except Exception:
         pass
+
+    return failures
 
 
 def provision_profile_mods_parallel(
@@ -327,9 +394,18 @@ def provision_profile_mods_parallel(
         project = mod.slug or mod.project_id
         versions = svc.get_project_versions(project, mc_version=profile.minecraft_version, loader=profile.loader)
         if not versions:
-            versions = svc.get_project_versions(project, loader=profile.loader)
-        if not versions:
             raise LookupError(f"No compatible {profile.loader} build for Minecraft {profile.minecraft_version}")
+        
+        if (project or "").lower() == "sodium":
+            has_iris = any((m.slug or m.project_id or "").lower() == "iris" for m in profile.mods)
+            if has_iris:
+                compat_versions = [
+                    v for v in versions 
+                    if not any(bad in v.get("version_number", "") for bad in ("0.8.14", "0.8.13"))
+                ]
+                if compat_versions:
+                    versions = compat_versions
+
         selected = select_preferred_version(versions)
         if not selected:
             raise LookupError("No stable or beta release found")
@@ -338,6 +414,8 @@ def provision_profile_mods_parallel(
         if not primary or not primary.get("url"):
             raise LookupError("Release contains no downloadable file")
         filename = primary.get("filename") or target_filename
+        if not profile.path.exists():
+            return filename
         if not download_file(primary["url"], profile.mods_path / filename):
             raise OSError("Download failed or timed out")
         mod.filename = filename
@@ -363,7 +441,12 @@ def provision_profile_mods_parallel(
     return failures
 
 
-def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = None, status_callback: Callable[[str], None] | None = None) -> None:
+def sync_profile_mods(
+    profile: ProfileData,
+    service: ModrinthService | None = None,
+    status_callback: Callable[[str], None] | None = None,
+    progress_callback: Callable[[float, str], None] | None = None
+) -> dict[str, str]:
     """Thread-safe synchronisation entry point used by install/update/delete.
 
     Each UI action already starts a worker.  Serialising work per profile
@@ -371,6 +454,11 @@ def sync_profile_mods(profile: ProfileData, service: ModrinthService | None = No
     previously made the launcher appear frozen during rapid clicks.
     """
     if not profile:
-        return
+        return {}
     with _profile_sync_lock(profile):
-        _sync_profile_mods(profile, service=service, status_callback=status_callback)
+        return _sync_profile_mods(
+            profile,
+            service=service,
+            status_callback=status_callback,
+            progress_callback=progress_callback
+        )

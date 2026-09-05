@@ -14,6 +14,11 @@ Window {
     transientParent: null
     color: "#0B0E14"
 
+    onClosing: function(close) {
+        close.accepted = false
+        liveLogsWindow.hide()
+    }
+
     property var liveLogService: (typeof profileController !== "undefined" && profileController) ? profileController.liveLogService : null
     property string activeFilter: "ALL" // "ALL", "ERROR", "WARN", "INFO", "DEBUG", "TRACE"
     property string searchQuery: ""
@@ -222,7 +227,7 @@ Window {
                     Rectangle {
                         width: 46; height: 52; color: closeM.containsMouse ? "#C42B1C" : "transparent"
                         Image { source: "icons/x.svg"; width: 12; height: 12; anchors.centerIn: parent; opacity: closeM.containsMouse ? 1.0 : 0.6; fillMode: Image.PreserveAspectFit }
-                        MouseArea { id: closeM; anchors.fill: parent; hoverEnabled: true; onClicked: liveLogsWindow.close() }
+                        MouseArea { id: closeM; anchors.fill: parent; hoverEnabled: true; onClicked: liveLogsWindow.hide() }
                     }
                 }
             }
@@ -248,6 +253,53 @@ Window {
                     model: logListModel
                     spacing: 2
                     boundsBehavior: Flickable.StopAtBounds
+
+                    ScrollBar.vertical: ScrollBar {
+                        id: logScrollBar
+                        policy: ScrollBar.AsNeeded
+                        width: 10
+                        contentItem: Rectangle {
+                            implicitWidth: 7
+                            radius: 4
+                            color: logScrollBar.pressed ? EzTheme.accent : "#596273"
+                        }
+                        background: Rectangle {
+                            implicitWidth: 10
+                            color: "#111722"
+                            radius: 4
+                        }
+                    }
+
+                    MouseArea {
+                        id: logMiddlePan
+                        anchors.fill: parent
+                        z: 1000
+                        acceptedButtons: Qt.MiddleButton
+                        preventStealing: true
+                        hoverEnabled: true
+                        cursorShape: autoPanActive ? Qt.SizeVerCursor : Qt.OpenHandCursor
+                        property bool autoPanActive: false
+                        property real pressY: 0
+                        property real pointerY: 0
+                        onPressed: function(mouse) {
+                            autoPanActive = !autoPanActive
+                            pressY = mouse.y
+                            pointerY = mouse.y
+                        }
+                        onPositionChanged: function(mouse) {
+                            pointerY = mouse.y
+                        }
+                        Timer {
+                            interval: 16
+                            repeat: true
+                            running: logMiddlePan.autoPanActive
+                            onTriggered: {
+                                var maxY = Math.max(0, logListView.contentHeight - logListView.height)
+                                var velocity = (logMiddlePan.pointerY - logMiddlePan.pressY) * 0.12
+                                logListView.contentY = Math.max(0, Math.min(maxY, logListView.contentY + velocity))
+                            }
+                        }
+                    }
 
                     delegate: Item {
                         width: logListView.width

@@ -777,7 +777,10 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            spacing: 6
+            // Hidden delegates have height 0. A ListView-level spacing would
+            // still reserve gaps for every hidden core mod, so spacing is
+            // included only in visible delegate heights instead.
+            spacing: 0
             model: profileController ? profileController.modModel : null
 
             ScrollBar.vertical: ScrollBar {
@@ -805,7 +808,7 @@ Item {
                     var pid = (model.projectId || "").toLowerCase()
                     var n = (model.name || "").toLowerCase()
                     return (window.integratedMods && (window.integratedMods.indexOf(s) !== -1 || window.integratedMods.indexOf(pid) !== -1)) ||
-                           model.essential || model.recommended || s === "ezclient" || n === "ezclient" || n === "ezclient core"
+                           s === "ezclient" || n === "ezclient" || n === "ezclient core"
                 }
                 readonly property bool matchesSearch: modSearch.text === "" ||
                     (model.name && model.name.toLowerCase().indexOf(modSearch.text.toLowerCase()) !== -1) ||
@@ -824,7 +827,7 @@ Item {
                 readonly property bool updateAvailable: modUpdateVersion !== ""
 
                 visible: matchesSearch && matchesStatus && (!modItem.isPerformanceMod || root.showCoreMods || root.filterStatus === "performance")
-                height: visible ? 56 : 0
+                height: visible ? 62 : 0
 
                 scale: rowMouse.containsMouse ? 1.008 : 1.0
                 Behavior on scale { NumberAnimation { duration: 100; easing.type: Easing.OutCubic } }
@@ -1059,7 +1062,7 @@ Item {
 
                     // Author
                     Text {
-                        text: model.author || "Modrinth"
+                        text: (typeof model.author === "string" && model.author) ? model.author : "Modrinth"
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
                         color: EzTheme.textSecondary

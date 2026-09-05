@@ -5,7 +5,7 @@ import os
 import sys
 
 APP_NAME = "EzClient"
-APP_VERSION = "1.8.2"
+APP_VERSION = "2.0.0"
 GITHUB_REPO = "LuigiLetsPlay/EzClient"
 
 def now_iso() -> str:
@@ -56,6 +56,7 @@ class ProfileData:
     profile_type: str = "ezclient"
     managed_core_mods: list[str] = field(default_factory=list)
     user_mods: list[str] = field(default_factory=list)
+    icon: str = ""
 
     @property
     def path(self) -> Path:

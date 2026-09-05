@@ -52,3 +52,40 @@ client_mod/bin/
 client_mod/*.class
 client_mod/**/*.class
 *.class
+
+# Archived legacy versions
+Old/
+
+# Certificates & Private Keys (NEVER commit to git)
+*.pfx
+*.p12
+*.key
+*.pem
+*.cer
+*.crt
+tools/*.pfx
+tools/*.cer
+installer/*.cer
+
+# Temporary & scratch dumps
+temp_*/
+scratch_*/
+*.patch
+*.diff
+*_methods.txt
+hud_code.txt
+gge.txt
+errexe_api.json
+yarn*.json
+fix_*.py
+fix.py
+gen_diff.py
+test_launch.py
+test_yacl.py
+temp_release_notes.txt
+capes.jar
+capes_extracted/
+chat_comp.txt
+game.json
+options.txt
+run_java*.bat

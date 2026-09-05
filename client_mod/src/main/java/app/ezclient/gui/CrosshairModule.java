@@ -76,7 +76,35 @@ public class CrosshairModule extends HudModule {
     }
 
     public CrosshairType getCrosshairType() { return crosshairType; }
-    public void setCrosshairType(CrosshairType crosshairType) { this.crosshairType = crosshairType; ConfigManager.save(); }
+    public void setCrosshairType(CrosshairType crosshairType) {
+        // CUSTOM_CROSS remains readable for old config files, but the beginner
+        // UI now uses one unambiguous cross style.
+        this.crosshairType = crosshairType == CrosshairType.CUSTOM_CROSS
+                ? CrosshairType.CLASSIC_CROSS : crosshairType;
+        ConfigManager.save();
+    }
+
+    public String getCrosshairTypeLabel() {
+        return switch (crosshairType) {
+            case CLASSIC_CROSS, CUSTOM_CROSS -> "Kreuz";
+            case DOT -> "Punkt";
+            case CIRCLE -> "Kreis";
+            case T_SHAPE -> "T-Form";
+            case CHEVRON -> "Chevron";
+        };
+    }
+
+    public void cycleCrosshairType(int direction) {
+        CrosshairType[] beginnerTypes = {
+                CrosshairType.CLASSIC_CROSS, CrosshairType.DOT,
+                CrosshairType.CIRCLE, CrosshairType.T_SHAPE, CrosshairType.CHEVRON
+        };
+        int current = 0;
+        for (int i = 0; i < beginnerTypes.length; i++) {
+            if (beginnerTypes[i] == crosshairType) current = i;
+        }
+        setCrosshairType(beginnerTypes[Math.floorMod(current + direction, beginnerTypes.length)]);
+    }
 
     public int getGap() { return gap; }
     public void setGap(int gap) { this.gap = Math.max(0, Math.min(15, gap)); ConfigManager.save(); }

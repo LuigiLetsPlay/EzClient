@@ -1,18 +1,18 @@
 package app.ezclient.gui;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.resources.Identifier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 /**
  * Advanced Badlion-style ToggleSprint & ToggleSneak module with custom status HUD,
- * sprint/sneak latches, fly boost multipliers, and inactivity hiding.
+ * sprint/sneak latches, fly boost multipliers, and complete HUD hiding.
  */
 public final class ToggleSprintSneakModule extends HudModule {
     public enum SprintMode {
         HOLD,
-        TOGGLE,
-        DISABLE_DOUBLE_TAP
+        TOGGLE
     }
 
     public enum SneakMode {
@@ -24,7 +24,7 @@ public final class ToggleSprintSneakModule extends HudModule {
     private SneakMode sneakMode = SneakMode.HOLD;
     private boolean isSprintToggled = true;
     private boolean isSneakToggled = false;
-    private boolean hideWhenInactive = false;
+    private boolean hideHud = false;
     private float flyBoostMultiplier = 1.0f;
     private String customSprintingText = "[Sprinting (Toggled)]";
     private String customSneakingText = "[Sneaking (Toggled)]";
@@ -32,6 +32,7 @@ public final class ToggleSprintSneakModule extends HudModule {
 
     private boolean wasSprintKeyPressed = false;
     private boolean wasSneakKeyPressed = false;
+    private int wallCollisionCooldown = 0;
 
     public ToggleSprintSneakModule() {
         super("ToggleSprint", "MOVEMENT", true, 6, 120, "", "");
@@ -49,7 +50,17 @@ public final class ToggleSprintSneakModule extends HudModule {
     public void setSprintMode(SprintMode sprintMode) { this.sprintMode = sprintMode; ConfigManager.save(); }
 
     public SneakMode getSneakMode() { return sneakMode; }
-    public void setSneakMode(SneakMode sneakMode) { this.sneakMode = sneakMode; ConfigManager.save(); }
+    public void setSneakMode(SneakMode sneakMode) {
+        this.sneakMode = sneakMode;
+        if (sneakMode != SneakMode.TOGGLE) {
+            isSneakToggled = false;
+            Minecraft client = Minecraft.getInstance();
+            if (client.options != null) {
+                client.options.keyShift.setDown(false);
+            }
+        }
+        ConfigManager.save();
+    }
 
     public boolean isSprintToggled() { return isSprintToggled; }
     public void setSprintToggled(boolean isSprintToggled) { this.isSprintToggled = isSprintToggled; }
@@ -57,8 +68,12 @@ public final class ToggleSprintSneakModule extends HudModule {
     public boolean isSneakToggled() { return isSneakToggled; }
     public void setSneakToggled(boolean isSneakToggled) { this.isSneakToggled = isSneakToggled; }
 
-    public boolean isHideWhenInactive() { return hideWhenInactive; }
-    public void setHideWhenInactive(boolean hideWhenInactive) { this.hideWhenInactive = hideWhenInactive; ConfigManager.save(); }
+    public boolean isHideHud() { return hideHud; }
+    public void setHideHud(boolean hideHud) { this.hideHud = hideHud; ConfigManager.save(); }
+
+    // Backward compatibility for config
+    public boolean isHideWhenInactive() { return hideHud; }
+    public void setHideWhenInactive(boolean val) { setHideHud(val); }
 
     public float getFlyBoostMultiplier() { return flyBoostMultiplier; }
     public void setFlyBoostMultiplier(float flyBoostMultiplier) { this.flyBoostMultiplier = Math.max(1.0f, Math.min(5.0f, flyBoostMultiplier)); ConfigManager.save(); }
@@ -71,6 +86,17 @@ public final class ToggleSprintSneakModule extends HudModule {
 
     public String getCustomVanillaText() { return customVanillaText; }
     public void setCustomVanillaText(String customVanillaText) { this.customVanillaText = customVanillaText; ConfigManager.save(); }
+
+    @Override
+    protected void onToggle() {
+        if (!isEnabled()) {
+            Minecraft client = Minecraft.getInstance();
+            if (client.options != null) {
+                client.options.keyShift.setDown(false);
+            }
+            isSneakToggled = false;
+        }
+    }
 
     @Override
     public void onTick() {
@@ -88,18 +114,39 @@ public final class ToggleSprintSneakModule extends HudModule {
         }
         wasSprintKeyPressed = sprintDown;
 
-        // ToggleSneak keypress handler
-        boolean sneakDown = client.options.keyShift.isDown();
-        if (sneakDown && !wasSneakKeyPressed) {
+        // ToggleSneak physical keypress handler
+        boolean physicalShiftDown = client.getWindow() != null
+                && InputConstants.isKeyDown(client.getWindow(), ((app.ezclient.mixin.KeyMappingAccessor) client.options.keyShift).ezclient$getKey().getValue());
+        if (physicalShiftDown && !wasSneakKeyPressed) {
             if (sneakMode == SneakMode.TOGGLE) {
                 isSneakToggled = !isSneakToggled;
+                if (!isSneakToggled) {
+                    client.options.keyShift.setDown(false);
+                }
             }
         }
-        wasSneakKeyPressed = sneakDown;
+        wasSneakKeyPressed = physicalShiftDown;
+
+        // Apply toggle sneak
+        if (sneakMode == SneakMode.TOGGLE && isSneakToggled) {
+            if (EzScreenBridge.current(client) == null) {
+                client.options.keyShift.setDown(true);
+            } else {
+                client.options.keyShift.setDown(false);
+            }
+        }
+
+        // Wall collision debounce (fixes sprint FOV shake / stutter against obstacles)
+        if (client.player.horizontalCollision) {
+            wallCollisionCooldown = 10;
+        } else if (wallCollisionCooldown > 0) {
+            wallCollisionCooldown--;
+        }
 
         // Apply sprint
         if (sprintMode == SprintMode.TOGGLE && isSprintToggled) {
-            if (client.options.keyUp.isDown() && !client.player.isCrouching() && !client.player.horizontalCollision && client.player.getFoodData().getFoodLevel() > 6) {
+            if (client.options.keyUp.isDown() && !client.player.isCrouching()
+                    && wallCollisionCooldown == 0 && client.player.getFoodData().getFoodLevel() > 6) {
                 client.player.setSprinting(true);
             }
         }
@@ -146,14 +193,22 @@ public final class ToggleSprintSneakModule extends HudModule {
 
     @Override
     public String displayText(Minecraft client) {
+        if (hideHud) return "";
         return getPrefix() + getCurrentStatus(client) + getSuffix();
     }
 
+    @Override
+    public String displayText(Minecraft client, boolean editor) {
+        if (editor) {
+            String text = getPrefix() + customSprintingText + getSuffix();
+            return text.trim().isEmpty() ? "[Sprinting (Toggled)]" : text;
+        }
+        return displayText(client);
+    }
+
     public void renderCustom(GuiGraphicsExtractor graphics, Minecraft client, boolean editor) {
-        if (hideWhenInactive && !editor && client.player != null) {
-            if (!client.player.isSprinting() && !client.player.isCrouching() && !client.player.getAbilities().flying) {
-                return;
-            }
+        if (hideHud && !editor) {
+            return;
         }
 
         float scale = (float) getScale();
@@ -161,8 +216,7 @@ public final class ToggleSprintSneakModule extends HudModule {
         graphics.pose().translate(getX(), getY());
         graphics.pose().scale(scale, scale);
 
-        String text = displayText(client);
-        if (editor) text = getPrefix() + customSprintingText + getSuffix();
+        String text = displayText(client, editor);
 
         int totalW = (client != null && client.font != null) ? client.font.width(text) + 8 : 80;
         int totalH = getHeight(client);

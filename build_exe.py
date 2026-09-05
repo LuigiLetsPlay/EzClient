@@ -10,9 +10,9 @@ def build_exe():
     print("       Building EzClient Standalone Windows .exe  ")
     print("==================================================")
 
-    # 1. Always rebuild the embedded mod. Merely checking whether the file
-    # exists can silently package an older Minecraft-targeted JAR.
-    print("[Build] Compiling EzClient.jar first...")
+    # 1. Rebuild only the actively maintained 26.x JARs. Frozen 2.0.0 assets
+    # are packaged as-is and require an explicit maintenance build.
+    print("[Build] Compiling actively maintained EzClient 26.x JARs first...")
     build_mod_script = root / "client_mod" / "build_mod.py"
     subprocess.run([sys.executable, str(build_mod_script)], check=True)
 
@@ -66,6 +66,7 @@ def build_exe():
         "--windowed",
         "--noupx",
         f"--icon={icon_path}",
+        f"--version-file={root / 'file_version_info.txt'}",
         f"--add-data={ui_data}",
         f"--add-data={assets_data}",
         "--clean",
@@ -87,6 +88,13 @@ def build_exe():
 
     dist_exe = root / "dist" / "EzClient.exe"
     if dist_exe.exists():
+        try:
+            from tools.sign_tool import sign_binary
+            print("[Build] Signing EzClient.exe with Authenticode...")
+            sign_binary(dist_exe)
+        except Exception as e:
+            print(f"[Build] Note: Could not sign EzClient.exe: {e}")
+
         size_mb = dist_exe.stat().st_size / (1024 * 1024)
         print("==================================================")
         print(f" [SUCCESS] EzClient.exe created successfully!")

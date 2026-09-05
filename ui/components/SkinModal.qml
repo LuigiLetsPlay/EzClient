@@ -414,26 +414,6 @@ Item {
                                     }
                                 }
 
-                                Rectangle {
-                                    width: 120; height: 36; radius: 8
-                                    color: capeBtnMouse.containsMouse ? EzTheme.surfaceActive : EzTheme.surface3
-                                    border.color: EzTheme.border
-                                    border.width: 1
-                                    Text { anchors.centerIn: parent; text: "Cape hochladen"; color: EzTheme.text; font.pixelSize: 12; font.bold: true }
-                                    MouseArea {
-                                        id: capeBtnMouse
-                                        anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            if (accountController) {
-                                                var cape = accountController.pickCapeFile()
-                                                if (cape) {
-                                                    skinModal.previewCapeUrl = accountController.capePreviewTextureUrl || cape
-                                                    if (modalSkin3D) modalSkin3D.updateCape()
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
                             }
                         }
                     }

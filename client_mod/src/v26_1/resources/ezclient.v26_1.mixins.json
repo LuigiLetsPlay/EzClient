@@ -1,0 +1,50 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "app.ezclient.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixinextras": {
+    "minVersion": "0.5.4"
+  },
+  "mixins": [],
+  "client": [
+    "RenderSectionRegionAccessor",
+    "ClientBrandRetrieverMixin",
+    "TitleScreenMixin",
+    "PauseScreenMixin",
+    "GameRendererMixin",
+    "MouseMixin",
+    "AbstractClientPlayerCapeMixin",
+    "AvatarRendererMixin",
+    "PlayerTabOverlayMixin",
+    "ConnectionMixin",
+    "ChatScreenMixin",
+    "GuiMixin",
+    "MinecraftMixin",
+    "BlockEntityVisibilityMixin",
+    "SectionVisibilityDataMixin",
+    "ClientLevelVisibilityMixin",
+    "RenderBatchGroupMixin",
+    "ScissorStateCacheMixin",
+    "BlockStateCacheMemoryMixin",
+    "ClearGlassMixin",
+    "BlockOverlayExtractionMixin",
+    "HitboxVisualizerMixin",
+    "ItemPhysicsStateMixin",
+    "ItemPhysicsMixin",
+    "BossBarCustomizerMixin",
+    "WeatherLevelMixin",
+    "WeatherParticlesMixin",
+    "WeatherFlashMixin",
+    "VisualTimeMixin",
+    "SoundVolumeMixin",
+    "ParticleCustomizerMixin",
+    "ParticleAlphaAccessor",
+    "NameplateCustomizerMixin",
+    "MultiPlayerGameModeMixin",
+    "SubtitleCustomizerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

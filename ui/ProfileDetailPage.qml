@@ -13,6 +13,8 @@ Item {
     readonly property string inspectedName: typeof profileController !== "undefined" && profileController ? profileController.inspectedName : "Profil"
     readonly property string inspectedVersion: typeof profileController !== "undefined" && profileController ? profileController.inspectedVersion : "26.2"
     readonly property string inspectedLoader: typeof profileController !== "undefined" && profileController ? profileController.inspectedLoader : "Fabric"
+    readonly property bool supportsMods: typeof profileController !== "undefined" && profileController ? profileController.inspectedSupportsMods : true
+    onSupportsModsChanged: if (!supportsMods && (selectedTab === "mods" || selectedTab === "shaders")) selectedTab = "overview"
     readonly property int inspectedModsCount: typeof profileController !== "undefined" && profileController ? profileController.inspectedModsCount : 0
     readonly property string inspectedLastPlayed: typeof profileController !== "undefined" && profileController ? profileController.inspectedLastPlayed : "Never"
     readonly property string inspectedGameDir: typeof profileController !== "undefined" && profileController ? profileController.inspectedGameDir : ""
@@ -38,8 +40,8 @@ Item {
         // ==========================================
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 92
-            color: EzTheme.surface
+            Layout.preferredHeight: 116
+            color: EzTheme.titlebarBg
             border.color: EzTheme.border
             border.width: 1
 
@@ -59,23 +61,22 @@ Item {
                 anchors.rightMargin: 24
                 spacing: 16
 
-                // Profile Avatar / Icon (52x52 with gradient & border glow)
-                Rectangle {
-                    Layout.preferredWidth: 52
-                    Layout.preferredHeight: 52
-                    radius: 12
-                    color: root.isInspectedActive ? EzTheme.surfaceActive : EzTheme.surface2
-                    border.color: root.isInspectedActive ? EzTheme.accent : EzTheme.borderLight
-                    border.width: 1.5
-
-                    // Inner letter
-                    Text {
-                        text: root.inspectedName.length >= 2 ? root.inspectedName.substring(0, 2).toUpperCase() : (root.inspectedName.length === 1 ? root.inspectedName.toUpperCase() : "EZ")
-                        font.family: EzTheme.mcFontFamily
-                        font.pixelSize: 18
-                        font.bold: true
-                        color: root.isInspectedActive ? EzTheme.accentLight : EzTheme.text
-                        anchors.centerIn: parent
+                // Profile Avatar / Icon (64x64 with click to edit icon)
+                ProfileIcon {
+                    Layout.preferredWidth: 64
+                    Layout.preferredHeight: 64
+                    radius: 16
+                    iconNameOrPath: (profileController && profileController.inspectedIcon) ? profileController.inspectedIcon : ""
+                    fallbackName: root.inspectedName
+                    bgColor: root.isInspectedActive ? EzTheme.surfaceActive : EzTheme.surface2
+                    borderColor: root.isInspectedActive ? EzTheme.accent : EzTheme.borderLight
+                    borderWidth: 1.5
+                    fontSize: 21
+                    interactive: true
+                    onClicked: {
+                        if (typeof window !== "undefined" && window && window.openProfileIconPicker) {
+                            window.openProfileIconPicker(root.inspectedId, (profileController ? profileController.inspectedIcon : ""), root.inspectedName)
+                        }
                     }
                 }
 
@@ -128,7 +129,7 @@ Item {
                         Text {
                             text: root.inspectedName
                             font.family: EzTheme.mcFontFamily
-                            font.pixelSize: 18
+                            font.pixelSize: 22
                             font.bold: true
                             color: EzTheme.text
                             elide: Text.ElideRight
@@ -153,6 +154,41 @@ Item {
                                 color: root.isInspectedActive ? EzTheme.accentLight : EzTheme.textMuted
                             }
                         }
+
+                        // Icon change button
+                        Rectangle {
+                            height: 18
+                            width: iconChangeTxt.implicitWidth + 12
+                            radius: 4
+                            color: iconChangeMouse.containsMouse ? EzTheme.surfaceHover : EzTheme.surface3
+                            border.color: iconChangeMouse.containsMouse ? EzTheme.accent : EzTheme.borderLight
+                            border.width: 1
+
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 4
+                                Text {
+                                    id: iconChangeTxt
+                                    text: "✎ Icon ändern"
+                                    font.family: EzTheme.fontFamily
+                                    font.pixelSize: 9
+                                    font.bold: true
+                                    color: iconChangeMouse.containsMouse ? EzTheme.accentLight : EzTheme.textSecondary
+                                }
+                            }
+
+                            MouseArea {
+                                id: iconChangeMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (typeof window !== "undefined" && window && window.openProfileIconPicker) {
+                                        window.openProfileIconPicker(root.inspectedId, (profileController ? profileController.inspectedIcon : ""), root.inspectedName)
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // Meta Chips Row (Minecraft Version, Loader, Stats)
@@ -160,8 +196,8 @@ Item {
                         spacing: 8
 
                         Rectangle {
-                            height: 18
-                            width: mcVerTxt.implicitWidth + 10
+                            Layout.preferredHeight: 18
+                            Layout.preferredWidth: mcVerTxt.implicitWidth + 10
                             radius: 4
                             color: EzTheme.surface2
                             border.color: EzTheme.border
@@ -178,8 +214,8 @@ Item {
                         }
 
                         Rectangle {
-                            height: 18
-                            width: loaderTxt.implicitWidth + 10
+                            Layout.preferredHeight: 18
+                            Layout.preferredWidth: loaderTxt.implicitWidth + 10
                             radius: 4
                             color: "#1F1A30"
                             border.color: "#6D28D9"
@@ -196,7 +232,7 @@ Item {
                         }
 
                         Text {
-                            text: root.inspectedModsCount + " Mods  ·  " + root.shaderList.length + " Shader  ·  " + root.resourcePackList.length + " Packs"
+                            text: root.supportsMods ? (root.inspectedModsCount + " Mods  ·  " + root.shaderList.length + " Shader  ·  " + root.resourcePackList.length + " Packs") : (root.resourcePackList.length + " Resource Packs · Vanilla")
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 11
                             color: EzTheme.textMuted
@@ -337,8 +373,8 @@ Item {
         // ==========================================
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 40
-            color: EzTheme.titlebarBg
+            Layout.preferredHeight: 50
+            color: EzTheme.surface
             border.color: EzTheme.border
             border.width: 1
 
@@ -349,18 +385,23 @@ Item {
                 spacing: 8
 
                 Repeater {
-                    model: [
+                    model: root.supportsMods ? [
                         { tabId: "overview", label: "Übersicht", icon: "home.svg" },
                         { tabId: "mods", label: "Mods (" + root.inspectedModsCount + ")", icon: "mods.svg" },
                         { tabId: "shaders", label: "Shader (" + root.shaderList.length + ")", icon: "sparkles.svg" },
+                        { tabId: "resourcepacks", label: "Resource Packs (" + root.resourcePackList.length + ")", icon: "box.svg" },
+                        { tabId: "settings", label: "Einstellungen", icon: "settings.svg" }
+                    ] : [
+                        { tabId: "overview", label: "Übersicht", icon: "home.svg" },
                         { tabId: "resourcepacks", label: "Resource Packs (" + root.resourcePackList.length + ")", icon: "box.svg" },
                         { tabId: "settings", label: "Einstellungen", icon: "settings.svg" }
                     ]
 
                     Rectangle {
                         width: tabInnerRow.implicitWidth + 24
-                        height: 40
-                        color: "transparent"
+                        height: 38
+                        radius: 10
+                        color: root.selectedTab === modelData.tabId ? EzTheme.surfaceActive : (tMouse.containsMouse ? EzTheme.surfaceHover : "transparent")
 
                         RowLayout {
                             id: tabInnerRow
@@ -391,6 +432,7 @@ Item {
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 1
                             color: EzTheme.accent
                             visible: root.selectedTab === modelData.tabId
                         }
@@ -446,6 +488,7 @@ Item {
 
                             // Card 1: Mods Metric
                             Rectangle {
+                                visible: root.supportsMods
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 84
                                 radius: 10
@@ -489,6 +532,7 @@ Item {
 
                             // Card 2: Shaderpacks Metric
                             Rectangle {
+                                visible: root.supportsMods
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 84
                                 radius: 10
@@ -862,7 +906,7 @@ Item {
                                         Image {
                                             id: pModIcon
                                             anchors.fill: parent
-                                            source: (model.name === "EzClient" || model.name === "EzClient Core") ? "assets/logo.png" : (model.icon_url || "")
+                                            source: (model.name === "EzClient" || model.name === "EzClient Core") ? "assets/logo.png" : (model.iconUrl || "")
                                             fillMode: Image.PreserveAspectCrop
                                             asynchronous: true
                                             visible: status === Image.Ready
@@ -1294,8 +1338,13 @@ Item {
                                 primary: true
                                 Layout.preferredHeight: 30
                                 onClicked: {
+                                    if (profileController && !root.isInspectedActive) profileController.activateInspectedProfile()
+                                    if (typeof modrinthController !== "undefined" && modrinthController) {
+                                        modrinthController.setProjectType("resourcepack")
+                                        modrinthController.search()
+                                    }
                                     if (typeof window !== "undefined" && window.navigateTo) {
-                                        window.navigateTo("mods")
+                                        window.navigateTo("resourcepack_library")
                                     }
                                 }
                             }
@@ -1477,6 +1526,9 @@ Item {
                                 EzButton {
                                     text: "Settings übertragen…"
                                     primary: true
+                                    Layout.preferredWidth: 190
+                                    Layout.minimumWidth: 190
+                                    Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                                     Layout.preferredHeight: 34
                                     onClicked: copySettingsModal.open()
                                 }
@@ -1510,6 +1562,9 @@ Item {
 
                                 EzButton {
                                     text: "Ordner öffnen"
+                                    Layout.preferredWidth: 190
+                                    Layout.minimumWidth: 190
+                                    Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                                     Layout.preferredHeight: 34
                                     onClicked: {
                                         if (profileController) profileController.openFolder("")
@@ -1544,7 +1599,9 @@ Item {
                                 }
 
                                 Rectangle {
-                                    Layout.preferredWidth: 100
+                                    Layout.preferredWidth: 190
+                                    Layout.minimumWidth: 190
+                                    Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                                     Layout.preferredHeight: 34
                                     radius: 6
                                     color: delBtnM.containsMouse ? "#5C1D24" : "#3B1217"
@@ -1567,7 +1624,13 @@ Item {
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
-                                            if (profileController) {
+                                            if (typeof window !== "undefined" && window.confirmDeleteProfile) {
+                                                window.confirmDeleteProfile(root.inspectedId, root.inspectedName, function() {
+                                                    if (typeof window !== "undefined" && window.navigateTo) {
+                                                        window.navigateTo("profiles")
+                                                    }
+                                                })
+                                            } else if (profileController) {
                                                 profileController.deleteProfile(root.inspectedId)
                                                 if (typeof window !== "undefined" && window.navigateTo) {
                                                     window.navigateTo("profiles")

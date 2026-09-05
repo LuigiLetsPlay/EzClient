@@ -40,13 +40,13 @@ class ModrinthController(QObject):
         self._version_type_filter: str = "all"
         self._loading: bool = False
         self._query: str = ""
-        self._project_type: str = "mod"  # "mod", "shader", "resourcepack"
+        self._project_type: str = "mod"  # "mod", "modpack", "shader", "resourcepack"
         self._mc_version: str = "26.2"  # Default to 26.2
         self._category: str = "All"
         self._sort: str = "relevance"
         self._offset: int = 0
         self._game_versions: list[str] = [
-            "All", "26.2", "26.1", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5",
+            "All", "26.2", "26.1.1", "26.1", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5",
             "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21"
         ]
 
@@ -54,7 +54,7 @@ class ModrinthController(QObject):
         self._available_categories = ["Featured", "All", "optimization", "utility", "library", "magic", "technology"]
         
         self._available_mc_versions = [
-            "All", "26.2", "26.1", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5",
+            "All", "26.2", "26.1.1", "26.1", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5",
             "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21"
         ]
 
@@ -143,8 +143,20 @@ class ModrinthController(QObject):
     @Slot(str)
     def setProjectType(self, pt: str) -> None:
         val = str(pt).lower().strip()
-        if val in ("mod", "shader", "resourcepack", "datapack") and self._project_type != val:
+        if val in ("mod", "modpack", "shader", "resourcepack", "datapack") and self._project_type != val:
+            prev_type = self._project_type
             self._project_type = val
+            if val == "modpack":
+                if self._mc_version != "All":
+                    self._mc_version = "All"
+                    self.mcVersionChanged.emit()
+            elif prev_type == "modpack" and self._mc_version in ("All", "all", "Alle", "alle", ""):
+                restored_v = "26.2"
+                if self._profile_controller and getattr(self._profile_controller, "activeVersion", None):
+                    restored_v = self._profile_controller.activeVersion
+                if self._mc_version != restored_v:
+                    self._mc_version = restored_v
+                    self.mcVersionChanged.emit()
             self.projectTypeChanged.emit()
             self.search()
 
@@ -206,7 +218,7 @@ class ModrinthController(QObject):
 
     def _run_search(self, append: bool = False) -> None:
         q = self._query
-        mv = self._mc_version if self._mc_version != "All" else None
+        mv = self._mc_version if self._mc_version not in ("All", "Alle", "all", "alle", "") else None
         cat = self._category
         sort = self._sort
         offset = self._offset
@@ -266,10 +278,16 @@ class ModrinthController(QObject):
                     if sort == "downloads" or sort == "follows":
                         hits.sort(key=lambda x: x.get("downloads", 0), reverse=True)
 
-                self._searchDoneSignal.emit({"hits": hits, "total_hits": total}, append)
+                try:
+                    self._searchDoneSignal.emit({"hits": hits, "total_hits": total}, append)
+                except RuntimeError:
+                    pass
 
             except Exception as e:
-                self._errorSignal.emit(str(e))
+                try:
+                    self._errorSignal.emit(str(e))
+                except RuntimeError:
+                    pass
 
         t = threading.Thread(target=worker, daemon=True)
         t.start()
@@ -298,14 +316,17 @@ class ModrinthController(QObject):
             return
 
         target_v = mc_version if mc_version else self._mc_version
-        mv = target_v if target_v != "All" else None
+        mv = target_v if target_v not in ("All", "Alle", "all", "alle", "") else None
         source = self._selected.get("source", "modrinth")
         ldr = self._loader
 
         def worker():
             try:
                 if source == "curseforge":
-                    versions = self._curseforge_svc.get_project_versions(proj_id, mc_version=mv, loader=ldr)
+                    versions = self._curseforge_svc.get_project_versions(
+                        proj_id, mc_version=mv,
+                        loader=None if self._selected.get("project_type") == "modpack" else ldr,
+                    )
                 else:
                     versions = self._modrinth_svc.get_project_versions(proj_id, mc_version=mv, loader=ldr)
                 self._versionsDoneSignal.emit(versions)
@@ -345,7 +366,7 @@ class ModrinthController(QObject):
         self.versionsChanged.emit()
         self.versionTypeFilterChanged.emit()
         target_v = mc_version if mc_version else self._mc_version
-        mv = target_v if target_v != "All" else None
+        mv = target_v if target_v not in ("All", "Alle", "all", "alle", "") else None
 
         def worker():
             try:

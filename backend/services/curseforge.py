@@ -20,6 +20,8 @@ LOADER_MAP = {
 CLASS_MAP = {
     "mod": 6,
     "mods": 6,
+    "modpack": 4471,
+    "modpacks": 4471,
     "shader": 6552,
     "shaders": 6552,
     "resourcepack": 12,
@@ -223,6 +225,19 @@ class CurseForgeService:
                 "dependencies": []
             })
         return versions
+
+    def get_file(self, mod_id: str | int, file_id: str | int) -> dict[str, Any]:
+        """Return one normalized CurseForge file including a usable CDN URL."""
+        resp = _make_request(f"/mods/{mod_id}/files/{file_id}")
+        if not resp or not isinstance(resp.get("data"), dict):
+            return {}
+        item = resp["data"]
+        filename = str(item.get("fileName") or f"{file_id}.jar")
+        download_url = item.get("downloadUrl")
+        if not download_url:
+            value = str(file_id)
+            download_url = f"https://edge.forgecdn.net/files/{value[:4]}/{value[4:]}/{urllib.parse.quote(filename)}"
+        return {"project_id": str(mod_id), "file_id": str(file_id), "filename": filename, "url": download_url}
 
     def get_fingerprint_matches(self, fingerprints: list[int]) -> list[dict[str, Any]]:
         """Matches local Murmur2 fingerprints against CurseForge database."""

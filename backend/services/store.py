@@ -4,14 +4,110 @@ from typing import Any
 import re
 import uuid
 import shutil
+import sys
+import os
+import stat
+import subprocess
+import time
 from dataclasses import asdict
-from backend.models.types import ProfileData, ModData, STATE_PATH, PROFILES_DIR, ICON_CACHE_DIR
+from backend.models.types import APP_VERSION, ProfileData, ModData, STATE_PATH, PROFILES_DIR, ICON_CACHE_DIR
+
+
+def ezclient_asset_name(minecraft_version: str) -> str:
+    from backend.services.minecraft_versions import FROZEN_EZCLIENT_VERSION, is_frozen_ezclient_version
+    product_version = FROZEN_EZCLIENT_VERSION if is_frozen_ezclient_version(minecraft_version) else APP_VERSION
+    # Every 26.x target must use an exact build. The Java sources are shared,
+    # while mappings, Mixins and metadata are compiled per Minecraft version.
+    return f"EzClient-{product_version}+{minecraft_version}.jar"
+
+
+def has_ezclient_asset(minecraft_version: str) -> bool:
+    if not minecraft_version.startswith("26."):
+        return False
+    filename = ezclient_asset_name(minecraft_version)
+    roots = [Path(__file__).resolve().parent.parent / "assets"]
+    if hasattr(sys, "_MEIPASS"):
+        roots.insert(0, Path(sys._MEIPASS) / "backend" / "assets")
+    return any((root / filename).is_file() for root in roots)
+
 
 def ensure(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
+
 ensure(PROFILES_DIR)
 ensure(ICON_CACHE_DIR)
+
+
+def _remove_readonly(func, path, excinfo):
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        pass
+
+
+def clean_trash_folders(base_dir: Path) -> None:
+    """Safely purge any orphaned .trash_* folders left from earlier renames."""
+    if not base_dir.exists():
+        return
+    try:
+        for item in base_dir.iterdir():
+            if item.is_dir() and item.name.startswith(".trash_"):
+                try:
+                    shutil.rmtree(item, onerror=_remove_readonly)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
+def robust_rmtree(path: Path, max_retries: int = 5) -> bool:
+    """Robustly delete a directory tree on Windows, handling locks, read-only files, and fallbacks."""
+    if not path.exists():
+        return True
+
+    # 1. Standard rmtree with readonly attribute stripping
+    for attempt in range(max_retries):
+        try:
+            shutil.rmtree(path, onerror=_remove_readonly)
+            if not path.exists():
+                return True
+        except Exception:
+            pass
+        time.sleep(0.08 * (attempt + 1))
+
+    # 2. Windows shell fallback via cmd /c rmdir /s /q
+    if path.exists() and sys.platform == "win32":
+        try:
+            subprocess.run(
+                f'cmd /c rmdir /s /q "{path}"',
+                shell=True,
+                capture_output=True,
+                timeout=5
+            )
+            if not path.exists():
+                return True
+        except Exception:
+            pass
+
+    # 3. If still locked (e.g. background antivirus or process), rename it to .trash_*
+    # so that the profile name/folder on disk is immediately free!
+    if path.exists():
+        try:
+            trash_name = f".trash_{path.name}_{uuid.uuid4().hex[:8]}"
+            trash_path = path.parent / trash_name
+            path.rename(trash_path)
+            try:
+                shutil.rmtree(trash_path, onerror=_remove_readonly)
+            except Exception:
+                pass
+            return True
+        except Exception as e:
+            print(f"[ProfileStore] Failed to rename locked folder {path.name}: {e}")
+
+    return not path.exists()
+
 
 def read_json(path: Path, default: Any) -> Any:
     try:
@@ -21,23 +117,33 @@ def read_json(path: Path, default: Any) -> Any:
 
 def write_json(path: Path, value: Any) -> None:
     ensure(path.parent)
-    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary = path.parent / f".{path.name}.{uuid.uuid4().hex[:8]}.tmp"
     temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
-    temporary.replace(path)
+    for attempt in range(5):
+        try:
+            os.replace(temporary, path)
+            return
+        except OSError:
+            time.sleep(0.04 * (attempt + 1))
+    try:
+        shutil.move(str(temporary), str(path))
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
 
 PERFORMANCE_MODS: list[ModData] = [
     ModData(
-        project_id="ezclient", slug="ezclient", name="EzClient Core", version_id="v-core", version="1.8.2",
-        filename="EzClient.jar", enabled=True, recommended=True, essential=True,
+        project_id="ezclient", slug="ezclient", name="EzClient Core", version_id="v-core", version="2.0.0",
+        filename=ezclient_asset_name("26.2"), enabled=True, recommended=True, essential=True,
         icon_url="assets/logo.png", author="EzClient Team", description="EzClient Core Mod – Fenstertitel 'EzClient', Icon, Narrator-Bypass & Auto-Optimierung."
     ),
     ModData(
-        project_id="sodium", slug="sodium", name="Sodium", version_id="v2", version="Latest",
+        project_id="AANobbMI", slug="sodium", name="Sodium", version_id="v2", version="Latest",
         filename="sodium-fabric.jar", enabled=True, recommended=True, essential=False,
         icon_url="https://cdn.modrinth.com/data/AANobbMI/295862f4724dc3f78df3447ad6072b2dcd3ef0c9_96.webp", author="CaffeineMC", description="Next-Gen Rendering Engine für maximale FPS."
     ),
     ModData(
-        project_id="lithium", slug="lithium", name="Lithium", version_id="v3", version="Latest",
+        project_id="gvQqBUqZ", slug="lithium", name="Lithium", version_id="v3", version="Latest",
         filename="lithium-fabric.jar", enabled=True, recommended=True, essential=False,
         icon_url="https://cdn.modrinth.com/data/gvQqBUqZ/bcc8686c13af0143adf4285d741256af824f70b7_96.webp", author="CaffeineMC", description="Physik-, CPU- und Chunk-Optimierung."
     ),
@@ -45,6 +151,12 @@ PERFORMANCE_MODS: list[ModData] = [
         project_id="YL57xq9U", slug="iris", name="Iris Shaders", version_id="v-iris", version="Latest",
         filename="iris.jar", enabled=True, recommended=True, essential=True,
         icon_url="https://cdn.modrinth.com/data/YL57xq9U/icon.png", author="Iris Team", description="Shader-Unterstützung mit hoher Performance."
+    ),
+    ModData(
+        project_id="NNAgCjsB", slug="entityculling", name="Entity Culling", version_id="v-culling", version="Latest",
+        filename="entityculling-fabric.jar", enabled=True, recommended=True, essential=False,
+        icon_url="https://cdn.modrinth.com/data/NNAgCjsB/icon.png", author="tr7zw",
+        description="Überspringt unsichtbare Entities und Block-Entities für stabilere FPS."
     ),
 ]
 
@@ -62,6 +174,22 @@ RECOMMENDED_MODS: list[ModData] = [
 ]
 
 ESSENTIALS_MODS: list[ModData] = PERFORMANCE_MODS + RECOMMENDED_MODS
+
+
+def performance_mods_for_version(minecraft_version: str) -> list[ModData]:
+    """Return only launcher-managed mods that actually support this target."""
+    try:
+        parsed = tuple(int(part) for part in minecraft_version.split("."))
+    except ValueError:
+        parsed = (0,)
+    templates: list[ModData] = []
+    if has_ezclient_asset(minecraft_version):
+        templates.append(PERFORMANCE_MODS[0])
+    # Sodium, Lithium and Iris have no Fabric releases for the classic
+    # Legacy-Fabric targets. Their managed stack starts at Minecraft 1.16.5.
+    if parsed >= (1, 16, 5):
+        templates.extend(PERFORMANCE_MODS[1:])
+    return templates
 
 def preseed_optimized_profile_settings(profile_dir: Path) -> None:
     """Pre-seeds options.txt and config/sodium-options.json with competitive PvP & performance settings."""
@@ -90,7 +218,7 @@ def preseed_optimized_profile_settings(profile_dir: Path) -> None:
             "cloudStatus": "false",          # OFF
             "particles": "2",                # Minimal (2)
             "biomeBlendRadius": "0",         # OFF (0)
-            "maxFps": "260",                 # Max Framerate / Unlimited
+            "maxFps": "120",                 # Balanced default; user settings are preserved
             "enableVsync": "false",          # VSync OFF
             "onboardAccessibility": "false", # Skip accessibility onboarding
             "narrator": "0",                 # Narrator OFF (0)
@@ -151,6 +279,7 @@ class ProfileStore:
             "last_profile": ""
         }
         self.profiles: list[ProfileData] = []
+        clean_trash_folders(PROFILES_DIR)
         self.load()
         # Disk cleanup is local, idempotent and version-gated. Network repair is
         # deliberately deferred to ProfileController's startup worker.
@@ -208,13 +337,29 @@ class ProfileStore:
                 needs_save = True
 
             if profile_type == "ezclient":
-                for core_mod in PERFORMANCE_MODS:
+                expected_templates = performance_mods_for_version(str(raw.get("minecraft_version", "")))
+                expected_slugs = {mod.slug.lower() for mod in expected_templates}
+                old_managed = {str(value).lower() for value in raw.get("managed_core_mods", [])}
+                incompatible = old_managed - expected_slugs
+                if incompatible:
+                    retained = []
+                    for mod in mods:
+                        slug_l = (mod.slug or mod.project_id or "").lower()
+                        if slug_l in incompatible:
+                            for path in (PROFILES_DIR / str(raw.get("id", "")) / "mods").glob(f"{Path(mod.filename).stem}*.jar*"):
+                                path.unlink(missing_ok=True)
+                            needs_save = True
+                            continue
+                        retained.append(mod)
+                    mods = retained
+                    existing_slugs = {(mod.slug or "").lower() for mod in mods}
+                for core_mod in expected_templates:
                     slug_l = core_mod.slug.lower()
                     if slug_l not in existing_slugs:
                         mods.append(ModData(**asdict(core_mod)))
                         existing_slugs.add(slug_l)
                         needs_save = True
-                expected_managed = [m.slug for m in PERFORMANCE_MODS]
+                expected_managed = [m.slug for m in expected_templates]
                 if raw.get("managed_core_mods") != expected_managed:
                     raw["managed_core_mods"] = expected_managed
                     needs_save = True
@@ -256,6 +401,7 @@ class ProfileStore:
                     "profile_type": profile.profile_type,
                     "managed_core_mods": list(profile.managed_core_mods),
                     "user_mods": list(profile.user_mods),
+                    "icon": getattr(profile, "icon", "") or "",
                 })
             except OSError as exc:
                 print(f"[ProfileStore] Could not write {profile.id}/profile.json: {exc}")
@@ -271,37 +417,59 @@ class ProfileStore:
                 return found
         return self.profiles[0] if self.profiles else None
 
+    def _unique_profile_name(self, requested: str) -> str:
+        base = requested.strip() or "Profil"
+        existing = {profile.name.casefold() for profile in self.profiles}
+        def occupied(candidate: str) -> bool:
+            return candidate.casefold() in existing or (PROFILES_DIR / self._profile_folder_name(candidate)).exists()
+        if not occupied(base):
+            return base
+        number = 2
+        while occupied(f"{base} ({number})"):
+            number += 1
+        return f"{base} ({number})"
+
+    @staticmethod
+    def _profile_folder_name(name: str) -> str:
+        # Keep the visible profile name as the folder name; replace only
+        # characters Windows cannot represent in a directory name.
+        cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "-", name).rstrip(" .")
+        return cleaned or "Profil"
+
     def create_profile(self, name: str, version: str, loader: str = "Fabric", preset: str = "ezclient",
-                       optimize: bool = True, selected_optional_mods: list[str] | None = None) -> ProfileData:
-        slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "profile"
+                       optimize: bool = True, selected_optional_mods: list[str] | None = None, icon: str = "") -> ProfileData:
+        name = self._unique_profile_name(name)
         profile_mods: list[ModData] = []
-        profile_type = "raw" if preset == "raw" else "ezclient"
-        if profile_type == "ezclient":
-            profile_mods = [ModData(**asdict(m)) for m in PERFORMANCE_MODS]
+        managed_templates: list[ModData] = []
+        supports_core = loader.lower() == "fabric" and has_ezclient_asset(version)
+        profile_type = "ezclient" if preset == "ezclient" and supports_core else ("performance" if loader.lower() == "fabric" and preset in ("performance", "ezclient") else "raw")
+        if profile_type in ("ezclient", "performance"):
+            managed_templates = performance_mods_for_version(version)
+            profile_mods = [ModData(**asdict(m)) for m in managed_templates]
+            for mod in profile_mods:
+                if mod.slug == "ezclient":
+                    mod.filename = ezclient_asset_name(version)
         selected = {str(value).lower() for value in (selected_optional_mods or [])}
         profile_mods.extend(
             ModData(**asdict(m)) for m in RECOMMENDED_MODS
             if m.slug.lower() in selected
         )
 
-        if version.startswith("26.") and version not in ["26.1", "26.2"]:
-            # Only remove EzClient if it's a 26.x version that is NOT 26.1 or 26.2
-            profile_mods = [m for m in profile_mods if (m.slug or "").lower() != "ezclient"]
-
         profile = ProfileData(
-            id=f"{slug}-{uuid.uuid4().hex[:8]}",
+            id=self._profile_folder_name(name),
             name=name,
             minecraft_version=version,
             loader=loader,
             optimize=optimize,
             mods=profile_mods,
-            integrated_mods=[m.slug for m in PERFORMANCE_MODS] if profile_type == "ezclient" else [],
+            integrated_mods=[m.slug for m in managed_templates] if profile_type in ("ezclient", "performance") else [],
             profile_type=profile_type,
-            managed_core_mods=[m.slug for m in PERFORMANCE_MODS] if profile_type == "ezclient" else [],
+            managed_core_mods=[m.slug for m in managed_templates] if profile_type in ("ezclient", "performance") else [],
             user_mods=[
                 m.slug for m in profile_mods
-                if m.slug and m.slug not in {core.slug for core in PERFORMANCE_MODS}
+                if m.slug and m.slug not in {core.slug for core in managed_templates}
             ],
+            icon=icon,
         )
         ensure(profile.mods_path)
         ensure(profile.path / "config")
@@ -318,9 +486,8 @@ class ProfileStore:
         src = self.get_by_id(profile_id)
         if not src:
             return None
-        new_name = f"{src.name} (Kopie)"
-        slug = re.sub(r"[^a-z0-9]+", "-", new_name.lower()).strip("-") or "profile"
-        new_id = f"{slug}-{uuid.uuid4().hex[:8]}"
+        new_name = self._unique_profile_name(src.name)
+        new_id = self._profile_folder_name(new_name)
         dup = ProfileData(
             id=new_id,
             name=new_name,
@@ -345,13 +512,43 @@ class ProfileStore:
 
     def delete_profile(self, profile_id: str) -> bool:
         target = self.get_by_id(profile_id)
-        if not target:
-            return False
-        self.profiles = [p for p in self.profiles if p.id != profile_id]
-        if self.settings.get("last_profile") == profile_id:
-            self.settings["last_profile"] = self.profiles[0].id if self.profiles else ""
-        self.save()
-        return True
+        target_path = target.path if target else (PROFILES_DIR / self._profile_folder_name(profile_id))
+        if not target and not target_path.exists():
+            target_path = PROFILES_DIR / profile_id
+
+        # Coordinate with any active background sync/downloads
+        lock = None
+        locked = False
+        try:
+            from backend.services.mod_downloader import _profile_sync_lock
+            target_obj = target or ProfileData(id=profile_id, name=profile_id, minecraft_version="26.2")
+            lock = _profile_sync_lock(target_obj)
+            locked = lock.acquire(timeout=2.0)
+        except Exception:
+            locked = False
+            lock = None
+
+        try:
+            if target:
+                self.profiles = [p for p in self.profiles if p.id != profile_id]
+                if self.settings.get("last_profile") == profile_id:
+                    self.settings["last_profile"] = self.profiles[0].id if self.profiles else ""
+                self.save()
+
+            success = True
+            if target_path.exists():
+                success = robust_rmtree(target_path)
+
+            if target:
+                alt_path = PROFILES_DIR / self._profile_folder_name(target.name)
+                if alt_path.exists() and alt_path != target_path:
+                    robust_rmtree(alt_path)
+
+            clean_trash_folders(PROFILES_DIR)
+            return success or (target is not None)
+        finally:
+            if locked and lock:
+                lock.release()
 
     def toggle_mod(self, profile_id: str, mod_id: str) -> bool:
         p = self.get_by_id(profile_id)
@@ -372,3 +569,4 @@ class ProfileStore:
                 self.save()
                 return True
         return False
+

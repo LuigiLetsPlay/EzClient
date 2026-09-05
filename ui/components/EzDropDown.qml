@@ -16,7 +16,16 @@ Item {
 
     function isEzClientSupported(version) {
         if (!version) return false
-        var supported = ["26.2", "26.1"]
+        if (typeof profileController !== "undefined" && profileController && profileController.gameVersionFamilies) {
+            var families = profileController.gameVersionFamilies
+            for (var i = 0; i < families.length; i++) {
+                var releases = families[i].releases || []
+                for (var j = 0; j < releases.length; j++) {
+                    if (releases[j].version === version) return Boolean(releases[j].hasEzClient)
+                }
+            }
+        }
+        var supported = ["26.2", "26.1.1", "26.1"]
         return supported.indexOf(version) !== -1
     }
 

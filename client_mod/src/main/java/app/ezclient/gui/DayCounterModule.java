@@ -54,4 +54,15 @@ public final class DayCounterModule extends HudModule {
 
         return sb.length() > 0 ? sb.toString() : String.valueOf(day);
     }
+
+    @Override
+    public String displayText(Minecraft client, boolean editor) {
+        if (editor) {
+            String d = showDay ? "Day 42" : "";
+            String p = showPlaytime ? (showDay ? " (12h 30m)" : "12h 30m") : "";
+            String res = d + p;
+            return res.isEmpty() ? "Day 42" : res;
+        }
+        return displayText(client);
+    }
 }

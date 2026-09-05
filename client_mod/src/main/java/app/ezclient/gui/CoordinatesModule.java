@@ -224,6 +224,21 @@ public final class CoordinatesModule extends HudModule {
         g.fill(centerX - 1, 1, centerX + 1, 5, 0xFFFF4444);
 
         String[] directions = {"S", "SW", "W", "NW", "N", "NE", "E", "SE"};
+        var waypoints = FeatureModule.get(WaypointsModule.class);
+        if (!editor && client.player != null && waypoints.isEnabled() && waypoints.flag("compass")) {
+            int drawn = 0;
+            for (var waypoint : waypoints.active(client)) {
+                if (++drawn > 32) break;
+                var delta = waypoint.position().subtract(client.player.position());
+                double bearing = Math.toDegrees(Math.atan2(-delta.x, delta.z));
+                float diff = net.minecraft.util.Mth.wrapDegrees((float)bearing - yaw);
+                float pos = centerX + diff;
+                if (pos >= 8 && pos <= w - 8) {
+                    g.text(client.font, waypoint.icon(), (int)pos - 2, 1, waypoint.color(), isTextShadow());
+                    g.fill((int)pos, 16, (int)pos + 1, 19, waypoint.color());
+                }
+            }
+        }
         int[] degrees = {0, 45, 90, 135, 180, 225, 270, 315};
 
         for (int i = 0; i < 8; i++) {

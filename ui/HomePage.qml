@@ -7,10 +7,19 @@ import "components"
 Item {
     id: root
 
+    Timer {
+        interval: 10000
+        repeat: true
+        running: root.visible
+        triggeredOnStart: true
+        onTriggered: if (profileController) profileController.refreshEzClientUpdateState()
+    }
+
     readonly property bool hasProfile: typeof profileController !== "undefined" && profileController && profileController.activeName !== "No Profile" && profileController.activeName !== ""
     readonly property string activeName: typeof profileController !== "undefined" && profileController ? profileController.activeName : ""
     readonly property string activeVersion: typeof profileController !== "undefined" && profileController ? profileController.activeVersion : "26.2"
     readonly property string activeLoader: typeof profileController !== "undefined" && profileController ? profileController.activeLoader : "Fabric"
+    readonly property bool activeIsVanilla: activeLoader.toLowerCase() === "vanilla"
     readonly property int activeModsCount: typeof profileController !== "undefined" && profileController ? profileController.activeModsCount : 0
     readonly property int activeRamMb: typeof profileController !== "undefined" && profileController ? profileController.activeRamMb : 4096
     readonly property bool isLaunching: typeof profileController !== "undefined" && profileController ? profileController.isLaunching : false
@@ -139,6 +148,17 @@ Item {
         width: Math.min(820, Math.max(480, root.width * 0.82))
         height: Math.max(540, root.height + 36)
 
+        SequentialAnimation {
+            id: accountSwitchAnimation
+            NumberAnimation { target: centeredHomeSkin3D; property: "opacity"; to: 0; duration: 110; easing.type: Easing.InQuad }
+            PauseAnimation { duration: 70 }
+            NumberAnimation { target: centeredHomeSkin3D; property: "opacity"; to: 1; duration: 190; easing.type: Easing.OutCubic }
+        }
+        Connections {
+            target: typeof accountController !== "undefined" ? accountController : null
+            function onAccountChanged() { accountSwitchAnimation.restart() }
+        }
+
         Skin3DView {
             id: centeredHomeSkin3D
             anchors.fill: parent
@@ -232,6 +252,29 @@ Item {
             }
         }
 
+        Row {
+            z: 7
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            anchors.topMargin: Math.max(96, parent.height * 0.12 + 34)
+            spacing: 7
+            visible: typeof accountController !== "undefined" && accountController && accountController.accounts.length > 1
+            Repeater {
+                model: (typeof accountController !== "undefined" && accountController) ? accountController.accounts : []
+                Rectangle {
+                    width: 34; height: 34; radius: 17
+                    color: modelData.active ? EzTheme.accent : "#D912151B"
+                    border.width: modelData.active ? 2 : 1
+                    border.color: modelData.active ? EzTheme.accentLight : EzTheme.border
+                    Image { anchors.fill: parent; anchors.margins: 3; source: modelData.avatarUrl; fillMode: Image.PreserveAspectCrop; smooth: true }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: accountController.switchAccount(modelData.uuid) }
+                    ToolTip.visible: accountMouse.containsMouse
+                    ToolTip.text: modelData.username
+                    MouseArea { id: accountMouse; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.NoButton }
+                }
+            }
+        }
+
     }
 
     // Controls are a separate overlay in front of the character's legs.
@@ -320,9 +363,9 @@ Item {
         Rectangle {
             Layout.alignment: Qt.AlignHCenter
             Layout.topMargin: 0
-            Layout.preferredHeight: 32
+            Layout.preferredHeight: 40
             Layout.preferredWidth: Math.min(root.width - 32, profPillRow.implicitWidth + 28)
-            radius: 16
+            radius: 12
             color: profPillMouse.containsMouse ? "#1A2520" : "#111B17"
             border.color: profPillMouse.containsMouse ? EzTheme.accentLight : EzTheme.borderLight
             border.width: 1
@@ -338,9 +381,11 @@ Item {
                 spacing: 8
 
                 Text {
-                    text: (root.hasProfile ? root.activeName : EzI18n.t("home_default_profile", "Standard Profil")) + "  ·  " + root.activeLoader + " " + root.activeVersion + "  ·  " + root.activeModsCount + " Mods"
+                    text: (root.hasProfile ? root.activeName : EzI18n.t("home_default_profile", "Standard Profil"))
+                          + "  ·  " + root.activeLoader + " " + root.activeVersion
+                          + (root.activeIsVanilla ? "" : "  ·  " + root.activeModsCount + " Mods")
                     font.family: EzTheme.fontFamily
-                    font.pixelSize: 11
+                    font.pixelSize: 12
                     font.bold: true
                     color: EzTheme.text
                     elide: Text.ElideRight
@@ -361,16 +406,16 @@ Item {
             }
         }
 
-        Item { Layout.preferredHeight: 20 }
+        Item { Layout.preferredHeight: 16 }
 
         // ── GIANT EPIC PLAY BUTTON ──
         Rectangle {
             id: launchBtn
             z: 6
             Layout.alignment: Qt.AlignHCenter
-            Layout.preferredWidth: Math.min(340, root.width - 32)
-            Layout.preferredHeight: 62
-            radius: EzTheme.radius
+            Layout.preferredWidth: Math.min(400, root.width - 40)
+            Layout.preferredHeight: 74
+            radius: 16
 
             scale: launchMouse.pressed ? 0.95 : (launchMouse.containsMouse ? 1.04 : 1.0)
             Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
@@ -428,13 +473,25 @@ Item {
                     }
                 }
 
-                Text {
-                    text: root.isLaunching ? EzI18n.t("home_launching", "STARTET…") : EzI18n.t("home_play", "SPIELEN")
-                    font.family: EzTheme.mcFontFamily
-                    font.pixelSize: 20
-                    font.bold: true
-                    color: "#000000"
-                    font.letterSpacing: 2
+                ColumnLayout {
+                    spacing: -1
+                    Text {
+                        text: root.isLaunching ? "WEITERE INSTANZ" : EzI18n.t("home_play", "SPIELEN")
+                        font.family: EzTheme.mcFontFamily
+                        font.pixelSize: 19
+                        font.bold: true
+                        color: "#000000"
+                        font.letterSpacing: 1.5
+                        Layout.alignment: Qt.AlignHCenter
+                    }
+                    Text {
+                        text: root.activeName + "  ·  " + root.activeLoader + " " + root.activeVersion
+                        font.family: EzTheme.fontFamily
+                        font.pixelSize: 10
+                        font.bold: true
+                        color: "#B5000000"
+                        Layout.alignment: Qt.AlignHCenter
+                    }
                 }
             }
 
@@ -444,7 +501,7 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                    if (profileController && !root.isLaunching) {
+                    if (profileController) {
                         profileController.launchActiveProfile()
                     }
                 }
@@ -574,14 +631,15 @@ Item {
         spacing: 20
 
         Repeater {
-            model: [
-                { iconSource: "icons/zap.svg", label: root.activeModsCount + " Mods", color: EzTheme.accentLight },
+            model: (root.activeIsVanilla ? [] : [
+                { iconSource: "icons/zap.svg", label: root.activeModsCount + " Mods", color: EzTheme.accentLight }
+            ]).concat([
                 { iconSource: "icons/cpu.svg", label: Math.round(root.activeRamMb / 1024 * 10) / 10 + " GB RAM", color: EzTheme.cyan },
                 { iconSource: "icons/play.svg", label: root.activeLoader + " " + root.activeVersion, color: EzTheme.purple }
-            ]
+            ])
 
             Rectangle {
-                height: 28
+                height: 32
                 width: statRow.implicitWidth + 20
                 radius: 14
                 color: "#0A0A0F80"
@@ -597,7 +655,7 @@ Item {
                     Text {
                         text: modelData.label
                         font.family: EzTheme.fontFamily
-                        font.pixelSize: 10
+                        font.pixelSize: 11
                         font.bold: true
                         color: modelData.color
                     }
@@ -606,85 +664,4 @@ Item {
         }
     }
 
-    // ─────────────────────────────────────────────────────────
-    // UPDATE POPUP
-    // ─────────────────────────────────────────────────────────
-    Rectangle {
-        id: updatePopup
-        z: 100
-        visible: profileController && profileController.ezClientUpdateAvailable
-        anchors.bottom: parent.bottom
-        anchors.right: parent.right
-        anchors.bottomMargin: 24
-        anchors.rightMargin: 24
-        width: 380
-        height: 80
-        radius: EzTheme.radius
-        color: EzTheme.surface
-        border.color: EzTheme.accent
-        border.width: 1
-
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: -4
-            radius: parent.radius + 4
-            color: "transparent"
-            border.color: EzTheme.accentGlow
-            border.width: 2
-            opacity: 0.3
-        }
-
-        RowLayout {
-            anchors.fill: parent
-            anchors.margins: 12
-            spacing: 12
-
-            Rectangle {
-                width: 38
-                height: 38
-                radius: 8
-                color: EzTheme.surface2
-                border.color: EzTheme.borderLight
-                border.width: 1
-                Image {
-                    source: "icons/zap.svg"
-                    width: 18
-                    height: 18
-                    anchors.centerIn: parent
-                }
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 2
-                Text {
-                    text: "EzClient Mod Upgrade"
-                    font.family: EzTheme.fontFamily
-                    font.pixelSize: 13
-                    font.bold: true
-                    color: EzTheme.text
-                }
-                Text {
-                    text: (profileController ? profileController.ezClientOutdatedCount : 1) + " Profil(e) bereit für Update auf v" + (profileController ? profileController.ezClientLatestVersion : "1.8.2")
-                    font.family: EzTheme.fontFamily
-                    font.pixelSize: 11
-                    color: EzTheme.textMuted
-                    elide: Text.ElideRight
-                    Layout.fillWidth: true
-                }
-            }
-
-            EzButton {
-                text: "Upgrade v" + (profileController ? profileController.ezClientLatestVersion : "1.8.2")
-                primary: true
-                mcFont: true
-                Layout.preferredHeight: 32
-                onClicked: {
-                    if (profileController) {
-                        profileController.applyEzClientUpdates()
-                    }
-                }
-            }
-        }
-    }
 }

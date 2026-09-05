@@ -41,6 +41,9 @@ public final class CommunityCapeManager {
     private static final ExecutorService WORKER = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "EzClient-Capes"); t.setDaemon(true); return t; });
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4)).build();
     private static volatile long nextRefresh;
+    private static final java.util.concurrent.atomic.AtomicBoolean REFRESH_RUNNING = new java.util.concurrent.atomic.AtomicBoolean();
+    private static final Set<UUID> VISIBLE_CAPES = new HashSet<>();
+    private static volatile long nextVisualScan;
     private static volatile long nextLocalScan;
     private static volatile long localFingerprint = Long.MIN_VALUE;
     private static volatile UUID localPlayer;
@@ -85,14 +88,18 @@ public final class CommunityCapeManager {
     public static void tick(Minecraft client) {
         if (client.player == null || client.level == null) return;
         if (System.currentTimeMillis() >= nextLocalScan) {
-            nextLocalScan = System.currentTimeMillis() + 500L;
+            nextLocalScan = System.currentTimeMillis() + 5000L;
             loadLocal(client.player.getUUID());
         }
 
         // Update animated capes
         if (!ANIMATED_CAPES.isEmpty()) {
             long now = System.currentTimeMillis();
-            for (AnimatedCape anim : ANIMATED_CAPES.values()) {
+            int updated = 0;
+            for (var entry : ANIMATED_CAPES.entrySet()) {
+                if (!VISIBLE_CAPES.contains(entry.getKey()) || updated >= 8) continue;
+                AnimatedCape anim = entry.getValue();
+                updated++;
                 if (anim.frameCount <= 1 || anim.fps <= 0) continue;
                 int currentFrame = (int) ((now * anim.fps / 1000L) % anim.frameCount);
                 if (currentFrame != anim.lastFrame[0]) {
@@ -103,6 +110,31 @@ public final class CommunityCapeManager {
         }
 
         long now = System.currentTimeMillis();
+        // Frequently scan nearby players in world (every 1.5s), prioritized by distance
+        if (now >= nextVisualScan) {
+            nextVisualScan = now + 1500L;
+            List<PlayerDistance> visual = new ArrayList<>();
+            for (var p : client.level.players()) {
+                if (p.getUUID().equals(client.player.getUUID())) continue;
+                double dSq = p.distanceToSqr(client.player);
+                if (dSq <= RANGE_SQ) {
+                    visual.add(new PlayerDistance(p.getUUID(), p.getScoreboardName(), dSq));
+                }
+            }
+            visual.sort(Comparator.comparingDouble(PlayerDistance::distanceSq));
+            VISIBLE_CAPES.clear();
+            VISIBLE_CAPES.add(client.player.getUUID());
+            for (PlayerDistance pd : visual.subList(0, Math.min(32, visual.size()))) {
+                VISIBLE_CAPES.add(pd.uuid());
+                if (!CAPES.containsKey(pd.uuid()) && !ThirdPartyPresence.isCached(pd.uuid())) {
+                    ThirdPartyPresence.enqueue(pd.uuid(), pd.name(), true, pd.distanceSq());
+                }
+            }
+            for (UUID id : new ArrayList<>(CAPES.keySet())) {
+                if (!VISIBLE_CAPES.contains(id)) { REMOTE_KEYS.remove(id); clearCape(id); }
+            }
+        }
+
         if (now < nextRefresh) return;
         nextRefresh = now + REFRESH_MS;
         List<UUID> nearby = new ArrayList<>();
@@ -115,6 +147,8 @@ public final class CommunityCapeManager {
             CommunityPresence.refreshNearby(nearby);
         }
     }
+
+    private record PlayerDistance(UUID uuid, String name, double distanceSq) {}
 
     private static void updateAnimatedFrame(AnimatedCape anim, int frameIdx) {
         int col = frameIdx % anim.columns;
@@ -145,8 +179,14 @@ public final class CommunityCapeManager {
         if (uuid.equals(localPlayer) && fingerprint == localFingerprint) return;
         localPlayer = uuid;
         localFingerprint = fingerprint;
-        clearCape(uuid);
-        if (fingerprint == 0L || !LOADING.add(uuid)) return;
+        if (fingerprint == 0L) {
+            if (!CAPES.containsKey(uuid)) {
+                String name = Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getScoreboardName() : null;
+                ThirdPartyPresence.enqueue(uuid, name, true, 0.0);
+            }
+            return;
+        }
+        if (!LOADING.add(uuid)) return;
 
         WORKER.execute(() -> {
             try {
@@ -158,7 +198,16 @@ public final class CommunityCapeManager {
                     int frameWidth = extractInt(json, "frame_width", 256);
                     int frameHeight = extractInt(json, "frame_height", 128);
 
+                    if (frameCount < 1 || frameCount > 120 || fps < 1 || fps > 20 || columns < 1 || columns > 32
+                            || frameWidth < 64 || frameWidth > 512 || frameHeight < 32 || frameHeight > 256
+                            || frameWidth != frameHeight * 2 || Files.size(animSheet) > 8 * 1024 * 1024)
+                        throw new IllegalArgumentException("Cape animation exceeds budget");
+
+                    validateImage(Files.readAllBytes(animSheet), 2 * 1024 * 1024);
                     NativeImage sheet = NativeImage.read(new ByteArrayInputStream(Files.readAllBytes(animSheet)));
+                    if (sheet.getWidth() < columns * frameWidth || sheet.getHeight() < ((frameCount + columns - 1) / columns) * frameHeight) {
+                        sheet.close(); throw new IllegalArgumentException("Incomplete cape framesheet");
+                    }
                     NativeImage frameImg = new NativeImage(frameWidth, frameHeight, true);
                     for (int y = 0; y < frameHeight && y < sheet.getHeight(); y++) {
                         for (int x = 0; x < frameWidth && x < sheet.getWidth(); x++) {
@@ -168,6 +217,7 @@ public final class CommunityCapeManager {
                     populateElytraAndMakeOpaque(frameImg);
 
                     Minecraft.getInstance().execute(() -> {
+                        if (!VISIBLE_CAPES.contains(uuid)) { frameImg.close(); sheet.close(); return; }
                         Identifier textureId = Identifier.fromNamespaceAndPath("ezclient", "cape/" + uuid.toString().replace("-", ""));
                         DynamicTexture dynTex = new DynamicTexture(() -> "ezclient-cape-anim", frameImg);
                         Minecraft.getInstance().getTextureManager().register(textureId, dynTex);
@@ -207,9 +257,10 @@ public final class CommunityCapeManager {
     }
 
     private static void refreshNearby(List<UUID> ids) {
+        if (!REFRESH_RUNNING.compareAndSet(false, true)) return;
         String query = String.join(",", ids.stream().map(UUID::toString).toList());
         WORKER.execute(() -> { try {
-            String body = HTTP.send(HttpRequest.newBuilder(URI.create(API + "/capes/active?players=" + query)).timeout(Duration.ofSeconds(6)).GET().build(), HttpResponse.BodyHandlers.ofString()).body();
+            String body = HTTP.send(HttpRequest.newBuilder(URI.create(API + "/capes/active?players=" + query)).timeout(Duration.ofSeconds(6)).GET().build(), CosmeticHttp.text()).body();
             Set<UUID> active = new HashSet<>();
             JsonObject payload = JsonParser.parseString(body).getAsJsonObject();
             for (JsonElement element : payload.getAsJsonArray("capes")) {
@@ -227,17 +278,31 @@ public final class CommunityCapeManager {
             for (UUID id : ids) {
                 if (!active.contains(id) && REMOTE_KEYS.remove(id) != null) clearCape(id);
             }
-        } catch (Exception ex) { EzClientMod.log("Cape: community sync unavailable (" + ex.getClass().getSimpleName() + ")."); } });
+        } catch (Exception ex) { EzClientMod.log("Cape: community sync unavailable (" + ex.getClass().getSimpleName() + ")."); }
+        finally { REFRESH_RUNNING.set(false); } });
     }
 
     private static void download(UUID id, String url) { try {
-        byte[] bytes = HTTP.send(HttpRequest.newBuilder(URI.create(url.replace("\\/", "/"))).timeout(Duration.ofSeconds(8)).GET().build(), HttpResponse.BodyHandlers.ofByteArray()).body();
+        byte[] bytes = HTTP.send(HttpRequest.newBuilder(URI.create(url.replace("\\/", "/"))).timeout(Duration.ofSeconds(8)).GET().build(), CosmeticHttp.bytes(8 * 1024 * 1024)).body();
         if (bytes.length <= 2 * 1024 * 1024) install(id, bytes);
     } catch (Exception ex) { REMOTE_KEYS.remove(id); EzClientMod.log("Cape: download failed for " + id + " (" + ex.getClass().getSimpleName() + ")."); } finally { LOADING.remove(id); } }
 
+    public static void downloadExternalCape(UUID id, String url) { try {
+        byte[] bytes = HTTP.send(HttpRequest.newBuilder(URI.create(url.replace("\\/", "/"))).timeout(Duration.ofSeconds(8)).GET().build(), CosmeticHttp.bytes(8 * 1024 * 1024)).body();
+        if (bytes.length <= 2 * 1024 * 1024) install(id, bytes);
+    } catch (Exception ex) { EzClientMod.log("Cape: external download failed for " + id + " (" + ex.getClass().getSimpleName() + ")."); } }
+
+    public static void installExternalCape(UUID id, byte[] bytes) {
+        try {
+            install(id, bytes);
+        } catch (Exception ex) {
+            EzClientMod.log("Cape: external install failed for " + id + " (" + ex.getClass().getSimpleName() + ").");
+        }
+    }
+
     private static void downloadAnimated(UUID id, String url) {
         try {
-            byte[] bytes = HTTP.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(10)).GET().build(), HttpResponse.BodyHandlers.ofByteArray()).body();
+            byte[] bytes = HTTP.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(10)).GET().build(), CosmeticHttp.bytes(8 * 1024 * 1024)).body();
             if (bytes.length <= 8 * 1024 * 1024) installAnimatedGif(id, bytes);
         } catch (Exception ex) {
             REMOTE_KEYS.remove(id);
@@ -249,14 +314,16 @@ public final class CommunityCapeManager {
 
     private static void installAnimatedGif(UUID id, byte[] bytes) throws Exception {
         List<NativeImage> frames = new ArrayList<>();
+        try {
         try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
             Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("gif");
             if (!readers.hasNext()) throw new IllegalArgumentException("GIF decoder unavailable");
             ImageReader reader = readers.next();
             try {
                 reader.setInput(input, false, false);
-                int count = Math.min(120, reader.getNumImages(true));
+                int count = Math.min(32, reader.getNumImages(true));
                 for (int index = 0; index < count; index++) {
+                    if (reader.getWidth(index) > 1024 || reader.getHeight(index) > 1024) throw new IllegalArgumentException("GIF frame too large");
                     BufferedImage frame = reader.read(index);
                     if (frame.getWidth() > 1024 || frame.getHeight() > 1024) throw new IllegalArgumentException("GIF frame too large");
                     frames.add(bakeCapeFace(frame));
@@ -274,17 +341,20 @@ public final class CommunityCapeManager {
             int ox = (i % columns) * 256;
             int oy = (i / columns) * 128;
             for (int y = 0; y < 128; y++) for (int x = 0; x < 256; x++) sheet.setPixel(ox + x, oy + y, frame.getPixel(x, y));
-            frame.close();
         }
         NativeImage first = new NativeImage(256, 128, true);
         for (int y = 0; y < 128; y++) for (int x = 0; x < 256; x++) first.setPixel(x, y, sheet.getPixel(x, y));
         Minecraft.getInstance().execute(() -> {
+            if (!VISIBLE_CAPES.contains(id)) { first.close(); sheet.close(); return; }
             Identifier textureId = Identifier.fromNamespaceAndPath("ezclient", "cape/" + id.toString().replace("-", ""));
             DynamicTexture texture = new DynamicTexture(() -> "ezclient-cape-anim", first);
             Minecraft.getInstance().getTextureManager().register(textureId, texture);
             publishCape(id, textureId);
             ANIMATED_CAPES.put(id, new AnimatedCape(texture, sheet, frames.size(), 12, columns, 256, 128, new int[]{-1}));
         });
+        } finally {
+            for (NativeImage frame : frames) frame.close();
+        }
     }
 
     private static NativeImage bakeCapeFace(BufferedImage source) {
@@ -316,23 +386,31 @@ public final class CommunityCapeManager {
     }
 
     private static void clearCape(UUID id) {
-        CAPES.remove(id);
-        SKINS.remove(id);
+        Minecraft.getInstance().execute(() -> {
+            Identifier texture = CAPES.remove(id);
+            ThirdPartyPresence.evictCape(id);
+            SKINS.remove(id);
+            closeAnimation(id);
+            if (texture != null) Minecraft.getInstance().getTextureManager().release(texture);
+        });
+    }
+
+    private static void closeAnimation(UUID id) {
         AnimatedCape old = ANIMATED_CAPES.remove(id);
-        if (old != null) {
-            Minecraft.getInstance().execute(() -> {
-                try { old.framesheet.close(); } catch (Exception ignored) {}
-                try { old.texture.close(); } catch (Exception ignored) {}
-            });
-        }
+        if (old != null) old.framesheet.close();
+        // GPU textures belong to TextureManager, which releases them on replacement.
+    }
+
+    public static void clearSession() {
+        for (UUID id : new ArrayList<>(CAPES.keySet())) clearCape(id);
+        VISIBLE_CAPES.clear();
+        REMOTE_KEYS.clear();
+        localFingerprint = Long.MIN_VALUE;
+        nextLocalScan = nextVisualScan = nextRefresh = 0;
     }
 
     private static void install(UUID id, byte[] bytes) throws Exception {
-        AnimatedCape oldAnimation = ANIMATED_CAPES.remove(id);
-        if (oldAnimation != null) {
-            try { oldAnimation.framesheet.close(); } catch (Exception ignored) {}
-            try { oldAnimation.texture.close(); } catch (Exception ignored) {}
-        }
+        validateImage(bytes, 1024 * 512);
         NativeImage image = NativeImage.read(new ByteArrayInputStream(bytes));
         if (image.getWidth() > 1024 || image.getHeight() > 512) { image.close(); return; }
         int w = image.getWidth();
@@ -346,6 +424,7 @@ public final class CommunityCapeManager {
         }
         populateElytraAndMakeOpaque(capeTexture);
         Minecraft.getInstance().execute(() -> {
+            if (!VISIBLE_CAPES.contains(id)) { capeTexture.close(); return; }
             Identifier texture = Identifier.fromNamespaceAndPath("ezclient", "cape/" + id.toString().replace("-", ""));
             Minecraft.getInstance().getTextureManager().register(texture, new DynamicTexture(() -> "ezclient-cape", capeTexture));
             publishCape(id, texture);
@@ -354,8 +433,27 @@ public final class CommunityCapeManager {
     }
 
     private static void publishCape(UUID player, Identifier texture) {
+        closeAnimation(player);
+        if (!CAPES.containsKey(player) && CAPES.size() >= 33) {
+            UUID evicted = CAPES.keySet().stream().filter(id -> !id.equals(localPlayer)).findFirst().orElse(null);
+            if (evicted != null) clearCape(evicted);
+        }
         CAPES.put(player, texture);
         SKINS.remove(player);
+    }
+
+    private static void validateImage(byte[] bytes, int maxPixels) throws Exception {
+        if (bytes.length > 8 * 1024 * 1024) throw new IllegalArgumentException("Image byte limit");
+        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+            if (!readers.hasNext()) throw new IllegalArgumentException("Unsupported image");
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(input);
+                long width = reader.getWidth(0), height = reader.getHeight(0);
+                if (width < 1 || height < 1 || width * height > maxPixels) throw new IllegalArgumentException("Image pixel limit");
+            } finally { reader.dispose(); }
+        }
     }
 
     /** Normalizes the launcher/community texture to Minecraft's cape atlas. */

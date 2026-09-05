@@ -16,6 +16,12 @@ import java.util.List;
  * spacious module cards with toggle dots, and clean bottom action bar.
  */
 public final class EzHubScreen extends Screen {
+    private static final int HUB_WIDTH = 360;
+    private static final int HUB_HEIGHT = 250;
+    private static final int GRID_GAP = 6;
+    private static final int CARD_MIN_WIDTH = 58;
+    private static final int CARD_HEIGHT = 58;
+    private static final int MODULE_ICON_SIZE = 23;
     private static final String[] FILTERS = {"All", "HUD", "Movement", "Render"};
     private static final Identifier EZCLIENT_ICON = Identifier.fromNamespaceAndPath("ezclient", "textures/icons/ezclient.png");
 
@@ -46,13 +52,14 @@ public final class EzHubScreen extends Screen {
 
     @Override
     protected void init() {
-        panelWidth = Math.min(370, Math.max(300, width * 35 / 100));
-        panelHeight = height - 16;
-        panelX = -panelWidth; // Start off-screen for animation
-        panelY = 8;
+        panelWidth = Math.min(HUB_WIDTH, width - 48);
+        panelHeight = Math.min(HUB_HEIGHT, height - 48);
+        panelX = (width - panelWidth) / 2;
+        panelY = (height - panelHeight) / 2;
+        animProgress = 0.0;
 
         // ── Top Search Box (right-aligned in header, next to close button) ──
-        int searchW = 76;
+        int searchW = 86;
         searchBox = new EditBox(font, panelX + panelWidth - searchW - 28, panelY + 9, searchW, 16, Component.literal("Search"));
         searchBox.setHint(app.ezclient.util.EzI18n.comp("ezclient.hub.search_hint"));
         searchBox.setValue(searchQuery);
@@ -70,7 +77,7 @@ public final class EzHubScreen extends Screen {
                 panelX + panelWidth - hudBtnW - 12, panelY + panelHeight - hudBtnH - 9,
                 hudBtnW, hudBtnH,
                 app.ezclient.util.EzI18n.comp("ezclient.hub.hud_editor_btn"), true,
-                b -> minecraft.gui.setScreen(new HudEditorScreen(this))
+                b -> EzScreenBridge.set(minecraft, new HudEditorScreen(this))
         );
         addRenderableWidget(hudEditorButton);
     }
@@ -128,10 +135,10 @@ public final class EzHubScreen extends Screen {
         int contentWidth = panelWidth - 24;
         int contentHeight = panelHeight - 104;
 
-        int gap = 8;
-        int columns = Math.max(1, (contentWidth + gap) / (74 + gap));
+        int gap = GRID_GAP;
+        int columns = Math.max(1, (contentWidth + gap) / (CARD_MIN_WIDTH + gap));
         int cardWidth = (contentWidth - gap * (columns - 1)) / columns;
-        int cardHeight = 72;
+        int cardHeight = CARD_HEIGHT;
 
         if (e.button() == 0) {
             // Check scrollbar click
@@ -162,7 +169,7 @@ public final class EzHubScreen extends Screen {
                     if (e.x() >= cx && e.x() <= cx + cardWidth && e.y() >= cy && e.y() <= cy + cardHeight) {
                         // Check if left clicked on top-left gear icon
                         boolean gearHit = e.x() >= cx && e.x() <= cx + 18 && e.y() >= cy && e.y() <= cy + 18;
-                        if (gearHit) {
+                        if (module.hasSettings() && gearHit) {
                             openModuleSettings(module);
                             return true;
                         }
@@ -189,8 +196,10 @@ public final class EzHubScreen extends Screen {
                     if (cy + cardHeight < contentY || cy > contentY + contentHeight) continue;
 
                     if (e.x() >= cx && e.x() <= cx + cardWidth && e.y() >= cy && e.y() <= cy + cardHeight) {
-                        openModuleSettings(module);
-                        return true;
+                        if (module.hasSettings()) {
+                            openModuleSettings(module);
+                            return true;
+                        }
                     }
                 }
             }
@@ -204,10 +213,10 @@ public final class EzHubScreen extends Screen {
         if (isDraggingScrollbar && maxScroll > 0) {
             int contentHeight = panelHeight - 104;
             int contentWidth = panelWidth - 24;
-            int gap = 8;
-            int columns = Math.max(1, (contentWidth + gap) / (74 + gap));
+            int gap = GRID_GAP;
+            int columns = Math.max(1, (contentWidth + gap) / (CARD_MIN_WIDTH + gap));
             int totalRows = (getFilteredModules().size() + columns - 1) / columns;
-            int totalHeight = totalRows * (72 + gap);
+            int totalHeight = totalRows * (CARD_HEIGHT + gap);
             int thumbH = Math.max(20, (int) (contentHeight * ((double) contentHeight / totalHeight)));
             double travel = contentHeight - thumbH;
             if (travel > 0) {
@@ -240,8 +249,8 @@ public final class EzHubScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
-        // Keep the world visible; the drawer only adds a very light focus veil.
-        graphics.fill(0, 0, width, height, 0x24000000);
+        // Keep the world visible with a sleek dark backdrop
+        graphics.fill(0, 0, width, height, 0x26000000);
 
         // Smooth scroll interpolation (Easing)
         scrollOffset += (targetScrollOffset - scrollOffset) * 0.28;
@@ -249,15 +258,21 @@ public final class EzHubScreen extends Screen {
             scrollOffset = targetScrollOffset;
         }
 
-        // Swipe-in animation from left
-        animProgress += (1.0 - animProgress) * 0.15;
+        // Smooth centered scale / entrance animation
+        animProgress += (1.0 - animProgress) * 0.25;
         if (Math.abs(1.0 - animProgress) < 0.01) animProgress = 1.0;
-        panelX = (int) (-panelWidth + (panelWidth + 10) * animProgress);
+
+        panelWidth = Math.min(HUB_WIDTH, width - 48);
+        panelHeight = Math.min(HUB_HEIGHT, height - 48);
+        int targetX = (width - panelWidth) / 2;
+        int targetY = (height - panelHeight) / 2;
+        panelX = targetX;
+        panelY = (int) (targetY - 8 * (1.0 - animProgress));
 
         int closeX = panelX + panelWidth - 22;
-        int searchW = 76;
+        int searchW = 86;
         searchBox.setWidth(searchW);
-        searchBox.setX(closeX - searchW - 6);
+        searchBox.setX(closeX - searchW - 8);
         searchBox.setY(panelY + 9);
 
         int hudBtnW = 135;
@@ -280,7 +295,7 @@ public final class EzHubScreen extends Screen {
         graphics.text(font, "EzClient", logoX + 24, logoY + 6, EzUi.TEXT_WHITE);
 
         // Version badge
-        String version = "v1.8.2";
+        String version = "v2.0.0";
         int vBadgeW = font.width(version) + 6;
         int vBadgeX = logoX + 24 + font.width("EzClient") + 4;
         EzUi.roundedRect(graphics, vBadgeX, logoY + 4, vBadgeW, 12, 3, 0xFF1A2630);
@@ -321,10 +336,10 @@ public final class EzHubScreen extends Screen {
         int contentWidth = panelWidth - 24;
         int contentHeight = panelHeight - 106;
 
-        int gap = 8;
-        int columns = Math.max(1, (contentWidth + gap) / (74 + gap));
+        int gap = GRID_GAP;
+        int columns = Math.max(1, (contentWidth + gap) / (CARD_MIN_WIDTH + gap));
         int cardWidth = (contentWidth - gap * (columns - 1)) / columns;
-        int cardHeight = 72;
+        int cardHeight = CARD_HEIGHT;
 
         List<Module> filtered = getFilteredModules();
         int totalRows = (filtered.size() + columns - 1) / columns;
@@ -347,17 +362,25 @@ public final class EzHubScreen extends Screen {
 
             EzUi.moduleCard(graphics, cx, cy, cardWidth, cardHeight, module.isEnabled(), hovered);
 
-            // Icon (centered, 28x28)
-            ModuleIconRenderer.draw(graphics, module, cx + (cardWidth - 28) / 2, cy + 10, 28);
+            // Compact icon, sized for the five-column module grid.
+            ModuleIconRenderer.draw(graphics, module,
+                    cx + (cardWidth - MODULE_ICON_SIZE) / 2, cy + 7, MODULE_ICON_SIZE);
 
-            // Name (centered below icon)
-            graphics.centeredText(font, Component.literal(module.getDisplayName()), cx + cardWidth / 2, cy + cardHeight - 22, EzUi.TEXT_LIGHT);
+            // Name (scaled down only as much as needed so neighboring cards never overlap).
+            String moduleName = module.getDisplayName();
+            float labelScale = Math.min(0.82f,
+                    (cardWidth - 6.0f) / Math.max(1.0f, font.width(moduleName)));
+            graphics.pose().pushMatrix();
+            graphics.pose().translate(cx + cardWidth / 2.0f, cy + cardHeight - 17.0f);
+            graphics.pose().scale(labelScale, labelScale);
+            graphics.centeredText(font, Component.literal(moduleName), 0, 0, EzUi.TEXT_LIGHT);
+            graphics.pose().popMatrix();
 
             // Toggle dot indicator (bottom right)
-            EzUi.toggleDot(graphics, cx + cardWidth - 12, cy + cardHeight - 12, module.isEnabled());
+            EzUi.toggleDot(graphics, cx + cardWidth - 10, cy + cardHeight - 10, module.isEnabled());
 
             // Settings gear icon (top-left) with clean text brightness highlight (no white box)
-            if (hovered) {
+            if (hovered && module.hasSettings()) {
                 boolean gearHovered = mouseX >= cx && mouseX <= cx + 18 && mouseY >= cy && mouseY <= cy + 18;
                 if (gearHovered) {
                     graphics.text(font, "⚙", cx + 4, cy + 3, 0xFFFFFFFF);
@@ -409,12 +432,14 @@ public final class EzHubScreen extends Screen {
 
     private void openModuleSettings(Module module) {
         if (minecraft == null) return;
-        if (module instanceof HudModule hud) {
-            minecraft.gui.setScreen(new HudSettingsScreen(this, hud));
+        if (module instanceof FeatureModule feature) {
+            EzScreenBridge.set(minecraft, new FeatureSettingsScreen(this, feature));
+        } else if (module instanceof HudModule hud) {
+            EzScreenBridge.set(minecraft, new HudSettingsScreen(this, hud));
         } else if (module instanceof ZoomModule) {
-            minecraft.gui.setScreen(new ZoomSettingsScreen(this));
+            EzScreenBridge.set(minecraft, new ZoomSettingsScreen(this));
         } else {
-            minecraft.gui.setScreen(new ModuleSettingsScreen(this, module));
+            EzScreenBridge.set(minecraft, new ModuleSettingsScreen(this, module));
         }
     }
 
@@ -425,6 +450,6 @@ public final class EzHubScreen extends Screen {
 
     @Override
     public void onClose() {
-        minecraft.gui.setScreen(parent);
+        EzScreenBridge.set(minecraft, parent);
     }
 }

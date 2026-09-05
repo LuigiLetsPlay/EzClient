@@ -69,6 +69,6 @@ public class FullbrightModule extends Module {
 
     @Override
     public boolean hasSettings() {
-        return true;
+        return false;
     }
 }

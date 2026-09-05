@@ -1,10 +1,27 @@
-# Release Notes formatting rules
+@C:\Users\Luigi\.codex\RTK.md
 
-When creating GitHub releases, creating changelogs, or generating any kind of release notes for the EzClient project, please follow these rules strictly:
+# EzClient maintenance policy
 
-1. **Clean formatting**: Ensure all descriptions and text are formatted cleanly. Do not use raw escape sequences like `\n` or `\r` directly in the markdown or text output unless writing code snippets.
-2. **Proper Markdown**: Use proper Markdown syntax for lists, headings, and line breaks instead of relying on explicit newline characters inside JSON strings when outputting raw text.
-3. **No messy dumps**: Ensure that script outputs or CLI outputs don't dump unformatted text or raw JSON fields into the release body if they are meant to be human-readable. Use `replace('\\n', '\n')` or similar in your scripts to format the output correctly before pushing to GitHub APIs.
-4. **Professional tone**: Keep release notes clear, professional, and user-friendly.
+## Active Minecraft line
 
-Follow these rules for all future version releases or hotfixes!
+- Only the `26.x` family (`26.1`, `26.1.1`, `26.2`) is actively developed and receives
+  EzClient module, rendering, performance, compatibility, or feature updates.
+- Normal changes belong in the current `app/ezclient` implementation and in
+  explicitly `26.x`-scoped sources/resources.
+- A normal JAR build is `python client_mod/build_mod.py`; it builds only
+  `26.1`, `26.1.1`, and `26.2`.
+
+## Retired legacy EzClient lines & Base Launcher Support
+
+- EzClient mod JARs for Minecraft versions outside of `26.x` (1.8.9, 1.12.2, 1.16.5,
+  1.20.1, 1.21.x) are retired and archived in `Old/` (ignored via `.gitignore`).
+- The launcher continues to fully support all Minecraft releases from `1.8.9` to `26.x`
+  for **Vanilla**, **Fabric**, and **Forge**.
+- No legacy/frozen stars or labels are displayed in the launcher; only active `26.x`
+  versions receive the gold EzClient badge.
+
+## 26.x artifact safety
+
+- The `26.x` family shares one maintained source implementation but produces an
+  exact JAR per Minecraft version. Never substitute one `26.x` JAR for another.
+- Future product version updates apply to `26.x` only.

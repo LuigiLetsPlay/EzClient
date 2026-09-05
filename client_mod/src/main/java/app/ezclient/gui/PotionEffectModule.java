@@ -38,7 +38,32 @@ public final class PotionEffectModule extends HudModule {
     private List<MobEffectInstance> editorEffects;
 
     public PotionEffectModule() {
-        super("Potion Effects", "HUD", false, 10, 100, "", "");
+        super("Potion Effects", "HUD", false, -1, 6, "", "");
+    }
+
+    @Override
+    public int getX() {
+        if (super.getX() == -1) {
+            Minecraft client = Minecraft.getInstance();
+            if (client.getWindow() != null) {
+                int screenW = client.getWindow().getGuiScaledWidth();
+                return Math.max(10, screenW - getWidth(client) - 6);
+            }
+            return 200;
+        }
+        return super.getX();
+    }
+
+    @Override
+    protected void onToggle() {
+        if (isEnabled() && super.getX() == -1) {
+            Minecraft client = Minecraft.getInstance();
+            if (client.getWindow() != null) {
+                int screenW = client.getWindow().getGuiScaledWidth();
+                setX(Math.max(10, screenW - getWidth(client) - 6));
+                setY(6);
+            }
+        }
     }
 
     @Override
@@ -80,7 +105,17 @@ public final class PotionEffectModule extends HudModule {
 
         List<MobEffectInstance> list = new ArrayList<>();
         if (client.player != null) {
-            list.addAll(client.player.getActiveEffects());
+            FullbrightModule fb = ModuleManager.getInstance().getFullbrightModule();
+            boolean fbActive = fb != null && fb.isEnabled();
+
+            for (MobEffectInstance inst : client.player.getActiveEffects()) {
+                if (inst.getEffect().is(MobEffects.NIGHT_VISION)) {
+                    if (fbActive || inst.getDuration() > 20000) {
+                        continue;
+                    }
+                }
+                list.add(inst);
+            }
         }
 
         if (sortOrder == SortOrder.DURATION_DESC) {

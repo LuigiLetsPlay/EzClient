@@ -1,0 +1,3 @@
+presence-api: "http://127.0.0.1:18765/api/presence"
+detector-token: "CHANGE_ME"
+refresh-seconds: 30

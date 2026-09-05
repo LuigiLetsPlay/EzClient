@@ -18,6 +18,7 @@ import net.minecraft.resources.Identifier;
 import app.ezclient.gui.ConfigManager;
 import app.ezclient.gui.EzClientScreen;
 import app.ezclient.gui.EzHubScreen;
+import app.ezclient.gui.EzScreenBridge;
 import app.ezclient.gui.HudEditorScreen;
 import app.ezclient.gui.HudRenderer;
 import app.ezclient.gui.ModuleManager;
@@ -29,11 +30,11 @@ import app.ezclient.render.ConnectedGlassModel;
  * EzClient Core Mod
  * - Dynamic Window Title ("EzClient") & Custom Window Icon
  * - Skip Narrator Notification & Accessibility Prompt
- * - First-Launch Performance & PvP Optimization (Fast Graphics, 8 Chunks, No Shadows/Clouds, Biome Blend 0, Unlimited FPS)
+ * - First-Launch Performance & PvP Optimization (Fast Graphics, 8 Chunks, No Shadows/Clouds, Biome Blend 0, 120 FPS default)
  */
 public class EzClientMod implements ClientModInitializer {
-    public static final String CLIENT_VERSION = "1.8.2";
-    public static final String CLIENT_TITLE = "EzClient 1.8.2";
+    public static final String CLIENT_VERSION = "2.0.0";
+    public static final String CLIENT_TITLE = "EzClient 2.0.0";
     private static volatile boolean running = true;
     private static Path ezClientDataDir = null;
 
@@ -86,15 +87,17 @@ public class EzClientMod implements ClientModInitializer {
         log("========================================");
 
         ConfigManager.load();
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STARTED.register(client ->
+            client.getSoundManager().addListener(app.ezclient.gui.FeatureModule.get(app.ezclient.gui.SoundEnhancerModule.class)));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.getWindow() != null) {
                 boolean isGuiKeyDown = InputConstants.isKeyDown(client.getWindow(), GLFW.GLFW_KEY_RIGHT_SHIFT);
                 if (isGuiKeyDown && !lastGuiKeyState) {
-                    if (client.gui.screen() instanceof EzHubScreen || client.gui.screen() instanceof HudEditorScreen) {
-                        client.gui.setScreen(null);
-                    } else if (client.gui.screen() == null && client.level != null && client.player != null) {
-                        client.gui.setScreen(new EzHubScreen(null));
+                    if (EzScreenBridge.current(client) instanceof EzHubScreen || EzScreenBridge.current(client) instanceof HudEditorScreen) {
+                        EzScreenBridge.set(client, null);
+                    } else if (EzScreenBridge.current(client) == null && client.level != null && client.player != null) {
+                        EzScreenBridge.set(client, new EzHubScreen(null));
                     }
                 }
                 lastGuiKeyState = isGuiKeyDown;
@@ -130,9 +133,21 @@ public class EzClientMod implements ClientModInitializer {
                 }
             } catch (Throwable ignored) {}
 
-            CommunityCapeManager.tick(client);
-            
+            if (client.level == null || client.player == null) {
+                app.ezclient.cosmetics.ThirdPartyPresence.clearPending();
+            } else {
+                CommunityCapeManager.tick(client);
+                app.ezclient.cosmetics.ActiveSkinManager.tick(client);
+            }
         });
+
+        try {
+            net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, mc) -> {
+                app.ezclient.cosmetics.ThirdPartyPresence.clearPending();
+                app.ezclient.cosmetics.CommunityPresence.clearOnline();
+                CommunityCapeManager.clearSession();
+            });
+        } catch (Throwable ignored) {}
 
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("ezclient", "performance_hud"), (graphics, tickDelta) -> {
             Minecraft client = Minecraft.getInstance();
@@ -244,7 +259,7 @@ public class EzClientMod implements ClientModInitializer {
                 options.put("cloudStatus", "false");            // OFF
                 options.put("particles", "2");                  // Minimal (2=minimal, 1=decreased, 0=all)
                 options.put("biomeBlendRadius", "0");           // 0 (OFF)
-                options.put("maxFps", "260");                   // Max framerate / Unlimited
+                options.put("maxFps", "120");                   // Leave CPU/GPU headroom
                 options.put("enableVsync", "false");            // VSync OFF
                 options.put("onboardAccessibility", "false");   // Skip accessibility screen
                 options.put("narrator", "0");                   // Narrator OFF (0)

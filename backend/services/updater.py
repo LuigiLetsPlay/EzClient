@@ -214,7 +214,14 @@ def run_installer_and_exit(installer_path: Path) -> bool:
 
         install_dir = _update_install_dir()
 
-        args = [str(installer_path), "--update", f"--dir={install_dir}"]
+        args = [
+            str(installer_path),
+            "/SILENT",
+            "/CLOSEAPPLICATIONS",
+            f"/DIR={install_dir}",
+            "--update",
+            f"--dir={install_dir}",
+        ]
         creationflags = 0
         if sys.platform == "win32":
             creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP

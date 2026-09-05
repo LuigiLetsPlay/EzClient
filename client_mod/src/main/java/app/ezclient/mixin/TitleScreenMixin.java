@@ -1,6 +1,7 @@
 package app.ezclient.mixin;
 
 import app.ezclient.gui.EzHubScreen;
+import app.ezclient.gui.EzScreenBridge;
 import app.ezclient.gui.EzButton;
 import com.llamalad7.mixinextras.expression.Definition;
 import com.llamalad7.mixinextras.expression.Expression;
@@ -75,7 +76,7 @@ public abstract class TitleScreenMixin {
         net.minecraft.resources.Identifier icon = net.minecraft.resources.Identifier.fromNamespaceAndPath("ezclient", "textures/icons/ezclient.png");
         EzButton button = new EzButton(
                 0, 0, 20, 20, Component.empty(), icon, true,
-                ignored -> Minecraft.getInstance().gui.setScreen(new EzHubScreen(titleScreen))
+                ignored -> EzScreenBridge.set(Minecraft.getInstance(), new EzHubScreen(titleScreen))
         );
 
         button.setPosition(

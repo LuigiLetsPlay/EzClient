@@ -2,15 +2,19 @@ package app.ezclient.gui;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import org.lwjgl.glfw.GLFW;
 
-/** Compact, clean settings screen for Zoom. */
+/** Compact, clean settings screen for Zoom with configurable Hotkey. */
 public final class ZoomSettingsScreen extends Screen {
     private final Screen parent;
     private int panelX;
     private int panelY;
     private int panelWidth;
     private int panelHeight;
+    private boolean isListeningForHotkey = false;
 
     public ZoomSettingsScreen(Screen parent) {
         super(app.ezclient.util.EzI18n.comp("ezclient.zoom.title"));
@@ -21,7 +25,7 @@ public final class ZoomSettingsScreen extends Screen {
     protected void init() {
         ZoomModule zoom = ModuleManager.getInstance().getZoomModule();
         panelWidth = Math.min(340, width - 24);
-        panelHeight = Math.min(226, height - 24);
+        panelHeight = Math.min(236, height - 24);
         panelX = (width - panelWidth) / 2;
         panelY = (height - panelHeight) / 2;
 
@@ -30,13 +34,22 @@ public final class ZoomSettingsScreen extends Screen {
 
         int controlX = panelX + 100;
         int controlWidth = panelWidth - 114;
+        int halfWidth = (controlWidth - 6) / 2;
         int y = panelY + 44;
 
-        addRenderableWidget(new EzButton(controlX, y, controlWidth, 18,
+        // Toggle button & Hotkey button side-by-side
+        addRenderableWidget(new EzButton(controlX, y, halfWidth, 18,
                 Component.literal(app.ezclient.util.EzI18n.get("ezclient.zoom.status", app.ezclient.util.EzI18n.onOrOff(zoom.isEnabled()))), zoom.isEnabled(), ignored -> {
                     zoom.toggle();
                     rebuildWidgets();
                 }));
+
+        addRenderableWidget(new EzButton(controlX + halfWidth + 6, y, halfWidth, 18,
+                Component.literal(getKeyName(zoom.getKeyBind())), isListeningForHotkey, ignored -> {
+                    isListeningForHotkey = true;
+                    rebuildWidgets();
+                }));
+
         y += 24;
         addSlider(controlX, y, controlWidth, normalized(zoom.getZoomLevel(), 1, 30),
                 v -> zoom.setZoomLevel(scale(v, 1, 30)),
@@ -63,6 +76,47 @@ public final class ZoomSettingsScreen extends Screen {
 
         addRenderableWidget(new EzButton(panelX + panelWidth - 56, panelY + panelHeight - 24, 46, 16,
                 app.ezclient.util.EzI18n.comp("ezclient.zoom.back"), false, ignored -> onClose()));
+    }
+
+    private String getKeyName(int key) {
+        if (isListeningForHotkey) return "Key: ...";
+        if (key == -1) return "Key: None";
+        String name = GLFW.glfwGetKeyName(key, 0);
+        if (name == null || name.isEmpty()) {
+            if (key == GLFW.GLFW_KEY_LEFT_SHIFT) return "Key: LShift";
+            if (key == GLFW.GLFW_KEY_RIGHT_SHIFT) return "Key: RShift";
+            if (key == GLFW.GLFW_KEY_LEFT_CONTROL) return "Key: LCtrl";
+            if (key == GLFW.GLFW_KEY_RIGHT_CONTROL) return "Key: RCtrl";
+            if (key == GLFW.GLFW_KEY_LEFT_ALT) return "Key: LAlt";
+            if (key == GLFW.GLFW_KEY_RIGHT_ALT) return "Key: RAlt";
+            if (key == GLFW.GLFW_KEY_SPACE) return "Key: Space";
+            return "Key: " + key;
+        }
+        return "Key: " + name.toUpperCase();
+    }
+
+    @Override
+    public boolean mouseClicked(MouseButtonEvent e, boolean doubleClick) {
+        if (isListeningForHotkey) {
+            return true;
+        }
+        return super.mouseClicked(e, doubleClick);
+    }
+
+    @Override
+    public boolean keyPressed(KeyEvent event) {
+        if (isListeningForHotkey) {
+            ZoomModule zoom = ModuleManager.getInstance().getZoomModule();
+            if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+                zoom.setKeyBind(-1);
+            } else {
+                zoom.setKeyBind(event.key());
+            }
+            isListeningForHotkey = false;
+            rebuildWidgets();
+            return true;
+        }
+        return super.keyPressed(event);
     }
 
     private void addSlider(int x, int y, int width, double initial,
@@ -112,6 +166,6 @@ public final class ZoomSettingsScreen extends Screen {
     @Override
     public void onClose() {
         ConfigManager.save();
-        minecraft.gui.setScreen(parent);
+        EzScreenBridge.set(minecraft, parent);
     }
 }

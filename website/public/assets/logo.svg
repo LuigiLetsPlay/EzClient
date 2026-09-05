@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="topFacet" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#55FFA2"/>
+      <stop offset="100%" stop-color="#1FD674"/>
+    </linearGradient>
+    <linearGradient id="leftFacet" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14B85E"/>
+      <stop offset="100%" stop-color="#086632"/>
+    </linearGradient>
+    <linearGradient id="rightFacet" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00E676"/>
+      <stop offset="100%" stop-color="#009A4D"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Top Facet -->
+  <polygon points="64,14 110,40 64,66 18,40" fill="url(#topFacet)" stroke="#A7F3D0" stroke-width="2.5" stroke-linejoin="round"/>
+
+  <!-- Left Facet -->
+  <polygon points="18,40 64,66 64,118 18,92" fill="url(#leftFacet)" stroke="#34D399" stroke-width="2.5" stroke-linejoin="round"/>
+
+  <!-- Right Facet -->
+  <polygon points="64,66 110,40 110,92 64,118" fill="url(#rightFacet)" stroke="#34D399" stroke-width="2.5" stroke-linejoin="round"/>
+
+  <!-- Stylized Isometric 'E' on Right Facet -->
+  <path d="M74 61 L98 47 L98 55 L82 64 L82 74 L94 67 L94 74 L82 81 L82 91 L98 81 L98 89 L74 103 Z" fill="#FFFFFF" opacity="0.95"/>
+
+  <!-- Geometric Circuit Accents on Left Facet -->
+  <polyline points="28,52 54,67 54,106" stroke="#A7F3D0" stroke-width="2.5" opacity="0.85" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

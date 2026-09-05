@@ -10,6 +10,6 @@ public final class EzClientScreen extends Screen {
 
     @Override
     protected void init() {
-        minecraft.gui.setScreen(new EzHubScreen(null));
+        EzScreenBridge.set(minecraft, new EzHubScreen(null));
     }
 }

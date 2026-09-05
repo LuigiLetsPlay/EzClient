@@ -1,5 +1,6 @@
 package app.ezclient.gui;
 
+import app.ezclient.shared.ZoomState;
 import net.minecraft.resources.Identifier;
 
 /**
@@ -7,10 +8,7 @@ import net.minecraft.resources.Identifier;
  * mouse scroll magnification, and cinematic smoothing options.
  */
 public final class ZoomModule extends Module {
-    private double zoomLevel = 4.0;
-    private double currentDynamicZoom = 4.0;
-    private double minZoom = 1.5;
-    private double maxZoom = 15.0;
+    private final ZoomState state = new ZoomState(4.0, 1.5, 15.0);
     private double scrollSensitivity = 0.5;
     private boolean smoothZoom = true;
     private boolean mouseSensitivityScaling = true;
@@ -18,7 +16,7 @@ public final class ZoomModule extends Module {
 
     public ZoomModule() {
         super("Zoom", "RENDER", true);
-        this.currentDynamicZoom = this.zoomLevel;
+        setKeyBind(org.lwjgl.glfw.GLFW.GLFW_KEY_C);
     }
 
     @Override
@@ -26,33 +24,32 @@ public final class ZoomModule extends Module {
         return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/zoom.png");
     }
 
-    public double getZoomLevel() { return zoomLevel; }
+    public double getZoomLevel() { return state.getConfiguredZoom(); }
     public void setZoomLevel(double zoomLevel) {
-        this.zoomLevel = Math.max(minZoom, Math.min(maxZoom, zoomLevel));
-        this.currentDynamicZoom = this.zoomLevel;
+        state.setConfiguredZoom(zoomLevel);
         ConfigManager.save();
     }
 
-    public double getActiveZoomLevel() { return currentDynamicZoom; }
+    public double getActiveZoomLevel() { return state.getActiveZoom(); }
 
     public void adjustScrollZoom(double delta) {
-        this.currentDynamicZoom = Math.max(minZoom, Math.min(maxZoom, this.currentDynamicZoom + delta));
+        state.adjust(delta);
     }
 
     public void resetToDefault() {
-        this.currentDynamicZoom = this.zoomLevel;
+        state.beginZoom();
     }
 
-    public double getMinZoom() { return minZoom; }
+    public double getMinZoom() { return state.getMinZoom(); }
     public void setMinZoom(double value) {
-        minZoom = Math.max(1.0, Math.min(value, maxZoom));
-        setZoomLevel(zoomLevel);
+        state.setMinZoom(value);
+        ConfigManager.save();
     }
 
-    public double getMaxZoom() { return maxZoom; }
+    public double getMaxZoom() { return state.getMaxZoom(); }
     public void setMaxZoom(double value) {
-        maxZoom = Math.max(minZoom, Math.min(30.0, value));
-        setZoomLevel(zoomLevel);
+        state.setMaxZoom(value);
+        ConfigManager.save();
     }
 
     public double getScrollSensitivity() { return scrollSensitivity; }

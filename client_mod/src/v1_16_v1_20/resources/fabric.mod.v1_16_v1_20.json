@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "ezclient",
+  "version": "${version}",
+  "name": "EzClient",
+  "description": "Premium Minecraft PvP and Performance Client Mod.",
+  "authors": ["Luigi", "EzClient Team"],
+  "contact": {
+    "homepage": "https://ezclient.app"
+  },
+  "license": "Proprietary",
+  "icon": "assets/ezclient/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "app.ezclient.v1_16_v1_20.EzClientMod_1_16_1_20"
+    ]
+  },
+  "mixins": [
+    "ezclient.v1_16_v1_20.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": "${loader_dependency}",
+    "minecraft": "${minecraft_dependency}",
+    "java": "${java_dependency}"
+  }
+}

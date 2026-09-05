@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 MIGRATION_VERSION = 1801
-CORE_IDS = ("ezclient", "sodium", "lithium", "iris")
+CORE_IDS = ("ezclient", "sodium", "lithium", "iris", "entityculling")
 
 # Normalized Fabric/Forge ids and historical launcher slugs. Filename matching
 # is only accepted together with ownership evidence from the saved profile.
@@ -89,7 +89,7 @@ class ProfileMigrationService:
         return report
 
     def _migrate_profile(self, profile: "ProfileData", report: MigrationReport) -> bool:
-        from backend.services.store import PERFORMANCE_MODS
+        from backend.services.store import performance_mods_for_version
 
         changed = False
         managed_manifest = {
@@ -179,7 +179,8 @@ class ProfileMigrationService:
             existing = {
                 _normal(mod.slug or mod.project_id): mod for mod in profile.mods
             }
-            for template in PERFORMANCE_MODS:
+            templates = performance_mods_for_version(profile.minecraft_version)
+            for template in templates:
                 target = existing.get(_normal(template.slug))
                 if target is None:
                     profile.mods.append(ModData(**asdict(template)))
@@ -192,11 +193,11 @@ class ProfileMigrationService:
                     if template.slug != "ezclient" and target.version != "Latest":
                         target.version = "Latest"
                         changed = True
-            expected_core = list(CORE_IDS)
+            expected_core = [template.slug for template in templates]
             if profile.managed_core_mods != expected_core:
                 profile.managed_core_mods = expected_core
                 changed = True
-            profile.integrated_mods = list(CORE_IDS)
+            profile.integrated_mods = list(expected_core)
         else:
             if profile.managed_core_mods:
                 profile.managed_core_mods = []

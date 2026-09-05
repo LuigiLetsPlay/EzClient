@@ -1,3 +1,5 @@
+from typing import Any
+
 from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex, QByteArray, Slot, Signal
 from backend.models.types import ProfileData
 
@@ -9,6 +11,7 @@ class ProfileModel(QAbstractListModel):
     ModsCountRole = Qt.UserRole + 5
     LastPlayedRole = Qt.UserRole + 6
     OptimizeRole = Qt.UserRole + 7
+    IconRole = Qt.UserRole + 8
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -23,6 +26,7 @@ class ProfileModel(QAbstractListModel):
             self.ModsCountRole: QByteArray(b"modsCount"),
             self.LastPlayedRole: QByteArray(b"lastPlayed"),
             self.OptimizeRole: QByteArray(b"optimize"),
+            self.IconRole: QByteArray(b"icon"),
         }
 
     def rowCount(self, parent=QModelIndex()) -> int:
@@ -46,6 +50,8 @@ class ProfileModel(QAbstractListModel):
             return p.last_played or "Never"
         elif role == self.OptimizeRole:
             return p.optimize
+        elif role == self.IconRole:
+            return getattr(p, "icon", "") or ""
         return None
 
     def set_profiles(self, profiles: list[ProfileData]) -> None:

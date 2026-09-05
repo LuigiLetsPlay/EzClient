@@ -11,6 +11,7 @@ from backend.services.minecraft import minecraft_dir
 from backend.models.types import STATE_PATH
 
 CACHE_FILE = STATE_PATH.parent / "auth_cache.json"
+ACCOUNTS_FILE = STATE_PATH.parent / "accounts.json"
 
 MICROSOFT_CLIENT_ID = "00000000402b5328"
 MICROSOFT_REDIRECT_URI = "https://login.live.com/oauth20_desktop.srf"
@@ -22,6 +23,7 @@ MICROSOFT_AUTH_URL = (
     f"&response_type=code"
     f"&redirect_uri={urllib.parse.quote(MICROSOFT_REDIRECT_URI)}"
     f"&scope={urllib.parse.quote(MICROSOFT_SCOPE)}"
+    f"&prompt=select_account"
 )
 
 @dataclass
@@ -31,6 +33,7 @@ class MinecraftSession:
     access_token: str
     user_type: str = "msa"
     skin_url: str = ""
+    cape_url: str = ""
     refresh_token: str = ""
     expires_at: float = 0.0
     is_online: bool = False
@@ -164,6 +167,8 @@ def _exchange_msa_token_to_minecraft(msa_token: str, refresh_token: str = "") ->
             uuid_val = prof_data.get("id", "")
             skins = prof_data.get("skins", [])
             skin_url = skins[0].get("url", "") if skins else ""
+            capes = prof_data.get("capes", [])
+            cape_url = next((cape.get("url", "") for cape in capes if cape.get("state", "ACTIVE") == "ACTIVE"), "")
 
             session = MinecraftSession(
                 username=name,
@@ -171,6 +176,7 @@ def _exchange_msa_token_to_minecraft(msa_token: str, refresh_token: str = "") ->
                 access_token=mc_token,
                 user_type="msa",
                 skin_url=skin_url,
+                cape_url=cape_url,
                 refresh_token=refresh_token,
                 expires_at=time.time() + float(expires_in) - 60,
                 is_online=True
@@ -253,8 +259,56 @@ def _save_cached_session(session: MinecraftSession) -> None:
     try:
         CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
         CACHE_FILE.write_text(json.dumps(asdict(session), indent=2), encoding="utf-8")
+        accounts = {}
+        if ACCOUNTS_FILE.is_file():
+            raw = json.loads(ACCOUNTS_FILE.read_text(encoding="utf-8"))
+            accounts = raw if isinstance(raw, dict) else {}
+        accounts[session.uuid] = asdict(session)
+        ACCOUNTS_FILE.write_text(json.dumps(accounts, indent=2), encoding="utf-8")
     except Exception:
         pass
+
+def list_saved_accounts() -> list[dict]:
+    try:
+        raw = json.loads(ACCOUNTS_FILE.read_text(encoding="utf-8")) if ACCOUNTS_FILE.is_file() else {}
+        if not isinstance(raw, dict):
+            raw = {}
+        active_uuid = ""
+        if CACHE_FILE.is_file():
+            cached = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+            active_uuid = str(cached.get("uuid", ""))
+            # Transparently migrate the former single-account cache.
+            if active_uuid and active_uuid not in raw:
+                raw[active_uuid] = cached
+                ACCOUNTS_FILE.write_text(json.dumps(raw, indent=2), encoding="utf-8")
+        return [
+            {
+                "uuid": uuid_value,
+                "username": str(data.get("username", "Player")),
+                "skinUrl": str(data.get("skin_url", "")),
+                "capeUrl": str(data.get("cape_url", "")),
+                "active": uuid_value == active_uuid,
+            }
+            for uuid_value, data in raw.items() if isinstance(data, dict)
+        ]
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return []
+
+def activate_saved_account(uuid_value: str) -> Optional[MinecraftSession]:
+    try:
+        raw = json.loads(ACCOUNTS_FILE.read_text(encoding="utf-8"))
+        data = raw.get(uuid_value) if isinstance(raw, dict) else None
+        if not isinstance(data, dict):
+            return None
+        session = MinecraftSession(**data)
+        if session.expires_at <= time.time() + 300 and session.refresh_token:
+            refreshed = _refresh_minecraft_token(session.refresh_token)
+            if refreshed:
+                return refreshed
+        CACHE_FILE.write_text(json.dumps(asdict(session), indent=2), encoding="utf-8")
+        return session
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return None
 
 def logout_account() -> None:
     """Clears cached account session."""
@@ -263,6 +317,22 @@ def logout_account() -> None:
             CACHE_FILE.unlink()
     except Exception:
         pass
+
+def remove_saved_account(uuid_value: str) -> bool:
+    """Removes one saved account and clears the active session when it matches."""
+    try:
+        raw = json.loads(ACCOUNTS_FILE.read_text(encoding="utf-8")) if ACCOUNTS_FILE.is_file() else {}
+        if not isinstance(raw, dict) or uuid_value not in raw:
+            return False
+        raw.pop(uuid_value, None)
+        ACCOUNTS_FILE.write_text(json.dumps(raw, indent=2), encoding="utf-8")
+        if CACHE_FILE.is_file():
+            active = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+            if str(active.get("uuid", "")) == uuid_value:
+                CACHE_FILE.unlink(missing_ok=True)
+        return True
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return False
 
 def _fallback_offline_account(mc_dir: Path) -> MinecraftSession:
     """Reads basic profile info from launcher_accounts.json for offline fallback."""
