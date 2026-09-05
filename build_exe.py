@@ -62,7 +62,7 @@ def build_exe():
     cmd = [
         "pyinstaller",
         "--name=EzClient",
-        "--onefile",
+        "--onedir",
         "--windowed",
         "--noupx",
         f"--icon={icon_path}",
@@ -86,23 +86,37 @@ def build_exe():
         print(f"[Build] PyInstaller failed with exit code {res.returncode}")
         sys.exit(res.returncode)
 
-    dist_exe = root / "dist" / "EzClient.exe"
+    dist_dir = root / "dist" / "EzClient"
+    dist_exe = dist_dir / "EzClient.exe"
     if dist_exe.exists():
         try:
             from tools.sign_tool import sign_binary
             print("[Build] Signing EzClient.exe with Authenticode...")
-            sign_binary(dist_exe)
+            sign_binary(dist_exe, description="EzClient")
         except Exception as e:
             print(f"[Build] Note: Could not sign EzClient.exe: {e}")
 
-        size_mb = dist_exe.stat().st_size / (1024 * 1024)
+        # Create portable ZIP archive
+        from backend.models.types import APP_VERSION
+        portable_zip_name = f"EzClient-v{APP_VERSION}-Windows-Portable"
+        print(f"[Build] Creating portable ZIP archive: {portable_zip_name}.zip ...")
+        zip_path = shutil.make_archive(
+            str(root / "dist" / portable_zip_name),
+            "zip",
+            root_dir=root / "dist",
+            base_dir="EzClient"
+        )
+        zip_size_mb = Path(zip_path).stat().st_size / (1024 * 1024)
+
         print("==================================================")
-        print(f" [SUCCESS] EzClient.exe created successfully!")
-        print(f" Location: {dist_exe.resolve()}")
-        print(f" Size: {size_mb:.2f} MB")
+        print(f" [SUCCESS] EzClient production build ready!")
+        print(f" Folder:   {dist_dir.resolve()}")
+        print(f" Launcher: {dist_exe.resolve()}")
+        print(f" Portable: {Path(zip_path).name} ({zip_size_mb:.2f} MB)")
         print("==================================================")
     else:
-        print("[Build] Warning: Output exe not found in dist/")
+        print("[Build] Warning: Output exe not found in dist/EzClient/")
 
 if __name__ == "__main__":
     build_exe()
+

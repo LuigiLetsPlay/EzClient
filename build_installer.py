@@ -30,7 +30,9 @@ def find_iscc() -> Path | None:
 
 
 def build() -> None:
-    launcher = ROOT / "dist" / "EzClient.exe"
+    launcher = ROOT / "dist" / "EzClient" / "EzClient.exe"
+    if not launcher.is_file():
+        launcher = ROOT / "dist" / "EzClient.exe"
     if not launcher.is_file():
         raise FileNotFoundError("Build the launcher first: python build_exe.py")
 
