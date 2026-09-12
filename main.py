@@ -15,6 +15,31 @@ from PySide6.QtCore import QUrl, Qt, QTimer, QSize
 
 from backend.models.types import APP_VERSION
 from backend.ui_splash import EzSplashScreen
+import traceback
+
+def handle_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    err_str = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+    print(f"[CRITICAL] Unhandled exception:\n{err_str}", file=sys.stderr)
+    try:
+        log_dir = Path.home() / ".ezclient" / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        (log_dir / "launcher_crash.log").write_text(err_str, encoding="utf-8")
+    except Exception:
+        pass
+    try:
+        from PySide6.QtWidgets import QMessageBox
+        QMessageBox.critical(
+            None,
+            "EzClient Unerwarteter Fehler",
+            f"Ein unerwarteter Fehler ist aufgetreten:\n\n{exc_type.__name__}: {exc_value}\n\nEin Fehlerbericht wurde unter ~/.ezclient/logs/launcher_crash.log gespeichert."
+        )
+    except Exception:
+        pass
+
+sys.excepthook = handle_exception
 
 
 def get_app_root() -> Path:
@@ -179,11 +204,34 @@ def main() -> None:
     splash.setMessage("Lade Launcher-Komponenten…", 95)
     app.processEvents()
 
+    from PySide6.QtWidgets import QMessageBox
+
+    qml_errors = []
+    def on_qml_warning(warnings):
+        for w in warnings:
+            msg = w.toString()
+            qml_errors.append(msg)
+            print(f"[QML] {msg}", file=sys.stderr)
+
+    engine.warnings.connect(on_qml_warning)
+
     qml_file = qml_dir / "App.qml"
     engine.load(QUrl.fromLocalFile(str(qml_file)))
 
     if not engine.rootObjects():
         splash.close()
+        err_detail = "\n".join(qml_errors[-6:]) if qml_errors else "Keine Fehlermeldung von QML empfangen."
+        try:
+            log_dir = Path.home() / ".ezclient" / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            (log_dir / "launcher_crash.log").write_text("\n".join(qml_errors), encoding="utf-8")
+        except Exception:
+            pass
+        QMessageBox.critical(
+            None,
+            "EzClient Launcher Fehler",
+            f"Die Benutzeroberfläche von EzClient konnte nicht geladen werden.\n\nDetails:\n{err_detail}"
+        )
         sys.exit(-1)
 
     window = engine.rootObjects()[0]

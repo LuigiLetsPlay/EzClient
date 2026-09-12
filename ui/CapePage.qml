@@ -130,67 +130,6 @@ Item {
                                     text: root.activeCommunityCapeUrl === (modelData.imageUrl || "") ? "Aktiv" : "Nutzen"
                                     primary: root.activeCommunityCapeUrl === (modelData.imageUrl || "")
                                     onClicked: {
-            }
-        }
-
-        Text { text: root.status; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: root.capes.length ? EzTheme.textMuted : EzTheme.textSecondary }
-
-        ScrollView {
-            Layout.fillWidth: true; Layout.fillHeight: true; clip: true
-
-            GridView {
-                id: capeGrid
-                anchors.fill: parent
-                cellWidth: Math.max(180, Math.min(250, width / Math.max(2, Math.floor(width / 220))))
-                cellHeight: 238
-                model: root.capes
-                delegate: Item {
-                    width: capeGrid.cellWidth; height: capeGrid.cellHeight
-                    Rectangle {
-                        anchors.fill: parent; anchors.margins: 6; radius: 14; color: EzTheme.surface2; border.color: cardMouse.containsMouse ? EzTheme.accent : EzTheme.border
-                        Behavior on border.color { ColorAnimation { duration: 120 } }
-                        ColumnLayout {
-                            anchors.fill: parent; anchors.margins: 12; spacing: 8
-                            Rectangle {
-                                Layout.preferredWidth: 72; Layout.fillHeight: true; Layout.alignment: Qt.AlignHCenter; radius: 9; color: EzTheme.surface3; clip: true
-                                CapeTextureImage {
-                                    anchors.fill: parent
-                                    anchors.margins: 7
-                                    capeSource: modelData.imageUrl || ""
-                                    animationSource: modelData.animationUrl || ""
-                                }
-                                Rectangle {
-                                    visible: !!modelData.isAnimated
-                                    anchors.top: parent.top; anchors.right: parent.right; anchors.margins: 4
-                                    width: 16; height: 16; radius: 8; color: EzTheme.accent
-                                    Text { anchors.centerIn: parent; text: "▶"; font.pixelSize: 9; color: "#0B0E14"; font.bold: true }
-                                }
-                                MouseArea {
-                                    anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        root.previewCapeUrl = modelData.imageUrl || ""
-                                        root.previewCapeAnimUrl = modelData.animationUrl || ""
-                                        root.previewCapeTitle = modelData.title || "Community Cape"
-                                        capePreviewDialog.open()
-                                    }
-                                }
-                            }
-                            RowLayout {
-                                Layout.fillWidth: true; spacing: 4
-                                Text { text: modelData.title || "Community Cape"; font.family: EzTheme.mcFontFamily; font.pixelSize: 12; font.bold: true; color: EzTheme.text; Layout.fillWidth: true; elide: Text.ElideRight }
-                                Rectangle {
-                                    visible: !!modelData.isAnimated
-                                    Layout.preferredHeight: 16; Layout.preferredWidth: 42; radius: 4; color: "#16A34A"
-                                    Text { anchors.centerIn: parent; text: "ANIM"; font.pixelSize: 9; font.bold: true; color: "#FFF" }
-                                }
-                            }
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Text { text: "von " + (modelData.owner || "EzClient Spieler"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted; Layout.fillWidth: true; elide: Text.ElideRight }
-                                EzButton {
-                                    text: root.activeCommunityCapeUrl === (modelData.imageUrl || "") ? "Aktiv" : "Nutzen"
-                                    primary: root.activeCommunityCapeUrl === (modelData.imageUrl || "")
-                                    onClicked: {
                                         if (root.activeCommunityCapeUrl === (modelData.imageUrl || "")) return
                                         accountController.activateCommunityCape(modelData.imageUrl, modelData.animationUrl || "")
                                     }
