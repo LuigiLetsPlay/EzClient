@@ -30,6 +30,12 @@ public final class CommunityPresence {
 
     private CommunityPresence() {}
 
+    public static void connect(UUID playerId, String username) {
+        nextHeartbeat = 0;
+        heartbeat(playerId, username);
+        CosmeticEvents.connect();
+    }
+
     public static String getApiUrl() {
         String env = System.getenv("EZCLIENT_CAPE_API");
         if (env != null && !env.isBlank()) return env.replaceAll("/+$", "");
@@ -47,22 +53,17 @@ public final class CommunityPresence {
 
         String name = username != null && !username.isBlank() ? username : "Spieler";
         String body = "{\"player_uuid\":\"" + playerId + "\",\"username\":\"" + name
-                + "\",\"client\":\"ezclient\"}";
+                + "\",\"client\":\"ezclient\",\"version\":\"2.1.0\"}";
         String endpoint = getApiUrl() + "/presence";
 
-        WORKER.execute(() -> {
-            try {
-                HttpRequest req = HttpRequest.newBuilder(URI.create(endpoint))
-                        .timeout(Duration.ofSeconds(5))
-                        .header("Content-Type", "application/json")
-                        .header("User-Agent", "EzClient/2.0.1")
-                        .POST(HttpRequest.BodyPublishers.ofString(body))
-                        .build();
-                HTTP.send(req, CosmeticHttp.text());
-            } catch (Exception ignored) {
-                // Heartbeat is decorative and must not fail loudly if presence server is unreachable
-            }
-        });
+        try {
+            HttpRequest req = HttpRequest.newBuilder(URI.create(endpoint))
+                    .timeout(Duration.ofSeconds(5))
+                    .header("Content-Type", "application/json")
+                    .header("User-Agent", "EzClient/2.1.0")
+                    .POST(HttpRequest.BodyPublishers.ofString(body)).build();
+            HTTP.sendAsync(req, CosmeticHttp.text()).exceptionally(error -> null);
+        } catch (RuntimeException ignored) {}
     }
 
     public static void heartbeat(UUID playerId) {
@@ -92,7 +93,12 @@ public final class CommunityPresence {
         while (entries.find()) {
             ClientType type = ClientType.fromWire(entries.group(2));
             if (type == ClientType.NONE) continue;
-            ONLINE.put(UUID.fromString(entries.group(1)), new SeenClient(type, now));
+            String version = "";
+            try {
+                var entry = com.google.gson.JsonParser.parseString(entries.group()).getAsJsonObject();
+                if (entry.has("version")) version = entry.get("version").getAsString();
+            } catch (RuntimeException ignored) {}
+            ONLINE.put(UUID.fromString(entries.group(1)), new SeenClient(type, now, version));
             structured = true;
         }
         // Compatibility with presence servers from before the client field existed.
@@ -110,6 +116,8 @@ public final class CommunityPresence {
 
     public static void clearOnline() {
         ONLINE.clear();
+        nextHeartbeat = 0;
+        CosmeticEvents.disconnect();
     }
 
     public static ClientType clientForPlayer(UUID playerId, String username) {
@@ -172,5 +180,11 @@ public final class CommunityPresence {
         }
     }
 
-    private record SeenClient(ClientType type, long timestamp) {}
+    public static String versionForPlayer(UUID player) {
+        SeenClient seen = ONLINE.get(player);
+        return seen != null && System.currentTimeMillis() - seen.timestamp() < 95_000L ? seen.version() : "";
+    }
+    private record SeenClient(ClientType type, long timestamp, String version) {
+        private SeenClient(ClientType type, long timestamp) { this(type, timestamp, ""); }
+    }
 }

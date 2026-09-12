@@ -30,7 +30,7 @@ import java.util.regex.Pattern;
 
 /** Bounded, client-only community cape cache. Never blocks rendering or sends cape bytes through a game server. */
 public final class CommunityCapeManager {
-    private static final String API = "http://5.175.192.90:18765/api";
+    private static final String API = CommunityPresence.getApiUrl();
     private static final long REFRESH_MS = 30_000L;
     private static final double RANGE_SQ = 96 * 96;
     private static final Map<UUID, Identifier> CAPES = new ConcurrentHashMap<>();
@@ -66,6 +66,21 @@ public final class CommunityCapeManager {
     private record CachedSkin(Identifier texture, PlayerSkin source, PlayerSkin result) {}
 
     private CommunityCapeManager() {}
+    public static void refreshNow() {
+        nextRefresh = 0;
+        nextVisualScan = 0;
+        nextLocalScan = 0;
+    }
+    public static void onJoin(Minecraft client) {
+        refreshNow();
+        tick(client);
+    }
+    /** Applies a server-sent cape update for one player without waiting for the periodic scan. */
+    public static void refreshPlayer(UUID player) {
+        if (player == null) return;
+        VISIBLE_CAPES.add(player);
+        refreshNearby(List.of(player));
+    }
     public static Identifier cape(UUID player) { return CAPES.get(player); }
     public static PlayerSkin replaceCape(PlayerSkin original, UUID player) {
         Identifier texture = cape(player);
@@ -88,7 +103,7 @@ public final class CommunityCapeManager {
     public static void tick(Minecraft client) {
         if (client.player == null || client.level == null) return;
         if (System.currentTimeMillis() >= nextLocalScan) {
-            nextLocalScan = System.currentTimeMillis() + 5000L;
+            nextLocalScan = System.currentTimeMillis() + 250L;
             loadLocal(client.player.getUUID());
         }
 
@@ -122,10 +137,12 @@ public final class CommunityCapeManager {
                 }
             }
             visual.sort(Comparator.comparingDouble(PlayerDistance::distanceSq));
+            Set<UUID> previousVisible = new HashSet<>(VISIBLE_CAPES);
             VISIBLE_CAPES.clear();
             VISIBLE_CAPES.add(client.player.getUUID());
             for (PlayerDistance pd : visual.subList(0, Math.min(32, visual.size()))) {
                 VISIBLE_CAPES.add(pd.uuid());
+                if (!previousVisible.contains(pd.uuid())) nextRefresh = 0;
                 if (!CAPES.containsKey(pd.uuid()) && !ThirdPartyPresence.isCached(pd.uuid())) {
                     ThirdPartyPresence.enqueue(pd.uuid(), pd.name(), true, pd.distanceSq());
                 }
@@ -135,7 +152,7 @@ public final class CommunityCapeManager {
             }
         }
 
-        if (now < nextRefresh) return;
+        if (now < nextRefresh || REFRESH_RUNNING.get()) return;
         nextRefresh = now + REFRESH_MS;
         List<UUID> nearby = new ArrayList<>();
         client.level.players().forEach(p -> {
@@ -145,6 +162,8 @@ public final class CommunityCapeManager {
         if (!nearby.isEmpty()) {
             refreshNearby(nearby);
             CommunityPresence.refreshNearby(nearby);
+        } else {
+            nextRefresh = now + 250L;
         }
     }
 

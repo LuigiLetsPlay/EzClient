@@ -17,9 +17,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent
 
 RELATIVE_FILES = [
+    "README.md",
     # Java Client Mod
     "client_mod/src/main/java/app/ezclient/EzClientMod.java",
-    "client_mod/src/main/java/app/ezclient/legacy/LegacyEzClientMod.java",
     "client_mod/src/main/java/app/ezclient/gui/EzHubScreen.java",
     "client_mod/src/main/java/app/ezclient/gui/HudEditorScreen.java",
     "client_mod/src/main/java/app/ezclient/cosmetics/CommunityPresence.java",

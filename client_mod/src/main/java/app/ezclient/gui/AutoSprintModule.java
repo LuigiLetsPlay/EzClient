@@ -13,6 +13,11 @@ public class AutoSprintModule extends Module {
     @Override
     public Identifier getIcon() { return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/auto_sprint.png"); }
 
+    @Override
+    public String getDescription() {
+        return "Aktiviert Sprint automatisch beim Vorwärtslaufen, sofern Hunger und Bewegung dies erlauben.";
+    }
+
 
     @Override
     public void onTick() {

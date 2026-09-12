@@ -1,31 +1,6 @@
-import os
-import sys
 import time
 import threading
 from typing import Any, Callable
-
-def kill_official_launcher() -> None:
-    """Terminates official Minecraft launcher processes."""
-    launcher_names = {
-        "minecraftlauncher.exe",
-        "minecraft.exe",
-        "minecraftinstaller.exe"
-    }
-    try:
-        import psutil
-        for proc in psutil.process_iter(['name', 'pid']):
-            try:
-                name = (proc.info.get('name') or "").lower()
-                if name in launcher_names:
-                    proc.kill()
-                    print(f"[ProcessWatcher] Terminated launcher process {name} (PID: {proc.pid})")
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
-    except Exception:
-        # Fallback using taskkill on Windows
-        if sys.platform.startswith("win"):
-            for name in ["MinecraftLauncher.exe", "Minecraft.exe"]:
-                os.system(f"taskkill /f /im {name} >nul 2>&1")
 
 def find_minecraft_process() -> Any:
     """Finds running Minecraft java process."""
@@ -45,10 +20,9 @@ def find_minecraft_process() -> Any:
     return None
 
 class MinecraftWatcher:
-    def __init__(self, on_started: Callable[[], None], on_exited: Callable[[], None], kill_launcher: bool = True):
+    def __init__(self, on_started: Callable[[], None], on_exited: Callable[[], None]):
         self._on_started = on_started
         self._on_exited = on_exited
-        self._kill_launcher = kill_launcher
         self._running = False
         self._thread: threading.Thread | None = None
 
@@ -72,11 +46,7 @@ class MinecraftWatcher:
             proc = find_minecraft_process()
             if proc:
                 game_proc = proc
-                if self._kill_launcher:
-                    print(f"[ProcessWatcher] Minecraft started (PID: {proc.pid})! Killing official launcher…")
-                    kill_official_launcher()
-                else:
-                    print(f"[ProcessWatcher] Minecraft started (PID: {proc.pid})! Launcher kill disabled.")
+                print(f"[ProcessWatcher] Minecraft started (PID: {proc.pid})!")
                 if self._on_started:
                     self._on_started()
                 break

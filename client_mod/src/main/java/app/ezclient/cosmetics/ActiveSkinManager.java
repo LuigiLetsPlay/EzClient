@@ -9,6 +9,7 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.core.ClientAsset;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.PlayerSkin;
+import net.minecraft.world.entity.player.PlayerModelType;
 
 import java.io.ByteArrayInputStream;
 import java.nio.file.Files;
@@ -20,6 +21,7 @@ public final class ActiveSkinManager {
     private static final Identifier TEXTURE_ID = Identifier.fromNamespaceAndPath("ezclient", "skin/active_local");
     private static volatile ClientAsset.Texture activeTexture;
     private static volatile UUID localPlayer;
+    private static volatile PlayerModelType activeModel = PlayerModelType.WIDE;
     private static volatile long fingerprint = Long.MIN_VALUE;
     private static long nextScan;
     private static DynamicTexture dynamicTexture;
@@ -34,7 +36,7 @@ public final class ActiveSkinManager {
 
     public static void tick(Minecraft client) {
         if (client.player == null || System.currentTimeMillis() < nextScan) return;
-        nextScan = System.currentTimeMillis() + 2000L;
+        nextScan = System.currentTimeMillis() + 100L;
         localPlayer = client.player.getUUID();
         if (!SCANNING.compareAndSet(false, true)) return;
         WORKER.execute(() -> scan(client));
@@ -45,14 +47,16 @@ public final class ActiveSkinManager {
         try {
             long descriptorStamp = Files.isRegularFile(descriptor) ? Files.getLastModifiedTime(descriptor).toMillis() : 0L;
             String skinPath = "";
+            String model = "default";
             if (descriptorStamp != 0L) {
                 JsonObject json = JsonParser.parseString(Files.readString(descriptor)).getAsJsonObject();
                 if (json.has("path")) skinPath = json.get("path").getAsString();
+                if (json.has("model")) model = json.get("model").getAsString();
             }
             Path file = skinPath.isBlank() ? null : Path.of(skinPath);
             long fileStamp = file != null && Files.isRegularFile(file)
                     ? Files.getLastModifiedTime(file).toMillis() ^ Files.size(file) : 0L;
-            long nextFingerprint = descriptorStamp ^ Long.rotateLeft(fileStamp, 19);
+            long nextFingerprint = descriptorStamp ^ Long.rotateLeft(fileStamp, 19) ^ model.hashCode();
             if (nextFingerprint == fingerprint) return;
             fingerprint = nextFingerprint;
             if (file == null || !Files.isRegularFile(file)) {
@@ -61,7 +65,8 @@ public final class ActiveSkinManager {
             }
             if (Files.size(file) > 1024 * 1024) return;
             byte[] bytes = Files.readAllBytes(file);
-            client.execute(() -> install(client, bytes));
+            PlayerModelType selectedModel = "slim".equalsIgnoreCase(model) ? PlayerModelType.SLIM : PlayerModelType.WIDE;
+            client.execute(() -> install(client, bytes, selectedModel));
         } catch (Exception ex) {
             EzClientMod.log("Skin hot reload failed: " + ex.getClass().getSimpleName());
         } finally {
@@ -74,12 +79,12 @@ public final class ActiveSkinManager {
         if (body == null || localPlayer == null || !localPlayer.equals(player)) return original;
         CachedSkin cached = cachedSkin;
         if (cached != null && cached.body() == body && (cached.source() == original || cached.source().equals(original))) return cached.result();
-        PlayerSkin result = new PlayerSkin(body, original.cape(), original.elytra(), original.model(), original.secure());
+        PlayerSkin result = new PlayerSkin(body, original.cape(), original.elytra(), activeModel, original.secure());
         cachedSkin = new CachedSkin(body, original, result);
         return result;
     }
 
-    private static void install(Minecraft client, byte[] bytes) {
+    private static void install(Minecraft client, byte[] bytes, PlayerModelType model) {
         try {
             NativeImage image = NativeImage.read(new ByteArrayInputStream(bytes));
             if (!((image.getWidth() == 64 && image.getHeight() == 64)
@@ -90,6 +95,8 @@ public final class ActiveSkinManager {
             DynamicTexture texture = new DynamicTexture(() -> "ezclient-active-skin", image);
             client.getTextureManager().register(TEXTURE_ID, texture);
             dynamicTexture = texture;
+            activeModel = model;
+            cachedSkin = null;
             activeTexture = new SkinAsset(TEXTURE_ID);
             EzClientMod.log("Skin hot reloaded without reconnecting.");
         } catch (Exception ex) {

@@ -36,6 +36,11 @@ public final class CpsModule extends HudModule {
     }
 
     @Override
+    public String getDescription() {
+        return "Zeigt Klicks pro Sekunde für linke und rechte Maustaste an.";
+    }
+
+    @Override
     public Identifier getIcon() {
         return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/cps.png");
     }
@@ -68,13 +73,21 @@ public final class CpsModule extends HudModule {
     @Override
     public int getWidth(Minecraft client) {
         if (client == null || client.font == null) return 48;
-        int textW = client.font.width(displayText(client)) + 8;
-        return showHistoryGraph ? Math.max(textW, 56) : textW;
+        int textW = client.font.width(displayText(client)) + CONTENT_PADDING_X * 2;
+        return showHistoryGraph ? Math.max(textW, 60) : textW;
+    }
+
+    @Override
+    public int getWidth(Minecraft client, boolean editor) {
+        if (!editor) return getWidth(client);
+        if (client == null || client.font == null) return 56;
+        int textW = client.font.width(textForRender(client, true)) + CONTENT_PADDING_X * 2;
+        return showHistoryGraph ? Math.max(textW, 60) : textW;
     }
 
     @Override
     public int getHeight(Minecraft client) {
-        return showHistoryGraph ? 24 : 14;
+        return showHistoryGraph ? 28 : 9 + CONTENT_PADDING_Y * 2;
     }
 
     @Override
@@ -85,6 +98,15 @@ public final class CpsModule extends HudModule {
             case LMB_ONLY -> l + " CPS";
             case RMB_ONLY -> r + " CPS";
             case COMBINED -> l + " | " + r;
+        };
+    }
+
+    private String textForRender(Minecraft client, boolean editor) {
+        if (!editor) return displayText(client);
+        return switch (displayMode) {
+            case LMB_ONLY -> getPrefix() + "14 CPS" + getSuffix();
+            case RMB_ONLY -> getPrefix() + "10 CPS" + getSuffix();
+            case COMBINED -> getPrefix() + "14 | 10" + getSuffix();
         };
     }
 
@@ -105,29 +127,22 @@ public final class CpsModule extends HudModule {
         graphics.pose().translate(getX(), getY());
         graphics.pose().scale(scale, scale);
 
-        String text = displayText(client);
-        if (editor) {
-            text = switch (displayMode) {
-                case LMB_ONLY -> getPrefix() + "14 CPS" + getSuffix();
-                case RMB_ONLY -> getPrefix() + "10 CPS" + getSuffix();
-                case COMBINED -> getPrefix() + "14 | 10" + getSuffix();
-            };
-        }
+        String text = textForRender(client, editor);
 
-        int textW = (client != null && client.font != null) ? client.font.width(text) + 8 : 48;
-        int totalW = showHistoryGraph ? Math.max(textW, 56) : textW;
+        int textW = (client != null && client.font != null) ? client.font.width(text) + CONTENT_PADDING_X * 2 : 48;
+        int totalW = showHistoryGraph ? Math.max(textW, 60) : textW;
         int totalH = getHeight(client);
 
         renderBackgroundAndBorder(graphics, 0, 0, totalW, totalH);
 
         int textColor = color();
-        int textY = showHistoryGraph ? 2 : 3;
-        graphics.text(client.font, text, 4, textY, textColor);
+        int textY = CONTENT_PADDING_Y;
+        graphics.text(client.font, text, CONTENT_PADDING_X, textY, textColor);
 
         if (showHistoryGraph) {
-            int graphX = 4;
-            int graphY = totalH - 8;
-            int graphW = totalW - 8;
+            int graphX = CONTENT_PADDING_X;
+            int graphY = totalH - CONTENT_PADDING_Y - 6;
+            int graphW = totalW - CONTENT_PADDING_X * 2;
             int barW = Math.max(1, graphW / HISTORY_SIZE);
 
             for (int i = 0; i < HISTORY_SIZE; i++) {

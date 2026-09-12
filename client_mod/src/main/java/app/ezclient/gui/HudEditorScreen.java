@@ -108,20 +108,24 @@ public final class HudEditorScreen extends Screen {
     }
 
     private int getModuleWidth(HudModule h) {
-        return (int) (h.getWidth(minecraft, true) * h.getScale());
+        return Math.max(1, (int) Math.ceil(h.getWidth(minecraft, true) * h.getScale()));
     }
 
     private int getModuleHeight(HudModule h) {
-        return (int) (h.getHeight(minecraft) * h.getScale());
+        return Math.max(1, (int) Math.ceil(h.getHeight(minecraft, true) * h.getScale()));
     }
 
     private HudModule hit(double mx, double my) {
-        // Only check enabled modules - disabled modules are not shown or interactive in HUD editor
-        for (HudModule h : ModuleManager.getInstance().getHudModules()) {
+        // Test in reverse render order so visually topmost module wins
+        var modules = ModuleManager.getInstance().getHudModules();
+        for (int index = modules.size() - 1; index >= 0; index--) {
+            HudModule h = modules.get(index);
             if (!h.isEnabled()) continue;
-            int w = getModuleWidth(h);
-            int he = getModuleHeight(h);
-            if (mx >= h.getX() && mx <= h.getX() + w && my >= h.getY() && my <= h.getY() + he) return h;
+            double scale = h.getScale();
+            if (!Double.isFinite(scale) || scale <= 0.0) continue;
+            double localX = (mx - h.getX()) / scale;
+            double localY = (my - h.getY()) / scale;
+            if (h.containsEditorPoint(minecraft, localX, localY)) return h;
         }
         return null;
     }
@@ -206,7 +210,13 @@ public final class HudEditorScreen extends Screen {
                         // Settings item
                         showContextMenu = false;
                         if (contextModule != null) {
-                            EzScreenBridge.set(minecraft, new HudSettingsScreen(this, contextModule));
+                            if (contextModule instanceof KeystrokesModule ks) {
+                                EzScreenBridge.set(minecraft, new KeystrokesSettingsScreen(this, ks));
+                            } else if (contextModule instanceof FeatureModule feat) {
+                                EzScreenBridge.set(minecraft, new FeatureSettingsScreen(this, feat));
+                            } else {
+                                EzScreenBridge.set(minecraft, new HudSettingsScreen(this, contextModule));
+                            }
                         }
                     } else if (relY < 44) {
                         // Toggle enabled/disabled item
@@ -273,8 +283,8 @@ public final class HudEditorScreen extends Screen {
                 return true;
             }
 
-            // Clicked background -> deselect
-            if (e.y() < height - 32) {
+            // Clicked background -> deselect (ignore clicks on the center bottom toolbar)
+            if (e.y() < height - 32 || e.x() < width / 2 - 165 || e.x() > width / 2 + 175) {
                 selected = null;
             }
         }

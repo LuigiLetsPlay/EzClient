@@ -1,5 +1,6 @@
 package app.ezclient.gui;
 
+import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.OverlayTexture;
@@ -8,30 +9,40 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 
 import java.awt.Color;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Damage Tint / Hit Color Module:
  * Customizes entity hurt flash colors away from vanilla red to custom RGBA hues or chroma effects.
+ * Implemented as a declarative FeatureModule with universal color field and per-entity rules.
  */
-public final class DamageTintModule extends Module {
+public final class DamageTintModule extends FeatureModule {
     public enum TargetScope {
         ALL_ENTITIES("All Entities"),
         PLAYERS_ONLY("Players Only"),
-        SELF_ONLY("Self Only");
+        SELF_ONLY("Self Only"),
+        NONE("None");
 
         private final String label;
         TargetScope(String label) { this.label = label; }
         public String getLabel() { return label; }
     }
 
-    private TargetScope targetScope = TargetScope.ALL_ENTITIES;
-    private int customColor = 0xFFFF2255; // Vibrant Pink-Red
-    private int customAlpha = 180; // 0 to 255
-    private boolean chromaMode = false;
-    private float flashDurationMultiplier = 1.0f; // 0.5x to 2.0x
+    private final Map<String, Integer> entityRules = new ConcurrentHashMap<>();
 
     public DamageTintModule() {
-        super("Damage Tint", "Render", false);
+        super("Damage Tint", false, 0);
+        option("Allgemein", "scope", "Ziel", "Wählt die Ziele für den Schadenstreffer-Effekt.",
+                "All Entities", 0, 0, "All Entities", "Players Only", "Self Only", "None");
+        colorOption("Farbe", "color", "Schadensfarbe", "Farbe und Transparenz des Schadensblitzes.", "B4FF2255");
+        flag("Farbe", "chroma", "Chroma-Modus", "Animiert die Schadensfarbe im Regenbogen-Verlauf.", false);
+        option("Darstellung", "flashDuration", "Flash-Dauer", "Multiplikator für die Dauer des Schadensblitzes.", 1.0, 0.5, 2.0);
+    }
+
+    @Override
+    public boolean hasPreview() {
+        return false;
     }
 
     @Override
@@ -40,8 +51,8 @@ public final class DamageTintModule extends Module {
     }
 
     @Override
-    public boolean hasSettings() {
-        return true;
+    public String getDescription() {
+        return "Färbt den Schadenstreffer-Effekt für ausgewählte Ziele mit eigener Farbe, Transparenz oder Chroma ein.";
     }
 
     @Override
@@ -49,20 +60,103 @@ public final class DamageTintModule extends Module {
         applyToTexture(Minecraft.getInstance());
     }
 
-    public TargetScope getTargetScope() { return targetScope; }
-    public void setTargetScope(TargetScope targetScope) { this.targetScope = targetScope; ConfigManager.save(); applyToTexture(Minecraft.getInstance()); }
+    public TargetScope getTargetScope() {
+        String s = text("scope");
+        try {
+            for (TargetScope scope : TargetScope.values()) {
+                if (scope.getLabel().equalsIgnoreCase(s) || scope.name().equalsIgnoreCase(s)) return scope;
+            }
+        } catch (Exception ignored) {}
+        return TargetScope.ALL_ENTITIES;
+    }
 
-    public int getCustomColor() { return customColor; }
-    public void setCustomColor(int customColor) { this.customColor = customColor; ConfigManager.save(); applyToTexture(Minecraft.getInstance()); }
+    public void setTargetScope(TargetScope targetScope) {
+        set("scope", targetScope.getLabel());
+        applyToTexture(Minecraft.getInstance());
+    }
 
-    public int getCustomAlpha() { return customAlpha; }
-    public void setCustomAlpha(int customAlpha) { this.customAlpha = Math.max(0, Math.min(255, customAlpha)); ConfigManager.save(); applyToTexture(Minecraft.getInstance()); }
+    public int getCustomColor() {
+        return tint("color", false) & 0x00FFFFFF;
+    }
 
-    public boolean isChromaMode() { return chromaMode; }
-    public void setChromaMode(boolean chromaMode) { this.chromaMode = chromaMode; ConfigManager.save(); applyToTexture(Minecraft.getInstance()); }
+    public void setCustomColor(int color) {
+        int alpha = getCustomAlpha();
+        int full = ((alpha & 0xFF) << 24) | (color & 0x00FFFFFF);
+        set("color", String.format("%08X", full));
+        applyToTexture(Minecraft.getInstance());
+    }
 
-    public float getFlashDurationMultiplier() { return flashDurationMultiplier; }
-    public void setFlashDurationMultiplier(float flashDurationMultiplier) { this.flashDurationMultiplier = Math.max(0.5f, Math.min(2.0f, flashDurationMultiplier)); ConfigManager.save(); }
+    public int getCustomAlpha() {
+        return (tint("color", false) >>> 24) & 0xFF;
+    }
+
+    public void setCustomAlpha(int alpha) {
+        int rgb = getCustomColor();
+        int full = ((Math.max(0, Math.min(255, alpha)) & 0xFF) << 24) | (rgb & 0x00FFFFFF);
+        set("color", String.format("%08X", full));
+        applyToTexture(Minecraft.getInstance());
+    }
+
+    public boolean isChromaMode() {
+        return flag("chroma");
+    }
+
+    public void setChromaMode(boolean chroma) {
+        set("chroma", chroma);
+        applyToTexture(Minecraft.getInstance());
+    }
+
+    public float getFlashDurationMultiplier() {
+        return (float) number("flashDuration");
+    }
+
+    public void setFlashDurationMultiplier(float multiplier) {
+        set("flashDuration", (double) Math.max(0.5f, Math.min(2.0f, multiplier)));
+    }
+
+    public Map<String, Integer> getEntityRules() { return entityRules; }
+    public Integer getEntityRule(String entityId) { return entityRules.get(entityId); }
+    public void setEntityRule(String entityId, int color) {
+        entityRules.put(entityId, color);
+        ConfigManager.save();
+        applyToTexture(Minecraft.getInstance());
+    }
+    public void removeEntityRule(String entityId) {
+        entityRules.remove(entityId);
+        ConfigManager.save();
+        applyToTexture(Minecraft.getInstance());
+    }
+    public void clearEntityRules() {
+        entityRules.clear();
+        ConfigManager.save();
+        applyToTexture(Minecraft.getInstance());
+    }
+
+    @Override
+    public JsonObject saveFeature() {
+        JsonObject json = super.saveFeature();
+        JsonObject rulesObj = new JsonObject();
+        for (Map.Entry<String, Integer> entry : entityRules.entrySet()) {
+            rulesObj.addProperty(entry.getKey(), entry.getValue());
+        }
+        json.add("entityRules", rulesObj);
+        return json;
+    }
+
+    @Override
+    public void loadFeature(JsonObject json) {
+        super.loadFeature(json);
+        entityRules.clear();
+        if (json.has("entityRules") && json.get("entityRules").isJsonObject()) {
+            JsonObject obj = json.getAsJsonObject("entityRules");
+            for (String key : obj.keySet()) {
+                try {
+                    entityRules.put(key, obj.get(key).getAsInt());
+                } catch (Exception ignored) {}
+            }
+        }
+        applyToTexture(Minecraft.getInstance());
+    }
 
     public void applyToTexture(Minecraft client) {
         if (client == null || client.gameRenderer == null) return;
@@ -86,6 +180,17 @@ public final class DamageTintModule extends Module {
     public int getTint(Entity entity, boolean isSelf) {
         if (!isEnabled()) return 0xB3FF0000;
 
+        if (entity != null) {
+            String id = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
+            if (entityRules.containsKey(id)) {
+                return entityRules.get(id);
+            }
+        }
+
+        TargetScope targetScope = getTargetScope();
+        if (targetScope == TargetScope.NONE) {
+            return 0xB3FF0000;
+        }
         if (targetScope == TargetScope.PLAYERS_ONLY && !(entity instanceof Player)) {
             return 0xB3FF0000;
         }
@@ -93,13 +198,13 @@ public final class DamageTintModule extends Module {
             return 0xB3FF0000;
         }
 
-        int alpha = customAlpha;
-        if (chromaMode) {
+        int alpha = getCustomAlpha();
+        if (isChromaMode()) {
             float hue = (float) ((System.currentTimeMillis() % 2000L) / 2000.0);
             int rgb = Color.HSBtoRGB(hue, 0.9f, 1.0f) & 0x00FFFFFF;
             return (alpha << 24) | rgb;
         }
 
-        return (alpha << 24) | (customColor & 0x00FFFFFF);
+        return (alpha << 24) | getCustomColor();
     }
 }

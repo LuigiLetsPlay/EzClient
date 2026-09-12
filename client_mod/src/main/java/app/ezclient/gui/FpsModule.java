@@ -32,6 +32,11 @@ public final class FpsModule extends HudModule {
     }
 
     @Override
+    public String getDescription() {
+        return "Zeigt die aktuelle Bildrate mit optionaler Glättung und Leistungsstatistik an.";
+    }
+
+    @Override
     public Identifier getIcon() {
         return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/fps.png");
     }
@@ -82,18 +87,28 @@ public final class FpsModule extends HudModule {
     @Override
     public int getWidth(Minecraft client) {
         if (client == null || client.font == null) return 40;
-        int baseW = client.font.width(displayText(client)) + 8;
+        int baseW = client.font.width(displayText(client)) + CONTENT_PADDING_X * 2;
         if (showMinMax) {
             String minMaxStr = "Min: " + minFps + " Max: " + maxFps;
-            int mmW = (int) (client.font.width(minMaxStr) * 0.7f) + 8;
+            int mmW = (int) (client.font.width(minMaxStr) * 0.7f) + CONTENT_PADDING_X * 2;
             return Math.max(baseW, mmW);
         }
         return baseW;
     }
 
     @Override
+    public int getWidth(Minecraft client, boolean editor) {
+        if (!editor) return getWidth(client);
+        if (client == null || client.font == null) return 40;
+        int textW = client.font.width(textForRender(true)) + CONTENT_PADDING_X * 2;
+        if (!showMinMax) return textW;
+        int minMaxW = (int) (client.font.width(minMaxText(true)) * 0.7f) + CONTENT_PADDING_X * 2;
+        return Math.max(textW, minMaxW);
+    }
+
+    @Override
     public int getHeight(Minecraft client) {
-        return showMinMax ? 22 : 14;
+        return showMinMax ? 26 : 9 + CONTENT_PADDING_Y * 2;
     }
 
     @Override
@@ -120,6 +135,19 @@ public final class FpsModule extends HudModule {
         };
     }
 
+    private String textForRender(boolean editor) {
+        if (!editor) return currentDisplayText();
+        return switch (formatOption) {
+            case LABEL_VALUE -> getPrefix() + "240" + getSuffix();
+            case VALUE_LABEL -> "240 FPS" + getSuffix();
+            case MINIMAL -> "240";
+        };
+    }
+
+    private String minMaxText(boolean editor) {
+        return "Min: " + (editor ? 180 : minFps) + "  Max: " + (editor ? 290 : maxFps);
+    }
+
     public void renderCustom(GuiGraphicsExtractor graphics, Minecraft client, boolean editor) {
         sampleFps(client);
         float scale = (float) getScale();
@@ -127,20 +155,13 @@ public final class FpsModule extends HudModule {
         graphics.pose().translate(getX(), getY());
         graphics.pose().scale(scale, scale);
 
-        String text = currentDisplayText();
-        if (editor) {
-            text = switch (formatOption) {
-                case LABEL_VALUE -> getPrefix() + "240" + getSuffix();
-                case VALUE_LABEL -> "240 FPS" + getSuffix();
-                case MINIMAL -> "240";
-            };
-        }
+        String text = textForRender(editor);
 
-        int textW = (client != null && client.font != null) ? client.font.width(text) + 8 : 40;
+        int textW = (client != null && client.font != null) ? client.font.width(text) + CONTENT_PADDING_X * 2 : 40;
         int totalW = textW;
         if (showMinMax && client != null && client.font != null) {
-            String mm = "Min: " + (editor ? 180 : minFps) + "  Max: " + (editor ? 290 : maxFps);
-            int mmW = (int) (client.font.width(mm) * 0.7f) + 8;
+            String mm = minMaxText(editor);
+            int mmW = (int) (client.font.width(mm) * 0.7f) + CONTENT_PADDING_X * 2;
             totalW = Math.max(textW, mmW);
         }
         int totalH = getHeight(client);
@@ -148,13 +169,13 @@ public final class FpsModule extends HudModule {
         renderBackgroundAndBorder(graphics, 0, 0, totalW, totalH);
 
         int textColor = color();
-        graphics.text(client.font, text, 4, 3, textColor);
+        graphics.text(client.font, text, CONTENT_PADDING_X, CONTENT_PADDING_Y, textColor);
 
         if (showMinMax) {
             graphics.pose().pushMatrix();
-            graphics.pose().translate(4, 13);
+            graphics.pose().translate(CONTENT_PADDING_X, 15);
             graphics.pose().scale(0.7f, 0.7f);
-            String mm = "Min: " + (editor ? 180 : minFps) + "  Max: " + (editor ? 290 : maxFps);
+            String mm = minMaxText(editor);
             graphics.text(client.font, mm, 0, 0, 0xFFAAAAAA);
             graphics.pose().popMatrix();
         }

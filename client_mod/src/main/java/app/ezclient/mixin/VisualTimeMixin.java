@@ -12,7 +12,9 @@ public class VisualTimeMixin {
     private void ezclient$time(EnvironmentAttribute<?> attribute, Vec3 position, SpatialAttributeInterpolator interpolator, CallbackInfoReturnable<Object> cir) {
         if (attribute != EnvironmentAttributes.SUN_ANGLE && attribute != EnvironmentAttributes.MOON_ANGLE && attribute != EnvironmentAttributes.STAR_ANGLE
             && attribute != EnvironmentAttributes.STAR_BRIGHTNESS && attribute != EnvironmentAttributes.SKY_LIGHT_FACTOR
-            && attribute != EnvironmentAttributes.SKY_COLOR && attribute != EnvironmentAttributes.SUNRISE_SUNSET_COLOR) return;
+            && attribute != EnvironmentAttributes.SKY_COLOR && attribute != EnvironmentAttributes.SUNRISE_SUNSET_COLOR
+            && attribute != EnvironmentAttributes.CLOUD_COLOR && attribute != EnvironmentAttributes.FOG_COLOR
+            && attribute != EnvironmentAttributes.SKY_LIGHT_COLOR && attribute != EnvironmentAttributes.AMBIENT_LIGHT_COLOR) return;
         var mc = Minecraft.getInstance();
         if (mc.level == null || mc.level.environmentAttributes() != (Object)this) return;
         var module = FeatureModule.get(TimeWeatherModule.class);
@@ -24,6 +26,10 @@ public class VisualTimeMixin {
         else if (attribute == EnvironmentAttributes.STAR_BRIGHTNESS) cir.setReturnValue((1 - daylight) * .5f);
         else if (attribute == EnvironmentAttributes.SKY_LIGHT_FACTOR) cir.setReturnValue(daylight);
         else if (attribute == EnvironmentAttributes.SKY_COLOR) cir.setReturnValue(HudModule.interpolateColor(0xff080b18, 0xff78a7ff, daylight));
+        else if (attribute == EnvironmentAttributes.CLOUD_COLOR) cir.setReturnValue(HudModule.interpolateColor(0xff252a38, 0xffffffff, daylight));
+        else if (attribute == EnvironmentAttributes.FOG_COLOR) cir.setReturnValue(HudModule.interpolateColor(0xff090d18, 0xffc0d8ff, daylight));
+        else if (attribute == EnvironmentAttributes.SKY_LIGHT_COLOR) cir.setReturnValue(HudModule.interpolateColor(0xff405080, 0xffffffff, daylight));
+        else if (attribute == EnvironmentAttributes.AMBIENT_LIGHT_COLOR) cir.setReturnValue(HudModule.interpolateColor(0xff000000, 0xff202020, daylight));
         else if (attribute == EnvironmentAttributes.SUNRISE_SUNSET_COLOR) cir.setReturnValue(daylight > .05 && daylight < .95 ? 0x88ff8844 : 0);
     }
 }

@@ -36,9 +36,10 @@ Item {
     function updateCape() {
         if (!isLoaded || !webEngine) return
         var info = capeAnimationInfo || {}
-        if (info.sheetUrl) {
-            setAnimatedCape(info.sheetUrl, info.frameCount, info.fps, info.columns,
-                            info.frameWidth, info.frameHeight, info.pingPong)
+        if (info && info.sheetUrl) {
+            var cleanSheet = (info.sheetUrl || "").replace(/[\r\n]/g, "").replace(/'/g, "\\'")
+            var animJs = "setAnimatedCape('" + cleanSheet + "', " + Number(info.frameCount) + ", " + Number(info.fps) + ", " + Number(info.columns) + ", " + Number(info.frameWidth) + ", " + Number(info.frameHeight) + ", " + (info.pingPong ? "true" : "false") + ");"
+            webEngine.runJavaScript(animJs)
             return
         }
         var src = (capeSource || "").replace(/[\r\n]/g, "").replace(/'/g, "\\'")
@@ -46,6 +47,15 @@ Item {
     }
 
     function setAnimatedCape(sheetUrl, frameCount, fps, columns, frameW, frameH, pingPong) {
+        skin3dRoot.capeAnimationInfo = {
+            sheetUrl: sheetUrl,
+            frameCount: frameCount,
+            fps: fps,
+            columns: columns,
+            frameWidth: frameW,
+            frameHeight: frameH,
+            pingPong: pingPong
+        }
         if (!isLoaded || !webEngine) return
         var cleanSheet = (sheetUrl || "").replace(/[\r\n]/g, "").replace(/'/g, "\\'")
         var js = "setAnimatedCape('" + cleanSheet + "', " + Number(frameCount) + ", " + Number(fps) + ", " + Number(columns) + ", " + Number(frameW) + ", " + Number(frameH) + ", " + (pingPong ? "true" : "false") + ");"

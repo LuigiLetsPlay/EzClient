@@ -1,4 +1,4 @@
-"""Build the complete EzClient 2.0.1 Windows release."""
+"""Build the complete EzClient 2.1.0 Windows release."""
 import subprocess
 import sys
 from pathlib import Path
@@ -12,8 +12,12 @@ def build() -> None:
         print(f"[Release] Running {script} ...")
         subprocess.run([sys.executable, str(ROOT / script)], cwd=ROOT, stdin=subprocess.DEVNULL, check=True)
 
-    for filename in ("EzClient.exe", "EzClient-Setup.exe"):
-        artifact = ROOT / "dist" / filename
+    launcher = ROOT / "dist" / "EzClient" / "EzClient.exe"
+    if not launcher.is_file():
+        launcher = ROOT / "dist" / "EzClient.exe"
+    setup = ROOT / "dist" / "EzClient-Setup.exe"
+
+    for artifact in (launcher, setup):
         if not artifact.is_file() or artifact.stat().st_size == 0:
             raise RuntimeError(f"Missing release artifact: {artifact}")
         print(f"[Release] Ready: {artifact} ({artifact.stat().st_size / 1024 / 1024:.1f} MB)")

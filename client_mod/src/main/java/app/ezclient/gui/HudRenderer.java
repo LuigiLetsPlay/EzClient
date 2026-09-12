@@ -6,12 +6,45 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 public final class HudRenderer {
     private HudRenderer() {}
 
+    /**
+     * Renders the module through its normal editor path and centers the resulting
+     * HUD geometry in the supplied preview area without changing saved X/Y values.
+     */
+    public static void drawCenteredPreview(GuiGraphicsExtractor graphics, HudModule module,
+                                           int centerX, int centerY, int maxWidth, int maxHeight) {
+        Minecraft client = Minecraft.getInstance();
+        int moduleWidth = Math.max(1, module.getWidth(client, true));
+        int moduleHeight = Math.max(1, module.getHeight(client, true));
+        float moduleScale = (float) module.getScale();
+        float renderedWidth = moduleWidth * moduleScale;
+        float renderedHeight = moduleHeight * moduleScale;
+        float fitScale = Math.min(1.0f, Math.min(
+                Math.max(1, maxWidth) / renderedWidth,
+                Math.max(1, maxHeight) / renderedHeight
+        ));
+
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(centerX, centerY);
+        graphics.pose().scale(fitScale, fitScale);
+        graphics.pose().translate(
+                -module.getX() - renderedWidth / 2.0f,
+                -module.getY() - renderedHeight / 2.0f
+        );
+        draw(graphics, module, true);
+        graphics.pose().popMatrix();
+    }
+
     public static void draw(GuiGraphicsExtractor graphics, HudModule module, boolean editor) {
         Minecraft client = Minecraft.getInstance();
         if (!module.isEnabled() && !editor) return;
         if (!editor && EzScreenBridge.hudHidden(client)) return;
         if (module instanceof FeatureModule feature) {
             feature.renderFeature(graphics, client, editor); return;
+        }
+
+        if (module instanceof ChatCustomizerModule chat) {
+            chat.renderCustom(graphics, client, editor);
+            return;
         }
 
         if (module instanceof KeystrokesModule keystrokes) {
@@ -48,7 +81,6 @@ public final class HudRenderer {
             toggleSprint.renderCustom(graphics, client, editor);
             return;
         }
-
         if (module instanceof CrosshairModule crosshair) {
             if (editor) crosshair.renderCustom(graphics, client, true);
             return;
@@ -61,11 +93,14 @@ public final class HudRenderer {
         graphics.pose().translate(module.getX(), module.getY());
         graphics.pose().scale(scale, scale);
 
-        int w = client.font.width(text) + 8;
-        int h = module.getHeight(client);
+        int w = module.getWidth(client, editor);
+        int h = module.getHeight(client, editor);
 
+        int padX = (module.hasBackground() || module.hasBorder()) ? HudModule.CONTENT_PADDING_X : 2;
+        int padY = (module.hasBackground() || module.hasBorder()) ? HudModule.CONTENT_PADDING_Y : 1;
         module.renderBackgroundAndBorder(graphics, 0, 0, w, h);
-        graphics.text(client.font, module.styledText(text), 4, 3, module.color(), module.isTextShadow());
+        graphics.text(client.font, module.styledText(text), padX,
+                padY, module.color(), module.isTextShadow());
 
         graphics.pose().popMatrix();
     }

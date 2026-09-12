@@ -330,8 +330,8 @@ export default function Hero() {
                       <div className="space-y-2">
                         <div className="p-2.5 rounded bg-[#12121B] border border-[#1A1A28] flex items-center justify-between text-xs">
                           <div>
-                            <span className="font-bold text-white block text-[11px]">Entity Culling</span>
-                            <span className="text-[10px] text-zinc-400">Blockiert unsichtbare Mobs</span>
+                            <span className="font-bold text-white block text-[11px]">Sodium</span>
+                            <span className="text-[10px] text-zinc-400">Schnelleres Rendering</span>
                           </div>
                           <button className="btn-emerald text-[10px] px-2.5 py-1 rounded">Installieren</button>
                         </div>

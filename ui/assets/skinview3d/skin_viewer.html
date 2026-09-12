@@ -162,13 +162,17 @@
     }
   }
 
+  let currentAnimSheet = "";
+
   function setAnimatedCape(sheetUrl, frameCount, fps, columns, frameW, frameH, pingPong) {
     stopCapeAnimation();
     if (!skinViewer || !sheetUrl) return;
 
+    currentAnimSheet = sheetUrl;
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
+      if (currentAnimSheet !== sheetUrl) return;
       capeAnimImg = img;
       const count = Math.max(1, Number(frameCount) || 1);
       const fFps = Math.max(1, Math.min(60, Number(fps) || 12));
@@ -181,6 +185,12 @@
         skinViewer.capeCanvas.width = fw;
         skinViewer.capeCanvas.height = fh;
         skinViewer.recreateCapeTexture();
+      }
+      if (skinViewer.playerObject && skinViewer.playerObject.cape && skinViewer.playerObject.cape.material) {
+        skinViewer.playerObject.cape.material.needsUpdate = true;
+      }
+      if (skinViewer.playerObject && skinViewer.playerObject.elytra && skinViewer.playerObject.elytra.material) {
+        skinViewer.playerObject.elytra.material.needsUpdate = true;
       }
 
       let currentFrame = 0;

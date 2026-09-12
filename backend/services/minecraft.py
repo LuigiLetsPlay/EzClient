@@ -64,7 +64,9 @@ def fabric_version(mc_version: str) -> str:
     ] if versions.exists() else []
     if not candidates:
         return f"fabric-loader-0.16.10-{mc_version}"
-    return max(candidates, key=lambda p: p.stat().st_mtime).name
+    from backend.services.game_bootstrap import _parse_loader_version
+    candidates.sort(key=lambda p: _parse_loader_version(p.name), reverse=True)
+    return candidates[0].name
 
 def patch_profile_file(path: Path, profile: ProfileData, version_id: str) -> None:
     data = read_json(path, {})

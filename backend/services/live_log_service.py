@@ -12,6 +12,29 @@ except ImportError:
     psutil = None
 
 TIMESTAMP_REGEX = re.compile(r"^\[(\d{2}:\d{2}:\d{2})\]")
+LOG_LEVEL_REGEX = re.compile(r"\[(?:[^/\]]+/)?(FATAL|ERROR|WARN|WARNING|INFO|DEBUG|TRACE)\]", re.IGNORECASE)
+
+
+def detect_log_level(raw: str) -> str:
+    m = LOG_LEVEL_REGEX.search(raw)
+    if m:
+        lvl = m.group(1).upper()
+        if lvl == "WARNING":
+            return "WARN"
+        if lvl == "FATAL":
+            return "ERROR"
+        return lvl
+    upper = raw.upper()
+    if any(x in upper for x in ("EXCEPTION", "CRASH")) or "ERROR:" in upper:
+        return "ERROR"
+    if "WARN" in upper:
+        return "WARN"
+    if "DEBUG" in upper:
+        return "DEBUG"
+    if "TRACE" in upper:
+        return "TRACE"
+    return "INFO"
+
 
 
 class LiveLogService(QObject):
@@ -23,6 +46,8 @@ class LiveLogService(QObject):
     logsCleared = Signal()
     instancesChanged = Signal()
     selectedInstanceChanged = Signal()
+    allInstancesStopped = Signal()
+    instanceExited = Signal(str, int, bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -87,6 +112,7 @@ class LiveLogService(QObject):
                 "profilePath": state["profile_path"],
                 "running": state["running"],
                 "pid": state["pid"] or 0,
+                "startTime": state["start_time"],
                 "uptime": int((state.get("end_time") or now) - state["start_time"]),
                 "lineCount": len(state["lines"]),
             } for instance_id in reversed(self._instance_order)
@@ -118,10 +144,10 @@ class LiveLogService(QObject):
         self.instancesChanged.emit()
         self.selectedInstanceChanged.emit()
         self.isRunningChanged.emit()
-        self.logsCleared.emit()
         self._emit_selected_stats()
         threading.Thread(target=self._tail_worker, args=(instance_id,), daemon=True).start()
         threading.Thread(target=self._stats_worker, args=(instance_id,), daemon=True).start()
+        threading.Thread(target=self._process_watcher_worker, args=(instance_id,), daemon=True).start()
         try:
             from backend.services import discord_service
             discord_service.set_rpc_state(f"Playing {instance_name}", "In Game")
@@ -147,14 +173,13 @@ class LiveLogService(QObject):
         self.instancesChanged.emit()
         self.selectedInstanceChanged.emit()
         self.isRunningChanged.emit()
-        self.logsCleared.emit()
         return instance_id
 
     def detach_process(self, instance_id: str = "") -> None:
         target_id = instance_id or self._selected_id
         with self._lock:
             state = self._instances.get(target_id)
-            if not state:
+            if not state or not state.get("running"):
                 return
             state["running"] = False
             state["end_time"] = time.time()
@@ -169,6 +194,66 @@ class LiveLogService(QObject):
                 discord_service.set_rpc_state("Im EzClient Launcher", "Navigating Menus")
             except Exception:
                 pass
+            try:
+                self.allInstancesStopped.emit()
+            except RuntimeError:
+                pass
+
+    def _process_watcher_worker(self, instance_id: str) -> None:
+        with self._lock:
+            state = self._instances.get(instance_id)
+            if not state:
+                return
+            proc = state.get("process")
+            pid = state.get("pid")
+            stop_event = state.get("stop_event")
+
+        if proc and hasattr(proc, "wait") and callable(proc.wait):
+            try:
+                proc.wait()
+            except Exception:
+                pass
+        elif proc and hasattr(proc, "poll") and callable(proc.poll):
+            while True:
+                if stop_event and stop_event.is_set():
+                    break
+                if proc.poll() is not None:
+                    break
+                time.sleep(0.5)
+        elif psutil and pid:
+            try:
+                p = psutil.Process(pid)
+                while p.is_running():
+                    if stop_event and stop_event.is_set():
+                        break
+                    time.sleep(0.5)
+            except Exception:
+                return
+        else:
+            return
+
+        time.sleep(0.5)
+        with self._lock:
+            state = self._instances.get(instance_id)
+            if not state or not state.get("running"):
+                return
+            intentional = state.get("intentional_stop", False)
+            rc = getattr(proc, "returncode", None) if proc else None
+
+        if rc is not None and not intentional:
+            if rc != 0:
+                self.append_system_message(f"Minecraft wurde mit Exit-Code {rc} beendet.", "WARN", instance_id)
+            else:
+                self.append_system_message("Minecraft wurde beendet.", "INFO", instance_id)
+        elif not intentional:
+            self.append_system_message("Minecraft wurde beendet.", "INFO", instance_id)
+
+        try:
+            self.instanceExited.emit(instance_id, int(rc) if rc is not None else 0, intentional)
+        except Exception:
+            pass
+
+        self.detach_process(instance_id)
 
     def _tail_worker(self, instance_id: str) -> None:
         last_pos = 0
@@ -196,9 +281,7 @@ class LiveLogService(QObject):
     def _process_log_line(self, instance_id: str, raw: str) -> None:
         match = TIMESTAMP_REGEX.search(raw)
         stamp = match.group(1) if match else time.strftime("%H:%M:%S")
-        upper = raw.upper()
-        level = "ERROR" if any(x in upper for x in ("ERROR", "FATAL", "EXCEPTION", "CRASH")) else (
-            "WARN" if "WARN" in upper else "DEBUG" if "DEBUG" in upper else "TRACE" if "TRACE" in upper else "INFO")
+        level = detect_log_level(raw)
         entry = {"raw": raw, "level": level, "time": stamp, "message": raw}
         with self._lock:
             state = self._instances.get(instance_id)
@@ -236,7 +319,41 @@ class LiveLogService(QObject):
     @Slot(result="QVariantList")
     def getBufferedLogs(self) -> list[dict[str, str]]:
         state = self._selected()
-        return [dict(item) for item in state["lines"]] if state else list(self._pending_lines)
+        if not state:
+            return list(self._pending_lines)
+        with self._lock:
+            # Fallback: if in-memory lines are empty, load lines from log file on disk
+            if not state["lines"] and state.get("log_file"):
+                try:
+                    p = Path(state["log_file"])
+                    if p.exists():
+                        with open(p, "r", encoding="utf-8", errors="replace") as f:
+                            for raw in f:
+                                raw = raw.rstrip("\r\n")
+                                if raw.strip():
+                                    match = TIMESTAMP_REGEX.search(raw)
+                                    stamp = match.group(1) if match else time.strftime("%H:%M:%S")
+                                    level = detect_log_level(raw)
+                                    state["lines"].append({"raw": raw, "level": level, "time": stamp, "message": raw})
+                except Exception:
+                    pass
+            return [dict(item) for item in state["lines"]]
+
+    @Slot(str, result=str)
+    def getFullLog(self, instance_id: str = "") -> str:
+        target_id = instance_id or self._selected_id
+        with self._lock:
+            state = self._instances.get(target_id)
+            if state:
+                log_file = state.get("log_file")
+                if log_file and Path(log_file).exists():
+                    try:
+                        return Path(log_file).read_text(encoding="utf-8", errors="replace")
+                    except Exception:
+                        pass
+                if state.get("lines"):
+                    return "\n".join(entry.get("raw", "") for entry in state["lines"])
+        return "\n".join(entry.get("raw", "") for entry in self._pending_lines)
 
     def _stats_worker(self, instance_id: str) -> None:
         with self._lock:
@@ -247,34 +364,39 @@ class LiveLogService(QObject):
             try:
                 process = psutil.Process(pid)
             except Exception:
-                pass
+                process = None
         while True:
             with self._lock:
                 state = self._instances.get(instance_id)
-                if not state or state["stop_event"].is_set():
+                if not state or not state.get("running") or state["stop_event"].is_set():
                     return
                 uptime = int(time.time() - state["start_time"])
-                selected = instance_id == self._selected_id
-            cpu = ram = 0.0
+                selected = (instance_id == self._selected_id)
+            cpu = 0.0
+            ram = 0.0
             if process:
                 try:
                     if not process.is_running():
-                        return
-                    cpu = process.cpu_percent(interval=0.1)
+                        break
+                    cpu = process.cpu_percent()
                     ram = process.memory_info().rss / (1024 * 1024)
                 except Exception:
-                    return
+                    pass
             if selected:
                 try:
                     self.statsUpdated.emit(round(cpu, 1), round(ram, 1), uptime)
-                except (RuntimeError, Exception):
-                    return
+                except Exception:
+                    pass
             time.sleep(1.0)
 
     def _emit_selected_stats(self) -> None:
         state = self._selected()
-        uptime = int(time.time() - state["start_time"]) if state else 0
-        self.statsUpdated.emit(0.0, 0.0, uptime)
+        now = time.time()
+        uptime = int((state.get("end_time") or now) - state["start_time"]) if state else 0
+        try:
+            self.statsUpdated.emit(0.0, 0.0, uptime)
+        except Exception:
+            pass
 
     @Slot(str, result=bool)
     def selectInstance(self, instance_id: str) -> bool:
@@ -284,7 +406,6 @@ class LiveLogService(QObject):
             self._selected_id = instance_id
         self.selectedInstanceChanged.emit()
         self.isRunningChanged.emit()
-        self.logsCleared.emit()
         self._emit_selected_stats()
         return True
 
@@ -331,7 +452,6 @@ class LiveLogService(QObject):
                 self._selected_id = self._instance_order[-1] if self._instance_order else ""
         self.instancesChanged.emit()
         self.selectedInstanceChanged.emit()
-        self.logsCleared.emit()
 
     @Slot(result=str)
     def getAllLogsText(self) -> str:

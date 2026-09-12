@@ -26,6 +26,11 @@ public final class TntTimerModule extends Module {
     }
 
     @Override
+    public String getDescription() {
+        return "Zeigt eine gut lesbare Restzeit über gezündetem TNT mit optionaler dynamischer Warnfarbe.";
+    }
+
+    @Override
     public boolean hasSettings() {
         return true;
     }

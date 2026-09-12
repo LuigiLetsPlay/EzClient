@@ -17,13 +17,30 @@ import java.util.List;
  */
 public final class ArmorStatusModule extends HudModule {
     public enum DurabilityMode { PERCENT, HITS, DAMAGE_BAR, ICON_ONLY }
+    public enum EquipmentMode {
+        ARMOR_ONLY("ezclient.hud_settings.armor_mode.armor"),
+        MAIN_HAND_ONLY("ezclient.hud_settings.armor_mode.main_hand"),
+        BOTH_HANDS("ezclient.hud_settings.armor_mode.both_hands"),
+        ARMOR_AND_MAIN_HAND("ezclient.hud_settings.armor_mode.armor_main"),
+        ALL("ezclient.hud_settings.armor_mode.all");
+
+        private final String translationKey;
+
+        EquipmentMode(String translationKey) {
+            this.translationKey = translationKey;
+        }
+
+        public String getLabel() {
+            return app.ezclient.util.EzI18n.get(translationKey);
+        }
+    }
 
     private boolean horizontal = false;
     private DurabilityMode durabilityMode = DurabilityMode.PERCENT;
     private boolean colorTiers = true;
     private boolean damageWarning = true;
     private boolean showItemCount = true;
-    private boolean showHands = true;
+    private EquipmentMode equipmentMode = EquipmentMode.ALL;
     private boolean dynamicBox = true;
 
     private static ItemStack dummyHelmet = null;
@@ -37,6 +54,11 @@ public final class ArmorStatusModule extends HudModule {
 
     public ArmorStatusModule() {
         super("Armor Status", "HUD", false, 10, 60, "", "");
+    }
+
+    @Override
+    public String getDescription() {
+        return "Zeigt Rüstung, Hand-Items und deren Haltbarkeit direkt im HUD an.";
     }
 
     @Override
@@ -59,31 +81,53 @@ public final class ArmorStatusModule extends HudModule {
     public boolean isShowItemCount() { return showItemCount; }
     public void setShowItemCount(boolean showItemCount) { this.showItemCount = showItemCount; ConfigManager.save(); }
 
-    public boolean isShowHands() { return showHands; }
-    public void setShowHands(boolean showHands) { this.showHands = showHands; ConfigManager.save(); }
+    public EquipmentMode getEquipmentMode() { return equipmentMode; }
+    public void setEquipmentMode(EquipmentMode equipmentMode) {
+        this.equipmentMode = equipmentMode == null ? EquipmentMode.ALL : equipmentMode;
+        ConfigManager.save();
+    }
+
+    /** Legacy config bridge: old true/false values map to All or Armor Only. */
+    public boolean isShowHands() { return equipmentMode != EquipmentMode.ARMOR_ONLY; }
+    public void setShowHands(boolean showHands) {
+        setEquipmentMode(showHands ? EquipmentMode.ALL : EquipmentMode.ARMOR_ONLY);
+    }
 
     public boolean isDynamicBox() { return dynamicBox; }
     public void setDynamicBox(boolean dynamicBox) { this.dynamicBox = dynamicBox; ConfigManager.save(); }
 
     private int getSlotCount() {
-        return showHands ? 6 : 4;
+        return slotIndices().length;
+    }
+
+    private int[] slotIndices() {
+        return switch (equipmentMode) {
+            case ARMOR_ONLY -> new int[]{0, 1, 2, 3};
+            case MAIN_HAND_ONLY -> new int[]{4};
+            case BOTH_HANDS -> new int[]{4, 5};
+            case ARMOR_AND_MAIN_HAND -> new int[]{0, 1, 2, 3, 4};
+            case ALL -> new int[]{0, 1, 2, 3, 4, 5};
+        };
+    }
+
+    private static ItemStack playerItem(Minecraft client, int index) {
+        if (client == null || client.player == null) return ItemStack.EMPTY;
+        return switch (index) {
+            case 0 -> client.player.getItemBySlot(EquipmentSlot.HEAD);
+            case 1 -> client.player.getItemBySlot(EquipmentSlot.CHEST);
+            case 2 -> client.player.getItemBySlot(EquipmentSlot.LEGS);
+            case 3 -> client.player.getItemBySlot(EquipmentSlot.FEET);
+            case 4 -> client.player.getMainHandItem();
+            case 5 -> client.player.getOffhandItem();
+            default -> ItemStack.EMPTY;
+        };
     }
 
     public int getEquippedCount(Minecraft client) {
         if (client == null || client.player == null) return 0;
         int count = 0;
-        EquipmentSlot[] armorSlots = {
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
-        };
-        for (EquipmentSlot slot : armorSlots) {
-            if (!client.player.getItemBySlot(slot).isEmpty()) count++;
-        }
-        if (showHands) {
-            if (!client.player.getMainHandItem().isEmpty()) count++;
-            if (!client.player.getOffhandItem().isEmpty()) count++;
+        for (int index : slotIndices()) {
+            if (!playerItem(client, index).isEmpty()) count++;
         }
         return count;
     }
@@ -94,18 +138,35 @@ public final class ArmorStatusModule extends HudModule {
         return getEquippedCount(client);
     }
 
+    private static final int SLOT_SIZE = 22;
+    private static final int SLOT_GAP = 2;
+
     @Override
     public int getWidth(Minecraft client) {
-        int slots = getActiveSlotCount(client, false);
-        if (dynamicBox && slots == 0) return 22;
-        return horizontal ? slots * 22 : 22;
+        return getWidth(client, false);
+    }
+
+    @Override
+    public int getWidth(Minecraft client, boolean editor) {
+        int slots = getActiveSlotCount(client, editor);
+        int pad = (hasBackground() || hasBorder()) ? CONTENT_PADDING_X : 2;
+        if (dynamicBox && slots == 0 && !editor) return SLOT_SIZE + pad * 2;
+        int count = Math.max(1, slots);
+        return (horizontal ? count * SLOT_SIZE + (count - 1) * SLOT_GAP : SLOT_SIZE) + pad * 2;
     }
 
     @Override
     public int getHeight(Minecraft client) {
-        int slots = getActiveSlotCount(client, false);
-        if (dynamicBox && slots == 0) return 22;
-        return horizontal ? 22 : slots * 22;
+        return getHeight(client, false);
+    }
+
+    @Override
+    public int getHeight(Minecraft client, boolean editor) {
+        int slots = getActiveSlotCount(client, editor);
+        int pad = (hasBackground() || hasBorder()) ? CONTENT_PADDING_Y : 1;
+        if (dynamicBox && slots == 0 && !editor) return SLOT_SIZE + pad * 2;
+        int count = Math.max(1, slots);
+        return (horizontal ? SLOT_SIZE : count * SLOT_SIZE + (count - 1) * SLOT_GAP) + pad * 2;
     }
 
     @Override
@@ -113,15 +174,24 @@ public final class ArmorStatusModule extends HudModule {
         return "Armor";
     }
 
-    private static ItemStack getDummyItem(int index) {
+    private static ItemStack damagedDummy(net.minecraft.world.level.ItemLike item, float remainingRatio) {
+        ItemStack stack = new ItemStack(item);
+        if (stack.isDamageableItem()) {
+            int remaining = Math.max(1, Math.round(stack.getMaxDamage() * remainingRatio));
+            stack.setDamageValue(Math.max(0, stack.getMaxDamage() - remaining));
+        }
+        return stack;
+    }
+
+    public static ItemStack getDummyItem(int index) {
         try {
             return switch (index) {
-                case 0 -> { if (dummyHelmet == null) dummyHelmet = new ItemStack(Items.NETHERITE_HELMET); yield dummyHelmet; }
-                case 1 -> { if (dummyChest == null) dummyChest = new ItemStack(Items.NETHERITE_CHESTPLATE); yield dummyChest; }
-                case 2 -> { if (dummyLegs == null) dummyLegs = new ItemStack(Items.NETHERITE_LEGGINGS); yield dummyLegs; }
-                case 3 -> { if (dummyBoots == null) dummyBoots = new ItemStack(Items.NETHERITE_BOOTS); yield dummyBoots; }
-                case 4 -> { if (dummyMainHand == null) dummyMainHand = new ItemStack(Items.NETHERITE_SWORD); yield dummyMainHand; }
-                case 5 -> { if (dummyOffHand == null) dummyOffHand = new ItemStack(Items.TOTEM_OF_UNDYING); yield dummyOffHand; }
+                case 0 -> { if (dummyHelmet == null) dummyHelmet = damagedDummy(Items.NETHERITE_HELMET, 0.85f); yield dummyHelmet; }
+                case 1 -> { if (dummyChest == null) dummyChest = damagedDummy(Items.NETHERITE_CHESTPLATE, 0.62f); yield dummyChest; }
+                case 2 -> { if (dummyLegs == null) dummyLegs = damagedDummy(Items.NETHERITE_LEGGINGS, 0.42f); yield dummyLegs; }
+                case 3 -> { if (dummyBoots == null) dummyBoots = damagedDummy(Items.NETHERITE_BOOTS, 0.08f); yield dummyBoots; }
+                case 4 -> { if (dummyMainHand == null) dummyMainHand = damagedDummy(Items.NETHERITE_SWORD, 0.74f); yield dummyMainHand; }
+                case 5 -> { if (dummyOffHand == null) dummyOffHand = damagedDummy(Items.SHIELD, 0.35f); yield dummyOffHand; }
                 default -> ItemStack.EMPTY;
             };
         } catch (Throwable ignored) {
@@ -140,122 +210,105 @@ public final class ArmorStatusModule extends HudModule {
         graphics.pose().translate(getX(), getY());
         graphics.pose().scale(scale, scale);
 
-        int totalW = horizontal ? activeSlots * 22 : 22;
-        int totalH = horizontal ? 22 : activeSlots * 22;
-
-        renderBackgroundAndBorder(graphics, 0, 0, totalW, totalH);
-
-        // Inner slot dividers
-        if (hasBorder()) {
-            int divColor = getBorderColor();
-            for (int i = 1; i < activeSlots; i++) {
-                if (horizontal) {
-                    graphics.fill(i * 22, 0, i * 22 + 1, 22, divColor);
-                } else {
-                    graphics.fill(0, i * 22, 22, i * 22 + 1, divColor);
-                }
-            }
-        }
-
-        EquipmentSlot[] armorSlots = {
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
-        };
+        int padX = (hasBackground() || hasBorder()) ? CONTENT_PADDING_X : 2;
+        int padY = (hasBackground() || hasBorder()) ? CONTENT_PADDING_Y : 1;
 
         List<ItemStack> itemsToRender = new ArrayList<>();
         if (editor) {
-            for (int i = 0; i < activeSlots; i++) {
-                itemsToRender.add(getDummyItem(i));
+            for (int index : slotIndices()) {
+                itemsToRender.add(getDummyItem(index));
             }
         } else if (client != null && client.player != null) {
-            if (dynamicBox) {
-                for (EquipmentSlot slot : armorSlots) {
-                    ItemStack item = client.player.getItemBySlot(slot);
-                    if (!item.isEmpty()) itemsToRender.add(item);
-                }
-                if (showHands) {
-                    ItemStack main = client.player.getMainHandItem();
-                    ItemStack off = client.player.getOffhandItem();
-                    if (!main.isEmpty()) itemsToRender.add(main);
-                    if (!off.isEmpty()) itemsToRender.add(off);
-                }
-            } else {
-                for (EquipmentSlot slot : armorSlots) {
-                    itemsToRender.add(client.player.getItemBySlot(slot));
-                }
-                if (showHands) {
-                    itemsToRender.add(client.player.getMainHandItem());
-                    itemsToRender.add(client.player.getOffhandItem());
-                }
+            for (int index : slotIndices()) {
+                ItemStack item = playerItem(client, index);
+                if (!dynamicBox || !item.isEmpty()) itemsToRender.add(item);
             }
         }
 
-        boolean criticalDamageFound = false;
-
         for (int i = 0; i < itemsToRender.size(); i++) {
-            int sx = horizontal ? i * 22 : 0;
-            int sy = horizontal ? 0 : i * 22;
+            int sx = padX + (horizontal ? i * (SLOT_SIZE + SLOT_GAP) : 0);
+            int sy = padY + (horizontal ? 0 : i * (SLOT_SIZE + SLOT_GAP));
+
+            if (hasBackground() || hasBorder()) {
+                renderBackgroundAndBorder(graphics, sx, sy, SLOT_SIZE, SLOT_SIZE);
+            }
 
             ItemStack item = itemsToRender.get(i);
 
             if (item != null && !item.isEmpty()) {
                 try {
                     graphics.item(item, sx + 3, sy + 3);
-                    graphics.itemDecorations(client.font, item, sx + 3, sy + 3);
 
-                    if (item.isDamageableItem()) {
-                        int maxDamage = item.getMaxDamage();
-                        int damage = item.getDamageValue();
-                        int remaining = maxDamage - damage;
-                        float ratio = (float) remaining / maxDamage;
-
-                        if (ratio < 0.10f) criticalDamageFound = true;
-
-                        int durColor = 0xFFFFFFFF;
+                    if (durabilityMode == DurabilityMode.ICON_ONLY) {
+                        ItemStack clean = item.copy();
+                        clean.setDamageValue(0);
+                        graphics.itemDecorations(client.font, clean, sx + 3, sy + 3);
+                    } else if (durabilityMode == DurabilityMode.DAMAGE_BAR) {
                         if (colorTiers) {
-                            if (ratio < 0.15f) durColor = 0xFFFF4444; // Red
-                            else if (ratio < 0.50f) durColor = 0xFFFFAA00; // Yellow
-                            else durColor = 0xFF55FF55; // Green
+                            graphics.itemDecorations(client.font, item, sx + 3, sy + 3);
+                        } else {
+                            ItemStack clean = item.copy();
+                            clean.setDamageValue(0);
+                            graphics.itemDecorations(client.font, clean, sx + 3, sy + 3);
+                            if (item.isDamageableItem()) {
+                                int maxDamage = item.getMaxDamage();
+                                int damage = item.getDamageValue();
+                                int remaining = maxDamage - damage;
+                                float ratio = Math.max(0f, Math.min(1f, (float) remaining / maxDamage));
+                                int barX = sx + 3 + 2;
+                                int barY = sy + 3 + 13;
+                                int barW = Math.round(13.0f * ratio);
+                                graphics.fill(barX, barY, barX + 13, barY + 2, 0xFF000000);
+                                graphics.fill(barX, barY, barX + barW, barY + 1, color());
+                            }
                         }
+                    } else {
+                        ItemStack clean = item.copy();
+                        clean.setDamageValue(0);
+                        graphics.itemDecorations(client.font, clean, sx + 3, sy + 3);
 
-                        if (durabilityMode == DurabilityMode.PERCENT) {
-                            graphics.pose().pushMatrix();
-                            graphics.pose().translate(sx + 11, sy + 15);
-                            graphics.pose().scale(0.55f, 0.55f);
-                            String text = Math.round(ratio * 100) + "%";
-                            graphics.centeredText(client.font, net.minecraft.network.chat.Component.literal(text), 0, 0, durColor);
-                            graphics.pose().popMatrix();
-                        } else if (durabilityMode == DurabilityMode.HITS) {
-                            graphics.pose().pushMatrix();
-                            graphics.pose().translate(sx + 11, sy + 15);
-                            graphics.pose().scale(0.55f, 0.55f);
-                            String text = String.valueOf(remaining);
-                            graphics.centeredText(client.font, net.minecraft.network.chat.Component.literal(text), 0, 0, durColor);
-                            graphics.pose().popMatrix();
+                        if (item.isDamageableItem()) {
+                            int maxDamage = item.getMaxDamage();
+                            int damage = item.getDamageValue();
+                            int remaining = maxDamage - damage;
+                            float ratio = (float) remaining / maxDamage;
+
+                            int durColor = color();
+                            if (colorTiers) {
+                                if (ratio < 0.15f) durColor = 0xFFFF4444; // Red
+                                else if (ratio < 0.50f) durColor = 0xFFFFAA00; // Yellow
+                                else durColor = 0xFF55FF55; // Green
+                            }
+
+                            if (durabilityMode == DurabilityMode.PERCENT) {
+                                graphics.pose().pushMatrix();
+                                graphics.pose().translate(sx + 11, sy + 15);
+                                graphics.pose().scale(0.55f, 0.55f);
+                                String text = Math.round(ratio * 100) + "%";
+                                graphics.centeredText(client.font, net.minecraft.network.chat.Component.literal(text), 0, 0, durColor);
+                                graphics.pose().popMatrix();
+                            } else if (durabilityMode == DurabilityMode.HITS) {
+                                graphics.pose().pushMatrix();
+                                graphics.pose().translate(sx + 11, sy + 15);
+                                graphics.pose().scale(0.55f, 0.55f);
+                                String text = String.valueOf(remaining);
+                                graphics.centeredText(client.font, net.minecraft.network.chat.Component.literal(text), 0, 0, durColor);
+                                graphics.pose().popMatrix();
+                            }
                         }
-                    } else if (showItemCount && item.getCount() > 1) {
-                        graphics.pose().pushMatrix();
-                        graphics.pose().translate(sx + 16, sy + 14);
-                        graphics.pose().scale(0.6f, 0.6f);
-                        graphics.text(client.font, String.valueOf(item.getCount()), 0, 0, 0xFFFFFFFF);
-                        graphics.pose().popMatrix();
+                    }
+
+                    if (damageWarning && !editor && item.isDamageableItem()) {
+                        float ratio = (float) (item.getMaxDamage() - item.getDamageValue()) / item.getMaxDamage();
+                        if (ratio < 0.10f && (System.currentTimeMillis() / 500) % 2 == 0) {
+                            graphics.fill(sx, sy, sx + SLOT_SIZE, sy + 1, 0xFFFF0000);
+                            graphics.fill(sx, sy + SLOT_SIZE - 1, sx + SLOT_SIZE, sy + SLOT_SIZE, 0xFFFF0000);
+                            graphics.fill(sx, sy, sx + 1, sy + SLOT_SIZE, 0xFFFF0000);
+                            graphics.fill(sx + SLOT_SIZE - 1, sy, sx + SLOT_SIZE, sy + SLOT_SIZE, 0xFFFF0000);
+                        }
                     }
                 } catch (Throwable ignored) {
                 }
-            }
-        }
-
-        // Damage Warning Alert
-        if (damageWarning && criticalDamageFound && !editor) {
-            long now = System.currentTimeMillis();
-            if ((now / 500) % 2 == 0) {
-                // Flash subtle red border around entire equipment module
-                graphics.fill(0, 0, totalW, 1, 0xFFFF0000);
-                graphics.fill(0, totalH - 1, totalW, totalH, 0xFFFF0000);
-                graphics.fill(0, 0, 1, totalH, 0xFFFF0000);
-                graphics.fill(totalW - 1, 0, totalW, totalH, 0xFFFF0000);
             }
         }
 

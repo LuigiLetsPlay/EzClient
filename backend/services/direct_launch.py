@@ -4,11 +4,13 @@ import json
 import shutil
 import zipfile
 import subprocess
+import threading
 from pathlib import Path
 from typing import Any, Callable, Optional, Tuple, List
 from backend.models.types import ProfileData, APP_VERSION
 from backend.services.minecraft import minecraft_dir
 from backend.services.msa_auth import get_minecraft_session, MinecraftSession
+from backend.services.minecraft_versions import version_tuple
 
 def maven_to_path(name: str) -> str:
     """Convert maven coordinates group:artifact:version[:classifier] to relative jar path."""
@@ -146,7 +148,9 @@ def find_version_meta(mc_dir: Path, mc_version: str, loader: str = "Fabric") -> 
             # 2. General fabric match
             candidates = list(versions_dir.glob("fabric-loader-*"))
         if candidates:
-            chosen = max(candidates, key=lambda p: p.stat().st_mtime)
+            from backend.services.game_bootstrap import _parse_loader_version
+            candidates.sort(key=lambda p: _parse_loader_version(p.name), reverse=True)
+            chosen = candidates[0]
             json_file = chosen / f"{chosen.name}.json"
             if json_file.exists():
                 try:
@@ -279,6 +283,7 @@ def launch_minecraft_direct(
     profile: ProfileData,
     status_callback: Optional[Callable[[str], None]] = None,
     log_file_path: Optional[Path] = None,
+    server_ip: Optional[str] = None,
 ) -> Optional[subprocess.Popen]:
     """
     Launches Minecraft standalone directly using Java & Knot/Fabric.
@@ -293,7 +298,7 @@ def launch_minecraft_direct(
     # saves. If the same visible name is later reused, an old managed JAR must
     # never be allowed to leak into a newly-created target.
     from backend.services.store import has_ezclient_asset
-    if not has_ezclient_asset(profile.minecraft_version):
+    if profile.profile_type != "raw" and not has_ezclient_asset(profile.minecraft_version):
         removed_core = False
         for candidate in profile.mods_path.glob("*EzClient*.jar"):
             candidate.unlink(missing_ok=True)
@@ -313,11 +318,13 @@ def launch_minecraft_direct(
         if removed_core:
             notify(f"Inkompatibler EzClient Core für Minecraft {profile.minecraft_version} wurde vor dem Start entfernt.")
 
-    # Configure optimal audio/accessibility defaults (10% music, skip narrator)
-    try:
-        ensure_profile_defaults(profile.path, notify)
-    except Exception as e:
-        notify(f"Warnung beim Anwenden der Spieleinstellungen: {e}")
+    # A raw modpack owns every option and override file. Never inject client
+    # defaults or modify its content before launch.
+    if profile.profile_type != "raw":
+        try:
+            ensure_profile_defaults(profile.path, notify)
+        except Exception as e:
+            notify(f"Warnung beim Anwenden der Spieleinstellungen: {e}")
 
     mc = minecraft_dir()
     # Run the fast readiness check on every launch. It catches an incomplete
@@ -331,8 +338,14 @@ def launch_minecraft_direct(
 
     if profile.loader.lower() == "forge":
         try:
-            from backend.services.mod_downloader import sync_profile_mods
-            sync_profile_mods(profile, status_callback=notify)
+            has_missing_mods = any(
+                m.enabled and not (profile.mods_path / (m.filename or f"{m.slug}.jar")).is_file()
+                for m in profile.mods
+                if (m.slug or m.project_id)
+            )
+            if profile.profile_type != "raw" or has_missing_mods:
+                from backend.services.mod_downloader import sync_profile_mods
+                sync_profile_mods(profile, status_callback=notify)
             import minecraft_launcher_lib
             from backend.services.java_runtime import install_required_java
             from backend.services.minecraft_versions import required_java
@@ -341,11 +354,20 @@ def launch_minecraft_direct(
             if not session.is_online:
                 notify("Microsoft-Anmeldung mit einer Minecraft-Java-Lizenz ist zum Starten erforderlich.")
                 return None
-            forge_versions = list((mc / "versions").glob(f"{profile.minecraft_version}-forge-*"))
+            requested = str(getattr(profile, "loader_version", "") or "").strip()
+            if profile.profile_type == "raw" and not requested:
+                notify("Das Modpack nennt keine exakte Forge-Version.")
+                return None
+            expected_id = (
+                requested if requested.startswith(f"{profile.minecraft_version}-forge-")
+                else f"{profile.minecraft_version}-forge-{requested}"
+            ) if requested else ""
+            expected_dir = mc / "versions" / expected_id if expected_id else None
+            forge_versions = [expected_dir] if expected_dir and expected_dir.is_dir() else list((mc / "versions").glob(f"{profile.minecraft_version}-forge-*"))
             if not forge_versions:
                 notify("Forge wurde nicht vollständig installiert.")
                 return None
-            installed_version = max(forge_versions, key=lambda path: path.stat().st_mtime).name
+            installed_version = expected_id or max(forge_versions, key=lambda path: path.stat().st_mtime).name
             java_bin = install_required_java(mc, required_java(profile.minecraft_version), notify)
             command = minecraft_launcher_lib.command.get_minecraft_command(
                 installed_version,
@@ -361,6 +383,14 @@ def launch_minecraft_direct(
                     "gameDirectory": str(profile.path),
                 },
             )
+            if server_ip:
+                if version_tuple(profile.minecraft_version) >= (1, 20):
+                    command.extend(["--quickPlayMultiplayer", server_ip.strip()])
+                else:
+                    server_parts = server_ip.split(":")
+                    command.extend(["--server", server_parts[0].strip()])
+                    if len(server_parts) > 1 and server_parts[1].isdigit():
+                        command.extend(["--port", server_parts[1].strip()])
             log_file = log_file_path or (profile.path / "ezclient_latest_run.log")
             log_file.parent.mkdir(parents=True, exist_ok=True)
             with open(log_file, "w", encoding="utf-8") as log_handle:
@@ -374,13 +404,21 @@ def launch_minecraft_direct(
             notify(f"Forge konnte nicht gestartet werden: {exc}")
             return None
 
-    # 0. Sync and verify all profile mods and dependencies
-    notify("Verifiziere & synchronisiere Mods und Bibliotheken…")
-    try:
-        from backend.services.mod_downloader import sync_profile_mods
-        sync_profile_mods(profile, status_callback=notify)
-    except Exception as e:
-        print(f"[DirectLaunch] Warning during mod sync: {e}")
+    # 0. Launcher-managed profiles may be synchronized. Modpack instances use
+    # exactly the files from their manifest and must remain untouched, unless
+    # user added mods with missing JAR files.
+    has_missing_mods = any(
+        m.enabled and not (profile.mods_path / (m.filename or f"{m.slug}.jar")).is_file()
+        for m in profile.mods
+        if (m.slug or m.project_id)
+    )
+    if profile.profile_type != "raw" or has_missing_mods:
+        notify("Verifiziere & synchronisiere Mods und Bibliotheken…")
+        try:
+            from backend.services.mod_downloader import sync_profile_mods
+            sync_profile_mods(profile, status_callback=notify)
+        except Exception as e:
+            print(f"[DirectLaunch] Warning during mod sync: {e}")
 
     # 1. Version and libraries lookup
     notify(f"Suche Version {profile.minecraft_version} & Fabric-Dateien…")
@@ -496,6 +534,7 @@ def launch_minecraft_direct(
         "-Dfabric.disableGui=true",
         "-Dfabric.system.disableGui=true",
         "-Dfabric.gui.disabled=true",
+        "-Dfabric.noGui=true",
         f"-Djava.library.path={natives_dir}",
         f"-Dorg.lwjgl.system.SharedLibraryExtractPath={natives_dir}",
         f"-Dorg.lwjgl.librarypath={natives_dir}",
@@ -518,6 +557,15 @@ def launch_minecraft_direct(
         "--userType", session.user_type,
         "--versionType", "EzClient"
     ]
+
+    if server_ip:
+        if version_tuple(profile.minecraft_version) >= (1, 20):
+            game_args.extend(["--quickPlayMultiplayer", server_ip.strip()])
+        else:
+            server_parts = server_ip.split(":")
+            game_args.extend(["--server", server_parts[0].strip()])
+            if len(server_parts) > 1 and server_parts[1].isdigit():
+                game_args.extend(["--port", server_parts[1].strip()])
 
     full_cmd = jvm_args + game_args
 
@@ -545,4 +593,65 @@ def launch_minecraft_direct(
         return None
 
     notify("Minecraft wurde erfolgreich gestartet!")
+
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            # Grant child process permission to set foreground window
+            ctypes.windll.user32.AllowSetForegroundWindow(proc.pid)
+        except Exception:
+            pass
+
+        def _focus_minecraft_window():
+            import time
+            import ctypes
+            from ctypes import wintypes
+            user32 = ctypes.windll.user32
+            start = time.time()
+            # Wait up to 35 seconds for the Minecraft window to appear
+            while time.time() - start < 35:
+                if proc.poll() is not None:
+                    break
+                found_hwnd = None
+
+                def enum_proc(hwnd, lparam):
+                    nonlocal found_hwnd
+                    if not user32.IsWindowVisible(hwnd):
+                        return True
+                    pid = wintypes.DWORD()
+                    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                    if pid.value == proc.pid:
+                        length = user32.GetWindowTextLengthW(hwnd)
+                        if length > 0:
+                            found_hwnd = hwnd
+                            return False
+                    return True
+
+                WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+                user32.EnumWindows(WNDENUMPROC(enum_proc), 0)
+
+                if found_hwnd:
+                    try:
+                        ico_path = str(Path(__file__).resolve().parents[2] / "ui" / "assets" / "icon.ico")
+                        if os.path.exists(ico_path):
+                            hicon_big = user32.LoadImageW(None, ico_path, 1, 32, 32, 0x0010)
+                            hicon_small = user32.LoadImageW(None, ico_path, 1, 16, 16, 0x0010)
+                            if hicon_big:
+                                user32.SendMessageW(found_hwnd, 0x0080, 1, hicon_big)
+                            if hicon_small:
+                                user32.SendMessageW(found_hwnd, 0x0080, 0, hicon_small)
+                    except Exception:
+                        pass
+                    time.sleep(0.15)
+                    try:
+                        user32.ShowWindow(found_hwnd, 9)  # SW_RESTORE
+                        user32.SetForegroundWindow(found_hwnd)
+                    except Exception:
+                        pass
+                    break
+
+                time.sleep(0.3)
+
+        threading.Thread(target=_focus_minecraft_window, daemon=True, name="MinecraftFocusWatcher").start()
+
     return proc

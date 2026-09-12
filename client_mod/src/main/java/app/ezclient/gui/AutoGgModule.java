@@ -47,6 +47,11 @@ public final class AutoGgModule extends Module {
     }
 
     @Override
+    public String getDescription() {
+        return "Sendet nach einem erkannten Spielende mit einstellbarer Verzögerung automatisch eine freundliche Nachricht.";
+    }
+
+    @Override
     public boolean hasSettings() {
         return true;
     }

@@ -51,11 +51,13 @@ public final class EzScreenBridge {
         return screen instanceof EzClientScreen
                 || screen instanceof EzHubScreen
                 || screen instanceof HudEditorScreen
-                || screen instanceof HudSettingsScreen
+                || screen instanceof ScrollingSettingsScreen
                 || screen instanceof ModuleSettingsScreen
-                || screen instanceof FeatureSettingsScreen
                 || screen instanceof FeatureStyleScreen
                 || screen instanceof WaypointScreen
+                || screen instanceof ModuleColorScreen
+                || screen instanceof ModulePreviewScreen
+                || screen instanceof CrosshairPaintScreen
                 || screen instanceof ZoomSettingsScreen;
     }
 

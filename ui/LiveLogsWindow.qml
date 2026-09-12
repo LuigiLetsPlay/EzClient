@@ -34,23 +34,65 @@ Window {
         return (h > 0 ? (h + ":") : "") + (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s
     }
 
+    property int currentTimestampSec: Math.floor(Date.now() / 1000)
+    Timer {
+        interval: 1000
+        running: liveLogsWindow.visible
+        repeat: true
+        onTriggered: {
+            liveLogsWindow.currentTimestampSec = Math.floor(Date.now() / 1000)
+        }
+    }
+
+    property var allLogs: []
+
     ListModel {
         id: logListModel
     }
 
+    function matchesFilter(entry) {
+        if (liveLogsWindow.activeFilter !== "ALL" && entry.level !== liveLogsWindow.activeFilter)
+            return false
+        var q = liveLogsWindow.searchQuery.toLowerCase().trim()
+        if (q && entry.raw.toLowerCase().indexOf(q) === -1)
+            return false
+        return true
+    }
+
+    function refilterLogs() {
+        logListModel.clear()
+        for (var i = 0; i < allLogs.length; ++i) {
+            var item = allLogs[i]
+            if (matchesFilter(item)) {
+                logListModel.append(item)
+            }
+        }
+        if (autoScroll && !searchQuery) {
+            Qt.callLater(function() { logListView.positionViewAtEnd() })
+        }
+    }
+
+    onActiveFilterChanged: refilterLogs()
+    onSearchQueryChanged: refilterLogs()
+
     function loadBufferedLogs() {
+        allLogs = []
         logListModel.clear()
         if (!liveLogService)
             return
         var entries = liveLogService.getBufferedLogs()
         for (var i = 0; i < entries.length; ++i) {
             var entry = entries[i]
-            logListModel.append({
+            var item = {
                 "raw": entry.raw,
                 "level": entry.level,
                 "time": entry.time,
                 "msg": entry.message
-            })
+            }
+            allLogs.push(item)
+            if (matchesFilter(item)) {
+                logListModel.append(item)
+            }
         }
         if (autoScroll && !searchQuery)
             Qt.callLater(function() { logListView.positionViewAtEnd() })
@@ -65,17 +107,24 @@ Window {
     Connections {
         target: liveLogsWindow.liveLogService
         function onLogAppended(raw, level, timeStr, msg) {
-            logListModel.append({
+            var item = {
                 "raw": raw,
                 "level": level,
                 "time": timeStr,
                 "msg": msg
-            })
-            if (logListModel.count > 5000) {
-                logListModel.remove(0, 500)
             }
-            if (liveLogsWindow.autoScroll && !searchQuery) {
-                logListView.positionViewAtEnd()
+            allLogs.push(item)
+            if (allLogs.length > 5000) {
+                allLogs.shift()
+            }
+            if (matchesFilter(item)) {
+                logListModel.append(item)
+                if (logListModel.count > 3000) {
+                    logListModel.remove(0, 300)
+                }
+                if (liveLogsWindow.autoScroll && !searchQuery) {
+                    logListView.positionViewAtEnd()
+                }
             }
         }
         function onStatsUpdated(cpu, ram, uptimeSec) {
@@ -83,7 +132,11 @@ Window {
             liveLogsWindow.ramUsage = (ram > 1024 ? (ram / 1024).toFixed(1) + " GB" : Math.round(ram) + " MB")
             liveLogsWindow.uptimeStr = liveLogsWindow.formatUptime(uptimeSec)
         }
+        function onSelectedInstanceChanged() {
+            liveLogsWindow.loadBufferedLogs()
+        }
         function onLogsCleared() {
+            allLogs = []
             logListModel.clear()
         }
     }
@@ -154,12 +207,17 @@ Window {
                             font.pixelSize: 11
                             color: EzTheme.text
                             clip: true
+                            verticalAlignment: TextInput.AlignVCenter
                             onTextChanged: liveLogsWindow.searchQuery = text.toLowerCase().trim()
                             Text {
                                 text: "Search logs…"
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 11
                                 color: EzTheme.textMuted
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                elide: Text.ElideRight
                                 visible: !searchInput.text && !searchInput.activeFocus
                             }
                         }
@@ -253,15 +311,31 @@ Window {
                     model: logListModel
                     spacing: 2
                     boundsBehavior: Flickable.StopAtBounds
+                    onContentYChanged: {
+                        if (moving || flicking) {
+                            liveLogsWindow.autoScroll = atYEnd
+                        }
+                    }
+                    onMovementEnded: {
+                        liveLogsWindow.autoScroll = atYEnd
+                    }
+                    onFlickEnded: {
+                        liveLogsWindow.autoScroll = atYEnd
+                    }
 
                     ScrollBar.vertical: ScrollBar {
                         id: logScrollBar
                         policy: ScrollBar.AsNeeded
                         width: 10
+                        onPositionChanged: {
+                            if (logScrollBar.pressed) {
+                                liveLogsWindow.autoScroll = logListView.atYEnd
+                            }
+                        }
                         contentItem: Rectangle {
                             implicitWidth: 7
                             radius: 4
-                            color: logScrollBar.pressed ? EzTheme.accent : "#596273"
+                            color: logScrollBar.pressed ? EzTheme.accent : (logScrollBar.hovered ? EzTheme.accentLight : "#596273")
                         }
                         background: Rectangle {
                             implicitWidth: 10
@@ -270,45 +344,15 @@ Window {
                         }
                     }
 
-                    MouseArea {
-                        id: logMiddlePan
-                        anchors.fill: parent
-                        z: 1000
-                        acceptedButtons: Qt.MiddleButton
-                        preventStealing: true
-                        hoverEnabled: true
-                        cursorShape: autoPanActive ? Qt.SizeVerCursor : Qt.OpenHandCursor
-                        property bool autoPanActive: false
-                        property real pressY: 0
-                        property real pointerY: 0
-                        onPressed: function(mouse) {
-                            autoPanActive = !autoPanActive
-                            pressY = mouse.y
-                            pointerY = mouse.y
-                        }
-                        onPositionChanged: function(mouse) {
-                            pointerY = mouse.y
-                        }
-                        Timer {
-                            interval: 16
-                            repeat: true
-                            running: logMiddlePan.autoPanActive
-                            onTriggered: {
-                                var maxY = Math.max(0, logListView.contentHeight - logListView.height)
-                                var velocity = (logMiddlePan.pointerY - logMiddlePan.pressY) * 0.12
-                                logListView.contentY = Math.max(0, Math.min(maxY, logListView.contentY + velocity))
-                            }
-                        }
+                    AutoscrollOverlay {
+                        target: logListView
+                        onScrolledUp: liveLogsWindow.autoScroll = false
+                        onScrolledToBottom: liveLogsWindow.autoScroll = true
                     }
 
                     delegate: Item {
-                        width: logListView.width
-                        visible: {
-                            if (liveLogsWindow.activeFilter !== "ALL" && model.level !== liveLogsWindow.activeFilter) return false
-                            if (liveLogsWindow.searchQuery && model.raw.toLowerCase().indexOf(liveLogsWindow.searchQuery) === -1) return false
-                            return true
-                        }
-                        height: visible ? (logTextRow.implicitHeight + 2) : 0
+                        width: logListView.width - (logScrollBar.visible ? 14 : 4)
+                        height: logTextRow.implicitHeight + 2
 
                         RowLayout {
                             id: logTextRow
@@ -344,14 +388,19 @@ Window {
                                 }
                             }
 
-                            // Log message
-                            Text {
+                            // Log message (Selectable & copyable)
+                            TextEdit {
                                 text: model.msg
                                 font.family: "Consolas, monospace"
                                 font.pixelSize: 11
                                 color: model.level === "ERROR" ? "#FFA49E" : (model.level === "WARN" ? "#FFE58F" : "#D0D4DC")
                                 Layout.fillWidth: true
-                                wrapMode: Text.WrapAnywhere
+                                wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                                readOnly: true
+                                selectByMouse: true
+                                activeFocusOnPress: true
+                                selectionColor: "#2563EB"
+                                selectedTextColor: "#FFFFFF"
                             }
                         }
                     }
@@ -377,7 +426,7 @@ Window {
                         spacing: 8
                         Image { source: "icons/box.svg"; width: 16; height: 16; opacity: 0.8; sourceSize: Qt.size(16,16) }
                         Text {
-                            text: "Instances"
+                            text: "Instances (" + (liveLogsWindow.liveLogService ? liveLogsWindow.liveLogService.runningCount : 0) + ")"
                             font.family: EzTheme.mcFontFamily
                             font.pixelSize: 13
                             font.bold: true
@@ -385,137 +434,184 @@ Window {
                         }
                     }
 
-                    // Active Instance Card
-                    Rectangle {
+                    // Instances List
+                    ScrollView {
                         Layout.fillWidth: true
-                        height: 140
-                        radius: 10
-                        color: "#141924"
-                        border.color: (liveLogsWindow.liveLogService && liveLogsWindow.liveLogService.isRunning) ? "#22C96E40" : "#222838"
-                        border.width: 1
+                        Layout.fillHeight: true
+                        clip: true
+                        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
                         ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 12
+                            width: parent.width
                             spacing: 8
 
-                            RowLayout {
-                                spacing: 10
+                            Repeater {
+                                model: liveLogsWindow.liveLogService ? liveLogsWindow.liveLogService.instances : []
+
                                 Rectangle {
-                                    width: 32; height: 32; radius: 6; color: "#1F2636"
-                                    Image {
-                                        anchors.fill: parent; anchors.margins: 4
-                                        source: "assets/logo.svg"; fillMode: Image.PreserveAspectFit
-                                    }
-                                }
-                                ColumnLayout {
-                                    spacing: 1
-                                    Text {
-                                        text: (liveLogsWindow.liveLogService ? liveLogsWindow.liveLogService.instanceName : "Minecraft")
-                                        font.family: EzTheme.mcFontFamily
-                                        font.pixelSize: 12
-                                        font.bold: true
-                                        color: EzTheme.text
-                                        elide: Text.ElideRight
-                                    }
-                                    Text {
-                                        text: (liveLogsWindow.liveLogService ? liveLogsWindow.liveLogService.loaderVersion : "Fabric 26.2")
-                                        font.family: EzTheme.fontFamily
-                                        font.pixelSize: 10
-                                        color: EzTheme.textMuted
-                                    }
-                                }
-                            }
-
-                            Rectangle { Layout.fillWidth: true; height: 1; color: "#1E2433" }
-
-                            // Player & Uptime
-                            RowLayout {
-                                Layout.fillWidth: true
-                                RowLayout {
-                                    spacing: 4
+                                    id: instCard
                                     Layout.fillWidth: true
-                                    Image { source: "icons/user.svg"; width: 12; height: 12; opacity: 0.8; sourceSize: Qt.size(12,12) }
-                                    Text {
-                                        text: accountController ? accountController.username : "Player"
-                                        font.family: EzTheme.fontFamily
-                                        font.pixelSize: 10
-                                        color: EzTheme.textSecondary
-                                        elide: Text.ElideRight
-                                        Layout.fillWidth: true
-                                    }
-                                }
-                                RowLayout {
-                                    spacing: 4
-                                    Rectangle { width: 6; height: 6; radius: 3; color: "#22C96E" }
-                                    Text {
-                                        text: liveLogsWindow.uptimeStr
-                                        font.family: "Consolas, monospace"
-                                        font.pixelSize: 10
-                                        font.bold: true
-                                        color: "#22C96E"
-                                    }
-                                }
-                            }
+                                    implicitHeight: cardInnerCol.implicitHeight + 16
+                                    radius: 8
+                                    property bool isSelected: liveLogsWindow.liveLogService && liveLogsWindow.liveLogService.selectedInstanceId === modelData.instanceId
+                                    color: isSelected ? "#182234" : (instCardHover.containsMouse ? "#141A26" : "#10141E")
+                                    border.color: isSelected ? EzTheme.accent : (modelData.running ? "#22C96E30" : "#222838")
+                                    border.width: isSelected ? 1.5 : 1
 
-                            // RAM & CPU Gauges
-                            RowLayout {
-                                Layout.fillWidth: true
-                                RowLayout {
-                                    spacing: 4
-                                    Image { source: "icons/database.svg"; width: 12; height: 12; opacity: 0.8; sourceSize: Qt.size(12,12) }
-                                    Text {
-                                        text: "RAM: " + liveLogsWindow.ramUsage
-                                        font.family: "Consolas, monospace"
-                                        font.pixelSize: 10
-                                        color: "#38BDF8"
+                                    MouseArea {
+                                        id: instCardHover
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            if (liveLogsWindow.liveLogService) {
+                                                liveLogsWindow.liveLogService.selectInstance(modelData.instanceId)
+                                            }
+                                        }
                                     }
-                                }
-                                Item { Layout.fillWidth: true }
-                                RowLayout {
-                                    spacing: 4
-                                    Image { source: "icons/cpu.svg"; width: 12; height: 12; opacity: 0.8; sourceSize: Qt.size(12,12) }
-                                    Text {
-                                        text: "CPU: " + liveLogsWindow.cpuUsage
-                                        font.family: "Consolas, monospace"
-                                        font.pixelSize: 10
-                                        color: "#FB923C"
+
+                                    ColumnLayout {
+                                        id: cardInnerCol
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.top: parent.top
+                                        anchors.margins: 8
+                                        spacing: 6
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 6
+
+                                            Rectangle {
+                                                width: 8; height: 8; radius: 4
+                                                color: modelData.running ? "#22C96E" : "#596273"
+                                            }
+
+                                            Text {
+                                                text: modelData.name || "Minecraft"
+                                                font.family: EzTheme.mcFontFamily
+                                                font.pixelSize: 11
+                                                font.bold: true
+                                                color: instCard.isSelected ? "#FFFFFF" : EzTheme.text
+                                                elide: Text.ElideRight
+                                                Layout.fillWidth: true
+                                            }
+
+                                            // Stop or Remove Button
+                                            Rectangle {
+                                                width: 22; height: 22; radius: 4
+                                                color: btnHover.containsMouse ? (modelData.running ? "#631720" : "#283042") : (modelData.running ? "#441217" : "#1C2230")
+                                                border.color: modelData.running ? "#B91C1C" : "#323B50"
+                                                border.width: 1
+
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: modelData.running ? "⏹" : "✕"
+                                                    font.pixelSize: 9
+                                                    color: modelData.running ? "#FFA49E" : "#94A3B8"
+                                                }
+
+                                                MouseArea {
+                                                    id: btnHover
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        if (!liveLogsWindow.liveLogService) return
+                                                        if (modelData.running) {
+                                                            liveLogsWindow.liveLogService.stopInstance(modelData.instanceId)
+                                                        } else {
+                                                            liveLogsWindow.liveLogService.removeInstance(modelData.instanceId)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 4
+
+                                            Text {
+                                                text: modelData.loader || "Vanilla"
+                                                font.family: EzTheme.fontFamily
+                                                font.pixelSize: 9
+                                                color: EzTheme.textMuted
+                                                elide: Text.ElideRight
+                                                Layout.fillWidth: true
+                                            }
+
+                                            Text {
+                                                text: modelData.running
+                                                      ? liveLogsWindow.formatUptime(Math.max(0, liveLogsWindow.currentTimestampSec - Math.floor(modelData.startTime || liveLogsWindow.currentTimestampSec)))
+                                                      : ("Beendet · " + liveLogsWindow.formatUptime(modelData.uptime || 0))
+                                                font.family: "Consolas, monospace"
+                                                font.pixelSize: 9
+                                                color: modelData.running ? "#22C96E" : EzTheme.textMuted
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
                     }
 
-                    // Stop Button
+                    // Resource Stats for selected running instance
                     Rectangle {
                         Layout.fillWidth: true
-                        height: 36
+                        implicitHeight: statsCol.implicitHeight + 16
                         radius: 8
-                        color: stopM.containsMouse ? "#5A161E" : "#3D1016"
-                        border.color: "#80222A"
+                        color: "#131824"
+                        border.color: "#222838"
                         border.width: 1
                         visible: liveLogsWindow.liveLogService && liveLogsWindow.liveLogService.isRunning
 
-                        RowLayout {
-                            anchors.centerIn: parent
+                        ColumnLayout {
+                            id: statsCol
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 10
                             spacing: 8
-                            Image { source: "icons/stop-circle.svg"; width: 14; height: 14; opacity: 0.8; sourceSize: Qt.size(14,14) }
-                            Text {
-                                text: "Minecraft beenden"
-                                font.family: EzTheme.fontFamily
-                                font.pixelSize: 11
-                                font.bold: true
-                                color: "#FFA49E"
-                            }
-                        }
 
-                        MouseArea {
-                            id: stopM
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (liveLogsWindow.liveLogService) liveLogsWindow.liveLogService.stopInstance()
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Image { source: "icons/user.svg"; width: 12; height: 12; opacity: 0.8; sourceSize: Qt.size(12,12) }
+                                Text {
+                                    text: accountController ? accountController.username : "Player"
+                                    font.family: EzTheme.fontFamily
+                                    font.pixelSize: 10
+                                    color: EzTheme.textSecondary
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
+                                Rectangle { width: 6; height: 6; radius: 3; color: "#22C96E" }
+                                Text {
+                                    text: liveLogsWindow.uptimeStr
+                                    font.family: "Consolas, monospace"
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    color: "#22C96E"
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Image { source: "icons/database.svg"; width: 12; height: 12; opacity: 0.8; sourceSize: Qt.size(12,12) }
+                                Text {
+                                    text: "RAM: " + liveLogsWindow.ramUsage
+                                    font.family: "Consolas, monospace"
+                                    font.pixelSize: 10
+                                    color: "#38BDF8"
+                                }
+                                Item { Layout.fillWidth: true }
+                                Image { source: "icons/cpu.svg"; width: 12; height: 12; opacity: 0.8; sourceSize: Qt.size(12,12) }
+                                Text {
+                                    text: "CPU: " + liveLogsWindow.cpuUsage
+                                    font.family: "Consolas, monospace"
+                                    font.pixelSize: 10
+                                    color: "#FB923C"
+                                }
                             }
                         }
                     }
@@ -523,10 +619,10 @@ Window {
                     // Open Profile Folder Button
                     Rectangle {
                         Layout.fillWidth: true
-                        height: 36
-                        radius: 8
-                        color: foldM.containsMouse ? "#1E2536" : "#141924"
-                        border.color: "#222838"
+                        height: 30
+                        radius: 6
+                        color: foldM.containsMouse ? "#202738" : "#171D2B"
+                        border.color: foldM.containsMouse ? "#3B4761" : "#263045"
                         border.width: 1
 
                         RowLayout {
@@ -538,6 +634,8 @@ Window {
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 11
                                 color: EzTheme.textSecondary
+                                elide: Text.ElideRight
+                                Layout.maximumWidth: parent.width - 36
                             }
                         }
 
@@ -554,11 +652,11 @@ Window {
                         }
                     }
 
-                    Item { Layout.fillHeight: true }
-
                     // Instance Count Footer
                     Text {
-                        text: (liveLogsWindow.liveLogService && liveLogsWindow.liveLogService.isRunning) ? "1 Running Instance" : "0 Instances Active"
+                        text: liveLogsWindow.liveLogService
+                            ? (liveLogsWindow.liveLogService.runningCount + (liveLogsWindow.liveLogService.runningCount === 1 ? " Running Instance" : " Running Instances"))
+                            : "0 Instances Active"
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 10
                         color: EzTheme.textMuted
@@ -583,7 +681,7 @@ Window {
                 spacing: 14
 
                 Text {
-                    text: "" + logListModel.count + " LINES"
+                    text: "" + logListModel.count + (logListModel.count === allLogs.length ? " LINES" : " / " + allLogs.length + " LINES")
                     font.family: "Consolas, monospace"
                     font.pixelSize: 10
                     color: EzTheme.textMuted

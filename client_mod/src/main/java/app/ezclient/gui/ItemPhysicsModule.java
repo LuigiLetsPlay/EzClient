@@ -9,9 +9,9 @@ public final class ItemPhysicsModule extends FeatureModule {
     private int ticks;
     public ItemPhysicsModule() {
         super("Item Physics", false, 10);
-        option("mode", "Ground rotation", "Flat", 0, 0, "Flat", "Rotating");
-        flag("physics", "Trajectory rotation", true);
-        option("speed", "Rotation speed", 1.0, 0, 5); option("cap", "Vanilla fallback above items", 100.0, 10, 500);
+        option("Darstellung", "mode", "Ground rotation", "Legt die Drehung liegender Gegenstände fest.", "Flat", 0, 0, "Flat", "Rotating");
+        flag("Darstellung", "physics", "Trajectory rotation", "Dreht Gegenstände während der Flugbahn.", true);
+        option("Darstellung", "speed", "Rotation speed", "Geschwindigkeit der Gegenstandsdrehung.", 1.0, 0, 5); option("Performance", "cap", "Vanilla fallback above items", "Schützt die Leistung bei vielen Gegenständen.", 100.0, 10, 500);
     }
     @Override public void onTick() {
         if (!isEnabled() || ++ticks % 10 != 0) return;

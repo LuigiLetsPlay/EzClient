@@ -7,3 +7,4 @@ EzPresetCard 1.0 EzPresetCard.qml
 WindowResizeHandles 1.0 WindowResizeHandles.qml
 SkinModal 1.0 SkinModal.qml
 Skin3DView 1.0 Skin3DView.qml
+AutoscrollOverlay 1.0 AutoscrollOverlay.qml

@@ -34,6 +34,11 @@ public final class PingModule extends HudModule {
     }
 
     @Override
+    public String getDescription() {
+        return "Zeigt die Serverlatenz mit optionalem Server- und Spielerstatus an.";
+    }
+
+    @Override
     public Identifier getIcon() {
         return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/ping.png");
     }

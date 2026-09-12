@@ -37,6 +37,7 @@ class MinecraftSession:
     refresh_token: str = ""
     expires_at: float = 0.0
     is_online: bool = False
+    skin_model: str = "default"
 
 def _decrypt_dpapi(raw_bytes: bytes) -> Optional[bytes]:
     """Decrypts Windows DPAPI encrypted data (used in launcher_msa_credentials.bin)."""
@@ -166,7 +167,8 @@ def _exchange_msa_token_to_minecraft(msa_token: str, refresh_token: str = "") ->
             name = prof_data.get("name", "Player")
             uuid_val = prof_data.get("id", "")
             skins = prof_data.get("skins", [])
-            skin_url = skins[0].get("url", "") if skins else ""
+            active_skin = next((skin for skin in skins if skin.get("state", "ACTIVE") == "ACTIVE"), {})
+            skin_url = active_skin.get("url", "")
             capes = prof_data.get("capes", [])
             cape_url = next((cape.get("url", "") for cape in capes if cape.get("state", "ACTIVE") == "ACTIVE"), "")
 
@@ -176,6 +178,7 @@ def _exchange_msa_token_to_minecraft(msa_token: str, refresh_token: str = "") ->
                 access_token=mc_token,
                 user_type="msa",
                 skin_url=skin_url,
+                skin_model="slim" if active_skin.get("variant", "").lower() == "slim" else "default",
                 cape_url=cape_url,
                 refresh_token=refresh_token,
                 expires_at=time.time() + float(expires_in) - 60,

@@ -111,7 +111,42 @@ class CrashDoctorService:
                 short_error="UnsupportedClassVersionError",
             )
 
-        # 3. Check for Fabric Incompatible Mods: Sodium vs. Iris or specific replacement recommendations
+        # 3. Check for Fabric Loader version incompatibility
+        fabric_loader_match = re.search(
+            r"Replace mod ['\"]Fabric Loader['\"]\s*\(fabricloader\)\s*(?P<curr_ver>[^\s]+)\s*with version\s*(?P<req_ver>[^\s]+)\s*or later",
+            combined_text,
+            re.IGNORECASE,
+        )
+        if not fabric_loader_match:
+            fabric_loader_match = re.search(
+                r"requires version\s*(?P<req_ver>[^\s]+)\s*or later of mod ['\"]Fabric Loader['\"]\s*\(fabricloader\).*?wrong version is present:\s*(?P<curr_ver>[^!\r\n]+)",
+                combined_text,
+                re.IGNORECASE | re.DOTALL,
+            )
+        if fabric_loader_match:
+            curr_v = fabric_loader_match.group("curr_ver").strip()
+            req_v = fabric_loader_match.group("req_ver").strip()
+            mc_ver = profile.minecraft_version if profile else "Minecraft"
+            return CrashDiagnosis(
+                has_solution=True,
+                problem_title="Veralteter Fabric Loader",
+                problem_description=(
+                    f"Installierte Mods verlangen Fabric Loader {req_v} oder neuer, "
+                    f"aber aktuell ist Version {curr_v} aktiv."
+                ),
+                solution_title="Fabric Loader automatisch aktualisieren",
+                solution_description=(
+                    f"EzClient lädt den neuesten stabilen Fabric Loader für {mc_ver} "
+                    f"herunter und aktualisiert die benötigten Bibliotheken."
+                ),
+                action_type="UPDATE_FABRIC_LOADER",
+                action_data={"required_version": req_v, "current_version": curr_v},
+                can_auto_fix=True,
+                raw_log=log,
+                short_error=f"Fabric Loader {req_v}+ erforderlich (aktuell: {curr_v})",
+            )
+
+        # 4. Check for Fabric Incompatible Mods: Sodium vs. Iris or specific replacement recommendations
         wrong_target = re.search(
             r"Mod ['\"](?P<name>[^'\"]+)['\"]\s*\((?P<mod_id>[^)]+)\).*?requires any (?P<required>[^\s]+) version of ['\"]?(?P<target>Minecraft|OpenJDK[^'\"\r\n]*)['\"]?.*?wrong version is present:\s*(?P<present>[^!\r\n]+)",
             combined_text,
@@ -464,6 +499,27 @@ class CrashDoctorService:
                 if not removed:
                     return False, "Der inkompatible EzClient Core war bereits entfernt."
                 return True, "Inkompatibler EzClient Core wurde entfernt. Das Fabric-Profil ist wieder startfähig."
+
+            elif action == "UPDATE_FABRIC_LOADER":
+                notify(f"Aktualisiere Fabric Loader für Minecraft {profile.minecraft_version}…")
+                import json
+                from backend.services.minecraft import minecraft_dir
+                from backend.services.game_bootstrap import _json, _download_libraries, FABRIC_META
+                mc_dir = minecraft_dir()
+                version = profile.minecraft_version
+                loaders = _json(f"{FABRIC_META}/{version}")
+                loader = next((item for item in loaders if item.get("loader", {}).get("stable")), loaders[0] if loaders else None)
+                if not loader:
+                    return False, f"Kein Fabric-Loader für Minecraft {version} verfügbar."
+                loader_version = loader["loader"]["version"]
+                fabric = _json(f"{FABRIC_META}/{version}/{loader_version}/profile/json")
+                fabric_id = fabric.get("id", f"fabric-loader-{loader_version}-{version}")
+                fabric_dir = mc_dir / "versions" / fabric_id
+                fabric_dir.mkdir(parents=True, exist_ok=True)
+                (fabric_dir / f"{fabric_id}.json").write_text(json.dumps(fabric, indent=2), encoding="utf-8")
+                _download_libraries(mc_dir, fabric.get("libraries", []), notify, "Fabric-Bibliotheken")
+                profile.loader_version = loader_version
+                return True, f"Fabric Loader wurde erfolgreich auf {loader_version} aktualisiert!"
 
             # C. FIX MOD INCOMPATIBILITY (e.g. Sodium & Iris version mismatch)
             elif action == "FIX_MOD_INCOMPATIBILITY":

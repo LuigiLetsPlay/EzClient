@@ -131,9 +131,12 @@ def write_json(path: Path, value: Any) -> None:
         temporary.unlink(missing_ok=True)
         raise
 
+INTEGRATED_MOD_IDS = ("ezclient", "sodium", "lithium", "iris", "entityculling")
+
+
 PERFORMANCE_MODS: list[ModData] = [
     ModData(
-        project_id="ezclient", slug="ezclient", name="EzClient Core", version_id="v-core", version="2.0.1",
+        project_id="ezclient", slug="ezclient", name="EzClient Core", version_id="v-core", version=APP_VERSION,
         filename=ezclient_asset_name("26.2"), enabled=True, recommended=True, essential=True,
         icon_url="assets/logo.png", author="EzClient Team", description="EzClient Core Mod – Fenstertitel 'EzClient', Icon, Narrator-Bypass & Auto-Optimierung."
     ),
@@ -276,6 +279,11 @@ class ProfileStore:
             "minimize_to_tray": True,
             "language": "de",
             "use_minecraft_font": True,
+            "show_recent_servers_home": True,
+            "recent_servers_home_hidden": False,
+            "show_suggested_servers_home": True,
+            "custom_home_servers": [],
+            "hidden_home_servers": [],
             "last_profile": ""
         }
         self.profiles: list[ProfileData] = []
@@ -316,7 +324,7 @@ class ProfileStore:
                     mod_obj.icon_url = icon_map[slug_l]
                     needs_save = True
                 # Make sure ezclient core mod is marked essential
-                if slug_l == "ezclient" or (mod_obj.filename and mod_obj.filename.lower() == "ezclient.jar"):
+                if slug_l in ("ezclient", "ezclient-core") or "ezclient" in (mod_obj.filename or "").lower():
                     if not mod_obj.essential or not mod_obj.enabled:
                         mod_obj.essential = True
                         mod_obj.enabled = True
@@ -325,6 +333,9 @@ class ProfileStore:
 
             integrated = {str(value).lower() for value in raw.get("integrated_mods", [])}
             profile_type = str(raw.get("profile_type", "")).lower()
+            mc_ver = str(raw.get("minecraft_version", ""))
+            is_active_26 = mc_ver.startswith("26.")
+            loader_l = str(raw.get("loader", "")).lower()
             if profile_type not in {"ezclient", "raw"}:
                 originally_managed = bool({"ezclient", "ezclient-core"} & integrated)
                 had_managed_stack = any(
@@ -335,6 +346,21 @@ class ProfileStore:
                 profile_type = "ezclient" if originally_managed or had_managed_stack else "raw"
                 raw["profile_type"] = profile_type
                 needs_save = True
+
+            # If a 26.x Fabric profile has EzClient mod or JAR present, ensure profile_type is ezclient
+            if is_active_26 and loader_l == "fabric" and profile_type != "ezclient":
+                has_ez_in_mods = any(
+                    str(item.get("slug", "")).lower() in {"ezclient", "ezclient-core"}
+                    or "ezclient" in str(item.get("filename", "")).lower()
+                    or "ezclient" in str(item.get("name", "")).lower()
+                    for item in raw_mods
+                )
+                prof_mods_dir = PROFILES_DIR / str(raw.get("id", "")) / "mods"
+                has_ez_on_disk = prof_mods_dir.exists() and any(prof_mods_dir.glob("EzClient*.jar"))
+                if has_ez_in_mods or has_ez_on_disk:
+                    profile_type = "ezclient"
+                    raw["profile_type"] = "ezclient"
+                    needs_save = True
 
             if profile_type == "ezclient":
                 expected_templates = performance_mods_for_version(str(raw.get("minecraft_version", "")))
@@ -347,7 +373,10 @@ class ProfileStore:
                         slug_l = (mod.slug or mod.project_id or "").lower()
                         if slug_l in incompatible:
                             for path in (PROFILES_DIR / str(raw.get("id", "")) / "mods").glob(f"{Path(mod.filename).stem}*.jar*"):
-                                path.unlink(missing_ok=True)
+                                try:
+                                    path.unlink(missing_ok=True)
+                                except OSError:
+                                    pass
                             needs_save = True
                             continue
                         retained.append(mod)
@@ -405,6 +434,10 @@ class ProfileStore:
                 })
             except OSError as exc:
                 print(f"[ProfileStore] Could not write {profile.id}/profile.json: {exc}")
+
+    def save_profile(self, profile: ProfileData | None = None) -> None:
+        """Alias for save() to persist profiles and state."""
+        self.save()
 
     def get_by_id(self, profile_id: str) -> ProfileData | None:
         return next((p for p in self.profiles if p.id == profile_id), None)

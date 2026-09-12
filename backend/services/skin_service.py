@@ -109,12 +109,13 @@ def get_active_skin() -> dict:
     return {}
 
 
-def set_active_skin(name: str, path: str, body_url: str, avatar_url: str) -> dict:
+def set_active_skin(name: str, path: str, body_url: str, avatar_url: str, variant: str = "default") -> dict:
     data = {
         "name": name,
         "path": path,
         "bodyUrl": body_url,
-        "avatarUrl": avatar_url
+        "avatarUrl": avatar_url,
+        "model": "slim" if variant == "slim" else "default",
     }
     try:
         (get_skins_dir() / "active_skin.json").write_text(json.dumps(data, indent=2), "utf-8")

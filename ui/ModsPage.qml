@@ -9,6 +9,8 @@ Item {
     // Inspected mod state
     property var currentInspectedMod: null
     property bool inspectModalOpen: false
+    readonly property var selectedRemoteMod: (typeof modrinthController !== "undefined" && modrinthController)
+                                           ? modrinthController.selectedMod : ({})
 
     // Version switch modal state
     property string versionSwitchModId: ""
@@ -84,8 +86,8 @@ Item {
 
                         Image {
                             anchors.fill: parent
-                            source: (modrinthController.selectedMod && modrinthController.selectedMod.icon_url)
-                                    ? modrinthController.selectedMod.icon_url
+                            source: (root.selectedRemoteMod && root.selectedRemoteMod.icon_url)
+                                    ? root.selectedRemoteMod.icon_url
                                     : ((root.currentInspectedMod && root.currentInspectedMod.iconUrl) ? root.currentInspectedMod.iconUrl : "")
                             fillMode: Image.PreserveAspectCrop
                             visible: status === Image.Ready
@@ -102,8 +104,8 @@ Item {
                         Layout.fillWidth: true
                         spacing: 2
                         Text {
-                            text: (modrinthController.selectedMod && modrinthController.selectedMod.title)
-                                  ? modrinthController.selectedMod.title
+                            text: (root.selectedRemoteMod && root.selectedRemoteMod.title)
+                                  ? root.selectedRemoteMod.title
                                   : ((root.currentInspectedMod && root.currentInspectedMod.name) ? root.currentInspectedMod.name : "")
                             font.family: EzTheme.mcFontFamily
                             font.pixelSize: 16
@@ -111,8 +113,8 @@ Item {
                             color: EzTheme.text
                         }
                         Text {
-                            text: "Modrinth · Autor: " + ((modrinthController.selectedMod && modrinthController.selectedMod.author)
-                                  ? modrinthController.selectedMod.author
+                            text: "Modrinth · Autor: " + ((root.selectedRemoteMod && root.selectedRemoteMod.author)
+                                  ? root.selectedRemoteMod.author
                                   : ((root.currentInspectedMod && root.currentInspectedMod.author) ? root.currentInspectedMod.author : "Community"))
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 11
@@ -173,8 +175,8 @@ Item {
                     Item { Layout.fillWidth: true }
 
                     Text {
-                        text: (modrinthController.selectedMod && modrinthController.selectedMod.downloads)
-                              ? (formatNum(modrinthController.selectedMod.downloads) + " Downloads auf Modrinth")
+                        text: (root.selectedRemoteMod && root.selectedRemoteMod.downloads)
+                              ? (formatNum(root.selectedRemoteMod.downloads) + " Downloads auf Modrinth")
                               : ""
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 10
@@ -193,8 +195,8 @@ Item {
                     
                     Text {
                         width: parent.width
-                        text: (modrinthController.selectedMod && modrinthController.selectedMod.description)
-                              ? modrinthController.selectedMod.description
+                        text: (root.selectedRemoteMod && root.selectedRemoteMod.description)
+                              ? root.selectedRemoteMod.description
                               : ((root.currentInspectedMod && root.currentInspectedMod.description) ? root.currentInspectedMod.description : "Lade Modrinth-Daten…")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 12
@@ -631,6 +633,7 @@ Item {
                         font.pixelSize: 12
                         color: EzTheme.text
                         selectByMouse: true
+                        clip: true
                         verticalAlignment: TextInput.AlignVCenter
 
                         Text {
@@ -638,7 +641,10 @@ Item {
                             font: parent.font
                             color: EzTheme.textSubtle
                             visible: parent.text === ""
+                            anchors.left: parent.left
+                            anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
+                            elide: Text.ElideRight
                         }
                     }
 
@@ -786,58 +792,82 @@ Item {
             ScrollBar.vertical: ScrollBar {
                 id: mScrollBar
                 policy: ScrollBar.AsNeeded
-                visible: modList.contentHeight > modList.height
+                width: 10
                 contentItem: Rectangle {
-                    implicitWidth: 5
+                    implicitWidth: 6
                     radius: 3
-                    color: EzTheme.borderLight
+                    color: mScrollBar.pressed ? EzTheme.accent : (mScrollBar.hovered ? EzTheme.accentLight : "#4A5568")
+                }
+                background: Rectangle {
+                    implicitWidth: 10
+                    color: "#111722"
+                    radius: 4
                 }
             }
 
-            delegate: Rectangle {
-                id: modItem
-                width: modList.width - (modList.contentHeight > modList.height ? 10 : 0)
-                radius: 6
+            AutoscrollOverlay {
+                target: modList
+            }
 
-                readonly property bool isFabricApi: model.slug === "fabric-api" || model.name === "Fabric API"
-                readonly property bool isEzClient: (model.slug || "").toLowerCase() === "ezclient" || (model.name || "").toLowerCase() === "ezclient" || (model.name || "").toLowerCase() === "ezclient core"
-                readonly property bool isShader: (model.filename || "").toLowerCase().endsWith(".zip") && ((model.description || "").toLowerCase().indexOf("shader") !== -1 || (model.slug || "").toLowerCase().indexOf("shader") !== -1 || (model.name || "").toLowerCase().indexOf("shader") !== -1)
-                readonly property bool isResourcePack: (model.filename || "").toLowerCase().endsWith(".zip") && !isShader
-                readonly property bool isPerformanceMod: {
-                    var s = (model.slug || "").toLowerCase()
-                    var pid = (model.projectId || "").toLowerCase()
-                    var n = (model.name || "").toLowerCase()
-                    return (window.integratedMods && (window.integratedMods.indexOf(s) !== -1 || window.integratedMods.indexOf(pid) !== -1)) ||
-                           s === "ezclient" || n === "ezclient" || n === "ezclient core"
-                }
-                readonly property bool matchesSearch: modSearch.text === "" ||
-                    (model.name && model.name.toLowerCase().indexOf(modSearch.text.toLowerCase()) !== -1) ||
-                    (model.description && model.description.toLowerCase().indexOf(modSearch.text.toLowerCase()) !== -1)
-                readonly property bool matchesStatus: root.filterStatus === "all" ||
-                    (root.filterStatus === "mods" && !modItem.isShader && !modItem.isResourcePack) ||
-                    (root.filterStatus === "shader" && modItem.isShader) ||
-                    (root.filterStatus === "resourcepack" && modItem.isResourcePack) ||
-                    (root.filterStatus === "performance" && modItem.isPerformanceMod) ||
-                    (root.filterStatus === "enabled" && model.enabled) ||
-                    (root.filterStatus === "disabled" && !model.enabled)
-                readonly property string modUpdateVersion: {
-                    var updates = profileController ? profileController.modUpdates : ({})
-                    return updates[model.projectId || model.slug || model.name] || ""
-                }
-                readonly property bool updateAvailable: modUpdateVersion !== ""
+            delegate: Item {
+                id: modDelegate
+                width: modList.width
+                visible: modItem.visible
+                height: visible ? 70 : 0
 
-                visible: matchesSearch && matchesStatus && (!modItem.isPerformanceMod || root.showCoreMods || root.filterStatus === "performance")
-                height: visible ? 62 : 0
+                Rectangle {
+                    id: modItem
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.rightMargin: (mScrollBar.visible || modList.contentHeight > modList.height ? 20 : 8)
+                    height: 62
+                    radius: 6
 
-                scale: rowMouse.containsMouse ? 1.008 : 1.0
+                    readonly property bool isFabricApi: model.slug === "fabric-api" || model.name === "Fabric API"
+                    readonly property bool isEzClient: (model.slug || "").toLowerCase() === "ezclient" || (model.name || "").toLowerCase() === "ezclient" || (model.name || "").toLowerCase() === "ezclient core"
+                    readonly property bool isShader: (model.filename || "").toLowerCase().endsWith(".zip") && ((model.description || "").toLowerCase().indexOf("shader") !== -1 || (model.slug || "").toLowerCase().indexOf("shader") !== -1 || (model.name || "").toLowerCase().indexOf("shader") !== -1)
+                    readonly property bool isResourcePack: (model.filename || "").toLowerCase().endsWith(".zip") && !isShader
+                    readonly property bool isPerformanceMod: {
+                        if (isEzClient) return false
+                        var s = (model.slug || "").toLowerCase()
+                        var pid = (model.projectId || "").toLowerCase()
+                        return Boolean(window.integratedMods && (window.integratedMods.indexOf(s) !== -1 || window.integratedMods.indexOf(pid) !== -1))
+                    }
+                    readonly property bool matchesSearch: modSearch.text === "" ||
+                        (model.name && model.name.toLowerCase().indexOf(modSearch.text.toLowerCase()) !== -1) ||
+                        (model.description && model.description.toLowerCase().indexOf(modSearch.text.toLowerCase()) !== -1)
+                    readonly property bool matchesStatus: root.filterStatus === "all" ||
+                        (root.filterStatus === "mods" && !modItem.isShader && !modItem.isResourcePack) ||
+                        (root.filterStatus === "shader" && modItem.isShader) ||
+                        (root.filterStatus === "resourcepack" && modItem.isResourcePack) ||
+                        (root.filterStatus === "performance" && (modItem.isPerformanceMod || modItem.isEzClient)) ||
+                        (root.filterStatus === "enabled" && model.enabled) ||
+                        (root.filterStatus === "disabled" && !model.enabled)
+                    readonly property string modUpdateVersion: {
+                        var updates = profileController ? profileController.modUpdates : ({})
+                        return updates[model.projectId || model.slug || model.name] || ""
+                    }
+                    readonly property bool updateAvailable: modUpdateVersion !== ""
+
+                    visible: matchesSearch && matchesStatus && (!modItem.isPerformanceMod || root.showCoreMods || root.filterStatus === "performance" || modItem.isEzClient)
+
+                readonly property bool isCardHovered: rowMouse.containsMouse ||
+                    (typeof titleMouse !== "undefined" && titleMouse && titleMouse.containsMouse) ||
+                    (typeof vPillMouse !== "undefined" && vPillMouse && vPillMouse.containsMouse) ||
+                    (typeof toggleMouse !== "undefined" && toggleMouse && toggleMouse.containsMouse) ||
+                    (typeof delMouse !== "undefined" && delMouse && delMouse.containsMouse) ||
+                    (typeof updateBtn !== "undefined" && updateBtn && updateBtn.visible && updateBtn.hovered)
+
+                scale: isCardHovered ? 1.008 : 1.0
                 Behavior on scale { NumberAnimation { duration: 100; easing.type: Easing.OutCubic } }
 
                 color: model.enabled
-                       ? (rowMouse.containsMouse ? EzTheme.surface2 : EzTheme.surface)
-                       : (rowMouse.containsMouse ? "#14141A" : "#0E0E12")
+                       ? (isCardHovered ? EzTheme.surface2 : EzTheme.surface)
+                       : (isCardHovered ? "#14141A" : "#0E0E12")
                 border.color: model.enabled
-                              ? (rowMouse.containsMouse ? EzTheme.accentLight : EzTheme.border)
-                              : "#161620"
+                              ? (isCardHovered ? EzTheme.accentLight : EzTheme.border)
+                              : (isCardHovered ? EzTheme.borderLight : "#161620")
                 border.width: 1
 
                 Behavior on color { ColorAnimation { duration: 100 } }
@@ -869,7 +899,9 @@ Item {
                         }
 
                         MouseArea {
+                            id: toggleMouse
                             anchors.fill: parent
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 profileController.toggleMod(model.slug || model.name)
@@ -941,7 +973,7 @@ Item {
                                 Image {
                                     id: modIconImg
                                     anchors.fill: parent
-                                    source: model.iconUrl || ""
+                                    source: modItem.isEzClient ? "assets/logo.svg" : (model.iconUrl || "")
                                     fillMode: Image.PreserveAspectCrop
                                     visible: status === Image.Ready
                                 }
@@ -962,13 +994,37 @@ Item {
                                 spacing: 1
 
                                 RowLayout {
+                                    Layout.fillWidth: true
                                     spacing: 6
                                     Text {
                                         text: model.name
                                         font.family: EzTheme.mcFontFamily
                                         font.pixelSize: 13
                                         font.bold: true
-                                        color: (modItem.isFabricApi || model.enabled) ? EzTheme.text : EzTheme.textSubtle
+                                        color: (modItem.isFabricApi || modItem.isEzClient || model.enabled) ? EzTheme.text : EzTheme.textSubtle
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
+                                        Layout.maximumWidth: 320
+                                    }
+                                    Rectangle {
+                                        height: 14
+                                        width: ezBadgeRow.implicitWidth + 8
+                                        radius: 3
+                                        color: "#2B230E"
+                                        border.color: "#EAB308"
+                                        border.width: 1
+                                        visible: modItem.isEzClient
+                                        RowLayout {
+                                            id: ezBadgeRow
+                                            anchors.centerIn: parent
+                                            spacing: 3
+                                            Text { text: "★"; font.pixelSize: 8; color: "#FFD76A" }
+                                            Text {
+                                                text: "EZCLIENT"
+                                                font.family: EzTheme.mcFontFamily; font.pixelSize: 8; font.bold: true
+                                                color: "#FFD76A"
+                                            }
+                                        }
                                     }
                                     Rectangle {
                                         height: 14
@@ -990,7 +1046,7 @@ Item {
                                         color: "#0E2B1F"
                                         border.color: "#166534"
                                         border.width: 1
-                                        visible: modItem.isPerformanceMod && !modItem.isFabricApi
+                                        visible: modItem.isPerformanceMod && !modItem.isFabricApi && !modItem.isEzClient
                                         RowLayout {
                                             id: perfRow
                                             anchors.centerIn: parent
@@ -1041,6 +1097,7 @@ Item {
                         }
 
                         MouseArea {
+                            id: titleMouse
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
@@ -1071,11 +1128,12 @@ Item {
                     }
 
                     EzButton {
+                        id: updateBtn
                         text: "Update " + modItem.modUpdateVersion
                         mcFont: true
                         primary: true
                         visible: !modItem.isFabricApi && !modItem.isEzClient && modItem.updateAvailable
-                        Layout.preferredWidth: 64
+                        Layout.preferredWidth: Math.max(76, implicitWidth)
                         Layout.preferredHeight: 28
                         onClicked: profileController.updateModVersion(model.slug || model.projectId || model.name, "Latest")
                     }
@@ -1087,7 +1145,6 @@ Item {
                         color: delMouse.containsMouse ? "#3D1418" : "transparent"
                         border.color: delMouse.containsMouse ? EzTheme.danger : "transparent"
                         border.width: 1
-                        visible: !modItem.isEzClient
 
                         Image {
                             source: "icons/trash.svg"
@@ -1115,22 +1172,32 @@ Item {
                             }
                         }
                     }
-
-                    Item {
-                        Layout.preferredWidth: 28
-                        visible: modItem.isEzClient
-                    }
                 }
 
                 MouseArea {
                     id: rowMouse
                     anchors.fill: parent
                     hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
                     z: -1
+                    onClicked: {
+                        var actVer = profileController ? profileController.activeVersion : ""
+                        root.currentInspectedMod = {
+                            name: model.name,
+                            slug: model.slug || model.name,
+                            version: model.version,
+                            author: model.author,
+                            description: model.description,
+                            iconUrl: model.iconUrl
+                        }
+                        modrinthController.inspectInstalledMod(model.slug || model.name, actVer)
+                        root.inspectModalOpen = true
+                    }
                 }
             }
         }
     }
+}
 
     function formatNum(n) {
         if (!n) return "0"

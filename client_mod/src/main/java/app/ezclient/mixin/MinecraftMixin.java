@@ -13,4 +13,12 @@ public abstract class MinecraftMixin {
     private void ezclient$customWindowTitle(CallbackInfoReturnable<String> cir) {
         cir.setReturnValue(EzClientMod.CLIENT_TITLE);
     }
+
+    @Inject(method = "pauseGame", at = @At("HEAD"), cancellable = true)
+    private void ezclient$onPauseGame(boolean pause, org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        if (app.ezclient.gui.BlockSelectionOverlay.isActive()) {
+            app.ezclient.gui.BlockSelectionOverlay.cancel((Minecraft) (Object) this);
+            ci.cancel();
+        }
+    }
 }

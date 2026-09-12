@@ -69,8 +69,8 @@ Item {
                 Rectangle { width: 230; height: 38; radius: 11; color: EzTheme.surface; border.color: search.activeFocus ? EzTheme.accent : EzTheme.border
                     RowLayout { anchors.fill: parent; anchors.margins: 11; spacing: 8
                         Image { source: "icons/search.svg"; width: 14; height: 14; opacity: .55 }
-                        TextInput { id: search; Layout.fillWidth: true; color: EzTheme.text; font.family: EzTheme.fontFamily; font.pixelSize: 11; verticalAlignment: TextInput.AlignVCenter
-                            Text { anchors.verticalCenter: parent.verticalCenter; visible: parent.text === ""; text: "Version suchen…"; color: EzTheme.textSubtle; font: parent.font }
+                        TextInput { id: search; Layout.fillWidth: true; color: EzTheme.text; font.family: EzTheme.fontFamily; font.pixelSize: 11; verticalAlignment: TextInput.AlignVCenter; clip: true
+                            Text { anchors.left: parent.left; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideRight; visible: parent.text === ""; text: "Version suchen…"; color: EzTheme.textSubtle; font: parent.font }
                         }
                     }
                 }

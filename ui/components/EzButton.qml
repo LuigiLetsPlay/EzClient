@@ -11,7 +11,7 @@ Button {
     property string iconSource: ""
 
     implicitHeight: 40
-    implicitWidth: Math.max(88, btnRow.implicitWidth + 28)
+    implicitWidth: Math.max(88, (btnIcon.visible ? (btnIcon.width + btnRow.spacing) : 0) + btnText.implicitWidth + 28)
 
     scale: control.down ? 0.96 : (control.hovered ? 1.02 : 1.0)
     Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
@@ -53,16 +53,19 @@ Button {
     }
 
     contentItem: Item {
+        id: contentContainer
         anchors.fill: parent
-        anchors.leftMargin: 10
-        anchors.rightMargin: 10
+        anchors.leftMargin: 8
+        anchors.rightMargin: 8
+        clip: true
 
         Row {
             id: btnRow
-            spacing: 8
+            spacing: 6
             anchors.centerIn: parent
 
             Image {
+                id: btnIcon
                 source: {
                     if (!control.iconSource) return ""
                     if (control.iconSource.indexOf("/") !== -1 || control.iconSource.startsWith("qrc:") || control.iconSource.startsWith("data:") || control.iconSource.startsWith("http")) {
@@ -78,9 +81,12 @@ Button {
             }
 
             Text {
+                id: btnText
                 text: control.text
                 font: control.font
                 elide: Text.ElideRight
+                width: Math.max(0, Math.min(implicitWidth, contentContainer.width - (btnIcon.visible ? (btnIcon.width + btnRow.spacing) : 0)))
+                horizontalAlignment: Text.AlignHCenter
                 color: {
                     if (!control.enabled) return EzTheme.textMuted
                     if (control.primary) return "#000000"

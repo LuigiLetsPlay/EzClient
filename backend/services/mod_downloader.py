@@ -322,14 +322,19 @@ def _sync_profile_mods(
             print(f"[ModDownloader] Error downloading dependency {dep_id}: {e}")
 
     # Remove stale conflicting mod duplicates for active profile mods
+    active_mod_filenames = {m.filename.lower() for m in profile.mods if m.filename}
     for mod in profile.mods:
         if mod.filename and mod.enabled:
             current_dest = mods_dir / mod.filename
             if current_dest.is_file():
-                prefix = (mod.slug or mod.name or "").lower().split("-")[0]
-                if len(prefix) >= 3:
-                    for old_file in mods_dir.glob(f"*{prefix}*.jar"):
-                        if old_file != current_dest and not old_file.name.endswith(".disabled"):
+                mod_slug = (mod.slug or "").lower().strip()
+                if not mod_slug or mod_slug in {"fabric", "forge", "neoforge", "minecraft"}:
+                    continue
+                for pattern in (f"{mod_slug}-*.jar", f"{mod_slug}_*.jar", f"{mod_slug}+*.jar"):
+                    for old_file in mods_dir.glob(pattern):
+                        if old_file.name.lower() in active_mod_filenames:
+                            continue
+                        if old_file.resolve() != current_dest.resolve() and not old_file.name.endswith(".disabled"):
                             try:
                                 old_file.unlink()
                             except OSError:

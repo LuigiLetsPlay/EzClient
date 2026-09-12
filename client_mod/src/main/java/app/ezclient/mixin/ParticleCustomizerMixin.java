@@ -20,6 +20,7 @@ public abstract class ParticleCustomizerMixin {
         String id = BuiltInRegistries.PARTICLE_TYPE.getKey(options.getType()).getPath();
         if (weather.isEnabled() && !weather.flag("precipitation") && (id.equals("rain") || id.equals("splash"))) { cir.setReturnValue(null); return; }
         if (!m.isEnabled() || ezclient$duplicating) return;
+        if (!m.allows(options)) { cir.setReturnValue(null); return; }
         var player = Minecraft.getInstance().player;
         boolean own = !m.flag("ownPotion") && id.contains("effect") && player != null && player.getBoundingBox().inflate(.25).contains(x, y, z);
         boolean crit = options.getType() == ParticleTypes.CRIT || options.getType() == ParticleTypes.ENCHANTED_HIT;

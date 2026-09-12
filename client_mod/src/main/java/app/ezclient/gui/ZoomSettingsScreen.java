@@ -24,29 +24,32 @@ public final class ZoomSettingsScreen extends Screen {
     @Override
     protected void init() {
         ZoomModule zoom = ModuleManager.getInstance().getZoomModule();
-        panelWidth = Math.min(340, width - 24);
-        panelHeight = Math.min(236, height - 24);
+        panelWidth = Math.min(ScrollingSettingsScreen.SETTINGS_WIDTH, width - 48);
+        panelHeight = Math.min(ScrollingSettingsScreen.SETTINGS_HEIGHT, height - 48);
         panelX = (width - panelWidth) / 2;
         panelY = (height - panelHeight) / 2;
 
         addRenderableWidget(new EzButton(panelX + panelWidth - 26, panelY + 6, 18, 16,
                 Component.literal("✕"), false, ignored -> onClose()));
+        addRenderableWidget(new EzButton(panelX + 6, panelY + 43, ScrollingSettingsScreen.SETTINGS_SIDEBAR_WIDTH - 12, 18,
+                Component.literal("Vorschau"), false, ignored -> EzScreenBridge.set(minecraft, new ModulePreviewScreen(this, zoom))));
 
-        int controlX = panelX + 100;
-        int controlWidth = panelWidth - 114;
-        int halfWidth = (controlWidth - 6) / 2;
-        int y = panelY + 44;
-
-        // Toggle button & Hotkey button side-by-side
-        addRenderableWidget(new EzButton(controlX, y, halfWidth, 18,
-                Component.literal(app.ezclient.util.EzI18n.get("ezclient.zoom.status", app.ezclient.util.EzI18n.onOrOff(zoom.isEnabled()))), zoom.isEnabled(), ignored -> {
-                    zoom.toggle();
+        String sbHkText = isListeningForHotkey ? "Taste: …" : (zoom.getKeyBind() > 0 || zoom.getKeyBind() <= -100 ? "Key: " + EzKeyBindings.getKeyOrMouseName(zoom.getKeyBind()) : "Taste: Keine");
+        addRenderableWidget(new EzButton(panelX + 6, panelY + 65, ScrollingSettingsScreen.SETTINGS_SIDEBAR_WIDTH - 12, 18,
+                Component.literal(sbHkText), isListeningForHotkey, ignored -> {
+                    isListeningForHotkey = !isListeningForHotkey;
                     rebuildWidgets();
                 }));
 
-        addRenderableWidget(new EzButton(controlX + halfWidth + 6, y, halfWidth, 18,
-                Component.literal(getKeyName(zoom.getKeyBind())), isListeningForHotkey, ignored -> {
-                    isListeningForHotkey = true;
+        int controlX = panelX + ScrollingSettingsScreen.SETTINGS_SIDEBAR_WIDTH + 8;
+        int controlWidth = panelWidth - ScrollingSettingsScreen.SETTINGS_SIDEBAR_WIDTH - 16;
+        int halfWidth = (controlWidth - 6) / 2;
+        int y = panelY + 44;
+
+        // Status Toggle button
+        addRenderableWidget(new EzButton(controlX, y, controlWidth, 18,
+                Component.literal(app.ezclient.util.EzI18n.get("ezclient.zoom.status", app.ezclient.util.EzI18n.onOrOff(zoom.isEnabled()))), zoom.isEnabled(), ignored -> {
+                    zoom.toggle();
                     rebuildWidgets();
                 }));
 
@@ -74,30 +77,24 @@ public final class ZoomSettingsScreen extends Screen {
                     rebuildWidgets();
                 }));
 
-        addRenderableWidget(new EzButton(panelX + panelWidth - 56, panelY + panelHeight - 24, 46, 16,
+        addRenderableWidget(new EzButton(controlX, panelY + panelHeight - 24, controlWidth, 16,
                 app.ezclient.util.EzI18n.comp("ezclient.zoom.back"), false, ignored -> onClose()));
     }
 
     private String getKeyName(int key) {
-        if (isListeningForHotkey) return "Key: ...";
-        if (key == -1) return "Key: None";
-        String name = GLFW.glfwGetKeyName(key, 0);
-        if (name == null || name.isEmpty()) {
-            if (key == GLFW.GLFW_KEY_LEFT_SHIFT) return "Key: LShift";
-            if (key == GLFW.GLFW_KEY_RIGHT_SHIFT) return "Key: RShift";
-            if (key == GLFW.GLFW_KEY_LEFT_CONTROL) return "Key: LCtrl";
-            if (key == GLFW.GLFW_KEY_RIGHT_CONTROL) return "Key: RCtrl";
-            if (key == GLFW.GLFW_KEY_LEFT_ALT) return "Key: LAlt";
-            if (key == GLFW.GLFW_KEY_RIGHT_ALT) return "Key: RAlt";
-            if (key == GLFW.GLFW_KEY_SPACE) return "Key: Space";
-            return "Key: " + key;
-        }
-        return "Key: " + name.toUpperCase();
+        if (isListeningForHotkey) return "Taste: …";
+        if (key <= 0 && key > -100) return "Taste: Keine";
+        return "Key: " + EzKeyBindings.getKeyOrMouseName(key);
     }
 
     @Override
     public boolean mouseClicked(MouseButtonEvent e, boolean doubleClick) {
-        if (isListeningForHotkey) {
+        if (isListeningForHotkey && e.button() != 0) {
+            ZoomModule zoom = ModuleManager.getInstance().getZoomModule();
+            int code = -100 - e.button();
+            EzKeyBindings.applyModuleKeyBind(zoom, code);
+            isListeningForHotkey = false;
+            rebuildWidgets();
             return true;
         }
         return super.mouseClicked(e, doubleClick);
@@ -107,10 +104,10 @@ public final class ZoomSettingsScreen extends Screen {
     public boolean keyPressed(KeyEvent event) {
         if (isListeningForHotkey) {
             ZoomModule zoom = ModuleManager.getInstance().getZoomModule();
-            if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
-                zoom.setKeyBind(-1);
+            if (event.key() == GLFW.GLFW_KEY_ESCAPE || event.key() == GLFW.GLFW_KEY_BACKSPACE || event.key() == GLFW.GLFW_KEY_DELETE) {
+                EzKeyBindings.applyModuleKeyBind(zoom, -1);
             } else {
-                zoom.setKeyBind(event.key());
+                EzKeyBindings.applyModuleKeyBind(zoom, event.key());
             }
             isListeningForHotkey = false;
             rebuildWidgets();
@@ -135,28 +132,35 @@ public final class ZoomSettingsScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
-        extractTransparentBackground(graphics);
+        EzUi.backdrop(graphics, width, height);
 
         EzUi.panel(graphics, panelX, panelY, panelWidth, panelHeight);
 
+        int sidebar = ScrollingSettingsScreen.SETTINGS_SIDEBAR_WIDTH;
+        graphics.fill(panelX + sidebar, panelY + 6, panelX + sidebar + 1, panelY + panelHeight - 6, EzUi.BORDER_SUBTLE);
+        int logoX = panelX + 26, logoY = panelY + 9;
+        EzUi.roundedRect(graphics, logoX, logoY, 20, 20, 3, 0xFF15181C);
+        ModuleIconRenderer.drawTexture(graphics, ScrollingSettingsScreen.SETTINGS_LOGO, logoX + 2, logoY + 2, 16);
+        EzUi.roundedRect(graphics, panelX + 6, panelY + 43, sidebar - 12, 18, 2, EzUi.BG_CARD_ACTIVE);
+        graphics.centeredText(font, Component.literal("Zoom"), panelX + sidebar / 2, panelY + 48, EzUi.TEXT_LIGHT);
+
         graphics.pose().pushMatrix();
-        graphics.pose().translate(panelX + 14, panelY + 9);
+        graphics.pose().translate(panelX + sidebar + 8, panelY + 9);
         graphics.pose().scale(1.15f, 1.15f);
         graphics.text(font, app.ezclient.util.EzI18n.get("ezclient.zoom.title"), 0, 0, EzUi.TEXT_WHITE);
         graphics.pose().popMatrix();
 
-        graphics.fill(panelX + 14, panelY + 28, panelX + panelWidth - 14, panelY + 29, EzUi.BORDER_SUBTLE);
-
-        int labelX = panelX + 14;
-        graphics.text(font, app.ezclient.util.EzI18n.get("ezclient.zoom.lbl_zoom"), labelX, panelY + 49, EzUi.TEXT_MUTED);
-        graphics.text(font, app.ezclient.util.EzI18n.get("ezclient.zoom.lbl_strength"), labelX, panelY + 74, EzUi.TEXT_MUTED);
-        graphics.text(font, app.ezclient.util.EzI18n.get("ezclient.zoom.lbl_wheel"), labelX, panelY + 100, EzUi.TEXT_MUTED);
-        graphics.text(font, app.ezclient.util.EzI18n.get("ezclient.zoom.lbl_min"), labelX, panelY + 126, EzUi.TEXT_MUTED);
-        graphics.text(font, app.ezclient.util.EzI18n.get("ezclient.zoom.lbl_max"), labelX, panelY + 152, EzUi.TEXT_MUTED);
-        graphics.text(font, app.ezclient.util.EzI18n.get("ezclient.zoom.lbl_smooth"), labelX, panelY + 178, EzUi.TEXT_MUTED);
+        graphics.fill(panelX + sidebar + 8, panelY + 28, panelX + panelWidth - 8, panelY + 29, EzUi.BORDER_SUBTLE);
 
         super.extractRenderState(graphics, mouseX, mouseY, delta);
+        boolean hover = children().stream().filter(child -> child instanceof net.minecraft.client.gui.components.AbstractWidget)
+                .map(child -> (net.minecraft.client.gui.components.AbstractWidget) child)
+                .anyMatch(widget -> widget.active && widget.visible && mouseX >= widget.getX() && mouseX < widget.getX() + widget.getWidth()
+                        && mouseY >= widget.getY() && mouseY < widget.getY() + widget.getHeight());
+        EzCursor.setPointer(hover);
     }
+
+    @Override public void removed() { EzCursor.setPointer(false); super.removed(); }
 
     @Override
     public boolean isPauseScreen() {

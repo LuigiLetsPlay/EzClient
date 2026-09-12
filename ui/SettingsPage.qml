@@ -196,16 +196,31 @@ Item {
                         border.width: 1
                         clip: true
 
+                        readonly property bool isVideo: {
+                            var p = (typeof profileController !== "undefined" && profileController) ? profileController.customBackgroundImage : "";
+                            return /\.(mp4|webm|mov|mkv)$/i.test(p);
+                        }
+
                         Image {
                             anchors.fill: parent
                             source: {
                                 var p = (typeof profileController !== "undefined" && profileController) ? profileController.customBackgroundImage : "";
-                                if (!p) return "assets/hero_bg.jpg";
+                                if (!p || parent.isVideo) return "assets/hero_bg.jpg";
                                 if (p.startsWith("file:///") || p.startsWith("http://") || p.startsWith("https://") || p.startsWith("qrc:/")) return p;
                                 var clean = p.replace(/\\/g, "/");
                                 return clean.startsWith("/") ? ("file://" + clean) : ("file:///" + clean);
                             }
                             fillMode: Image.PreserveAspectCrop
+                            opacity: parent.isVideo ? 0.45 : 1.0
+                        }
+
+                        Image {
+                            anchors.centerIn: parent
+                            width: 18
+                            height: 18
+                            source: "icons/play.svg"
+                            visible: parent.isVideo
+                            opacity: 0.9
                         }
                     }
 
@@ -722,6 +737,24 @@ Item {
                     spacing: 0
 
                     EzToggleRow {
+                        label: "Server-Schnellstart auf Home anzeigen"
+                        sub: "Zeigt eine Schnellstart-Leiste mit eigenen und vorgeschlagenen Servern für Sofort-Beitritt auf der Startseite"
+                        toggleValue: profileController ? profileController.showRecentServersHome : true
+                        onToggled: function(val) { if (profileController) profileController.setShowRecentServersHome(val) }
+                    }
+
+                    Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border; opacity: 0.6; Layout.topMargin: 8; Layout.bottomMargin: 8 }
+
+                    EzToggleRow {
+                        label: "Vorgeschlagene Server auf Home anzeigen"
+                        sub: "Zeigt automatisch Server-Empfehlungen und zuletzt gespielte Server aus Minecraft in der Schnellstartleiste an"
+                        toggleValue: profileController ? profileController.showSuggestedServersHome : true
+                        onToggled: function(val) { if (profileController) profileController.setShowSuggestedServersHome(val) }
+                    }
+
+                    Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border; opacity: 0.6; Layout.topMargin: 8; Layout.bottomMargin: 8 }
+
+                    EzToggleRow {
                         label: "Live-Logs Konsole beim Spielstart anzeigen"
                         sub: "Öffnet das moderne Terminal-Fenster mit Syntax-Highlighting, Filter-Pills und Echtzeit-Statistiken"
                         toggleValue: profileController ? profileController.showLiveLogs : true
@@ -733,7 +766,7 @@ Item {
                     EzToggleRow {
                         label: EzI18n.t("settings_direct_launch", "Schnellstart (Native Java-Engine)")
                         sub: EzI18n.t("settings_direct_launch_desc", "Startet Minecraft blitzschnell mit verifizierter Microsoft-Sitzung")
-                        toggleValue: profileController ? profileController.preferDirectLaunch : true
+                        toggleValue: (profileController && typeof profileController.preferDirectLaunch === "boolean") ? profileController.preferDirectLaunch : true
                         onToggled: function(val) { if (profileController) profileController.setPreferDirectLaunch(val) }
                     }
 
@@ -742,7 +775,7 @@ Item {
                     EzToggleRow {
                         label: EzI18n.t("settings_kill_official", "Minecraft Launcher automatisch beenden")
                         sub: EzI18n.t("settings_kill_official_desc", "Beendet den offiziellen Mojang Launcher sofort, falls dieser als Fallback genutzt wird")
-                        toggleValue: profileController ? profileController.killOfficialLauncher : true
+                        toggleValue: (profileController && typeof profileController.killOfficialLauncher === "boolean") ? profileController.killOfficialLauncher : true
                         onToggled: function(val) { if (profileController) profileController.setKillOfficialLauncher(val) }
                     }
 

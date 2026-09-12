@@ -300,7 +300,7 @@ Profilnamen werden eindeutig gehalten. Bei Duplikaten werden sichtbare Namen wie
 
 Launcher-eigene Kern-Mods und vom Benutzer installierte JARs müssen getrennt verwaltet werden. Synchronisierung darf unbekannte Benutzer-JARs niemals löschen.
 
-Sodium, Lithium und Iris dürfen nicht blind für alte Minecraft-Versionen installiert werden. Die verwaltete moderne Performance-Mod-Auswahl beginnt erst bei Versionen, für die tatsächlich passende Veröffentlichungen vorhanden sind; es darf keinen Fallback auf eine JAR für eine andere Minecraft-Version geben.
+Zum verwalteten EzClient-Stack gehören ausschließlich EzClient Core, Sodium und Lithium. Das Performance-Profil ohne EzClient Core verwaltet ausschließlich Sodium und Lithium. Entity Culling darf vom Launcher nie installiert werden; alle weiteren Mods sind nur benutzerverwaltete optionale Mods. Sodium und Lithium dürfen nicht blind für alte Minecraft-Versionen installiert werden. Die verwaltete moderne Performance-Mod-Auswahl beginnt erst bei Versionen, für die tatsächlich passende Veröffentlichungen vorhanden sind; es darf keinen Fallback auf eine JAR für eine andere Minecraft-Version geben.
 
 ## 11. Direct Launch, Assets und Legacy Fabric
 

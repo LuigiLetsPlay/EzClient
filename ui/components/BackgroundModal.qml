@@ -14,6 +14,7 @@ Rectangle {
     Behavior on opacity { NumberAnimation { duration: 180 } }
 
     property string previewPath: ""
+    readonly property bool isVideo: /\.(mp4|webm|mov|mkv)$/i.test(previewPath)
     property real currentOpacity: 0.60
     property string currentFillMode: "PreserveAspectCrop"
 
@@ -31,7 +32,7 @@ Rectangle {
     }
 
     function formatUrl(p) {
-        if (!p) return Qt.resolvedUrl("../assets/hero_bg.jpg").toString();
+        if (!p || bgModal.isVideo) return Qt.resolvedUrl("../assets/hero_bg.jpg").toString();
         if (p.startsWith("file:///") || p.startsWith("http://") || p.startsWith("https://") || p.startsWith("qrc:/")) return p;
         var clean = p.replace(/\\/g, "/");
         if (clean.startsWith("/")) return "file://" + clean;
@@ -121,7 +122,22 @@ Rectangle {
                     fillMode: bgModal.currentFillMode === "PreserveAspectFit" 
                               ? Image.PreserveAspectFit 
                               : (bgModal.currentFillMode === "Stretch" ? Image.Stretch : Image.PreserveAspectCrop)
-                    opacity: bgModal.currentOpacity
+                    opacity: bgModal.isVideo ? 0.45 : bgModal.currentOpacity
+                }
+
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 44; height: 44; radius: 22
+                    color: "#A00B0E14"
+                    border.color: EzTheme.borderLight; border.width: 1
+                    visible: bgModal.isVideo
+                    z: 5
+                    Image {
+                        source: "../icons/play.svg"
+                        anchors.centerIn: parent
+                        width: 20; height: 20
+                        opacity: 0.95
+                    }
                 }
 
                 // Vignette mock

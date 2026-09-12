@@ -135,6 +135,7 @@ Item {
                             color: EzTheme.text
                             verticalAlignment: TextInput.AlignVCenter
                             selectByMouse: true
+                            clip: true
                             Keys.onReturnPressed: createBtnAction()
 
                             Text {
@@ -142,7 +143,10 @@ Item {
                                 font: parent.font
                                 color: EzTheme.textSubtle
                                 visible: parent.text === ""
+                                anchors.left: parent.left
+                                anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
+                                elide: Text.ElideRight
                             }
                         }
                     }
@@ -467,6 +471,7 @@ Item {
                     font.pixelSize: 12
                     color: EzTheme.text
                     selectByMouse: true
+                    clip: true
                     verticalAlignment: TextInput.AlignVCenter
 
                     Text {
@@ -474,7 +479,10 @@ Item {
                         font: parent.font
                         color: EzTheme.textSubtle
                         visible: parent.text === ""
+                        anchors.left: parent.left
+                        anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
+                        elide: Text.ElideRight
                     }
                 }
 
@@ -560,6 +568,7 @@ Item {
                         spacing: 3
 
                         RowLayout {
+                            Layout.fillWidth: true
                             spacing: 8
                             Text {
                                 text: model.profileName
@@ -567,6 +576,9 @@ Item {
                                 font.pixelSize: 14
                                 font.bold: true
                                 color: EzTheme.text
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                Layout.maximumWidth: 280
                             }
                             Rectangle {
                                 width: activePillText.implicitWidth + 8
@@ -587,12 +599,16 @@ Item {
                         }
 
                         RowLayout {
+                            Layout.fillWidth: true
                             spacing: 8
                             Text {
                                 text: "Minecraft " + model.minecraftVersion + "  ·  " + model.loader + "  ·  " + model.modsCount + " Mods"
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 11
                                 color: EzTheme.textMuted
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                Layout.maximumWidth: 240
                             }
                             Rectangle { width: 4; height: 4; radius: 2; color: EzTheme.borderLight }
                             Text {
@@ -600,6 +616,8 @@ Item {
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 10
                                 color: EzTheme.textSubtle
+                                elide: Text.ElideRight
+                                Layout.maximumWidth: 160
                             }
                         }
                     }

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
 import urllib.parse
 import urllib.request
+import uuid
 import zipfile
 from pathlib import Path
 from typing import Any, Callable
@@ -15,7 +17,7 @@ from backend.models.types import ModData, ProfileData
 from backend.services.curseforge import _make_request as curseforge_make_request
 from backend.services.mod_downloader import download_file
 from backend.services.mod_scanner import extract_jar_metadata
-from backend.services.modrinth import USER_AGENT
+from backend.services.modrinth import USER_AGENT, get_json
 
 
 def default_norisk_root() -> Path:
@@ -71,16 +73,21 @@ def discover_norisk_profiles(root: Path | None = None) -> list[dict[str, Any]]:
                     if not jar.name.startswith("nrc-") and not jar.name.lower().startswith("norisk"):
                         extra_count += 1
 
+        xaero_waypoints = discover_xaero_waypoints(source)
+        game_version = str(raw.get("game_version") or "")
         result.append({
             "id": p_id or relative,
             "name": str(raw.get("name") or relative),
-            "version": str(raw.get("game_version") or ""),
+            "version": game_version,
             "loader": str(raw.get("loader") or "Fabric").title(),
             "loaderVersion": str(raw.get("loader_version") or ""),
             "ramMb": int(memory.get("max") or 4096),
             "modCount": max(len(mods), extra_count),
             "path": str(source),
             "norisk_root": str(base),
+            "hasXaeroWaypoints": bool(xaero_waypoints),
+            "canConvertXaeroWaypoints": bool(xaero_waypoints) and game_version in {"26.1", "26.1.1", "26.2"},
+            "xaeroWaypointCount": len(xaero_waypoints),
             "raw": raw,
         })
     return result
@@ -96,12 +103,14 @@ _COPY_FILES = (
 )
 
 
-def _copy_tree(source: Path, target: Path) -> None:
+def _copy_tree(source: Path, target: Path, skip_names: set[str] | None = None) -> None:
     if source.is_dir():
+        skipped = {name.casefold() for name in (skip_names or set())}
         target.mkdir(parents=True, exist_ok=True)
         for item in source.iterdir():
             # Skip NoRisk internal folders and transient library caches
-            if item.name.startswith("nrc-") or item.name.lower() in (
+            skip_xaero = "xaero" in skipped and item.name.casefold().startswith("xaero")
+            if skip_xaero or item.name.casefold() in skipped or item.name.startswith("nrc-") or item.name.lower() in (
                 "noriskclient", "noriskclientlauncher", "logs", "crash-reports", ".fabric",
                 "libraries", "loader", "image-cache", "screenshot-cache", "cosmetic-cache"
             ):
@@ -110,10 +119,271 @@ def _copy_tree(source: Path, target: Path) -> None:
             if item.is_dir():
                 shutil.copytree(
                     item, dest_item, dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns("libraries", "loader", "cache", "*cache*")
+                    ignore=shutil.ignore_patterns("libraries", "loader", "cache", "*cache*", "xaero*", "Xaero*")
+                    if "xaero" in skipped else shutil.ignore_patterns("libraries", "loader", "cache", "*cache*", *(skip_names or ()))
                 )
             elif item.is_file():
                 shutil.copy2(item, dest_item)
+
+
+_XAERO_COLORS = (
+    0xFF202020, 0xFF3546B8, 0xFF2E9E55, 0xFF2FA7A0,
+    0xFFB83A3A, 0xFF9B4DB8, 0xFFE39A32, 0xFFAAAAAA,
+    0xFF555555, 0xFF4D6FFF, 0xFF45D66B, 0xFF46D9D0,
+    0xFFFF5555, 0xFFFF63D8, 0xFFFFD84A, 0xFFFFFFFF,
+)
+
+
+def _clean_servers_nbt(data: bytes) -> bytes:
+    import io
+    import struct
+    import gzip
+
+    is_gzip = data[:2] == b"\x1f\x8b"
+    raw = gzip.decompress(data) if is_gzip else data
+    bio = io.BytesIO(raw)
+
+    def read_tag(bio, tag_type):
+        if tag_type == 0:
+            return None
+        elif tag_type == 1:
+            return bio.read(1)
+        elif tag_type == 2:
+            return bio.read(2)
+        elif tag_type == 3:
+            return bio.read(4)
+        elif tag_type == 4:
+            return bio.read(8)
+        elif tag_type == 5:
+            return bio.read(4)
+        elif tag_type == 6:
+            return bio.read(8)
+        elif tag_type == 7:
+            length = struct.unpack(">i", bio.read(4))[0]
+            return struct.pack(">i", length) + bio.read(length)
+        elif tag_type == 8:
+            length = struct.unpack(">h", bio.read(2))[0]
+            return bio.read(length).decode("utf-8", errors="replace")
+        elif tag_type == 9:
+            elem_type = bio.read(1)[0]
+            count = struct.unpack(">i", bio.read(4))[0]
+            items = [read_tag(bio, elem_type) for _ in range(count)]
+            return (elem_type, items)
+        elif tag_type == 10:
+            comp = {}
+            while True:
+                tt_b = bio.read(1)
+                if not tt_b or tt_b[0] == 0:
+                    break
+                tt = tt_b[0]
+                nl = struct.unpack(">h", bio.read(2))[0]
+                name = bio.read(nl).decode("utf-8", errors="replace")
+                comp[name] = (tt, read_tag(bio, tt))
+            return comp
+        elif tag_type == 11:
+            length = struct.unpack(">i", bio.read(4))[0]
+            return struct.pack(">i", length) + bio.read(length * 4)
+        elif tag_type == 12:
+            length = struct.unpack(">i", bio.read(4))[0]
+            return struct.pack(">i", length) + bio.read(length * 8)
+        raise ValueError(f"Unknown tag type {tag_type}")
+
+    def write_tag(bio, tag_type, val):
+        if tag_type in (1, 2, 3, 4, 5, 6, 7, 11, 12):
+            bio.write(val)
+        elif tag_type == 8:
+            raw_str = val.encode("utf-8")
+            bio.write(struct.pack(">h", len(raw_str)))
+            bio.write(raw_str)
+        elif tag_type == 9:
+            elem_type, items = val
+            bio.write(bytes([elem_type]))
+            bio.write(struct.pack(">i", len(items)))
+            for it in items:
+                write_tag(bio, elem_type, it)
+        elif tag_type == 10:
+            for name, (tt, v) in val.items():
+                bio.write(bytes([tt]))
+                nb = name.encode("utf-8")
+                bio.write(struct.pack(">h", len(nb)))
+                bio.write(nb)
+                write_tag(bio, tt, v)
+            bio.write(b"\x00")
+
+    root_type = bio.read(1)[0]
+    nl = struct.unpack(">h", bio.read(2))[0]
+    root_name = bio.read(nl).decode("utf-8", errors="replace")
+    root_val = read_tag(bio, root_type)
+
+    if isinstance(root_val, dict) and "servers" in root_val:
+        elem_type, server_list = root_val["servers"][1]
+        filtered = []
+        for s in server_list:
+            if not isinstance(s, dict):
+                filtered.append(s)
+                continue
+            s_name = str(s.get("name", (8, ""))[1])
+            s_ip = str(s.get("ip", (8, ""))[1])
+            low_name = s_name.lower()
+            low_ip = s_ip.lower()
+            if any(ad in low_name or ad in low_ip for ad in ("norisk", "advert")):
+                continue
+            filtered.append(s)
+        root_val["servers"] = (9, (elem_type, filtered))
+
+    out = io.BytesIO()
+    out.write(bytes([root_type]))
+    nb = root_name.encode("utf-8")
+    out.write(struct.pack(">h", len(nb)))
+    out.write(nb)
+    write_tag(out, root_type, root_val)
+    res = out.getvalue()
+    return gzip.compress(res) if is_gzip else res
+
+
+def _copy_cleaned_servers_dat(source: Path, destination: Path) -> None:
+    try:
+        data = source.read_bytes()
+        cleaned = _clean_servers_nbt(data)
+        destination.write_bytes(cleaned)
+    except Exception:
+        shutil.copy2(source, destination)
+
+
+
+def _xaero_context(path: Path, source: Path) -> tuple[str, str]:
+    parts = [part for part in path.relative_to(source).parts]
+    server = next((part[len("Multiplayer_"):] for part in parts if part.startswith("Multiplayer_")), "")
+    world = f"server:{server.lower()}" if server else "default"
+    dimension = "minecraft:overworld"
+    for part in parts:
+        lowered = part.lower()
+        if lowered in ("dim%-1", "dim-1", "the_nether"):
+            dimension = "minecraft:the_nether"
+        elif lowered in ("dim%1", "dim1", "the_end"):
+            dimension = "minecraft:the_end"
+    return world, dimension
+
+
+def _signed_argb(color: int) -> int:
+    value = 0xFF000000 | (int(color) & 0xFFFFFF)
+    return value - 0x100000000 if value >= 0x80000000 else value
+
+
+def _discover_norisk_waypoint_json(source: Path) -> list[dict[str, Any]]:
+    """Read NoRisk's current Xaero-compatible JSON waypoint store."""
+    root = source / "NoRiskClient" / "waypoints"
+    if not root.is_dir():
+        return []
+    found: list[dict[str, Any]] = []
+    for path in root.rglob("*.json"):
+        if path.name.casefold() == "world_config.json":
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        sets = payload.get("sets") if isinstance(payload, dict) else None
+        if not isinstance(sets, dict):
+            continue
+        world, _ = _xaero_context(path, source)
+        dimension_name = path.stem.casefold().replace("$", ":")
+        dimension = {
+            "overworld": "minecraft:overworld",
+            "the_nether": "minecraft:the_nether",
+            "the_end": "minecraft:the_end",
+        }.get(dimension_name, dimension_name if ":" in dimension_name else f"minecraft:{dimension_name}")
+        for waypoint_set in sets.values():
+            waypoints = waypoint_set.get("waypoints") if isinstance(waypoint_set, dict) else None
+            if not isinstance(waypoints, list):
+                continue
+            for waypoint in waypoints:
+                if not isinstance(waypoint, dict):
+                    continue
+                try:
+                    name = str(waypoint.get("name") or "Waypoint").strip()
+                    x, y, z = float(waypoint["x"]), float(waypoint["y"]), float(waypoint["z"])
+                    if not name or len(name) > 80:
+                        continue
+                except (KeyError, TypeError, ValueError):
+                    continue
+                found.append({
+                    "id": str(waypoint.get("id") or uuid.uuid4()), "name": name,
+                    "x": x, "y": y, "z": z,
+                    "color": _signed_argb(int(waypoint.get("color") or 0x22C96E)),
+                    "icon": "Flag", "world": world, "dimension": dimension,
+                    "visible": not bool(waypoint.get("disabled", False)),
+                    "folderId": "general", "blocks": [],
+                })
+    return found
+
+
+def discover_xaero_waypoints(source: Path) -> list[dict[str, Any]]:
+    """Read classic Xaero and current NoRisk/Xaero waypoints without modifying the source."""
+    source = Path(source)
+    roots = [source / "xaero" / "minimap", source / "XaeroWaypoints"]
+    found: list[dict[str, Any]] = _discover_norisk_waypoint_json(source)
+    seen: set[tuple[str, str, float, float, float]] = set()
+    for waypoint in found:
+        seen.add((waypoint["world"], waypoint["dimension"], waypoint["x"], waypoint["y"], waypoint["z"]))
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for path in root.rglob("*.txt"):
+            world, dimension = _xaero_context(path, source)
+            try:
+                lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+            except OSError:
+                continue
+            for line in lines:
+                if not line.startswith("waypoint:"):
+                    continue
+                fields = line.split(":")
+                if len(fields) < 8:
+                    continue
+                try:
+                    name = fields[1].strip() or "Waypoint"
+                    x, y, z = float(fields[3]), float(fields[4]), float(fields[5])
+                    color_index = int(fields[6]) % len(_XAERO_COLORS)
+                except (TypeError, ValueError):
+                    continue
+                key = (world, dimension, x, y, z)
+                if key in seen:
+                    continue
+                seen.add(key)
+                found.append({
+                    "id": str(uuid.uuid4()), "name": name, "x": x, "y": y, "z": z,
+                    "color": _signed_argb(_XAERO_COLORS[color_index]), "icon": "Flag", "world": world,
+                    "dimension": dimension, "visible": True, "folderId": "general", "blocks": [],
+                })
+    return found
+
+
+def _is_xaero_mod(*values: object) -> bool:
+    return "xaero" in " ".join(str(value or "") for value in values).casefold()
+
+
+def _write_ezclient_waypoints(destination: Path, waypoints: list[dict[str, Any]]) -> None:
+    if not waypoints:
+        return
+    config_path = destination / "config" / "ezclient.json"
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8")) if config_path.is_file() else {}
+    except (OSError, ValueError):
+        config = {}
+    if not isinstance(config, dict):
+        config = {}
+    feature = config.setdefault("feature_Waypoints", {})
+    if not isinstance(feature, dict):
+        feature = {}
+        config["feature_Waypoints"] = feature
+    existing = feature.get("waypoints") if isinstance(feature.get("waypoints"), list) else []
+    existing_keys = {(p.get("world"), p.get("dimension"), p.get("x"), p.get("y"), p.get("z")) for p in existing if isinstance(p, dict)}
+    feature["waypoints"] = existing + [p for p in waypoints if (p["world"], p["dimension"], p["x"], p["y"], p["z"]) not in existing_keys]
+    feature.setdefault("folders", [{"id": "general", "name": "GENERAL", "visible": True, "collapsed": False}])
+    feature["enabled"] = True
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _classify_zip_pack(zip_path: Path, display_name: str = "") -> str:
@@ -317,10 +587,48 @@ def _enrich_mod_metadata(
         progress(0.90, "Metadaten erfolgreich zugewiesen.")
 
 
+def _matches_hashes(path: Path, hashes: dict[str, str]) -> bool:
+    if not path.is_file():
+        return False
+    for algorithm, expected in hashes.items():
+        if algorithm not in ("sha1", "sha256", "sha512", "md5"):
+            continue
+        if hashlib.new(algorithm, path.read_bytes()).hexdigest().lower() != expected.lower():
+            return False
+    return True
+
+
+def _resolve_exact_file(provider: str, project: str, version: str, filename: str,
+                        hashes: dict[str, str]) -> dict:
+    if provider == "modrinth":
+        if version and version.lower() != "latest":
+            data = get_json("https://api.modrinth.com/v2/version/" + urllib.parse.quote(version, safe=""))
+        elif hashes.get("sha512") or hashes.get("sha1"):
+            algorithm = "sha512" if hashes.get("sha512") else "sha1"
+            data = get_json("https://api.modrinth.com/v2/version_file/" + hashes[algorithm] + "?algorithm=" + algorithm)
+        else:
+            raise ValueError("NoRisk-Mod benötigt eine exakte Versions-ID oder einen Dateihash: " + filename)
+        files = data.get("files", [])
+        if hashes:
+            files = [f for f in files if all(f.get("hashes", {}).get(k, v).lower() == v.lower() for k, v in hashes.items())]
+        match = next((f for f in files if f.get("filename") == filename), None) if filename else next((f for f in files if f.get("primary")), files[0] if files else None)
+        if not match:
+            raise ValueError("Datei fehlt in der festgelegten Version: " + filename)
+        return dict(match, version_id=data["id"])
+    if provider == "curseforge" and project and version and version.lower() != "latest":
+        data = curseforge_make_request(f"/mods/{int(project)}/files/{int(version)}").get("data", {})
+        return {"filename": data["fileName"], "url": data.get("downloadUrl"),
+                "version_id": str(data["id"]),
+                "hashes": { {1: "sha1", 2: "md5"}[h["algo"]]: h["value"]
+                           for h in data.get("hashes", []) if h.get("algo") in (1, 2)}}
+    raise ValueError("Keine exakte Download-Quelle für " + filename)
+
+
 def import_norisk_files(
     discovered: dict[str, Any],
     profile: ProfileData,
     progress: Callable[[float, str], None] | None = None,
+    convert_xaero_waypoints: bool = False,
 ) -> None:
     """Copy portable player content, mods, shaderpacks, and metadata into EzClient."""
     source = Path(str(discovered["path"]))
@@ -342,6 +650,18 @@ def import_norisk_files(
 
     imported_mods: list[ModData] = []
     handled_filenames: set[str] = set()
+    handled_projects: set[tuple[str, str]] = set()
+    handled_mod_ids: set[str] = set()
+    scanner_cache: dict = {}
+    xaero_waypoints = discover_xaero_waypoints(source) if convert_xaero_waypoints else []
+
+    def duplicate_jar(path: Path) -> bool:
+        mod_id = str(extract_jar_metadata(path, scanner_cache).get("mod_id") or "").lower()
+        if mod_id and mod_id in handled_mod_ids:
+            return True
+        if mod_id:
+            handled_mod_ids.add(mod_id)
+        return False
 
     # 1. Process mods listed in the profile manifest
     for raw_mod in raw_mods:
@@ -355,22 +675,52 @@ def import_norisk_files(
         version_id = str(src.get("version_id") or src.get("file_id") or "").strip()
         raw_version = str(raw_mod.get("version") or "Unbekannt").strip()
         src_type = str(src.get("type") or "local").lower()
+        if convert_xaero_waypoints and _is_xaero_mod(fn, disp_name, raw_mod.get("id"), src.get("project_id")):
+            continue
         provider = "curseforge" if ("curse" in src_type or proj_id.isdigit()) else ("modrinth" if "modrinth" in src_type else "local")
         enabled = bool(raw_mod.get("enabled", True))
 
+        if fn and (Path(fn).name != fn or "\\" in fn):
+            raise ValueError("Ungültiger Dateiname: " + fn)
+        key = (provider, proj_id.lower())
+        if (fn and fn.lower() in handled_filenames) or (proj_id and key in handled_projects):
+            continue
+        hashes = dict(src.get("hashes") or {})
+        for algorithm in ("sha1", "sha256", "sha512", "md5"):
+            if src.get(algorithm):
+                hashes[algorithm] = str(src[algorithm])
         candidate = _find_candidate_file(fn, mod_cache_dir, source)
-
-        # Download if missing and URL is available
-        if candidate is None and dl_url and fn:
+        if candidate and not _matches_hashes(candidate, hashes):
+            candidate = None
+        if candidate is None:
+            if not dl_url or (version_id and version_id.lower() != "latest"):
+                exact = _resolve_exact_file(provider, proj_id, version_id, fn, hashes)
+                fn = exact["filename"]
+                dl_url = exact.get("url") or ""
+                version_id = exact["version_id"]
+                hashes = {**exact.get("hashes", {}), **hashes}
+            if not fn or Path(fn).name != fn or "\\" in fn or not dl_url:
+                raise ValueError("Exakte Mod-Datei nicht verfügbar: " + disp_name)
             target_candidate = mods_dest / fn
-            if download_file(dl_url, target_candidate):
-                candidate = target_candidate
+            if not _matches_hashes(target_candidate, hashes):
+                if not download_file(dl_url, target_candidate, use_cache=False):
+                    raise RuntimeError("Download fehlgeschlagen: " + disp_name)
+            if not _matches_hashes(target_candidate, hashes):
+                target_candidate.unlink(missing_ok=True)
+                raise ValueError("Dateihash stimmt nicht überein: " + fn)
+            candidate = target_candidate
 
         if candidate and candidate.is_file():
             clean_name = candidate.name
             handled_filenames.add(clean_name.lower())
+            if proj_id:
+                handled_projects.add(key)
 
             if clean_name.lower().endswith(".jar"):
+                if duplicate_jar(candidate):
+                    if candidate.parent == mods_dest:
+                        candidate.unlink()
+                    continue
                 target_jar = mods_dest / clean_name
                 if not target_jar.exists() or target_jar.resolve() != candidate.resolve():
                     shutil.copy2(candidate, target_jar)
@@ -383,6 +733,9 @@ def import_norisk_files(
                     filename=clean_name,
                     enabled=enabled,
                     source=provider,
+                    pinned=True,
+                    download_url=dl_url,
+                    hashes=hashes or {"sha256": hashlib.sha256(candidate.read_bytes()).hexdigest()},
                     description="Aus NoRiskClient importiert",
                 ))
 
@@ -403,7 +756,9 @@ def import_norisk_files(
         for jar in dir_path.glob("*.jar"):
             if jar.name.startswith("nrc-") or jar.name.lower().startswith("norisk"):
                 continue
-            if jar.name.lower() not in handled_filenames:
+            if convert_xaero_waypoints and _is_xaero_mod(jar.name):
+                continue
+            if jar.name.lower() not in handled_filenames and not duplicate_jar(jar):
                 handled_filenames.add(jar.name.lower())
                 target_jar = mods_dest / jar.name
                 if not target_jar.exists() or target_jar.resolve() != jar.resolve():
@@ -425,14 +780,24 @@ def import_norisk_files(
 
     # 3. Copy player content folders (config, saves, screenshots, xaero, etc.)
     for folder in _COPY_DIRS:
-        _copy_tree(source / folder, destination / folder)
+        if convert_xaero_waypoints and folder.casefold() in {"xaero", "xaerowaypoints", "xaeroworldmap"}:
+            continue
+        _copy_tree(source / folder, destination / folder, {"xaero"} if convert_xaero_waypoints else None)
 
     # 4. Copy standard config files (options.txt, servers.dat, etc.)
     for filename in _COPY_FILES:
         candidate = source / filename
         if candidate.is_file():
             destination.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(candidate, destination / filename)
+            if filename.lower().startswith("servers.dat"):
+                _copy_cleaned_servers_dat(candidate, destination / filename)
+            else:
+                shutil.copy2(candidate, destination / filename)
+
+    if convert_xaero_waypoints:
+        _write_ezclient_waypoints(destination, xaero_waypoints)
+
+    (destination / ".norisk-import").write_text("Preserve imported configuration", encoding="utf-8")
 
     # 5. Apply JVM and memory settings
     profile.mods = imported_mods

@@ -152,8 +152,8 @@ Rectangle {
             Popup {
                 id: profPopup
                 y: profilePill.height + 8
-                width: 380
-                height: Math.min((profileController && profileController.profileModel ? profileController.profileModel.rowCount() : 1) * 56 + 60, 400)
+                width: 520
+                height: Math.min(Math.ceil(pList.count / 2) * 56 + 60, 400)
                 padding: 10
                 closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
 
@@ -167,16 +167,19 @@ Rectangle {
                 contentItem: ColumnLayout {
                     spacing: 4
 
-                    ListView {
+                    GridView {
                         id: pList
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        cellWidth: (width - 14) / 2
+                        cellHeight: 56
+                        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn }
                         clip: true
                         model: profileController ? profileController.profileModel : null
                         boundsBehavior: Flickable.StopAtBounds
 
                         delegate: Rectangle {
-                            width: pList.width
+                            width: pList.cellWidth - 4
                             height: 50
                             radius: EzTheme.radiusSm
                             color: (model.profileId === profileController.activeId)
@@ -438,7 +441,7 @@ Rectangle {
                 spacing: 6
                 Image { source: "icons/zap.svg"; width: 12; height: 12; fillMode: Image.PreserveAspectFit }
                 Text {
-                    text: "Update v" + (profileController ? profileController.ezClientLatestVersion : "2.0.1")
+                    text: "Update v" + (profileController ? profileController.ezClientLatestVersion : "2.1.0")
                     font.family: EzTheme.mcFontFamily
                     font.pixelSize: 10
                     font.bold: true

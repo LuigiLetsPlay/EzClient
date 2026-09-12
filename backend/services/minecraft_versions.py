@@ -55,6 +55,10 @@ def is_frozen_ezclient_version(version: str) -> bool:
     return False
 
 
+def is_active_ezclient_version(version: str) -> bool:
+    return str(version or "").startswith("26.")
+
+
 def catalog(asset_exists) -> list[dict]:
     result = []
     for family, releases in RELEASE_FAMILIES:

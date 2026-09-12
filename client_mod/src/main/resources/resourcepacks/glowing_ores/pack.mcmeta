@@ -1,0 +1,10 @@
+{
+   "pack": {
+      "pack_format": 34,
+        "supported_formats": {
+            "min_inclusive": 8,
+            "max_inclusive": 69
+        },
+      "description": "§6v2.0-1.21+ §r| by GridExpert"
+   }
+}

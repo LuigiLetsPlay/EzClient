@@ -35,7 +35,8 @@ Item {
             previewName = "Steve"
         }
         isApplied = true
-        appliedVariant = "classic"
+        appliedVariant = accountController && accountController.skinModel === "slim" ? "slim" : "classic"
+        skinVariant = appliedVariant
         previewLoaded = false
         statusMsg = ""
         isError = false

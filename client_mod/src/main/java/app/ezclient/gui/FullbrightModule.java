@@ -27,6 +27,11 @@ public class FullbrightModule extends Module {
         return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/fullbright.png");
     }
 
+    @Override
+    public String getDescription() {
+        return "Erhöht die Sichtbarkeit in dunklen Bereichen und kann pro Dimension gezielt deaktiviert werden.";
+    }
+
     public int getBrightnessLevel() { return brightnessLevel; }
     public void setBrightnessLevel(int brightnessLevel) { this.brightnessLevel = Math.max(100, Math.min(1500, brightnessLevel)); ConfigManager.save(); }
 
@@ -44,6 +49,12 @@ public class FullbrightModule extends Module {
         if (disableInNether && client.level.dimension() == Level.NETHER) return false;
         if (disableInEnd && client.level.dimension() == Level.END) return false;
         return true;
+    }
+
+    @Override
+    public void setKeyBind(int keyBind) {
+        super.setKeyBind(keyBind);
+        EzKeyBindings.setKeyCode(EzKeyBindings.KEY_FULLBRIGHT, keyBind);
     }
 
     @Override

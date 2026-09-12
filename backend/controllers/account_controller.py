@@ -56,6 +56,10 @@ def _strip_png_metadata(raw: bytes) -> bytes:
 
 def _bake_editor_cape(image: QImage, fit_mode: str = "Cover") -> QImage:
     """Convert the portrait editor canvas to a vanilla cape texture with Elytra wings."""
+    # If the image is already a 2:1 Minecraft cape texture, preserve all faces natively.
+    if abs((image.width() / max(1, image.height())) - 2.0) < 0.05 and fit_mode == "FullCape":
+        return image.scaled(64, 32, Qt.IgnoreAspectRatio, Qt.SmoothTransformation if image.width() > 64 else Qt.FastTransformation)
+
     portrait = image
     aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
     scaled = portrait.scaled(10, 16, aspect, Qt.SmoothTransformation)
@@ -65,13 +69,17 @@ def _bake_editor_cape(image: QImage, fit_mode: str = "Cover") -> QImage:
     result = QImage(64, 32, QImage.Format_RGBA8888)
     result.fill(Qt.transparent)
     painter = QPainter(result)
-    # 1. Cape back face: (1, 1, 10, 16)
+    # 1. Cape back face (outside, facing world): (1, 1, 10, 16)
     painter.drawImage(1, 1, visible)
-    # Cape inner face: (12, 1, 10, 16)
-    painter.drawImage(12, 1, visible)
-    # Cape top/bottom/sides borders
+    # Cape inner face (inside, facing player's back): (12, 1, 10, 16)
+    painter.drawImage(12, 1, visible.mirrored(True, False))
+    # Cape top border (10x1): (1, 0, 10, 1)
     painter.drawImage(1, 0, visible.scaled(10, 1))
+    # Cape bottom border (10x1): (11, 0, 10, 1)
+    painter.drawImage(11, 0, visible.scaled(10, 1))
+    # Cape right side border (1x16): (0, 1, 1, 16)
     painter.drawImage(0, 1, visible.scaled(1, 16))
+    # Cape left side border (1x16): (11, 1, 1, 16)
     painter.drawImage(11, 1, visible.scaled(1, 16))
 
     # 2. Elytra wings: texOffs(22, 0)
@@ -82,7 +90,7 @@ def _bake_editor_cape(image: QImage, fit_mode: str = "Cover") -> QImage:
     # Outer wing: (24, 2, 10, 20)
     painter.drawImage(24, 2, elytra_visible)
     # Inner wing: (36, 2, 10, 20)
-    painter.drawImage(36, 2, elytra_visible)
+    painter.drawImage(36, 2, elytra_visible.mirrored(True, False))
     # Wing borders & caps: (22, 0, 24, 22)
     painter.drawImage(22, 2, elytra_visible.scaled(2, 20))
     painter.drawImage(34, 2, elytra_visible.scaled(2, 20))
@@ -94,8 +102,8 @@ def _bake_editor_cape(image: QImage, fit_mode: str = "Cover") -> QImage:
 def _write_hd_cape_preview(image: QImage, editor: bool = False, fit_mode: str = "Cover") -> bool:
     """Write a high-resolution preview texture for the launcher's 3D viewer."""
     rgba = image.convertToFormat(QImage.Format_RGBA8888)
-    if not editor and abs((rgba.width() / max(1, rgba.height())) - 2.0) < 0.02:
-        preview = rgba
+    if (not editor or fit_mode == "FullCape") and abs((rgba.width() / max(1, rgba.height())) - 2.0) < 0.05:
+        preview = rgba.scaled(1280, 640, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
     else:
         portrait = rgba
         aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
@@ -106,17 +114,25 @@ def _write_hd_cape_preview(image: QImage, editor: bool = False, fit_mode: str = 
         preview = QImage(1280, 640, QImage.Format_RGBA8888)
         preview.fill(Qt.transparent)
         painter = QPainter(preview)
-        # Cape visible face: (20, 20, 200, 320)
+        # Cape visible face (back): (20, 20, 200, 320)
         painter.drawImage(20, 20, portrait_visible)
-        # Cape inner face: (240, 20, 200, 320)
-        painter.drawImage(240, 20, portrait_visible)
+        # Cape inner face (front): (240, 20, 200, 320)
+        painter.drawImage(240, 20, portrait_visible.mirrored(True, False))
+        # Top edge: (20, 0, 200, 20)
+        painter.drawImage(20, 0, portrait_visible.scaled(200, 20))
+        # Bottom edge: (220, 0, 200, 20)
+        painter.drawImage(220, 0, portrait_visible.scaled(200, 20))
+        # Right edge: (0, 20, 20, 320)
+        painter.drawImage(0, 20, portrait_visible.scaled(20, 320))
+        # Left edge: (220, 20, 20, 320)
+        painter.drawImage(220, 20, portrait_visible.scaled(20, 320))
         # Elytra wings at 20x scale: (480, 40, 200, 400) and (720, 40, 200, 400)
         elytra_scaled = portrait.scaled(200, 400, aspect, Qt.SmoothTransformation)
         el_left = max(0, (elytra_scaled.width() - 200) // 2)
         el_top = max(0, (elytra_scaled.height() - 400) // 2)
         elytra_vis = elytra_scaled.copy(el_left, el_top, 200, 400)
         painter.drawImage(480, 40, elytra_vis)
-        painter.drawImage(720, 40, elytra_vis)
+        painter.drawImage(720, 40, elytra_vis.mirrored(True, False))
         painter.drawImage(440, 40, elytra_vis.scaled(40, 400))
         painter.drawImage(680, 40, elytra_vis.scaled(40, 400))
         painter.drawImage(480, 0, elytra_vis.scaled(400, 40))
@@ -135,23 +151,43 @@ def _write_hd_cape_preview(image: QImage, editor: bool = False, fit_mode: str = 
 
 
 def _write_hd_upload_atlas(image: QImage, fit_mode: str = "Cover") -> bool:
-    """Write a sharp 1024x512 atlas for the community upload.
-
-    The server accepts this size and stores it unchanged.  It uses the same
-    normalized vanilla cape UVs as the 64x32 game texture, so the visible back
-    face receives 160x256 pixels instead of only 10x16.
-    """
+    """Write a sharp 1024x512 atlas for the community upload with all 6 faces."""
     portrait = image.convertToFormat(QImage.Format_RGBA8888)
-    aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
-    scaled = portrait.scaled(160, 256, aspect, Qt.SmoothTransformation)
-    left = max(0, (scaled.width() - 160) // 2)
-    top = max(0, (scaled.height() - 256) // 2)
-    visible = scaled.copy(left, top, 160, 256)
-    atlas = QImage(1024, 512, QImage.Format_RGBA8888)
-    atlas.fill(Qt.transparent)
-    painter = QPainter(atlas)
-    painter.drawImage(16, 16, visible)
-    painter.end()
+    if abs((portrait.width() / max(1, portrait.height())) - 2.0) < 0.05 and fit_mode == "FullCape":
+        atlas = portrait.scaled(1024, 512, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+    else:
+        aspect = Qt.IgnoreAspectRatio if fit_mode == "Stretch" else Qt.KeepAspectRatioByExpanding
+        scaled = portrait.scaled(160, 256, aspect, Qt.SmoothTransformation)
+        left = max(0, (scaled.width() - 160) // 2)
+        top = max(0, (scaled.height() - 256) // 2)
+        visible = scaled.copy(left, top, 160, 256)
+        atlas = QImage(1024, 512, QImage.Format_RGBA8888)
+        atlas.fill(Qt.transparent)
+        painter = QPainter(atlas)
+        # Back face: (16, 16, 160, 256)
+        painter.drawImage(16, 16, visible)
+        # Front face: (192, 16, 160, 256)
+        painter.drawImage(192, 16, visible.mirrored(True, False))
+        # Top edge: (16, 0, 160, 16)
+        painter.drawImage(16, 0, visible.scaled(160, 16))
+        # Bottom edge: (176, 0, 160, 16)
+        painter.drawImage(176, 0, visible.scaled(160, 16))
+        # Right edge: (0, 16, 16, 256)
+        painter.drawImage(0, 16, visible.scaled(16, 256))
+        # Left edge: (176, 16, 16, 256)
+        painter.drawImage(176, 16, visible.scaled(16, 256))
+        # Elytra wings at 16x scale:
+        elytra_scaled = portrait.scaled(160, 320, aspect, Qt.SmoothTransformation)
+        el_left = max(0, (elytra_scaled.width() - 160) // 2)
+        el_top = max(0, (elytra_scaled.height() - 320) // 2)
+        elytra_vis = elytra_scaled.copy(el_left, el_top, 160, 320)
+        painter.drawImage(384, 32, elytra_vis)
+        painter.drawImage(576, 32, elytra_vis.mirrored(True, False))
+        painter.drawImage(352, 32, elytra_vis.scaled(32, 320))
+        painter.drawImage(544, 32, elytra_vis.scaled(32, 320))
+        painter.drawImage(384, 0, elytra_vis.scaled(320, 32))
+        painter.end()
+
     encoded = QByteArray()
     buffer = QBuffer(encoded)
     if not buffer.open(QIODevice.WriteOnly) or not atlas.save(buffer, "PNG"):
@@ -218,6 +254,8 @@ class AccountController(QObject):
         self._account_type = "Microsoft Account"
         self._uuid = ""
         self._skin_url = ""
+        self._skin_model = "default"
+        self._custom_skin_model = "default"
         self._skin_version = int(time.time())
         self._is_online = False
         self._is_logging_in = False
@@ -234,6 +272,10 @@ class AccountController(QObject):
         self._cape_preview_pending: tuple[int, str, str] | None = None
         self._cape_preview_worker_running = False
         self._cape_preview_revision = 0
+        self._cape_anim_lock = threading.Lock()
+        self._cape_anim_pending: tuple[int, str, float, float, int, bool, tuple[float, float, float, float] | None] | None = None
+        self._cape_anim_worker_running = False
+        self._cape_anim_revision = 0
         try:
             marker = Path(DATA_DIR) / "cosmetics" / "active_community_cape.txt"
             if marker.is_file():
@@ -245,6 +287,7 @@ class AccountController(QObject):
             from backend.services.skin_service import get_active_skin
             act = get_active_skin()
             if act:
+                self._custom_skin_model = act.get("model", "default")
                 self._active_custom_name = act.get("name", "")
                 self._active_custom_path = act.get("path", "")
                 self._active_custom_body = act.get("bodyUrl", "")
@@ -263,6 +306,7 @@ class AccountController(QObject):
                 self._username = session.username
                 self._uuid = session.uuid
                 self._skin_url = session.skin_url
+                self._skin_model = session.skin_model
                 self._is_online = session.is_online
                 self._skin_version = int(time.time())
                 self._account_type = "Microsoft Account (Online Verifiziert)" if session.is_online else "Microsoft Account (Lokal)"
@@ -309,6 +353,7 @@ class AccountController(QObject):
         self._username = session.username
         self._uuid = session.uuid
         self._skin_url = session.skin_url
+        self._skin_model = session.skin_model
         self._active_custom_path = ""
         self._active_custom_name = ""
         self._active_custom_avatar = ""
@@ -399,6 +444,10 @@ class AccountController(QObject):
     @Property(str, notify=accountChanged)
     def activeSkinPath(self) -> str:
         return self._active_custom_path or ""
+
+    @Property(str, notify=accountChanged)
+    def skinModel(self) -> str:
+        return self._custom_skin_model if self._active_custom_path else self._skin_model
 
     @Property(str, notify=accountChanged)
     def skinTextureUrl(self) -> str:
@@ -535,11 +584,14 @@ class AccountController(QObject):
                     raw = response.read(2 * 1024 * 1024 + 1)
                 if not cape_community.is_safe_cape_png(raw):
                     raise ValueError("Ungültiges Cape-Bild")
+
+                # 1. Save local active cape immediately so the user can use it ingame
                 target = Path(DATA_DIR) / "cosmetics" / "active_cape.png"
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(raw)
                 (target.parent / "active_community_cape.txt").write_text(image_url, encoding="utf-8")
                 self._active_community_cape_url = image_url
+
                 community_image = QImage()
                 if community_image.loadFromData(raw, "PNG"):
                     _write_hd_cape_preview(community_image, editor=False)
@@ -553,21 +605,38 @@ class AccountController(QObject):
                     )
                     with urllib.request.urlopen(animation_request, timeout=20) as response:
                         animation_raw = response.read(8 * 1024 * 1024 + 1)
-                    if len(animation_raw) > 8 * 1024 * 1024 or not animation_raw.startswith((b"GIF87a", b"GIF89a")):
-                        raise ValueError("Ungültige Cape-Animation")
-                    with tempfile.TemporaryDirectory(prefix="ezclient-cape-") as temporary:
-                        source = Path(temporary) / "community.gif"
-                        source.write_bytes(animation_raw)
-                        info = cape_media.probe_media(source)
-                        fps = max(1, min(20, round(info.source_fps or 12)))
-                        cape_media.generate_frame_sheet(
-                            source, anim_dir,
-                            cape_media.AnimationOptions(0.0, min(10.0, info.duration), fps, False, None),
-                        )
+                    if len(animation_raw) <= 8 * 1024 * 1024 and animation_raw.startswith((b"GIF87a", b"GIF89a")):
+                        with tempfile.TemporaryDirectory(prefix="ezclient-cape-") as temporary:
+                            source = Path(temporary) / "community.gif"
+                            source.write_bytes(animation_raw)
+                            info = cape_media.probe_media(source)
+                            fps = max(1, min(20, round(info.source_fps or 12)))
+                            cape_media.generate_frame_sheet(
+                                source, anim_dir,
+                                cape_media.AnimationOptions(0.0, min(10.0, info.duration), fps, False, None),
+                            )
 
                 self.accountChanged.emit()
                 self.capeCommunityChanged.emit()
-                self.capeCommunityStatusChanged.emit("Cape aktiviert und synchronisiert.", False)
+                self.capeCommunityStatusChanged.emit("Cape erfolgreich aktiviert!", False)
+
+                # 2. Synchronize with community server (best effort)
+                try:
+                    session = get_minecraft_session()
+                    if session and session.uuid:
+                        parts = image_url.rstrip("/").split("/")
+                        cape_id = parts[-2] if len(parts) >= 2 else parts[-1]
+                        tokens_file = Path(DATA_DIR) / "cosmetics" / "cape_tokens.json"
+                        tokens = json.loads(tokens_file.read_text(encoding="utf-8")) if tokens_file.is_file() else {}
+                        key = session.uuid.replace("-", "").lower()
+                        result = cape_community.activate_cape(cape_id, session.username, session.uuid,
+                                                              tokens.get(key, ""), session.access_token)
+                        if result and result.get("token"):
+                            tokens[key] = result["token"]
+                            tokens_file.parent.mkdir(parents=True, exist_ok=True)
+                            tokens_file.write_text(json.dumps(tokens), encoding="utf-8")
+                except Exception:
+                    pass  # Local activation is preserved even if server sync fails
             except Exception as exc:
                 self.capeCommunityStatusChanged.emit(f"Cape konnte nicht aktiviert werden: {exc}", True)
 
@@ -733,48 +802,81 @@ class AccountController(QObject):
             if len(parts) == 4 and all(0.0 <= p <= 1.0 for p in parts) and parts[2] > 0 and parts[3] > 0:
                 crop_box = (parts[0], parts[1], parts[2], parts[3])
 
-        def worker() -> None:
-            try:
-                cosmetics = (Path(DATA_DIR) / "cosmetics").resolve()
-                target = (cosmetics / "pending_cape_animation").resolve()
-                if target.parent != cosmetics:
-                    raise ValueError("Ungültiger Animationspfad.")
-                if target.exists():
-                    shutil.rmtree(target)
+        with self._cape_anim_lock:
+            self._cape_anim_revision += 1
+            revision = self._cape_anim_revision
+            self._cape_anim_pending = (revision, source, start, end, fps, ping_pong, crop_box)
+            if self._cape_anim_worker_running:
+                return True
+            self._cape_anim_worker_running = True
 
-                manifest = cape_media.generate_frame_sheet(
-                    source,
-                    target,
-                    cape_media.AnimationOptions(start, end, fps, ping_pong, crop_box),
-                )
-                from PIL import Image
-                sheet_path = target / manifest.sheet
-                with Image.open(sheet_path) as sheet:
-                    first_frame = sheet.convert("RGBA").crop((0, 0, manifest.frame_width, manifest.frame_height))
-                    fallback = cosmetics / "pending_cape.png"
-                    first_frame.save(fallback, "PNG", optimize=True)
-                fallback.write_bytes(_strip_png_metadata(fallback.read_bytes()))
-                if not cape_community.is_safe_cape_png(fallback.read_bytes()):
-                    raise ValueError("Das Animations-Fallback entspricht nicht dem Cape-Format.")
-                shutil.copyfile(fallback, cosmetics / "pending_cape_preview.png")
-                shutil.copyfile(fallback, cosmetics / "pending_cape_upload.png")
-                preview_url = QUrl.fromLocalFile(str(cosmetics / "pending_cape_preview.png")).toString()
-                sheet_url = QUrl.fromLocalFile(str(sheet_path)).toString()
-                self.capeMediaPrepared.emit(preview_url, manifest.frame_count, manifest.duration)
-                self.capeAnimationPrepared.emit(
-                    sheet_url,
-                    manifest.frame_count,
-                    manifest.fps,
-                    manifest.columns,
-                    manifest.frame_width,
-                    manifest.frame_height,
-                    manifest.ping_pong,
-                )
-                self.skinUploadStatusChanged.emit(
-                    f"Animation bereit: {manifest.frame_count} Frames bei {manifest.fps} FPS.", False
-                )
-            except Exception as exc:
-                self.skinUploadStatusChanged.emit(f"Animation konnte nicht erstellt werden: {exc}", True)
+        def worker() -> None:
+            while True:
+                with self._cape_anim_lock:
+                    job = self._cape_anim_pending
+                    self._cape_anim_pending = None
+                if job is None:
+                    with self._cape_anim_lock:
+                        if self._cape_anim_pending is not None:
+                            continue
+                        self._cape_anim_worker_running = False
+                    return
+
+                rev, job_source, job_start, job_end, job_fps, job_ping_pong, job_crop_box = job
+                try:
+                    cosmetics = (Path(DATA_DIR) / "cosmetics").resolve()
+                    cosmetics.mkdir(parents=True, exist_ok=True)
+                    target = (cosmetics / "pending_cape_animation").resolve()
+                    if target.parent != cosmetics:
+                        raise ValueError("Ungültiger Animationspfad.")
+
+                    manifest = cape_media.generate_frame_sheet(
+                        job_source,
+                        target,
+                        cape_media.AnimationOptions(job_start, job_end, job_fps, job_ping_pong, job_crop_box),
+                    )
+                    from PIL import Image
+                    sheet_path = target / manifest.sheet
+                    with Image.open(sheet_path) as sheet:
+                        first_frame = sheet.convert("RGBA").crop((0, 0, manifest.frame_width, manifest.frame_height))
+                        fallback = cosmetics / "pending_cape.png"
+                        first_frame.save(fallback, "PNG", optimize=True)
+                    fallback.write_bytes(_strip_png_metadata(fallback.read_bytes()))
+                    if not cape_community.is_safe_cape_png(fallback.read_bytes()):
+                        raise ValueError("Das Animations-Fallback entspricht nicht dem Cape-Format.")
+                    shutil.copyfile(fallback, cosmetics / "pending_cape_preview.png")
+                    shutil.copyfile(fallback, cosmetics / "pending_cape_upload.png")
+
+                    # Check if a newer job was queued while we were processing this one
+                    with self._cape_anim_lock:
+                        if self._cape_anim_pending is not None:
+                            continue
+                        self._cape_anim_worker_running = False
+
+                    ts = int(time.time() * 1000)
+                    preview_url = QUrl.fromLocalFile(str(cosmetics / "pending_cape_preview.png")).toString() + f"?v={rev}_{ts}"
+                    sheet_url = QUrl.fromLocalFile(str(sheet_path)).toString() + f"?v={rev}_{ts}"
+                    self.capeMediaPrepared.emit(preview_url, manifest.frame_count, manifest.duration)
+                    self.capeAnimationPrepared.emit(
+                        sheet_url,
+                        manifest.frame_count,
+                        manifest.fps,
+                        manifest.columns,
+                        manifest.frame_width,
+                        manifest.frame_height,
+                        manifest.ping_pong,
+                    )
+                    self.skinUploadStatusChanged.emit(
+                        f"Animation bereit: {manifest.frame_count} Frames bei {manifest.fps} FPS.", False
+                    )
+                    return
+                except Exception as exc:
+                    with self._cape_anim_lock:
+                        if self._cape_anim_pending is not None:
+                            continue
+                        self._cape_anim_worker_running = False
+                    self.skinUploadStatusChanged.emit(f"Animation konnte nicht erstellt werden: {exc}", True)
+                    return
 
         threading.Thread(target=worker, name="EzClient-CapeMedia", daemon=True).start()
         return True
@@ -789,27 +891,30 @@ class AccountController(QObject):
             image = QImage(source)
             if image.isNull() or image.width() < 1 or image.height() < 1 or image.width() > 4096 or image.height() > 4096:
                 raise ValueError("Das Bild kann nicht verarbeitet werden.")
-            _, _, crop_part = fit_mode.partition("|")
-            # The UI always provides a cape-shaped 10:16 selection. Transfer
-            # that exact selection to the cape face without a second fit mode.
-            mode = "Stretch"
+            prefix, _, crop_part = fit_mode.partition("|")
+            is_2_to_1 = abs((image.width() / max(1, image.height())) - 2.0) < 0.05
             rgba = image.convertToFormat(QImage.Format_RGBA8888)
-            if crop_part:
+            mode = "Stretch"
+
+            is_full_cape = is_2_to_1 and (prefix == "FullCape" or not crop_part or crop_part == "0.0000,0.0000,1.0000,1.0000")
+            if not is_full_cape and crop_part:
                 try:
                     cx, cy, cw, ch = (max(0.0, min(1.0, float(v))) for v in crop_part.split(","))
-                    x = round(cx * rgba.width())
-                    y = round(cy * rgba.height())
-                    w = max(1, min(rgba.width() - x, round(cw * rgba.width())))
-                    h = max(1, min(rgba.height() - y, round(ch * rgba.height())))
-                    cropped = rgba.copy(x, y, w, h)
-                    if not cropped.isNull():
-                        rgba = cropped
+                    if not (cx <= 0.001 and cy <= 0.001 and cw >= 0.999 and ch >= 0.999):
+                        x = round(cx * rgba.width())
+                        y = round(cy * rgba.height())
+                        w = max(1, min(rgba.width() - x, round(cw * rgba.width())))
+                        h = max(1, min(rgba.height() - y, round(ch * rgba.height())))
+                        cropped = rgba.copy(x, y, w, h)
+                        if not cropped.isNull():
+                            rgba = cropped
                 except ValueError:
                     pass
-            cape = _bake_editor_cape(rgba, mode)
-            if not _write_hd_cape_preview(rgba, editor=True, fit_mode=mode):
+            bake_mode = "FullCape" if is_full_cape else mode
+            cape = _bake_editor_cape(rgba, bake_mode)
+            if not _write_hd_cape_preview(rgba, editor=not is_full_cape, fit_mode=bake_mode):
                 raise ValueError("Die Cape-Vorschau konnte nicht erzeugt werden.")
-            if not _write_hd_upload_atlas(rgba, mode):
+            if not _write_hd_upload_atlas(rgba, bake_mode):
                 raise ValueError("Das hochauflösende Cape konnte nicht erzeugt werden.")
 
             cosmetics = Path(DATA_DIR) / "cosmetics"
@@ -903,11 +1008,16 @@ class AccountController(QObject):
         pending_animation = (cosmetics / "pending_cape_animation").resolve()
         active_animation = (cosmetics / "active_cape_animation").resolve()
         if pending_animation.parent == cosmetics.resolve() and pending_animation.exists():
-            if active_animation.exists():
-                shutil.rmtree(active_animation)
-            pending_animation.replace(active_animation)
+            active_animation.mkdir(parents=True, exist_ok=True)
+            for item in pending_animation.iterdir():
+                dest = active_animation / item.name
+                if item.is_file():
+                    shutil.copyfile(item, dest)
+                elif item.is_dir():
+                    shutil.copytree(item, dest, dirs_exist_ok=True)
+            shutil.rmtree(pending_animation, ignore_errors=True)
         elif active_animation.exists():
-            shutil.rmtree(active_animation)
+            shutil.rmtree(active_animation, ignore_errors=True)
         (cosmetics / "active_community_cape.txt").unlink(missing_ok=True)
         self._active_community_cape_url = ""
         self.accountChanged.emit()
@@ -1085,6 +1195,7 @@ class AccountController(QObject):
                     self._username = session.username
                     self._uuid = session.uuid
                     self._skin_url = session.skin_url
+                    self._skin_model = session.skin_model
                     self._is_online = session.is_online
                     self._account_type = "Microsoft Account (Online Verifiziert)"
                     self._is_logging_in = False
@@ -1231,6 +1342,15 @@ class AccountController(QObject):
                 p = user_p
                 clean_path = str(p)
 
+        if not p.is_file():
+            from backend.services.skin_service import fetch_skin_by_username
+            ok, fetched_path, message = fetch_skin_by_username(target)
+            if not ok:
+                self.skinUploadStatusChanged.emit(fetched_path or message or "Skin konnte nicht geladen werden.", True)
+                return
+            clean_path = fetched_path
+            p = Path(clean_path)
+
         body_p, av_p = generate_skin_renders(clean_path) if (p.exists() and p.is_file()) else ("", "")
         clean_name = (custom_name or "").strip() or (p.stem.replace("_", " ").replace("-", " ").title() if p.exists() else target)
         av_url = ("file:///" + str(Path(av_p)).replace("\\", "/")) if av_p else f"https://mc-heads.net/avatar/{clean_name}/64"
@@ -1240,7 +1360,8 @@ class AccountController(QObject):
         self._active_custom_avatar = av_url
         self._active_custom_name = clean_name
         self._active_custom_path = str(clean_path) if (p.exists() and p.is_file()) else ""
-        set_active_skin(clean_name, self._active_custom_path, body_url, av_url)
+        self._custom_skin_model = "slim" if variant == "slim" else "default"
+        set_active_skin(clean_name, self._active_custom_path, body_url, av_url, self._custom_skin_model)
         add_skin_to_history(clean_name, self._active_custom_path, av_url)
         self._skin_version = int(time.time())
         self.accountChanged.emit()

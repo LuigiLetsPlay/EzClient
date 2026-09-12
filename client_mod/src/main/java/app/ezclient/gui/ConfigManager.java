@@ -219,6 +219,21 @@ public class ConfigManager {
                     if (json.has("crosshairHideBow")) crosshair.setHideOnBowZoom(json.get("crosshairHideBow").getAsBoolean());
                     if (json.has("crosshairHideF3")) crosshair.setHideInF3(json.get("crosshairHideF3").getAsBoolean());
                     if (json.has("crosshairHideThirdPerson")) crosshair.setHideInThirdPerson(json.get("crosshairHideThirdPerson").getAsBoolean());
+                    if (json.has("crosshairCenterOnMonitor")) crosshair.setCenterOnMonitor(json.get("crosshairCenterOnMonitor").getAsBoolean());
+                    if (json.has("crosshairTargetRules") && json.get("crosshairTargetRules").isJsonObject()) {
+                        crosshair.clearTargetRules();
+                        JsonObject obj = json.getAsJsonObject("crosshairTargetRules");
+                        for (String key : obj.keySet()) {
+                            if (obj.get(key).isJsonObject()) {
+                                JsonObject ro = obj.getAsJsonObject(key);
+                                int c = ro.has("color") ? ro.get("color").getAsInt() : 0xFFFF3333;
+                                float s = ro.has("scale") ? ro.get("scale").getAsFloat() : 1.0f;
+                                String t = ro.has("type") ? ro.get("type").getAsString() : "AUTO";
+                                String p = ro.has("pattern") ? ro.get("pattern").getAsString() : "";
+                                crosshair.getTargetRules().put(key, new CrosshairModule.CrosshairTargetRule(c, s, t, p));
+                            }
+                        }
+                    }
 
                     ToggleSprintSneakModule toggleSprint = ModuleManager.getInstance().getToggleSprintSneakModule();
                     if (json.has("toggleSprintEnabled")) toggleSprint.setEnabled(json.get("toggleSprintEnabled").getAsBoolean());
@@ -244,6 +259,7 @@ public class ConfigManager {
                     DayCounterModule dayCounter = ModuleManager.getInstance().getDayCounterModule();
                     if (json.has("dayCounterShowDay")) dayCounter.setShowDay(json.get("dayCounterShowDay").getAsBoolean());
                     if (json.has("dayCounterShowPlaytime")) dayCounter.setShowPlaytime(json.get("dayCounterShowPlaytime").getAsBoolean());
+                    if (json.has("dayCounterStartAtDayOne")) dayCounter.setStartAtDayOne(json.get("dayCounterStartAtDayOne").getAsBoolean());
 
                     ClockModule clock = ModuleManager.getInstance().getClockModule();
                     if (json.has("clockFormat")) {
@@ -321,6 +337,12 @@ public class ConfigManager {
                     if (json.has("damageTintAlpha")) damageTint.setCustomAlpha(json.get("damageTintAlpha").getAsInt());
                     if (json.has("damageTintChroma")) damageTint.setChromaMode(json.get("damageTintChroma").getAsBoolean());
                     if (json.has("damageTintFlashDuration")) damageTint.setFlashDurationMultiplier(json.get("damageTintFlashDuration").getAsFloat());
+                    if (json.has("damageTintEntityRules") && json.get("damageTintEntityRules").isJsonObject()) {
+                        JsonObject obj = json.getAsJsonObject("damageTintEntityRules");
+                        for (String key : obj.keySet()) {
+                            try { damageTint.setEntityRule(key, obj.get(key).getAsInt()); } catch (Exception ignored) {}
+                        }
+                    }
 
                     // Motion Blur
                     MotionBlurModule motionBlur = ModuleManager.getInstance().getMotionBlurModule();
@@ -394,6 +416,10 @@ public class ConfigManager {
                         if (h.has("rainbowSpeed")) hud.setRainbowSpeed(h.get("rainbowSpeed").getAsFloat());
                         if (h.has("rainbowSaturation")) hud.setRainbowSaturation(h.get("rainbowSaturation").getAsFloat());
                         if (h.has("rainbowBorder")) hud.setRainbowBorder(h.get("rainbowBorder").getAsBoolean());
+                        if (h.has("borderColorMode")) {
+                            try { hud.setBorderColorMode(HudModule.ColorMode.valueOf(h.get("borderColorMode").getAsString())); } catch (Exception ignored) {}
+                        }
+                        if (h.has("borderWaveColor2")) hud.setBorderWaveColor2(h.get("borderWaveColor2").getAsInt());
                     }
 
                     for (Module m : ModuleManager.getInstance().getModules()) {
@@ -511,6 +537,18 @@ public class ConfigManager {
             json.addProperty("crosshairHideBow", crosshair.isHideOnBowZoom());
             json.addProperty("crosshairHideF3", crosshair.isHideInF3());
             json.addProperty("crosshairHideThirdPerson", crosshair.isHideInThirdPerson());
+            json.addProperty("crosshairCenterOnMonitor", crosshair.isCenterOnMonitor());
+            JsonObject targetRulesObj = new JsonObject();
+            for (var entry : crosshair.getTargetRules().entrySet()) {
+                var r = entry.getValue();
+                JsonObject ro = new JsonObject();
+                ro.addProperty("color", r.color());
+                ro.addProperty("scale", r.scale());
+                if (r.type() != null) ro.addProperty("type", r.type());
+                if (r.pattern() != null && !r.pattern().isEmpty()) ro.addProperty("pattern", r.pattern());
+                targetRulesObj.add(entry.getKey(), ro);
+            }
+            json.add("crosshairTargetRules", targetRulesObj);
 
             ToggleSprintSneakModule toggleSprint = ModuleManager.getInstance().getToggleSprintSneakModule();
             json.addProperty("toggleSprintEnabled", toggleSprint.isEnabled());
@@ -532,6 +570,7 @@ public class ConfigManager {
             DayCounterModule dayCounter = ModuleManager.getInstance().getDayCounterModule();
             json.addProperty("dayCounterShowDay", dayCounter.isShowDay());
             json.addProperty("dayCounterShowPlaytime", dayCounter.isShowPlaytime());
+            json.addProperty("dayCounterStartAtDayOne", dayCounter.isStartAtDayOne());
 
             ClockModule clock = ModuleManager.getInstance().getClockModule();
             json.addProperty("clockFormat", clock.getClockFormat().name());
@@ -595,6 +634,11 @@ public class ConfigManager {
             json.addProperty("damageTintAlpha", damageTint.getCustomAlpha());
             json.addProperty("damageTintChroma", damageTint.isChromaMode());
             json.addProperty("damageTintFlashDuration", damageTint.getFlashDurationMultiplier());
+            JsonObject tintRulesObj = new JsonObject();
+            for (var entry : damageTint.getEntityRules().entrySet()) {
+                tintRulesObj.addProperty(entry.getKey(), entry.getValue());
+            }
+            json.add("damageTintEntityRules", tintRulesObj);
 
             // Motion Blur
             MotionBlurModule motionBlur = ModuleManager.getInstance().getMotionBlurModule();
@@ -660,6 +704,8 @@ public class ConfigManager {
                 h.addProperty("rainbowSpeed", hud.getRainbowSpeed());
                 h.addProperty("rainbowSaturation", hud.getRainbowSaturation());
                 h.addProperty("rainbowBorder", hud.isRainbowBorder());
+                h.addProperty("borderColorMode", hud.getBorderColorMode().name());
+                h.addProperty("borderWaveColor2", hud.getBorderWaveColor2());
                 json.add("hud" + hud.getName(), h);
             }
 

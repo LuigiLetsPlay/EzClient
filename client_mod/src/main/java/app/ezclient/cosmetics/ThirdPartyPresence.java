@@ -5,7 +5,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -23,13 +22,17 @@ public final class ThirdPartyPresence {
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofMillis(1500)).build();
     private static final ConcurrentHashMap<UUID, CachedResult> CACHE = new ConcurrentHashMap<>();
 
-    private static final long CACHE_DURATION_MS = 3600_000L; // 1 hour
+    private static final long CACHE_DURATION_MS = 5 * 60_000L;
+    private static final long NEGATIVE_CACHE_MS = 2 * 60_000L;
+    private static final long ERROR_RETRY_MS = 30_000L;
+    private static final String NORISK_CAPE_API = "https://api.norisk.gg/api/v1/cosmetics/user/";
+    private static final String NORISK_CAPE_CDN = "https://cdn.norisk.gg/capes/prod/";
     private static final double MAX_CAPE_FETCH_DIST_SQ = 96.0 * 96.0;
 
     // Circuit breaker state per host
     private static final ConcurrentHashMap<String, Long> HOST_BACKOFF = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, AtomicInteger> HOST_FAILURES = new ConcurrentHashMap<>();
-    private static final long CIRCUIT_BREAKER_TRIP_MS = 15 * 60_000L; // 15 minutes backoff on repeated failure
+    private static final long CIRCUIT_BREAKER_TRIP_MS = 60_000L;
 
     public record QueuedTarget(UUID playerId, String username, boolean highPriority, double distanceSq, long queuedAt)
             implements Comparable<QueuedTarget> {
@@ -59,7 +62,7 @@ public final class ThirdPartyPresence {
     public static boolean isCached(UUID playerId) {
         if (playerId == null) return true;
         CachedResult cached = CACHE.get(playerId);
-        return cached != null && (System.currentTimeMillis() - cached.timestamp < CACHE_DURATION_MS);
+        return cached != null && (System.currentTimeMillis() - cached.timestamp < cached.durationMs);
     }
 
     public static void clearPending() {
@@ -81,7 +84,7 @@ public final class ThirdPartyPresence {
         
         CachedResult cached = CACHE.get(playerId);
         if (cached != null) {
-            if (System.currentTimeMillis() - cached.timestamp < CACHE_DURATION_MS) {
+            if (System.currentTimeMillis() - cached.timestamp < cached.durationMs) {
                 return cached.type;
             }
         }
@@ -96,7 +99,7 @@ public final class ThirdPartyPresence {
         long now = System.currentTimeMillis();
         CachedResult cached = CACHE.get(playerId);
         // Fix: Negative cache hits must return immediately!
-        if (cached != null && (now - cached.timestamp < CACHE_DURATION_MS)) {
+        if (cached != null && (now - cached.timestamp < cached.durationMs)) {
             return;
         }
 
@@ -110,7 +113,7 @@ public final class ThirdPartyPresence {
             try {
                 target = QUEUE.take();
                 CachedResult cached = CACHE.get(target.playerId());
-                if (cached == null || System.currentTimeMillis() - cached.timestamp >= CACHE_DURATION_MS) {
+                if (cached == null || System.currentTimeMillis() - cached.timestamp >= cached.durationMs) {
                     queryApis(target.playerId(), target.username(), target.distanceSq());
                     // Each player can require several requests; pace the entire lookup.
                     Thread.sleep(750L);
@@ -150,28 +153,27 @@ public final class ThirdPartyPresence {
         // Capes should only be downloaded for players within render/visual range or local player
         boolean shouldFetchCapes = distanceSq <= MAX_CAPE_FETCH_DIST_SQ;
 
-        // 1. Check LabyMod direct CDN (ultra-fast ~200ms, detects both cape & client)
-        if (shouldFetchCapes) {
-            byte[] labyCape = fetchImage("https://dl.labymod.net/capes/" + uuidDashed);
-            if (labyCape != null) {
-                detectedType = CommunityPresence.ClientType.LABYMOD;
-                CommunityCapeManager.installExternalCape(playerId, labyCape);
-                capeLoaded = true;
+        // 1. NoRisk's public cape endpoint returns a hash, not JSON or an image URL.
+        // HTTP 200 also confirms a NoRisk account when no cape is selected.
+        NoRiskCape noRisk = fetchNoRiskCape(uuidDashed);
+        if (noRisk.userFound()) {
+            detectedType = CommunityPresence.ClientType.NORISK;
+            if (shouldFetchCapes && noRisk.capeHash() != null) {
+                byte[] cape = fetchImage(NORISK_CAPE_CDN + noRisk.capeHash() + ".png");
+                if (cape != null) {
+                    CommunityCapeManager.installExternalCape(playerId, cape);
+                    capeLoaded = true;
+                }
             }
         }
 
-        // 2. Check NoRisk (with circuit breaker to prevent hanging on dead proxy)
-        if (detectedType == CommunityPresence.ClientType.NONE) {
-            JsonObject noRisk = fetchEndpoint("https://api.errexe.xyz/capes/norisk/" + uuidDashed);
-            if (noRisk != null && noRisk.has("provider") && "norisk".equalsIgnoreCase(noRisk.get("provider").getAsString())) {
-                detectedType = CommunityPresence.ClientType.NORISK;
-                if (shouldFetchCapes && !capeLoaded && noRisk.has("hasCape") && noRisk.get("hasCape").getAsBoolean() && noRisk.has("capeUrl") && !noRisk.get("capeUrl").isJsonNull()) {
-                    byte[] cape = fetchImage(noRisk.get("capeUrl").getAsString());
-                    if (cape != null) {
-                        CommunityCapeManager.installExternalCape(playerId, cape);
-                        capeLoaded = true;
-                    }
-                }
+        // 2. LabyMod cape fallback, only when NoRisk has no selected/available cape.
+        if (shouldFetchCapes && !capeLoaded) {
+            byte[] labyCape = fetchImage("https://dl.labymod.net/capes/" + uuidDashed);
+            if (labyCape != null) {
+                if (detectedType == CommunityPresence.ClientType.NONE) detectedType = CommunityPresence.ClientType.LABYMOD;
+                CommunityCapeManager.installExternalCape(playerId, labyCape);
+                capeLoaded = true;
             }
         }
 
@@ -201,13 +203,45 @@ public final class ThirdPartyPresence {
             }
         }
 
-        // Fix: ALWAYS cache the result (even ClientType.NONE) so we never poll again!
+        // Confirmed misses are short-lived; a failed upstream request must be retried soon.
+        long duration = detectedType != CommunityPresence.ClientType.NONE ? CACHE_DURATION_MS
+                : noRisk.unavailable() ? ERROR_RETRY_MS : NEGATIVE_CACHE_MS;
+        if (noRisk.capeHash() != null && !capeLoaded) duration = ERROR_RETRY_MS;
         if (CACHE.size() >= 2048) {
             long cutoff = System.currentTimeMillis() - CACHE_DURATION_MS;
             CACHE.entrySet().removeIf(entry -> entry.getValue().timestamp < cutoff);
             if (CACHE.size() >= 2048) CACHE.remove(CACHE.keys().nextElement());
         }
-        CACHE.put(playerId, new CachedResult(detectedType, System.currentTimeMillis()));
+        CACHE.put(playerId, new CachedResult(detectedType, System.currentTimeMillis(), duration));
+    }
+
+    private static NoRiskCape fetchNoRiskCape(String uuid) {
+        String url = NORISK_CAPE_API + uuid + "/cape";
+        if (!isHostAvailable(url)) return NoRiskCape.failed();
+        try {
+            HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                    .timeout(Duration.ofSeconds(3)).GET().build();
+            HttpResponse<String> resp = HTTP.send(req, CosmeticHttp.text());
+            if (resp.statusCode() == 404) {
+                recordHostSuccess(url);
+                return new NoRiskCape(false, false, null);
+            }
+            if (resp.statusCode() == 200) {
+                recordHostSuccess(url);
+                String hash = resp.body().trim();
+                return new NoRiskCape(true, false,
+                        hash.matches("[a-fA-F0-9]{32,64}") ? hash : null);
+            }
+            if (resp.statusCode() == 429 || resp.statusCode() >= 500) recordHostFailure(url);
+        } catch (Exception e) {
+            recordHostFailure(url);
+        }
+        return NoRiskCape.failed();
+    }
+
+    private record NoRiskCape(boolean userFound, boolean unavailable, String capeHash) {
+        private static NoRiskCape failed() { return new NoRiskCape(false, true, null); }
     }
 
     private static boolean isHostAvailable(String url) {
@@ -309,10 +343,12 @@ public final class ThirdPartyPresence {
     private static class CachedResult {
         final CommunityPresence.ClientType type;
         final long timestamp;
+        final long durationMs;
         
-        CachedResult(CommunityPresence.ClientType type, long timestamp) {
+        CachedResult(CommunityPresence.ClientType type, long timestamp, long durationMs) {
             this.type = type;
             this.timestamp = timestamp;
+            this.durationMs = durationMs;
         }
     }
 }

@@ -25,13 +25,19 @@ Item {
     property string cropImageSource: ""
     property int previewRequestId: 0
     property bool previewProcessing: false
+    property bool isFullCapeDetected: false
+    property bool fullCapeMode: false
+    readonly property var account: (typeof accountController !== "undefined" && accountController) ? accountController : null
 
     function loadSource(url) {
         if (!url) return
         root.selectedSource = url
         root.cropX = 0; root.cropY = 0; root.cropW = 1; root.cropH = 1
+        root.fullCapeMode = false
+        root.isFullCapeDetected = false
         var clean = url.toLowerCase().split("?")[0]
         root.animatedSource = clean.endsWith(".gif") || clean.endsWith(".mp4") || clean.endsWith(".webm")
+        editorSkin3D.capeAnimationInfo = ({})
         if (root.animatedSource) {
             root.mediaProcessing = true
             statusText.text = "Animation wird verarbeitet …"
@@ -62,6 +68,9 @@ Item {
         if (!root.selectedSource) return
         if (root.animatedSource) {
             root.prepareAnimation()
+        } else if (root.fullCapeMode) {
+            root.previewProcessing = true
+            root.previewRequestId = accountController.requestCapePreview(root.selectedSource, "FullCape|")
         } else {
             var crop = root.cropX.toFixed(4) + "," + root.cropY.toFixed(4) + "," + root.cropW.toFixed(4) + "," + root.cropH.toFixed(4)
             root.previewProcessing = true
@@ -86,7 +95,7 @@ Item {
 
     Timer {
         id: liveCropTimer
-        interval: 120
+        interval: 200
         repeat: false
         onTriggered: root.prepare()
     }
@@ -95,6 +104,7 @@ Item {
         accountController.cancelPendingCape()
         root.selectedSource = ""
         root.pendingPreview = ""
+        editorSkin3D.capeAnimationInfo = ({})
         editorSkin3D.updateCape()
     }
 
@@ -119,8 +129,10 @@ Item {
             statusText.color = isError ? "#FCA5A5" : "#86EFAC"
         }
         function onCapeMediaPrepared(previewUrl, frameCount, duration) {
-            root.pendingPreview = previewUrl + "?v=" + Date.now()
-            root.mediaProcessing = false
+            root.pendingPreview = previewUrl
+            if (!root.animatedSource) {
+                root.mediaProcessing = false
+            }
         }
         function onCapeAnimationPrepared(sheetUrl, frameCount, fps, columns, frameW, frameH, pingPong) {
             root.mediaProcessing = false
@@ -175,8 +187,8 @@ Item {
                     id: editorSkin3D
                     anchors.fill: parent
                     anchors.margins: 8
-                    skinSource: accountController.skinTextureUrl
-                    capeSource: root.pendingPreview !== "" ? root.pendingPreview : accountController.capePreviewTextureUrl
+                    skinSource: root.account ? root.account.skinTextureUrl : ""
+                    capeSource: root.animatedSource ? "" : (root.pendingPreview !== "" ? root.pendingPreview : (root.account ? root.account.capePreviewTextureUrl : ""))
                     animation: root.previewAnimation
                     autoRotate: false
                     interactive: true
@@ -185,7 +197,7 @@ Item {
 
                 Rectangle {
                     anchors.fill: parent
-                    visible: root.mediaProcessing || root.previewProcessing
+                    visible: (root.mediaProcessing && root.cropImageSource === "") || root.previewProcessing
                     color: "#CC0F0B18"
                     z: 50
                     ColumnLayout {
@@ -193,7 +205,7 @@ Item {
                         spacing: 12
                         BusyIndicator {
                             Layout.alignment: Qt.AlignHCenter
-                            running: root.mediaProcessing || root.previewProcessing
+                            running: visible
                         }
                         Text {
                             text: root.mediaProcessing ? "Animation wird vorbereitet …" : "Vorschau wird geladen …"
@@ -202,6 +214,19 @@ Item {
                             font.bold: true
                             Layout.alignment: Qt.AlignHCenter
                         }
+                    }
+                }
+
+                Rectangle {
+                    anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 14
+                    width: 28; height: 28; radius: 14
+                    color: "#B319132A"; border.color: EzTheme.accent
+                    visible: root.mediaProcessing && root.cropImageSource !== ""
+                    z: 51
+                    BusyIndicator {
+                        anchors.fill: parent
+                        anchors.margins: 4
+                        running: parent.visible
                     }
                 }
 
@@ -330,14 +355,62 @@ Item {
                     }
                 }
 
-                Text { text: "Zuschneiden"; color: EzTheme.text; font.bold: true; font.pixelSize: 15; visible: root.selectedSource !== "" }
+                Text { text: "Cape-Format & Modus"; color: EzTheme.text; font.bold: true; font.pixelSize: 15; visible: root.selectedSource !== "" && !root.animatedSource }
+
+                RowLayout {
+                    visible: root.selectedSource !== "" && !root.animatedSource
+                    Layout.fillWidth: true
+                    spacing: 8
+                    EzButton {
+                        text: "Minecraft Cape (64x32 Vollformat)"
+                        primary: root.fullCapeMode
+                        onClicked: {
+                            root.fullCapeMode = true
+                            root.prepare()
+                        }
+                    }
+                    EzButton {
+                        text: "Eigenes Motiv (Zuschneiden & 3D)"
+                        primary: !root.fullCapeMode
+                        onClicked: {
+                            root.fullCapeMode = false
+                            cropStage.resetSelection()
+                            root.prepare()
+                        }
+                    }
+                }
+
+                Rectangle {
+                    visible: root.selectedSource !== "" && !root.animatedSource && root.fullCapeMode
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 52
+                    radius: 9
+                    color: EzTheme.surface2
+                    border.color: EzTheme.accent
+                    RowLayout {
+                        anchors.fill: parent; anchors.margins: 10; spacing: 10
+                        Rectangle {
+                            Layout.preferredWidth: 8; Layout.preferredHeight: 8
+                            radius: 4; color: "#22C55E"
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Minecraft-Cape aktiv: Alle 6 Seiten (Vorderseite, Rückseite, Oben, Unten, Kanten und Elytra) werden 1:1 unverzerrt gerendert."
+                            color: EzTheme.text
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: 11
+                        }
+                    }
+                }
+
+                Text { text: "Zuschneiden"; color: EzTheme.text; font.bold: true; font.pixelSize: 15; visible: root.selectedSource !== "" && !root.fullCapeMode }
 
                 // Interactive crop editor. Drag inside the frame to move it,
                 // drag the corner handle to resize. The cape is made from the
                 // framed region only.
                 Rectangle {
                     id: cropStage
-                    visible: root.selectedSource !== ""
+                    visible: root.selectedSource !== "" && !root.fullCapeMode
                     Layout.fillWidth: true
                     Layout.preferredHeight: 360
                     radius: 10
@@ -376,8 +449,20 @@ Item {
                         asynchronous: true
                         cache: false
                         source: root.cropImageSource
-                        onStatusChanged: if (status === Image.Ready && cropStage.paintW > 0 && cropStage.paintH > 0) cropStage.resetSelection()
-                        onPaintedWidthChanged: if (status === Image.Ready && cropStage.paintW > 0 && cropStage.paintH > 0 && root.cropW === 1 && root.cropH === 1) cropStage.resetSelection()
+                        onStatusChanged: {
+                            if (status === Image.Ready) {
+                                var aspect = (sourceSize.height > 0) ? (sourceSize.width / sourceSize.height) : 0
+                                if (Math.abs(aspect - 2.0) < 0.1 && !root.animatedSource) {
+                                    root.isFullCapeDetected = true
+                                    root.fullCapeMode = true
+                                    root.prepare()
+                                } else {
+                                    root.isFullCapeDetected = false
+                                    if (cropStage.paintW > 0 && cropStage.paintH > 0) cropStage.resetSelection()
+                                }
+                            }
+                        }
+                        onPaintedWidthChanged: if (status === Image.Ready && cropStage.paintW > 0 && cropStage.paintH > 0 && root.cropW === 1 && root.cropH === 1 && !root.fullCapeMode) cropStage.resetSelection()
                     }
 
                     // Cape-proportioned crop frame (10x16 like the real cape).
@@ -570,7 +655,7 @@ Item {
                 }
 
                 RowLayout {
-                    visible: root.selectedSource !== ""
+                    visible: root.selectedSource !== "" && !root.fullCapeMode
                     Layout.fillWidth: true
                     spacing: 10
                     EzButton { text: "Motiv zurücksetzen"; onClicked: cropStage.resetSelection() }
@@ -578,7 +663,7 @@ Item {
                 }
 
                 GridLayout {
-                    visible: root.selectedSource !== ""
+                    visible: root.selectedSource !== "" && !root.fullCapeMode
                     Layout.fillWidth: true
                     columns: 2
                     columnSpacing: 12

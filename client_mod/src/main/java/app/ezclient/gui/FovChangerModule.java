@@ -31,6 +31,11 @@ public final class FovChangerModule extends Module {
     }
 
     @Override
+    public String getDescription() {
+        return "Steuert, wie Sprinten, Effekte, Bogen und Fliegen dein Sichtfeld beeinflussen.";
+    }
+
+    @Override
     public boolean hasSettings() {
         return true;
     }

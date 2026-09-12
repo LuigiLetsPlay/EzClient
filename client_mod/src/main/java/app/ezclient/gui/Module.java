@@ -25,7 +25,7 @@ public abstract class Module {
     public String getCategory() { return category; }
     public int getKeyBind() { return keyBind; }
     public void setKeyBind(int keyBind) {
-        this.keyBind = keyBind >= GLFW.GLFW_KEY_SPACE && keyBind <= GLFW.GLFW_KEY_LAST ? keyBind : -1;
+        this.keyBind = (keyBind <= -100 || (keyBind >= GLFW.GLFW_KEY_SPACE && keyBind <= GLFW.GLFW_KEY_LAST)) ? keyBind : -1;
         ConfigManager.save();
     }
 
@@ -49,7 +49,30 @@ public abstract class Module {
 
     protected void onToggle() {}
 
+    private boolean favorite = false;
+    public boolean isFavorite() { return favorite; }
+    public void setFavorite(boolean favorite) {
+        this.favorite = favorite;
+        ConfigManager.save();
+    }
+
+    public String getDescription() { return ""; }
+    public String getLocalizedDescription() {
+        String cleanId = name.toLowerCase().replaceAll("[^a-z0-9]", "");
+        return app.ezclient.util.EzI18n.getOrDefault("ezclient.module." + cleanId + ".desc", getDescription());
+    }
+
+    public void resetSettings() {}
+
     // Methods for building settings UI
     public boolean hasSettings() { return false; }
+    public boolean hasPreview() {
+        return switch (getName()) {
+            case "Scoreboard Customizer", "Motion Blur", "Chat Customizer",
+                 "TNT Timer", "FOV Changer", "Clear Glass",
+                 "Zoom", "Custom Crosshair", "Armor Status", "Toggle Sprint & Sneak" -> true;
+            default -> false;
+        };
+    }
     public boolean mouseClickedSettings(double mouseX, double mouseY, int button, int x, int y, int width, int height) { return false; }
 }

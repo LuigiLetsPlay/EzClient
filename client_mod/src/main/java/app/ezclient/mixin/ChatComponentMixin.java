@@ -3,6 +3,7 @@ package app.ezclient.mixin;
 import app.ezclient.gui.AutoGgModule;
 import app.ezclient.gui.ChatCustomizerModule;
 import app.ezclient.gui.ModuleManager;
+import app.ezclient.gui.XaeroWaypointShare;
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.components.ChatComponent;
@@ -29,12 +30,13 @@ public class ChatComponentMixin {
             autoGg.onChatMessage(message.getString());
         }
 
+        Component decorated = XaeroWaypointShare.decorate(message);
         ChatCustomizerModule customizer = ModuleManager.getInstance().getChatCustomizerModule();
         if (customizer != null && customizer.isEnabled()) {
-            return customizer.appendTimestamp(message);
+            return customizer.appendTimestamp(decorated);
         }
 
-        return message;
+        return decorated;
     }
 
     @ModifyConstant(
@@ -60,5 +62,75 @@ public class ChatComponentMixin {
             return new OptionInstance<>("custom_opacity", OptionInstance.noTooltip(), (c, val) -> Component.empty(), OptionInstance.UnitDouble.INSTANCE, customVal, v -> {});
         }
         return options.textBackgroundOpacity();
+    }
+
+    @org.spongepowered.asm.mixin.injection.Inject(
+            method = "isChatFocused",
+            at = @At("HEAD"),
+            cancellable = true
+    )
+    private void ezclient$forceFocusedForDummy(org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Boolean> cir) {
+        if (ChatCustomizerModule.isDummyChat((ChatComponent)(Object)this)) {
+            cir.setReturnValue(true);
+        }
+    }
+
+    @org.spongepowered.asm.mixin.injection.Inject(
+            method = "extractRenderState(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/gui/Font;IIILnet/minecraft/client/gui/components/ChatComponent$DisplayMode;Z)V",
+            at = @At(value = "INVOKE", target = "Lorg/joml/Matrix3x2fStack;pushMatrix()Lorg/joml/Matrix3x2fStack;", shift = At.Shift.AFTER)
+    )
+    private void ezclient$offsetChatPosition(net.minecraft.client.gui.GuiGraphicsExtractor graphics, net.minecraft.client.gui.Font font, int tickCount, int mouseX, int mouseY, ChatComponent.DisplayMode displayMode, boolean isRestricted, org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        if (ChatCustomizerModule.isDummyChat((ChatComponent)(Object)this)) {
+            return;
+        }
+        ChatCustomizerModule customizer = ModuleManager.getInstance().getChatCustomizerModule();
+        if (customizer != null && customizer.isEnabled()) {
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc.getWindow() != null) {
+                int defY = mc.getWindow().getGuiScaledHeight() - 40 - customizer.getHeight(mc);
+                float scale = (float) customizer.getScale();
+                graphics.pose().translate(customizer.getX(), customizer.getY());
+                if (scale != 1.0f) {
+                    graphics.pose().scale(scale, scale);
+                }
+                graphics.pose().translate(-4, -defY);
+            }
+        }
+    }
+
+    @ModifyVariable(
+            method = "captureClickableText(Lnet/minecraft/client/gui/ActiveTextCollector;IILnet/minecraft/client/gui/components/ChatComponent$DisplayMode;)V",
+            at = @At("HEAD"),
+            ordinal = 0,
+            argsOnly = true
+    )
+    private int ezclient$offsetClickX(int mouseX) {
+        ChatCustomizerModule customizer = ModuleManager.getInstance().getChatCustomizerModule();
+        if (customizer != null && customizer.isEnabled()) {
+            double scale = customizer.getScale();
+            if (scale <= 0.0) scale = 1.0;
+            return (int) Math.round(4.0 + (mouseX - customizer.getX()) / scale);
+        }
+        return mouseX;
+    }
+
+    @ModifyVariable(
+            method = "captureClickableText(Lnet/minecraft/client/gui/ActiveTextCollector;IILnet/minecraft/client/gui/components/ChatComponent$DisplayMode;)V",
+            at = @At("HEAD"),
+            ordinal = 1,
+            argsOnly = true
+    )
+    private int ezclient$offsetClickY(int mouseY) {
+        ChatCustomizerModule customizer = ModuleManager.getInstance().getChatCustomizerModule();
+        if (customizer != null && customizer.isEnabled()) {
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc.getWindow() != null) {
+                int defY = mc.getWindow().getGuiScaledHeight() - 40 - customizer.getHeight(mc);
+                double scale = customizer.getScale();
+                if (scale <= 0.0) scale = 1.0;
+                return (int) Math.round(defY + (mouseY - customizer.getY()) / scale);
+            }
+        }
+        return mouseY;
     }
 }

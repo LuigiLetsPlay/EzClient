@@ -14,6 +14,7 @@ import base64
 import hmac
 import html
 import json
+import queue
 import os
 import re
 import secrets
@@ -47,11 +48,64 @@ TOKENS_DATABASE = ROOT / "tokens.json"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 RATE_LIMITS: dict[str, list[float]] = {}
-PRESENCE: dict[str, tuple[float, str, str]] = {}  # uuid -> (timestamp, username, verified client)
+PRESENCE: dict[str, tuple[float, str, str, str]] = {}  # uuid -> (timestamp, username, verified client)
 MOJANG_VERIFIED_CACHE: dict[str, tuple[str, float]] = {}
 STATE_LOCK = threading.Lock()
 REPORTS_LOCK = threading.Lock()
 TOKENS_LOCK = threading.Lock()
+
+
+SELECTION_LOCK = threading.RLock()
+EVENT_LOCK = threading.Lock()
+EVENT_CLIENTS: set[queue.Queue] = set()
+SESSION_CHALLENGES: dict[str, float] = {}
+
+
+def verify_session_proof(challenge: str, owner: str, player: str) -> bool:
+    with STATE_LOCK:
+        expires = SESSION_CHALLENGES.pop(challenge, 0)
+    if expires < time.monotonic():
+        return False
+    query = urllib.parse.urlencode({"username": owner, "serverId": challenge})
+    try:
+        with urllib.request.urlopen("https://sessionserver.mojang.com/session/minecraft/hasJoined?" + query, timeout=8) as response:
+            profile = json.load(response)
+        return hmac.compare_digest(str(profile.get("id", "")).lower(), player.replace("-", "").lower())
+    except (OSError, ValueError):
+        return False
+
+
+def broadcast(event: dict) -> None:
+    with EVENT_LOCK:
+        for channel in EVENT_CLIENTS:
+            try:
+                channel.put_nowait(event)
+            except queue.Full:
+                # Force a full refresh if the consumer fell behind.
+                while True:
+                    try:
+                        channel.get_nowait()
+                    except queue.Empty:
+                        break
+                channel.put_nowait({"type": "resync"})
+
+
+def load_selections() -> dict:
+    try:
+        return json.loads((ROOT / "selections.json").read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def select_cape(player: str, cape_id: str | None) -> None:
+    with SELECTION_LOCK:
+        selections = load_selections()
+        selections[player] = cape_id
+        ROOT.mkdir(parents=True, exist_ok=True)
+        temporary = ROOT / "selections.tmp"
+        temporary.write_text(json.dumps(selections), encoding="utf-8")
+        temporary.replace(ROOT / "selections.json")
+    broadcast({"type": "cape", "player_uuid": player, "cape_id": cape_id})
 
 
 def allow_request(ip: str, limit: int, window_seconds: int) -> bool:
@@ -85,7 +139,8 @@ def online_players(requested: set[str] | None = None) -> list[dict]:
                 continue
             name = data[1] if isinstance(data, tuple) else "Spieler"
             client = data[2] if isinstance(data, tuple) and len(data) > 2 else "ezclient"
-            result.append({"uuid": player_id, "username": name, "client": client})
+            version = data[3] if isinstance(data, tuple) and len(data) > 3 else ""
+            result.append({"uuid": player_id, "username": name, "client": client, "version": version})
     return result
 
 
@@ -314,6 +369,15 @@ def active_capes(player_ids: set[str] | None = None) -> list[dict]:
             continue
         if owner_uuid not in newest or str(cape.get("created_at", "")) > str(newest[owner_uuid].get("created_at", "")):
             newest[owner_uuid] = cape
+    by_id = {cape["id"]: cape for cape in load_capes()}
+    with SELECTION_LOCK:
+        selections = load_selections()
+    for player, selected in selections.items():
+        if player_ids is not None and player not in player_ids:
+            continue
+        newest.pop(player, None)
+        if selected in by_id:
+            newest[player] = dict(by_id[selected], owner_uuid=player, active=True)
     return [cape for cape in newest.values() if cape.get("active", True) is not False]
 
 
@@ -365,6 +429,24 @@ class CapeHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path.rstrip("/")
         if not allow_request(self.client_address[0], 900, 60):
             self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Zu viele Anfragen"})
+            return
+        if path == "/api/capes/challenge":
+            if not allow_request(self.client_address[0], 20, 60):
+                self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Zu viele Anfragen"})
+                return
+            with STATE_LOCK:
+                now = time.monotonic()
+                for expired in [key for key, expiry in SESSION_CHALLENGES.items() if expiry < now]:
+                    SESSION_CHALLENGES.pop(expired, None)
+                if len(SESSION_CHALLENGES) >= 1024:
+                    self.send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Bitte später erneut versuchen"})
+                    return
+                challenge = secrets.token_hex(20)
+                SESSION_CHALLENGES[challenge] = now + 120
+            self.send_json(HTTPStatus.OK, {"challenge": challenge})
+            return
+        if path == "/api/events":
+            self.stream_events()
             return
         if path == "/api/presence":
             requested = {value for value in urlparse(self.path).query.removeprefix("players=").split(",")
@@ -436,10 +518,74 @@ class CapeHandler(BaseHTTPRequestHandler):
             return
         self.send_json(HTTPStatus.NOT_FOUND, {"error": "Route nicht gefunden"})
 
+    def stream_events(self) -> None:
+        channel = queue.Queue(maxsize=64)
+        with EVENT_LOCK:
+            if len(EVENT_CLIENTS) >= 512:
+                self.send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Event capacity reached"})
+                return
+            EVENT_CLIENTS.add(channel)
+        try:
+            self.connection.settimeout(35)
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("X-Accel-Buffering", "no")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(b'data: {"type":"resync"}\n\n')
+            self.wfile.flush()
+            while True:
+                try:
+                    event = channel.get(timeout=15)
+                    data = ("data: " + json.dumps(event) + "\n\n").encode()
+                except queue.Empty:
+                    data = b": heartbeat\n\n"
+                self.wfile.write(data)
+                self.wfile.flush()
+        except (OSError, TimeoutError):
+            pass
+        finally:
+            with EVENT_LOCK:
+                EVENT_CLIENTS.discard(channel)
+            self.close_connection = True
+
+    def activate_cape(self) -> None:
+        if not allow_request(self.client_address[0], 30, 60):
+            self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Zu viele Anfragen"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= 4096:
+                raise ValueError("Ungültige Anfrage")
+            payload = json.loads(self.rfile.read(length))
+            player = normalize_player_uuid(payload.get("owner_uuid", ""))
+            cape_id = str(uuid.UUID(payload.get("cape_id", "")))
+            token = str(payload.get("token", ""))
+            stored = load_tokens().get(player.replace("-", ""), "")
+            if not (stored and token and hmac.compare_digest(stored, token)):
+                bearer = bearer_token(self.headers)
+                authenticated = (verify_minecraft_access_token(bearer, payload.get("owner", ""), player)
+                                 if bearer else verify_session_proof(str(payload.get("challenge", "")), payload.get("owner", ""), player))
+                if not authenticated:
+                    self.send_json(HTTPStatus.FORBIDDEN, {"error": "Die Minecraft-Sitzung ist ungültig oder abgelaufen."})
+                    return
+                if not stored:
+                    _, stored = verify_account_ownership(player, "")
+            if not any(cape["id"] == cape_id for cape in load_capes()):
+                raise ValueError("Cape nicht gefunden")
+            select_cape(player, cape_id)
+            self.send_json(HTTPStatus.OK, {"cape_id": cape_id, "token": stored})
+        except (ValueError, TypeError, AttributeError) as exc:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+
     def do_POST(self) -> None:
         path = urlparse(self.path).path.rstrip("/")
         if path == "/api/presence":
             self.update_presence()
+            return
+        if path == "/api/capes/activate":
+            self.activate_cape()
             return
         if path == "/api/capes/deactivate":
             self.deactivate_cape()
@@ -512,6 +658,7 @@ class CapeHandler(BaseHTTPRequestHandler):
                 "active": True,
             })
             save_capes(capes)
+            select_cape(owner_uuid, cape_id)
 
             self.send_json(HTTPStatus.CREATED, {
                 "id": cape_id,
@@ -551,6 +698,7 @@ class CapeHandler(BaseHTTPRequestHandler):
                     changed = True
             if changed:
                 save_capes(capes)
+            select_cape(owner_uuid, None)
             self.send_json(HTTPStatus.OK, {"active": False})
         except (ValueError, json.JSONDecodeError) as exc:
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -579,8 +727,9 @@ class CapeHandler(BaseHTTPRequestHandler):
                     self.send_json(HTTPStatus.FORBIDDEN, {"error": "Nicht autorisierte Client-Erkennung"})
                     return
             with STATE_LOCK:
-                PRESENCE[player_id] = (time.monotonic(), username, client)
-            self.send_json(HTTPStatus.OK, {"ok": True, "expires_in": PRESENCE_TTL_SECONDS})
+                PRESENCE[player_id] = (time.monotonic(), username, client, clean_text(str(payload.get("version", "")), 32))
+            broadcast({"type": "presence", "uuid": player_id, "client": client, "version": clean_text(str(payload.get("version", "")), 32)})
+            self.send_json(HTTPStatus.OK, {"ok": True, "expires_in": PRESENCE_TTL_SECONDS, "version": "2.1.0"})
         except (ValueError, json.JSONDecodeError):
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Ungültige Präsenz"})
 

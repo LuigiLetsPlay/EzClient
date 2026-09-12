@@ -3,6 +3,7 @@ package app.ezclient.gui;
 import net.minecraft.resources.Identifier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 
@@ -18,6 +19,7 @@ import java.util.List;
 public final class PotionEffectModule extends HudModule {
     public enum DisplayStyle {
         COMPACT,  // Icons + timer
+        ORIGINAL, // Original Minecraft effect icons
         DETAILED  // Icon + Name + Amplifier + Timer
     }
 
@@ -37,8 +39,19 @@ public final class PotionEffectModule extends HudModule {
     private List<MobEffectInstance> cachedEffects = List.of();
     private List<MobEffectInstance> editorEffects;
 
+    private static final int TILE_SIZE = 30;
+    private static final int ITEM_GAP = 2;
+    private static final int OUTER_PADDING = 5;
+    private static final int ORIGINAL_TEXT_INSET = 4;
+    private record EffectLayout(int width, int height, List<Integer> itemWidths, int itemHeight) {}
+
     public PotionEffectModule() {
         super("Potion Effects", "HUD", false, -1, 6, "", "");
+    }
+
+    @Override
+    public String getDescription() {
+        return "Zeigt aktive Trankeffekte mit Dauer, Stärke und Ablaufwarnung im HUD an.";
     }
 
     @Override
@@ -100,6 +113,8 @@ public final class PotionEffectModule extends HudModule {
             return editorEffects;
         }
 
+        if (client == null) return cachedEffects;
+
         long tick = client.level == null ? Long.MIN_VALUE : client.level.getOverworldClockTime();
         if (tick == cachedEffectTick) return cachedEffects;
 
@@ -132,24 +147,96 @@ public final class PotionEffectModule extends HudModule {
 
     @Override
     public int getWidth(Minecraft client) {
-        return widthForCount(3);
+        return layoutFor(client, getSortedEffects(client, false)).width();
+    }
+
+    @Override
+    public int getWidth(Minecraft client, boolean editor) {
+        return layoutFor(client, getSortedEffects(client, editor)).width();
     }
 
     @Override
     public int getHeight(Minecraft client) {
-        return heightForCount(3);
+        return layoutFor(client, getSortedEffects(client, false)).height();
     }
 
-    private int widthForCount(int count) {
-        if (count <= 0) return 60;
-        int maxItemW = displayStyle == DisplayStyle.COMPACT ? 42 : 94;
-        return vertical ? maxItemW : count * (maxItemW + 4);
+    @Override
+    public int getHeight(Minecraft client, boolean editor) {
+        return layoutFor(client, getSortedEffects(client, editor)).height();
     }
 
-    private int heightForCount(int count) {
-        if (count <= 0) return 24;
-        int itemH = displayStyle == DisplayStyle.COMPACT ? 16 : 20;
-        return vertical ? count * (itemH + 2) : itemH;
+    private EffectLayout layoutFor(Minecraft client, List<MobEffectInstance> effects) {
+        if (effects.isEmpty()) return new EffectLayout(TILE_SIZE, TILE_SIZE, List.of(TILE_SIZE), TILE_SIZE);
+        if (displayStyle == DisplayStyle.ORIGINAL) {
+            List<Integer> tileWidths = new ArrayList<>(effects.size());
+            int maxTileWidth = TILE_SIZE;
+            int combinedTileWidth = 0;
+            for (MobEffectInstance effect : effects) {
+                int tileWidth = Math.max(TILE_SIZE, showTime
+                        ? textWidth(client, timeText(effect)) + ORIGINAL_TEXT_INSET * 2
+                        : TILE_SIZE);
+                tileWidths.add(tileWidth);
+                maxTileWidth = Math.max(maxTileWidth, tileWidth);
+                combinedTileWidth += tileWidth;
+            }
+            int width = vertical ? maxTileWidth : combinedTileWidth + (effects.size() - 1) * ITEM_GAP;
+            int height = vertical ? effects.size() * TILE_SIZE + (effects.size() - 1) * ITEM_GAP : TILE_SIZE;
+            return new EffectLayout(width, height, List.copyOf(tileWidths), TILE_SIZE);
+        }
+
+        int itemHeight = displayStyle == DisplayStyle.COMPACT ? 14 : 20;
+        List<Integer> itemWidths = new ArrayList<>(effects.size());
+        int maxWidth = 1;
+        int combinedWidth = 0;
+        for (MobEffectInstance effect : effects) {
+            String name = effectName(effect);
+            String amplifier = toRoman(effect.getAmplifier());
+            String time = timeText(effect);
+            int itemWidth;
+            if (displayStyle == DisplayStyle.COMPACT) {
+                String label = compactLabel(name, amplifier);
+                itemWidth = textWidth(client, label) + (showTime ? 4 + textWidth(client, time) : 0);
+            } else {
+                itemWidth = Math.max(textWidth(client, name + " " + amplifier), showTime ? textWidth(client, time) : 0);
+            }
+            itemWidth = Math.max(1, itemWidth);
+            itemWidths.add(itemWidth);
+            maxWidth = Math.max(maxWidth, itemWidth);
+            combinedWidth += itemWidth;
+        }
+
+        int width = vertical
+                ? maxWidth + OUTER_PADDING * 2
+                : combinedWidth + OUTER_PADDING * 2 + (effects.size() - 1) * 4;
+        int height = vertical
+                ? effects.size() * itemHeight + (effects.size() - 1) * ITEM_GAP + OUTER_PADDING * 2
+                : itemHeight + OUTER_PADDING * 2;
+        return new EffectLayout(width, height, List.copyOf(itemWidths), itemHeight);
+    }
+
+    private static int textWidth(Minecraft client, String text) {
+        return client == null || client.font == null ? text.length() * 6 : client.font.width(text);
+    }
+
+    private static String effectName(MobEffectInstance effect) {
+        return net.minecraft.network.chat.Component.translatable(effect.getDescriptionId()).getString();
+    }
+
+    private static String compactLabel(String name, String amplifier) {
+        return name.substring(0, Math.min(3, name.length())).toUpperCase() + " " + amplifier;
+    }
+
+    private static String timeText(MobEffectInstance effect) {
+        int seconds = effect.getDuration() / 20;
+        int remainingSeconds = seconds % 60;
+        return (seconds / 60) + (remainingSeconds < 10 ? ":0" : ":") + remainingSeconds;
+    }
+
+    private int effectBorderColor(MobEffectInstance effect, boolean blinking) {
+        if (blinking) return 0xFFFF4B4B;
+        if (isRainbowBorder() || !useCustomColors || getColorMode() != ColorMode.SOLID) return currentBorderColor();
+        int rgb = effect.getEffect().value().getColor() & 0x00FFFFFF;
+        return (currentBorderColor() & 0xFF000000) | rgb;
     }
 
     @Override
@@ -179,16 +266,20 @@ public final class PotionEffectModule extends HudModule {
 
         // Reuse the already collected effects. The old code constructed three
         // dummy effect instances again every frame just to calculate this box.
-        int totalW = widthForCount(effects.size());
-        int totalH = heightForCount(effects.size());
+        EffectLayout layout = layoutFor(client, effects);
+        int totalW = layout.width();
+        int totalH = layout.height();
 
-        renderBackgroundAndBorder(graphics, 0, 0, totalW, totalH);
+        if (displayStyle != DisplayStyle.ORIGINAL) {
+            renderBackgroundAndBorder(graphics, 0, 0, totalW, totalH);
+        }
 
-        int curX = 3;
-        int curY = 3;
+        int curX = displayStyle == DisplayStyle.ORIGINAL ? 0 : OUTER_PADDING;
+        int curY = displayStyle == DisplayStyle.ORIGINAL ? 0 : OUTER_PADDING;
         long now = System.currentTimeMillis();
 
-        for (MobEffectInstance effect : effects) {
+        for (int index = 0; index < effects.size(); index++) {
+            MobEffectInstance effect = effects.get(index);
             int duration = effect.getDuration();
             int secs = duration / 20;
             boolean blinking = blinkWarningSeconds > 0 && secs <= blinkWarningSeconds;
@@ -196,10 +287,9 @@ public final class PotionEffectModule extends HudModule {
                 // Blink tick: skip drawing text or draw dim
             }
 
-            String name = net.minecraft.network.chat.Component.translatable(effect.getDescriptionId()).getString();
+            String name = effectName(effect);
             String amp = toRoman(effect.getAmplifier());
-            int remainingSeconds = secs % 60;
-            String timeStr = (secs / 60) + (remainingSeconds < 10 ? ":0" : ":") + remainingSeconds;
+            String timeStr = timeText(effect);
 
             int nameColor = color();
             if (getColorMode() == ColorMode.SOLID && useCustomColors) {
@@ -209,21 +299,38 @@ public final class PotionEffectModule extends HudModule {
 
             int timerColor = blinking ? 0xFFFF4444 : ((getColorMode() == ColorMode.RAINBOW || getColorMode() == ColorMode.WAVE) ? color(80L) : 0xFFAAAAAA);
 
-            if (displayStyle == DisplayStyle.COMPACT) {
-                String label = name.substring(0, Math.min(3, name.length())).toUpperCase() + " " + amp;
-                graphics.text(client.font, label, curX, curY + 1, nameColor);
-                if (showTime) {
-                    graphics.text(client.font, timeStr, curX + 26, curY + 1, timerColor);
+            if (displayStyle == DisplayStyle.ORIGINAL) {
+                int tileWidth = layout.itemWidths().get(index);
+                renderBackgroundAndBorder(graphics, curX, curY, tileWidth, TILE_SIZE, effectBorderColor(effect, blinking));
+                Identifier effectId = BuiltInRegistries.MOB_EFFECT.getKey(effect.getEffect().value());
+                if (effectId != null) {
+                    Identifier texture = Identifier.fromNamespaceAndPath(
+                            effectId.getNamespace(), "textures/mob_effect/" + effectId.getPath() + ".png");
+                    ModuleIconRenderer.drawTexture(graphics, texture, curX + 6, curY + 6, 18);
                 }
-                if (vertical) curY += 14;
-                else curX += 44;
+                graphics.text(client.font, amp,
+                        curX + tileWidth - textWidth(client, amp) - ORIGINAL_TEXT_INSET,
+                        curY + ORIGINAL_TEXT_INSET, nameColor, true);
+                if (showTime) graphics.text(client.font, timeStr,
+                        curX + Math.max(ORIGINAL_TEXT_INSET, (tileWidth - textWidth(client, timeStr)) / 2),
+                        curY + TILE_SIZE - ORIGINAL_TEXT_INSET - 9, timerColor, true);
+                if (vertical) curY += TILE_SIZE + ITEM_GAP;
+                else curX += tileWidth + ITEM_GAP;
+            } else if (displayStyle == DisplayStyle.COMPACT) {
+                String label = compactLabel(name, amp);
+                graphics.text(client.font, label, curX, curY + 2, nameColor);
+                if (showTime) {
+                    graphics.text(client.font, timeStr, curX + textWidth(client, label) + 4, curY + 2, timerColor);
+                }
+                if (vertical) curY += layout.itemHeight() + ITEM_GAP;
+                else curX += layout.itemWidths().get(index) + 4;
             } else {
                 graphics.text(client.font, name + " " + amp, curX, curY + 1, nameColor);
                 if (showTime) {
                     graphics.text(client.font, timeStr, curX, curY + 10, timerColor);
                 }
-                if (vertical) curY += 20;
-                else curX += client.font.width(name + " " + amp) + 24;
+                if (vertical) curY += layout.itemHeight() + ITEM_GAP;
+                else curX += layout.itemWidths().get(index) + 4;
             }
         }
 

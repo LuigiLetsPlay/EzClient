@@ -91,6 +91,31 @@ public final class EzUi {
         }
     }
 
+    public static void backdrop(GuiGraphicsExtractor g, int width, int height) {
+        g.fill(0, 0, width, height, 0x380A0D12);
+    }
+
+    public static void toggleSwitch(GuiGraphicsExtractor g, int x, int y, int width, int height, boolean active, boolean hovered) {
+        int radius = height / 2;
+        int trackColor = active ? (hovered ? 0xFF24D174 : 0xFF1EA85E)
+                                : (hovered ? 0xFF2B323D : 0xFF1C222B);
+        int borderColor = active ? (hovered ? 0xFF3DE088 : 0xFF22C96E)
+                                 : (hovered ? 0xFF454F5E : 0xFF2D3540);
+
+        roundedRect(g, x, y, width, height, radius, borderColor);
+        roundedRect(g, x + 1, y + 1, width - 2, height - 2, Math.max(1, radius - 1), trackColor);
+
+        int knobSize = Math.max(4, height - 4);
+        int knobX = active ? (x + width - knobSize - 2) : (x + 2);
+        int knobY = y + 2;
+        int knobColor = active ? 0xFFFFFFFF : (hovered ? 0xFFCBD5E1 : 0xFF94A3B8);
+        roundedRect(g, knobX, knobY, knobSize, knobSize, knobSize / 2, knobColor);
+
+        if (active) {
+            roundedRect(g, knobX - 1, knobY - 1, knobSize + 2, knobSize + 2, (knobSize + 2) / 2, 0x20FFFFFF);
+        }
+    }
+
     public static void panel(GuiGraphicsExtractor g, int x, int y, int width, int height) {
         // Drop shadow
         roundedRect(g, x + 2, y + 3, width, height, 10, 0x40000000);
@@ -152,5 +177,13 @@ public final class EzUi {
         roundedRect(g, x, y, width, height, 4, borderColor);
         roundedRect(g, x + 1, y + 1, width - 2, height - 2, 3, bgColor);
         g.centeredText(Minecraft.getInstance().font, Component.literal(text), x + width / 2, y + (height - 8) / 2, textColor);
+    }
+
+    public static void outline(GuiGraphicsExtractor g, int x, int y, int width, int height, int color) {
+        g.outline(x, y, width, height, color);
+    }
+
+    public static void circle(GuiGraphicsExtractor g, int cx, int cy, int radius, int color) {
+        roundedRect(g, cx - radius, cy - radius, radius * 2, radius * 2, radius, color);
     }
 }

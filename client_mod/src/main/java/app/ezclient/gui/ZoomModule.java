@@ -24,6 +24,17 @@ public final class ZoomModule extends Module {
         return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/zoom.png");
     }
 
+    @Override
+    public void setKeyBind(int keyBind) {
+        super.setKeyBind(keyBind);
+        EzKeyBindings.setKeyCode(EzKeyBindings.KEY_ZOOM, keyBind);
+    }
+
+    @Override
+    public String getDescription() {
+        return "Vergrößert die Sicht mit sanftem Zoom, Mausrad-Steuerung und optional angepasster Maus-Empfindlichkeit.";
+    }
+
     public double getZoomLevel() { return state.getConfiguredZoom(); }
     public void setZoomLevel(double zoomLevel) {
         state.setConfiguredZoom(zoomLevel);

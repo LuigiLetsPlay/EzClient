@@ -8,6 +8,7 @@ Item {
     signal navigate(string route)
     property string reportedCapeId: ""
     readonly property string activeCommunityCapeUrl: typeof accountController !== "undefined" && accountController ? accountController.activeCommunityCapeUrl : ""
+    readonly property var account: (typeof accountController !== "undefined" && accountController) ? accountController : null
     property string previewCapeUrl: ""
     property string previewCapeTitle: ""
     property string previewCapeAnimUrl: ""
@@ -39,9 +40,8 @@ Item {
             EzButton { text: "Aktualisieren"; onClicked: accountController.refreshCapeCommunity() }
             EzButton {
                 text: "Zurücksetzen"
-                enabled: typeof accountController !== "undefined" && accountController
-                         && (accountController.capeTextureUrl !== "" || root.activeCommunityCapeUrl !== "")
-                onClicked: accountController.resetCustomCape()
+                enabled: root.account && (root.account.capeTextureUrl !== "" || root.activeCommunityCapeUrl !== "")
+                onClicked: root.account.resetCustomCape()
             }
         }
 
@@ -52,7 +52,7 @@ Item {
                 anchors.fill: parent; anchors.margins: 16; spacing: 16
                 Rectangle {
                     Layout.preferredWidth: 70; Layout.preferredHeight: 70; radius: 10; color: EzTheme.surface3; clip: true
-                    Image { id: activeCapeImage; anchors.fill: parent; anchors.margins: 8; source: typeof accountController !== "undefined" ? accountController.capeTextureUrl : ""; fillMode: Image.PreserveAspectFit; rotation: 90; transformOrigin: Item.Center; visible: source !== "" }
+                    Image { id: activeCapeImage; anchors.fill: parent; anchors.margins: 8; source: root.account ? root.account.capeTextureUrl : ""; fillMode: Image.PreserveAspectFit; rotation: 90; transformOrigin: Item.Center; visible: source !== "" }
                     Image { anchors.centerIn: parent; visible: !activeCapeImage.visible; source: "icons/shield.svg"; width: 28; height: 28; fillMode: Image.PreserveAspectFit; opacity: 0.4 }
                 }
                 ColumnLayout {
@@ -68,7 +68,68 @@ Item {
                         if (capeUrl && capeUrl !== "") root.navigate("cape_editor")
                     }
                 }
-                EzButton { text: "Veröffentlichen"; enabled: typeof accountController !== "undefined" && accountController.capeTextureUrl !== ""; onClicked: publishDialog.open() }
+                EzButton { text: "Veröffentlichen"; enabled: root.account && root.account.capeTextureUrl !== ""; onClicked: publishDialog.open() }
+            }
+        }
+
+        Text { text: root.status; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: root.capes.length ? EzTheme.textMuted : EzTheme.textSecondary }
+
+        ScrollView {
+            Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+
+            GridView {
+                id: capeGrid
+                anchors.fill: parent
+                cellWidth: Math.max(180, Math.min(250, width / Math.max(2, Math.floor(width / 220))))
+                cellHeight: 238
+                model: root.capes
+                delegate: Item {
+                    width: capeGrid.cellWidth; height: capeGrid.cellHeight
+                    Rectangle {
+                        anchors.fill: parent; anchors.margins: 6; radius: 14; color: EzTheme.surface2; border.color: cardMouse.containsMouse ? EzTheme.accent : EzTheme.border
+                        Behavior on border.color { ColorAnimation { duration: 120 } }
+                        ColumnLayout {
+                            anchors.fill: parent; anchors.margins: 12; spacing: 8
+                            Rectangle {
+                                Layout.preferredWidth: 72; Layout.fillHeight: true; Layout.alignment: Qt.AlignHCenter; radius: 9; color: EzTheme.surface3; clip: true
+                                CapeTextureImage {
+                                    anchors.fill: parent
+                                    anchors.margins: 7
+                                    capeSource: modelData.imageUrl || ""
+                                    animationSource: modelData.animationUrl || ""
+                                }
+                                Rectangle {
+                                    visible: !!modelData.isAnimated
+                                    anchors.top: parent.top; anchors.right: parent.right; anchors.margins: 4
+                                    width: 16; height: 16; radius: 8; color: EzTheme.accent
+                                    Text { anchors.centerIn: parent; text: "▶"; font.pixelSize: 9; color: "#0B0E14"; font.bold: true }
+                                }
+                                MouseArea {
+                                    anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        root.previewCapeUrl = modelData.imageUrl || ""
+                                        root.previewCapeAnimUrl = modelData.animationUrl || ""
+                                        root.previewCapeTitle = modelData.title || "Community Cape"
+                                        capePreviewDialog.open()
+                                    }
+                                }
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true; spacing: 4
+                                Text { text: modelData.title || "Community Cape"; font.family: EzTheme.mcFontFamily; font.pixelSize: 12; font.bold: true; color: EzTheme.text; Layout.fillWidth: true; elide: Text.ElideRight }
+                                Rectangle {
+                                    visible: !!modelData.isAnimated
+                                    Layout.preferredHeight: 16; Layout.preferredWidth: 42; radius: 4; color: "#16A34A"
+                                    Text { anchors.centerIn: parent; text: "ANIM"; font.pixelSize: 9; font.bold: true; color: "#FFF" }
+                                }
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Text { text: "von " + (modelData.owner || "EzClient Spieler"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted; Layout.fillWidth: true; elide: Text.ElideRight }
+                                EzButton {
+                                    text: root.activeCommunityCapeUrl === (modelData.imageUrl || "") ? "Aktiv" : "Nutzen"
+                                    primary: root.activeCommunityCapeUrl === (modelData.imageUrl || "")
+                                    onClicked: {
             }
         }
 
@@ -144,33 +205,37 @@ Item {
         }
     }
 
-    ColumnLayout {
-        visible: false
-        anchors.centerIn: parent
-        width: Math.min(460, parent.width - 48)
-        spacing: 14
-        Rectangle {
-            Layout.alignment: Qt.AlignHCenter
-            Layout.preferredWidth: 76; Layout.preferredHeight: 96
-            radius: 18; color: EzTheme.surfaceActive; border.color: EzTheme.accent
-            Image { anchors.centerIn: parent; source: "icons/shield.svg"; width: 36; height: 36; fillMode: Image.PreserveAspectFit }
-        }
-        Text { Layout.alignment: Qt.AlignHCenter; text: "Cape Studio"; font.family: EzTheme.mcFontFamily; font.pixelSize: 25; font.bold: true; color: EzTheme.text }
-        Text { Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; text: "Entwirf, importiere und veröffentliche Capes vollständig im Editor."; font.family: EzTheme.fontFamily; font.pixelSize: 13; color: EzTheme.textSecondary }
-        EzButton { Layout.alignment: Qt.AlignHCenter; text: "Cape Editor öffnen"; primary: true; onClicked: root.navigate("cape_editor") }
-    }
-
     Dialog {
-        id: capePreviewDialog; modal: true; anchors.centerIn: parent; width: 440; height: 620; title: root.previewCapeTitle
+        id: capePreviewDialog; modal: true; anchors.centerIn: parent; width: 460; height: 580; title: root.previewCapeTitle
         background: Rectangle { radius: 16; color: EzTheme.surface2; border.color: EzTheme.border }
         contentItem: Rectangle {
             color: EzTheme.surface3; radius: 12; clip: true
-            CapeTextureImage {
+            Skin3DView {
+                id: preview3DSkin
                 anchors.fill: parent
-                anchors.margins: 12
+                anchors.margins: 8
+                skinSource: root.account ? root.account.skinTextureUrl : ""
                 capeSource: root.previewCapeUrl
-                animationSource: root.previewCapeAnimUrl
+                initialRotateY: 180
+                interactive: true
+                autoRotate: false
+                animation: "idle"
             }
+            Rectangle {
+                anchors.top: parent.top; anchors.left: parent.left; anchors.margins: 12
+                width: hintLabel.implicitWidth + 16; height: 26; radius: 13
+                color: "#990F0B18"; border.color: EzTheme.border
+                Text {
+                    id: hintLabel; anchors.centerIn: parent
+                    text: "3D-Ansicht · Ziehen: Drehen · Rad: Zoom"
+                    font.pixelSize: 11; color: EzTheme.textSecondary
+                }
+            }
+        }
+        onAboutToShow: {
+            preview3DSkin.updateSkin()
+            preview3DSkin.updateCape()
+            preview3DSkin.resetView()
         }
     }
 
@@ -197,5 +262,4 @@ Item {
         footer: DialogButtonBox { Button { text: "Abbrechen"; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole } Button { text: "Melden"; DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole } }
         onAccepted: accountController.reportCape(root.reportedCapeId, reportReason.text)
     }
-
 }

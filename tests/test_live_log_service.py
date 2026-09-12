@@ -53,6 +53,28 @@ class LiveLogServiceTests(unittest.TestCase):
             self.assertIn("only one", service.getAllLogsText())
             self.assertNotIn("only two", service.getAllLogsText())
 
+    def test_stopped_instance_keeps_logs_and_has_starttime(self):
+        service = LiveLogService()
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "game.log"
+            log_path.write_text("[12:34:56] [INFO]: Game started\n[12:34:58] [INFO]: World loaded\n", encoding="utf-8")
+            inst_id = service.begin_instance(log_path, "TestProfile", "Fabric 26.2", "User", tmp)
+            insts = service.instances
+            self.assertEqual(len(insts), 1)
+            self.assertIn("startTime", insts[0])
+            self.assertTrue(insts[0]["running"])
+
+            # Stop instance
+            service.detach_process(inst_id)
+            insts_after = service.instances
+            self.assertFalse(insts_after[0]["running"])
+
+            # Select inactive instance and verify logs are loaded and intact
+            self.assertTrue(service.selectInstance(inst_id))
+            logs = service.getAllLogsText()
+            self.assertIn("Game started", logs)
+            self.assertIn("World loaded", logs)
+
 
 if __name__ == "__main__":
     unittest.main()

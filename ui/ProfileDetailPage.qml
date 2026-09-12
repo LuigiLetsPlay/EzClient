@@ -836,6 +836,8 @@ Item {
                                         font.family: EzTheme.fontFamily
                                         font.pixelSize: 12
                                         color: EzTheme.text
+                                        clip: true
+                                        verticalAlignment: TextInput.AlignVCenter
                                         selectByMouse: true
                                         onTextChanged: root.modSearchQuery = text.trim().toLowerCase()
 
@@ -844,6 +846,10 @@ Item {
                                             font.family: EzTheme.fontFamily
                                             font.pixelSize: 12
                                             color: EzTheme.textMuted
+                                            anchors.left: parent.left
+                                            anchors.right: parent.right
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            elide: Text.ElideRight
                                             visible: !mSearchInput.text
                                         }
                                     }
@@ -872,15 +878,19 @@ Item {
 
                         // Mods List Repeater
                         Repeater {
-                            model: profileController ? profileController.modModel : null
+                            model: profileController ? (profileController.inspectedModModel || profileController.modModel) : null
                             Rectangle {
                                 Layout.fillWidth: true
                                 height: 64
                                 radius: 10
-                                scale: modItemMouse.containsMouse ? 1.008 : 1.0
+                                readonly property bool isCardHovered: modItemMouse.containsMouse ||
+                                    (typeof pToggleM !== "undefined" && pToggleM && pToggleM.containsMouse) ||
+                                    (typeof pDelM !== "undefined" && pDelM && pDelM.containsMouse)
+
+                                scale: isCardHovered ? 1.008 : 1.0
                                 Behavior on scale { NumberAnimation { duration: 100; easing.type: Easing.OutCubic } }
-                                color: modItemMouse.containsMouse ? EzTheme.surface2 : EzTheme.surface
-                                border.color: model.enabled ? (modItemMouse.containsMouse ? EzTheme.accentLight : EzTheme.border) : "#1A1A22"
+                                color: isCardHovered ? EzTheme.surface2 : EzTheme.surface
+                                border.color: model.enabled ? (isCardHovered ? EzTheme.accentLight : EzTheme.border) : (isCardHovered ? EzTheme.borderLight : "#1A1A22")
                                 border.width: 1
                                 opacity: model.enabled ? 1.0 : 0.65
                                 visible: root.modSearchQuery === "" || (model.name && model.name.toLowerCase().indexOf(root.modSearchQuery) !== -1)
@@ -906,7 +916,7 @@ Item {
                                         Image {
                                             id: pModIcon
                                             anchors.fill: parent
-                                            source: (model.name === "EzClient" || model.name === "EzClient Core") ? "assets/logo.png" : (model.iconUrl || "")
+                                            source: (model.name === "EzClient" || model.name === "EzClient Core" || (model.slug || "").toLowerCase() === "ezclient") ? "assets/logo.svg" : (model.iconUrl || "")
                                             fillMode: Image.PreserveAspectCrop
                                             asynchronous: true
                                             visible: status === Image.Ready
@@ -929,6 +939,7 @@ Item {
                                         spacing: 3
 
                                         RowLayout {
+                                            Layout.fillWidth: true
                                             spacing: 8
                                             Text {
                                                 text: model.name
@@ -936,6 +947,29 @@ Item {
                                                 font.pixelSize: 13
                                                 font.bold: true
                                                 color: model.enabled ? EzTheme.text : EzTheme.textMuted
+                                                elide: Text.ElideRight
+                                                Layout.fillWidth: true
+                                                Layout.maximumWidth: 260
+                                            }
+
+                                            Rectangle {
+                                                height: 18
+                                                width: ezBadgeTxt.implicitWidth + 10
+                                                radius: 4
+                                                color: "#2B230E"
+                                                border.color: "#EAB308"
+                                                border.width: 1
+                                                visible: (model.slug || "").toLowerCase() === "ezclient" || (model.name || "").toLowerCase() === "ezclient" || (model.name || "").toLowerCase() === "ezclient core"
+
+                                                Text {
+                                                    id: ezBadgeTxt
+                                                    text: "★ EzClient"
+                                                    font.family: EzTheme.mcFontFamily
+                                                    font.pixelSize: 9
+                                                    font.bold: true
+                                                    color: "#FFD76A"
+                                                    anchors.centerIn: parent
+                                                }
                                             }
 
                                             Rectangle {
@@ -962,6 +996,8 @@ Item {
                                                 font.family: EzTheme.fontFamily
                                                 font.pixelSize: 10
                                                 color: EzTheme.textMuted
+                                                elide: Text.ElideRight
+                                                Layout.maximumWidth: 120
                                                 visible: model.author !== ""
                                             }
                                         }
@@ -996,7 +1032,9 @@ Item {
                                         }
 
                                         MouseArea {
+                                            id: pToggleM
                                             anchors.fill: parent
+                                            hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: profileController.toggleMod(model.slug || model.name)
                                         }
@@ -1004,12 +1042,10 @@ Item {
 
                                     // Delete Button
                                     Rectangle {
-                                        property bool isEzCore: (model.slug || "").toLowerCase() === "ezclient" || (model.name || "").toLowerCase() === "ezclient" || (model.name || "").toLowerCase() === "ezclient core"
                                         Layout.preferredWidth: 28
                                         Layout.preferredHeight: 28
                                         radius: 6
                                         color: pDelM.containsMouse ? "#3B1119" : "transparent"
-                                        visible: !isEzCore
 
                                         Image {
                                             source: "icons/trash.svg"

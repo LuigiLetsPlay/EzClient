@@ -47,7 +47,14 @@ class ProfileModel(QAbstractListModel):
         elif role == self.ModsCountRole:
             return len(p.mods)
         elif role == self.LastPlayedRole:
-            return p.last_played or "Never"
+            if not p.last_played or p.last_played == "Never":
+                return "Never"
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(p.last_played)
+                return dt.strftime("%d.%m.%Y %H:%M")
+            except Exception:
+                return p.last_played
         elif role == self.OptimizeRole:
             return p.optimize
         elif role == self.IconRole:

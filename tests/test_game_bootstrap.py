@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.services.game_bootstrap import _download, _library_artifact
+from backend.services.game_bootstrap import _download, _library_artifact, _parse_loader_version
 from backend.services.direct_launch import _java_major, maven_module_key
 
 
@@ -53,6 +53,11 @@ class GameBootstrapTests(unittest.TestCase):
             self.assertEqual(source.read_bytes(), target.read_bytes())
             self.assertEqual(1, results.count(True))
             self.assertFalse(list(target.parent.glob("*.part")))
+
+    def test_parse_loader_version(self):
+        self.assertEqual((0, 16, 10), _parse_loader_version("fabric-loader-0.16.10"))
+        self.assertEqual((1, 2, 3), _parse_loader_version("1.2.3"))
+        self.assertEqual((0,), _parse_loader_version("unknown"))
 
 
 if __name__ == "__main__":

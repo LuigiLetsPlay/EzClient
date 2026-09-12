@@ -54,6 +54,7 @@ class ProfileController(QObject):
     noriskProfilesChanged = Signal()
     noriskImportProgress = Signal(float, str)
     noriskImportFinished = Signal(str, bool, str)
+    isPingingServersChanged = Signal()
     _syncNeeded = Signal()
     _modUpdatesDone = Signal(int, dict)
 
@@ -62,6 +63,7 @@ class ProfileController(QObject):
         self._store = store
         self._profile_model = profile_model
         self._mod_model = mod_model
+        self._inspected_mod_model = ModModel(self)
         self._live_log_service = LiveLogService(self)
         self._active_profile: ProfileData | None = self._store.get_last_or_default()
         self._inspected_profile: ProfileData | None = self._active_profile
@@ -73,16 +75,21 @@ class ProfileController(QObject):
         self._crash_fix_success: bool = False
         self._norisk_profiles: list[dict[str, Any]] = []
         self._is_launching: bool = False
+        self._is_pinging_servers: bool = False
         self._mod_updates: dict[str, str] = {}
         self._update_check_token: int = 0
         self._ez_client_update_available: bool = False
         self._skip_next_registry_scan: bool = False
         self._syncNeeded.connect(self._sync_models)
+        self._live_log_service.instanceExited.connect(self._on_instance_exited)
+        self._live_log_service.allInstancesStopped.connect(self._on_all_instances_stopped)
 
         # Normalize any legacy profile mod filenames and auto-update
         self._normalize_versioned_ezclient_assets()
+        self._sync_models()
         self.profilesChanged.emit()
         self.activeProfileChanged.emit()
+        self.inspectedProfileChanged.emit()
         if self._active_profile:
             threading.Thread(target=self._warm_registry_after_startup, daemon=True).start()
         threading.Thread(target=self._auto_update_ezclient_mods, daemon=True).start()
@@ -108,12 +115,15 @@ class ProfileController(QObject):
                         changed = True
                     retained.append(mod)
                 else:
-                    candidate = profile.mods_path / (mod.filename or expected)
-                    if candidate.is_file():
-                        candidate.unlink(missing_ok=True)
-                    changed = True
+                    if not profile.minecraft_version.startswith("26."):
+                        candidate = profile.mods_path / (mod.filename or expected)
+                        if candidate.is_file():
+                            candidate.unlink(missing_ok=True)
+                        changed = True
+                    else:
+                        retained.append(mod)
             profile.mods = retained
-            if not available:
+            if not available and not profile.minecraft_version.startswith("26."):
                 profile.profile_type = "raw"
                 old_managed = list(profile.managed_core_mods)
                 old_integrated = list(profile.integrated_mods)
@@ -474,6 +484,317 @@ class ProfileController(QObject):
             self._store.save()
             self.settingsChanged.emit()
 
+    @Property(bool, notify=settingsChanged)
+    def showRecentServersHome(self) -> bool:
+        return bool(self._store.settings.get("show_recent_servers_home", True))
+
+    @Slot(bool)
+    def setShowRecentServersHome(self, val: bool) -> None:
+        val = bool(val)
+        if self.showRecentServersHome != val:
+            self._store.settings["show_recent_servers_home"] = val
+            self._store.save()
+            self.settingsChanged.emit()
+            self.settingSaved.emit("Schnellstart-Einstellung aktualisiert")
+
+    @Property(bool, notify=settingsChanged)
+    def recentServersHomeHidden(self) -> bool:
+        return bool(self._store.settings.get("recent_servers_home_hidden", False))
+
+    @Slot(bool)
+    def setRecentServersHomeHidden(self, val: bool) -> None:
+        val = bool(val)
+        if self.recentServersHomeHidden != val:
+            self._store.settings["recent_servers_home_hidden"] = val
+            self._store.save()
+            self.settingsChanged.emit()
+
+    @Property(bool, notify=settingsChanged)
+    def showSuggestedServersHome(self) -> bool:
+        return bool(self._store.settings.get("show_suggested_servers_home", True))
+
+    @Slot(bool)
+    def setShowSuggestedServersHome(self, val: bool) -> None:
+        val = bool(val)
+        if self.showSuggestedServersHome != val:
+            self._store.settings["show_suggested_servers_home"] = val
+            self._store.save()
+            self.settingsChanged.emit()
+
+    @Slot(result=bool)
+    def getShowSuggestedServersHome(self) -> bool:
+        return self.showSuggestedServersHome
+
+    @Property(bool, notify=settingsChanged)
+    def hasHiddenSuggestedServers(self) -> bool:
+        hidden = self._store.settings.get("hidden_home_servers", [])
+        return bool(hidden)
+
+    @Property(bool, notify=isPingingServersChanged)
+    def isPingingServers(self) -> bool:
+        return self._is_pinging_servers
+
+    @Slot(str, str, result=bool)
+    def addCustomHomeServer(self, name: str, ip: str) -> bool:
+        ip = (ip or "").strip()
+        name = (name or "").strip()
+        if not ip:
+            return False
+        if not name:
+            name = ip
+
+        custom_list = list(self._store.settings.get("custom_home_servers", []))
+        hidden_list = list(self._store.settings.get("hidden_home_servers", []))
+
+        # Unhide if it was hidden
+        hidden_list = [h for h in hidden_list if h.lower() != ip.lower()]
+        self._store.settings["hidden_home_servers"] = hidden_list
+
+        found = False
+        for srv in custom_list:
+            if srv.get("ip", "").lower() == ip.lower():
+                srv["name"] = name
+                found = True
+                break
+
+        if not found:
+            custom_list.append({
+                "name": name,
+                "ip": ip,
+                "icon": ""
+            })
+
+        self._store.settings["custom_home_servers"] = custom_list
+        self._store.save()
+        self.settingsChanged.emit()
+        self.settingSaved.emit(f"Server '{name}' hinzugefügt")
+        self.refreshHomeServers()
+        return True
+
+    @Slot(str, bool)
+    def removeHomeServer(self, ip: str, is_custom: bool) -> None:
+        ip = (ip or "").strip()
+        if not ip:
+            return
+
+        if is_custom:
+            custom_list = list(self._store.settings.get("custom_home_servers", []))
+            custom_list = [s for s in custom_list if s.get("ip", "").lower() != ip.lower()]
+            self._store.settings["custom_home_servers"] = custom_list
+        else:
+            hidden_list = list(self._store.settings.get("hidden_home_servers", []))
+            if ip.lower() not in [h.lower() for h in hidden_list]:
+                hidden_list.append(ip.lower())
+            self._store.settings["hidden_home_servers"] = hidden_list
+
+        self._store.save()
+        self.settingsChanged.emit()
+
+    @Slot(str, int, result=bool)
+    def moveCustomHomeServer(self, ip: str, direction: int) -> bool:
+        """Move custom server up (direction=-1) or down (direction=1)."""
+        ip_clean = (ip or "").strip().lower()
+        if not ip_clean:
+            return False
+
+        custom_list = list(self._store.settings.get("custom_home_servers", []))
+        idx = -1
+        for i, srv in enumerate(custom_list):
+            if srv.get("ip", "").strip().lower() == ip_clean:
+                idx = i
+                break
+
+        if idx == -1:
+            return False
+
+        new_idx = idx + direction
+        if new_idx < 0 or new_idx >= len(custom_list):
+            return False
+
+        custom_list[idx], custom_list[new_idx] = custom_list[new_idx], custom_list[idx]
+        self._store.settings["custom_home_servers"] = custom_list
+        self._store.save()
+        self.settingsChanged.emit()
+        return True
+
+    @Slot()
+    def resetSuggestedHomeServers(self) -> None:
+        self._store.settings["hidden_home_servers"] = []
+        self._store.settings["show_suggested_servers_home"] = True
+        self._store.save()
+        self.settingsChanged.emit()
+        self.settingSaved.emit("Vorgeschlagene Server wiederhergestellt")
+        self.refreshHomeServers()
+
+    @Slot()
+    def refreshHomeServers(self) -> None:
+        """Pings all home servers (custom and suggested) asynchronously to update player counts, status, and favicons."""
+        if self._is_pinging_servers:
+            return
+
+        self._is_pinging_servers = True
+        self.isPingingServersChanged.emit()
+
+        def _worker():
+            from backend.services.server_pinger import (
+                ping_minecraft_server,
+                set_cached_server_status,
+                clear_server_status_cache
+            )
+            from concurrent.futures import ThreadPoolExecutor
+
+            # Gather all current IPs to ping
+            ips_to_ping = []
+            custom_list = list(self._store.settings.get("custom_home_servers", []))
+            for s in custom_list:
+                ip = s.get("ip", "").strip()
+                if ip and ip not in ips_to_ping:
+                    ips_to_ping.append(ip)
+
+            profile = self._active_profile
+            if self.showSuggestedServersHome and profile:
+                try:
+                    from backend.services.server_nbt import get_actually_played_servers
+                    launcher_history = self._store.settings.get("played_servers_history", {}).get(profile.id, [])
+                    suggested = get_actually_played_servers(profile.path, limit=3, launcher_history=launcher_history)
+                    for s in suggested:
+                        ip = s.get("ip", "").strip()
+                        if ip and ip not in ips_to_ping:
+                            ips_to_ping.append(ip)
+                except Exception:
+                    pass
+
+            if not ips_to_ping:
+                self._is_pinging_servers = False
+                self.isPingingServersChanged.emit()
+                return
+
+            def _ping_one(addr: str):
+                try:
+                    clear_server_status_cache(addr)
+                    res = ping_minecraft_server(addr, timeout=2.5)
+                    set_cached_server_status(addr, res)
+                    # If this is a custom server without an icon, and ping returned a favicon, save it!
+                    if res.get("favicon"):
+                        changed = False
+                        for c in custom_list:
+                            if c.get("ip", "").strip().lower() == addr.lower() and not c.get("icon"):
+                                c["icon"] = res["favicon"]
+                                changed = True
+                        if changed:
+                            self._store.settings["custom_home_servers"] = custom_list
+                            self._store.save()
+                except Exception:
+                    pass
+
+            with ThreadPoolExecutor(max_workers=min(len(ips_to_ping), 5)) as executor:
+                list(executor.map(_ping_one, ips_to_ping))
+
+            self._is_pinging_servers = False
+            try:
+                self.isPingingServersChanged.emit()
+                self.settingsChanged.emit()
+            except RuntimeError:
+                pass
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    @Slot(result=list)
+    def getHomeServers(self) -> list:
+        hidden = {h.lower() for h in self._store.settings.get("hidden_home_servers", [])}
+        custom_list = list(self._store.settings.get("custom_home_servers", []))
+
+        result = []
+        seen_ips = set()
+
+        profile = self._active_profile
+        known_icons = {}
+        if profile:
+            try:
+                from backend.services.server_nbt import parse_servers_dat
+                for s in parse_servers_dat(profile.path / "servers.dat"):
+                    if s.get("ip") and s.get("icon"):
+                        known_icons[s["ip"].strip().lower()] = s["icon"]
+            except Exception:
+                pass
+
+        # 1. Custom Servers (always on top, in user-defined order)
+        num_custom = len(custom_list)
+        for idx, srv in enumerate(custom_list):
+            ip = srv.get("ip", "").strip()
+            if not ip or ip.lower() in seen_ips:
+                continue
+            seen_ips.add(ip.lower())
+            icon = srv.get("icon") or known_icons.get(ip.lower(), "")
+            result.append({
+                "name": srv.get("name") or ip,
+                "ip": ip,
+                "icon": icon,
+                "is_custom": True,
+                "is_first_custom": (idx == 0),
+                "is_last_custom": (idx == num_custom - 1)
+            })
+
+        # 2. Suggested Servers: ONLY servers actually played on (from logs/launcher history), max 3, skipped if in custom or hidden
+        if self.showSuggestedServersHome and profile:
+            try:
+                from backend.services.server_nbt import get_actually_played_servers
+                launcher_history = self._store.settings.get("played_servers_history", {}).get(profile.id, [])
+                recent = get_actually_played_servers(profile.path, limit=3, launcher_history=launcher_history)
+                suggested_count = 0
+                for r in recent:
+                    if suggested_count >= 3:
+                        break
+                    ip = r.get("ip", "").strip()
+                    # Skip if empty, already in custom servers (seen_ips), or hidden by user
+                    if not ip or ip.lower() in seen_ips or ip.lower() in hidden:
+                        continue
+                    seen_ips.add(ip.lower())
+                    icon = r.get("icon") or known_icons.get(ip.lower(), "")
+                    result.append({
+                        "name": r.get("name") or ip,
+                        "ip": ip,
+                        "icon": icon,
+                        "is_custom": False,
+                        "is_first_custom": False,
+                        "is_last_custom": False
+                    })
+                    suggested_count += 1
+            except Exception:
+                pass
+
+        # Attach real-time ping status data to result entries
+        from backend.services.server_pinger import get_cached_server_status
+        uncached_present = False
+        for entry in result:
+            addr = entry.get("ip", "")
+            cached = get_cached_server_status(addr) if addr else None
+            if cached:
+                entry["online"] = cached.get("online", False)
+                entry["players_online"] = cached.get("players_online", 0)
+                entry["players_max"] = cached.get("players_max", 0)
+                entry["player_sample"] = cached.get("player_sample", [])
+                entry["latency_ms"] = cached.get("latency_ms", -1)
+                if not entry.get("icon") and cached.get("favicon"):
+                    entry["icon"] = cached["favicon"]
+            else:
+                entry["online"] = None  # None indicates checking / not yet loaded
+                entry["players_online"] = 0
+                entry["players_max"] = 0
+                entry["player_sample"] = []
+                entry["latency_ms"] = -1
+                uncached_present = True
+
+        if uncached_present and not self._is_pinging_servers and len(result) > 0:
+            self.refreshHomeServers()
+
+        return result
+
+    @Slot(result=list)
+    def getRecentServersForActiveProfile(self) -> list:
+        return self.getHomeServers()
+
+
     @Slot(result=str)
     def pickBackgroundImage(self) -> str:
         file_path, _ = QFileDialog.getOpenFileName(
@@ -619,6 +940,13 @@ class ProfileController(QObject):
         else:
             self._installed_registry.scan_directory(Path("/nonexistent"))
             self._mod_model.set_mods([])
+
+        target_inspected = self._inspected_profile or self._active_profile
+        if target_inspected:
+            self._inspected_mod_model.set_mods(self._mods_with_local_extensions(target_inspected))
+        else:
+            self._inspected_mod_model.set_mods([])
+
         self.profilesChanged.emit()
         self.activeProfileChanged.emit()
         self.checkModUpdates()
@@ -646,6 +974,39 @@ class ProfileController(QObject):
         log = custom_log or (self._live_log_service.getFullLog() if hasattr(self, '_live_log_service') else "")
         self._crash_diagnosis = self._crash_doctor.analyze(log, "", self._active_profile)
         self.crashDiagnosisChanged.emit()
+
+    def _on_all_instances_stopped(self) -> None:
+        try:
+            self.launchStatusChanged.emit("Spiel beendet", False)
+            self.restoreFromTrayRequested.emit()
+        except RuntimeError:
+            pass
+
+    def _on_instance_exited(self, instance_id: str, rc: int, intentional: bool) -> None:
+        # Always signal that game instance exited to restore launcher from tray/minimized state
+        try:
+            self.launchStatusChanged.emit("Spiel beendet", False)
+            self.restoreFromTrayRequested.emit()
+        except RuntimeError:
+            pass
+
+        if intentional or rc == 0:
+            return
+        log = self._live_log_service.getFullLog(instance_id) if hasattr(self, '_live_log_service') else ""
+        if not log and self._active_profile:
+            log_file = self._active_profile.path / "ezclient_latest_run.log"
+            if log_file.exists():
+                try:
+                    log = log_file.read_text(encoding="utf-8", errors="replace")
+                except Exception:
+                    pass
+        diagnosis = self._crash_doctor.analyze(log, f"Minecraft wurde mit Exit-Code {rc} beendet.", self._active_profile)
+        self._crash_diagnosis = diagnosis
+        self.crashDiagnosisChanged.emit()
+        try:
+            self.gameCrashed.emit(diagnosis.problem_title, diagnosis.short_error, log)
+        except RuntimeError:
+            pass
 
     @Slot()
     def fixCurrentCrash(self) -> None:
@@ -918,6 +1279,7 @@ class ProfileController(QObject):
         p = self._store.get_by_id(profile_id)
         if p:
             self._inspected_profile = p
+            self._inspected_mod_model.set_mods(self._mods_with_local_extensions(p))
             self.inspectedProfileChanged.emit()
 
     @Slot()
@@ -955,6 +1317,26 @@ class ProfileController(QObject):
     def inspectedHasEzClient(self) -> bool:
         p = self._inspected_profile or self._active_profile
         return bool(p and p.profile_type == "ezclient")
+
+    @Property(bool, notify=inspectedProfileChanged)
+    def inspectedCanInstallEzClient(self) -> bool:
+        p = self._inspected_profile or self._active_profile
+        if not p:
+            return False
+        from backend.services.minecraft_versions import is_active_ezclient_version
+        return bool(p.loader.lower() == "fabric" and is_active_ezclient_version(p.minecraft_version) and p.profile_type != "ezclient")
+
+    @Slot()
+    def installEzClientToInspectedProfile(self) -> None:
+        p = self._inspected_profile or self._active_profile
+        if not p or not self.inspectedCanInstallEzClient:
+            return
+        p.profile_type = "ezclient"
+        self._store.save()
+        self.applyEzClientUpdates()
+        self._sync_models()
+        self.inspectedProfileChanged.emit()
+        self.activeProfileChanged.emit()
 
     @Property(int, notify=inspectedProfileChanged)
     def inspectedModsCount(self) -> int:
@@ -1231,6 +1613,10 @@ class ProfileController(QObject):
     @Property(QObject, constant=True)
     def modModel(self) -> ModModel:
         return self._mod_model
+
+    @Property(QObject, constant=True)
+    def inspectedModModel(self) -> ModModel:
+        return self._inspected_mod_model
 
     @Slot(str)
     def selectProfile(self, profile_id: str) -> None:
@@ -1620,14 +2006,9 @@ class ProfileController(QObject):
         if not self._active_profile:
             return
 
-        is_core = (mod_id.lower() in ("ezclient", "ezclient-core", "fabric-api") or
-                   (mod_name and mod_name.lower() in ("ezclient", "ezclient core", "fabric api")))
-        if is_core:
-            self.settingSaved.emit("Core-Mods werden vom EzClient-Profil verwaltet und können nicht entfernt werden.")
-            return
-
         mod_id_clean = mod_id.strip().lower()
         name_clean = mod_name.strip().lower()
+        is_ezclient = mod_id_clean in ("ezclient", "ezclient-core") or name_clean in ("ezclient", "ezclient core")
 
         deleted_filenames = []
         retained = []
@@ -1638,11 +2019,19 @@ class ProfileController(QObject):
             if (m_slug and m_slug == mod_id_clean) or (m_pid and m_pid == mod_id_clean) or (name_clean and m_name == name_clean):
                 if m.filename:
                     deleted_filenames.append(m.filename)
+            elif is_ezclient and ((m_slug in ("ezclient", "ezclient-core")) or (m_pid in ("ezclient", "ezclient-core"))):
+                if m.filename:
+                    deleted_filenames.append(m.filename)
             else:
                 retained.append(m)
 
         self._active_profile.mods = retained
-        self._active_profile.user_mods = [s for s in self._active_profile.user_mods if s.lower() != mod_id_clean]
+        self._active_profile.user_mods = [s for s in self._active_profile.user_mods if s.lower() not in (mod_id_clean, name_clean)]
+        self._active_profile.managed_core_mods = [s for s in self._active_profile.managed_core_mods if s.lower() not in (mod_id_clean, name_clean)]
+        self._active_profile.integrated_mods = [s for s in self._active_profile.integrated_mods if s.lower() not in (mod_id_clean, name_clean)]
+        if is_ezclient:
+            self._active_profile.managed_core_mods = [s for s in self._active_profile.managed_core_mods if s.lower() not in ("ezclient", "ezclient-core")]
+            self._active_profile.integrated_mods = [s for s in self._active_profile.integrated_mods if s.lower() not in ("ezclient", "ezclient-core")]
         self._store.save()
         self._sync_models()
         self.activeProfileChanged.emit()
@@ -1798,7 +2187,8 @@ class ProfileController(QObject):
         return any(valid_file(path) or valid_file(path.with_name(path.name + ".disabled")) for path in candidates)
 
     @Slot()
-    def launchActiveProfile(self) -> None:
+    @Slot(str)
+    def launchActiveProfile(self, server_ip: str = "") -> None:
         if self._is_launching:
             return
         if not self._active_profile:
@@ -1807,6 +2197,20 @@ class ProfileController(QObject):
 
         self._is_launching = True
         profile = self._active_profile
+
+        if server_ip and self._active_profile:
+            try:
+                hist_dict = self._store.settings.setdefault("played_servers_history", {})
+                prof_hist = list(hist_dict.get(self._active_profile.id, []))
+                clean_ip = server_ip.strip()
+                if clean_ip:
+                    prof_hist = [x for x in prof_hist if x.lower() != clean_ip.lower()]
+                    prof_hist.insert(0, clean_ip)
+                    hist_dict[self._active_profile.id] = prof_hist[:10]
+                    self._store.save()
+                    self.settingsChanged.emit()
+            except Exception:
+                pass
 
         # Early initialization of LiveLogService so instance and logs are active immediately
         log_file = profile.path / "ezclient_latest_run.log"
@@ -1851,7 +2255,10 @@ class ProfileController(QObject):
                         _safe_emit_status(message, False)
 
                     _safe_emit_status("Starte Minecraft direkt…", False)
-                    proc = launch_minecraft_direct(profile, _direct_status, log_file)
+                    if server_ip:
+                        proc = launch_minecraft_direct(profile, _direct_status, log_file, server_ip=server_ip)
+                    else:
+                        proc = launch_minecraft_direct(profile, _direct_status, log_file)
                     if not proc:
                         self._live_log_service.append_system_message(
                             "Minecraft wurde nicht gestartet. Prüfe die obigen Meldungen.",
@@ -1899,6 +2306,11 @@ class ProfileController(QObject):
                     pass
 
         threading.Thread(target=_launch_worker, daemon=True).start()
+
+    @Slot(str)
+    def launchActiveProfileWithServer(self, server_ip: str) -> None:
+        """Launch active profile and instantly connect to the specified Minecraft server."""
+        self.launchActiveProfile(server_ip=server_ip)
 
     @Slot(str)
     def copyToClipboard(self, text: str) -> None:

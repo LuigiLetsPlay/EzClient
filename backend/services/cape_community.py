@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import os
 import urllib.error
 import urllib.parse
@@ -208,3 +209,28 @@ def report_cape(cape_id: str, reason: str, reporter: str) -> None:
     )
     with urllib.request.urlopen(request, timeout=10):
         pass
+
+def activate_cape(cape_id: str, owner: str, owner_uuid: str, token: str, access_token: str = "") -> dict:
+    payload = {"cape_id": cape_id, "owner": owner,
+               "owner_uuid": normalize_player_uuid(owner_uuid), "token": token}
+    headers = {"Content-Type": "application/json", "User-Agent": f"EzClient/{APP_VERSION}"}
+    if urllib.parse.urlparse(_base_url()).scheme == "https" and access_token:
+        headers["Authorization"] = f"Bearer {access_token}"
+    elif not token and access_token:
+        # Prove the Minecraft session without sending its access token to the cape server.
+        with urllib.request.urlopen(f"{_base_url()}/capes/challenge", timeout=8) as response:
+            challenge = json.load(response)["challenge"]
+        if not re.fullmatch(r"[a-f0-9]{40}", challenge):
+            raise ValueError("Ungültige Sitzungsanfrage")
+        proof = json.dumps({"accessToken": access_token, "selectedProfile": owner_uuid.replace("-", ""),
+                            "serverId": challenge}).encode()
+        join = urllib.request.Request("https://sessionserver.mojang.com/session/minecraft/join",
+                                      data=proof, headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(join, timeout=10):
+            pass
+        payload["challenge"] = challenge
+    data = json.dumps(payload).encode()
+    request = urllib.request.Request(f"{_base_url()}/capes/activate", data=data, headers=headers, method="POST")
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return json.loads(response.read())
+

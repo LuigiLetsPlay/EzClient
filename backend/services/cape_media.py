@@ -159,16 +159,19 @@ def _crop_frame(frame: Image.Image, crop_box: tuple[float, float, float, float] 
 def _atlas_from_face(face: Image.Image, crop_box: tuple[float, float, float, float] | None = None) -> Image.Image:
     atlas = Image.new("RGBA", ATLAS_SIZE, (0, 0, 0, 0))
     fitted = _crop_frame(face.convert("RGBA"), crop_box)
-    source_ratio = fitted.width / max(1, fitted.height)
-    target_ratio = 10 / 16
-    if source_ratio > target_ratio:
-        width = round(fitted.height * target_ratio)
-        left = (fitted.width - width) // 2
-        cropped = fitted.crop((left, 0, left + width, fitted.height))
+    if crop_box is not None:
+        cropped = fitted
     else:
-        height = round(fitted.width / target_ratio)
-        top = (fitted.height - height) // 2
-        cropped = fitted.crop((0, top, fitted.width, top + height))
+        source_ratio = fitted.width / max(1, fitted.height)
+        target_ratio = 10 / 16
+        if source_ratio > target_ratio:
+            width = round(fitted.height * target_ratio)
+            left = (fitted.width - width) // 2
+            cropped = fitted.crop((left, 0, left + width, fitted.height))
+        else:
+            height = round(fitted.width / target_ratio)
+            top = (fitted.height - height) // 2
+            cropped = fitted.crop((0, top, fitted.width, top + height))
 
     # 1. Cape visible back face: 10x16 at 4x scale = (40, 64) at (4, 4)
     cape_face = cropped.resize((40, 64), Image.Resampling.LANCZOS)
@@ -203,8 +206,6 @@ def generate_frame_sheet(
     """Convert one bounded media clip atomically into a PNG sheet + JSON manifest."""
     source_path = Path(source).resolve()
     target = Path(output_dir).resolve()
-    if target.exists():
-        raise FileExistsError("Der Animations-Ausgabeordner existiert bereits.")
     info = probe_media(source_path)
     selected = _validated_options(info, options)
     parent = target.parent
@@ -289,7 +290,14 @@ def generate_frame_sheet(
         (temporary / "animation.json").write_text(
             json.dumps(asdict(manifest), ensure_ascii=False, indent=2), encoding="utf-8"
         )
-        temporary.replace(target)
+        target.mkdir(parents=True, exist_ok=True)
+        for item in temporary.iterdir():
+            dest = target / item.name
+            if item.is_file():
+                shutil.copyfile(item, dest)
+            elif item.is_dir():
+                shutil.copytree(item, dest, dirs_exist_ok=True)
+        shutil.rmtree(temporary, ignore_errors=True)
         return manifest
     except Exception:
         shutil.rmtree(temporary, ignore_errors=True)

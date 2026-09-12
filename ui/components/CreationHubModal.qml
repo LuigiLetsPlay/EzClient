@@ -17,6 +17,10 @@ Item {
     property bool noriskImporting: false
     property string noriskStatus: ""
     property bool noriskAddPerformance: true
+    property bool noriskWaypointPrompt: false
+    property string pendingNoriskProfileId: ""
+    property string pendingNoriskProfileName: ""
+    property int pendingXaeroWaypointCount: 0
     property var windowRef: null
 
     function open(initialView = "choices") {
@@ -32,6 +36,16 @@ Item {
     function close() {
         isOpen = false
         creationHubView = "choices"
+        noriskWaypointPrompt = false
+    }
+
+    function runNoRiskImport(profileId, convertWaypoints) {
+        noriskWaypointPrompt = false
+        noriskImporting = true
+        noriskStatus = "Import wird vorbereitet …"
+        if (profileController) {
+            profileController.importNoRiskProfile(profileId, noriskAddPerformance, convertWaypoints)
+        }
     }
 
     Connections {
@@ -386,6 +400,13 @@ Item {
                                 font.pixelSize: 11
                                 color: EzTheme.textMuted
                             }
+                            Text {
+                                visible: modelData.hasXaeroWaypoints
+                                text: modelData.xaeroWaypointCount + " Xaero-Waypoint" + (modelData.xaeroWaypointCount === 1 ? " erkannt" : "s erkannt")
+                                font.family: EzTheme.fontFamily
+                                font.pixelSize: 10
+                                color: EzTheme.accentLight
+                            }
                         }
 
                         EzButton {
@@ -394,11 +415,12 @@ Item {
                             enabled: !root.noriskImporting
                             Layout.preferredWidth: 125
                             onClicked: {
-                                root.noriskImporting = true
-                                root.noriskStatus = "Import wird vorbereitet …"
-                                if (profileController) {
-                                    profileController.importNoRiskProfile(modelData.id, root.noriskAddPerformance)
-                                }
+                                if (modelData.canConvertXaeroWaypoints) {
+                                    root.pendingNoriskProfileId = modelData.id
+                                    root.pendingNoriskProfileName = modelData.name
+                                    root.pendingXaeroWaypointCount = modelData.xaeroWaypointCount
+                                    root.noriskWaypointPrompt = true
+                                } else root.runNoRiskImport(modelData.id, false)
                             }
                         }
                     }
@@ -471,6 +493,74 @@ Item {
                 font.pixelSize: 11
                 color: EzTheme.accentLight
                 horizontalAlignment: Text.AlignHCenter
+            }
+        }
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        visible: root.noriskWaypointPrompt
+        z: 20
+        color: "#D9000000"
+
+        MouseArea { anchors.fill: parent }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 48, 560)
+            height: 250
+            radius: 16
+            color: EzTheme.surface
+            border.color: EzTheme.accent
+            border.width: 1
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 22
+                spacing: 12
+
+                Text {
+                    Layout.fillWidth: true
+                    text: root.pendingXaeroWaypointCount + " Xaero-Waypoint" + (root.pendingXaeroWaypointCount === 1 ? " erkannt" : "s erkannt")
+                    font.family: EzTheme.fontFamily
+                    font.pixelSize: 18
+                    font.bold: true
+                    color: EzTheme.text
+                }
+                Text {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: "Möchtest du die Waypoints aus „" + root.pendingNoriskProfileName + "“ in EzClient-Waypoints umwandeln? Bei der Konvertierung werden Xaero Minimap/World Map und deren Daten nicht in das neue Profil kopiert."
+                    font.family: EzTheme.fontFamily
+                    font.pixelSize: 12
+                    color: EzTheme.textSecondary
+                }
+                Text {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: "Keine Sorge: Das originale NoRisk-Profil wird nicht verändert."
+                    font.family: EzTheme.fontFamily
+                    font.pixelSize: 11
+                    font.bold: true
+                    color: EzTheme.accentLight
+                }
+                Item { Layout.fillHeight: true }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    Item { Layout.fillWidth: true }
+                    EzButton {
+                        text: "Xaero behalten"
+                        Layout.preferredWidth: 140
+                        onClicked: root.runNoRiskImport(root.pendingNoriskProfileId, false)
+                    }
+                    EzButton {
+                        text: "In EzClient umwandeln"
+                        primary: true
+                        Layout.preferredWidth: 180
+                        onClicked: root.runNoRiskImport(root.pendingNoriskProfileId, true)
+                    }
+                }
             }
         }
     }

@@ -41,14 +41,67 @@ public class GuiMixin {
                 return;
             }
 
-            int width = client.getWindow().getGuiScaledWidth();
-            int height = client.getWindow().getGuiScaledHeight();
-            int x = width / 2;
-            int y = height / 2;
+            float x = client.getWindow().getWidth() / (2.0f * client.getWindow().getGuiScale());
+            float y = client.getWindow().getHeight() / (2.0f * client.getWindow().getGuiScale());
+            if (module.isCenterOnMonitor()) {
+                float[] monPos = ezclient$getMonitorCenterGuiPos(client);
+                if (monPos != null) {
+                    x = monPos[0];
+                    y = monPos[1];
+                }
+            }
 
             module.renderCrosshair(graphics, client, x, y, false);
             ci.cancel();
         }
+    }
+
+    private static float[] ezclient$getMonitorCenterGuiPos(Minecraft client) {
+        if (client.getWindow() == null) return null;
+        long window = client.getWindow().handle();
+        int[] winX = new int[1], winY = new int[1];
+        int[] winW = new int[1], winH = new int[1];
+        org.lwjgl.glfw.GLFW.glfwGetWindowPos(window, winX, winY);
+        org.lwjgl.glfw.GLFW.glfwGetWindowSize(window, winW, winH);
+
+        org.lwjgl.PointerBuffer monitors = org.lwjgl.glfw.GLFW.glfwGetMonitors();
+        long bestMonitor = 0;
+        int bestMonX = 0, bestMonY = 0, bestMonW = 0, bestMonH = 0;
+        int maxOverlap = -1;
+
+        if (monitors != null) {
+            int[] monX = new int[1], monY = new int[1];
+            for (int i = 0; i < monitors.limit(); i++) {
+                long monitor = monitors.get(i);
+                org.lwjgl.glfw.GLFW.glfwGetMonitorPos(monitor, monX, monY);
+                org.lwjgl.glfw.GLFWVidMode mode = org.lwjgl.glfw.GLFW.glfwGetVideoMode(monitor);
+                if (mode == null) continue;
+                int mx = monX[0], my = monY[0], mw = mode.width(), mh = mode.height();
+
+                int overlapX = Math.max(0, Math.min(winX[0] + winW[0], mx + mw) - Math.max(winX[0], mx));
+                int overlapY = Math.max(0, Math.min(winY[0] + winH[0], my + mh) - Math.max(winY[0], my));
+                int overlap = overlapX * overlapY;
+                if (overlap > maxOverlap) {
+                    maxOverlap = overlap;
+                    bestMonitor = monitor;
+                    bestMonX = mx;
+                    bestMonY = my;
+                    bestMonW = mw;
+                    bestMonH = mh;
+                }
+            }
+        }
+
+        if (bestMonitor != 0 && winW[0] > 0 && winH[0] > 0) {
+            double monCenterX = bestMonX + bestMonW / 2.0;
+            double monCenterY = bestMonY + bestMonH / 2.0;
+            double relX = monCenterX - winX[0];
+            double relY = monCenterY - winY[0];
+            float guiScaledW = client.getWindow().getGuiScaledWidth();
+            float guiScaledH = client.getWindow().getGuiScaledHeight();
+            return new float[]{ (float)(relX * (guiScaledW / winW[0])), (float)(relY * (guiScaledH / winH[0])) };
+        }
+        return null;
     }
 
     @Inject(method = "extractEffects", at = @At("HEAD"), cancellable = true)

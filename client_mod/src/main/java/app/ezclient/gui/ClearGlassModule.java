@@ -16,6 +16,11 @@ public final class ClearGlassModule extends Module {
     }
 
     @Override
+    public String getDescription() {
+        return "Verbindet Glasflächen visuell, damit Glaswände und Fenster klarer und ruhiger wirken.";
+    }
+
+    @Override
     public void setEnabled(boolean enabled) {
         active = enabled;
         super.setEnabled(enabled);

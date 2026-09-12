@@ -67,13 +67,15 @@ def _extract_overrides(archive: zipfile.ZipFile, prefix: str, profile_root: Path
 def install_modrinth_modpack(
     project_id: str,
     profile: ProfileData,
+    version_id: str = "",
     progress: Callable[[float, str], None] | None = None,
     service: ModrinthService | None = None,
 ) -> dict[str, Any]:
     """Install a Modrinth .mrpack into an already-created isolated profile."""
     svc = service or ModrinthService()
     versions = svc.get_project_versions(project_id)
-    selected = select_preferred_version(versions)
+    selected = next((item for item in versions if str(item.get("id", "")) == version_id), None) if version_id else None
+    selected = selected or select_preferred_version(versions)
     if not selected:
         raise ModpackInstallError("Für dieses Modpack wurde keine installierbare Version gefunden.")
     files = selected.get("files", [])
@@ -99,15 +101,18 @@ def install_modrinth_modpack(
             if not minecraft_version:
                 raise ModpackInstallError("Das Modpack nennt keine Minecraft-Version.")
             loader = "Vanilla"
+            loader_version = ""
             for dependency, label in (
                 ("fabric-loader", "Fabric"), ("quilt-loader", "Quilt"),
                 ("neoforge", "NeoForge"), ("forge", "Forge"),
             ):
                 if dependencies.get(dependency):
                     loader = label
+                    loader_version = str(dependencies.get(dependency) or "")
                     break
             profile.minecraft_version = minecraft_version
             profile.loader = loader
+            profile.loader_version = loader_version
 
             entries = []
             for entry in index.get("files", []):
@@ -145,6 +150,7 @@ def install_modrinth_modpack(
         "version": index.get("versionId", selected.get("version_number", "")),
         "minecraft_version": profile.minecraft_version,
         "loader": profile.loader,
+        "loader_version": profile.loader_version,
         "files": len(entries),
     }
 
@@ -152,6 +158,7 @@ def install_modrinth_modpack(
 def install_curseforge_modpack(
     project_id: str,
     profile: ProfileData,
+    version_id: str = "",
     progress: Callable[[float, str], None] | None = None,
     service: CurseForgeService | None = None,
 ) -> dict[str, Any]:
@@ -160,7 +167,9 @@ def install_curseforge_modpack(
     versions = svc.get_project_versions(project_id, mc_version=None, loader=None)
     if not versions:
         raise ModpackInstallError("Für dieses CurseForge-Modpack wurde keine Datei gefunden.")
-    pack_file = versions[0].get("files", [{}])[0]
+    selected = next((item for item in versions if str(item.get("id", "")) == version_id), None) if version_id else None
+    selected = selected or versions[0]
+    pack_file = selected.get("files", [{}])[0]
     if not pack_file.get("url"):
         raise ModpackInstallError("Die CurseForge-Modpack-Datei besitzt keinen Download-Link.")
     if progress:
@@ -178,6 +187,7 @@ def install_curseforge_modpack(
             loaders = minecraft.get("modLoaders") if isinstance(minecraft.get("modLoaders"), list) else []
             loader_id = str(loaders[0].get("id") or "") if loaders and isinstance(loaders[0], dict) else ""
             profile.loader = "NeoForge" if loader_id.startswith("neoforge-") else ("Forge" if loader_id.startswith("forge-") else ("Fabric" if loader_id.startswith("fabric-") else "Vanilla"))
+            profile.loader_version = loader_id.split("-", 1)[1] if "-" in loader_id else ""
             entries = [entry for entry in manifest.get("files", []) if isinstance(entry, dict) and entry.get("required", True)]
             resolved: list[dict[str, Any]] = []
             for index, entry in enumerate(entries):
@@ -202,4 +212,4 @@ def install_curseforge_modpack(
             _extract_overrides(archive, str(manifest.get("overrides") or "overrides"), profile.path)
     if progress:
         progress(1.0, "CurseForge-Modpack ist spielbereit")
-    return {"name": manifest.get("name", profile.name), "version": manifest.get("version", ""), "minecraft_version": profile.minecraft_version, "loader": profile.loader, "files": len(resolved)}
+    return {"name": manifest.get("name", profile.name), "version": manifest.get("version", ""), "minecraft_version": profile.minecraft_version, "loader": profile.loader, "loader_version": profile.loader_version, "files": len(resolved)}

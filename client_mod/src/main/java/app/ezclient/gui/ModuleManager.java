@@ -100,7 +100,11 @@ public final class ModuleManager {
         // HUD modules collection cached for rendering loop
         this.modules.addAll(List.of(new HitboxModule(), new ItemPhysicsModule(), new TimeWeatherModule(),
                 new ParticleCustomizerModule(), new BlockOverlayModule(), new BossBarModule(), new BedwarsModule(),
-                new NameplateModule(), new WaypointsModule(), new SoundEnhancerModule()));
+                new NameplateModule(), new WaypointsModule(), new SoundEnhancerModule(),
+                new GlowingOresModule(), new NoFogModule(), new SaturationModule(), new FreelookModule(),
+                new BastiTimerModule(), new ArrowTrailModule(), new SpotifyOverlayModule(),
+                new HighQualityScreenshotModule(), new GlintCustomizerModule(), new ShulkerPreviewModule(),
+                new WaveyCapesModule()));
         this.hudModules = this.modules.stream()
                 .filter(m -> m instanceof HudModule && !(m instanceof CrosshairModule))
                 .filter(m -> !(m instanceof FeatureModule feature) || feature.hasHud())

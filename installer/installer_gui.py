@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont, QIcon, QPixmap, QColor
 
 APP_NAME = "EzClient"
-APP_VERSION = "2.0.1"
+APP_VERSION = "2.1.0"
 GITHUB_REPO = "LuigiLetsPlay/EzClient"
 DEFAULT_INSTALL_DIR = Path(os.getenv("LOCALAPPDATA", str(Path.home()))) / "Programs" / "EzClient"
 

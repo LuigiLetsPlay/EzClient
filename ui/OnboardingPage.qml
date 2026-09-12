@@ -54,6 +54,10 @@ Item {
     property string downloadStatus: "Bereite Profil vor…"
     property bool setupFailed: false
     property bool noriskAddPerformance: true
+    property bool noriskWaypointPrompt: false
+    property string pendingNoriskProfileId: ""
+    property string pendingNoriskProfileName: ""
+    property int pendingXaeroWaypointCount: 0
 
     function reset() {
         if (typeof completeTimer !== "undefined" && completeTimer) {
@@ -69,6 +73,7 @@ Item {
         downloadStatus = EzI18n.currentLanguage === "en" ? "Preparing profile…" : "Bereite Profil vor…"
         setupFailed = false
         noriskAddPerformance = true
+        noriskWaypointPrompt = false
         if (typeof nameInput !== "undefined" && nameInput) {
             nameInput.text = ""
         }
@@ -105,13 +110,23 @@ Item {
         }
     }
 
-    function importNoRisk(profileId) {
+    function requestNoRiskImport(profile) {
+        if (profile.canConvertXaeroWaypoints) {
+            pendingNoriskProfileId = profile.id
+            pendingNoriskProfileName = profile.name
+            pendingXaeroWaypointCount = profile.xaeroWaypointCount
+            noriskWaypointPrompt = true
+        } else importNoRisk(profile.id, false)
+    }
+
+    function importNoRisk(profileId, convertWaypoints) {
+        noriskWaypointPrompt = false
         root.step = "downloading"
         root.downloadProgress = 0.05
         root.setupFailed = false
         root.downloadStatus = "Importiere NoRisk-Profil…"
         if (typeof profileController !== "undefined" && profileController) {
-            profileController.importNoRiskProfile(profileId, root.noriskAddPerformance)
+            profileController.importNoRiskProfile(profileId, root.noriskAddPerformance, convertWaypoints)
         }
     }
 
@@ -139,6 +154,51 @@ Item {
             } else {
                 root.downloadStatus = message
                 root.setupFailed = true
+            }
+        }
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        visible: root.noriskWaypointPrompt
+        z: 100
+        color: "#D9000000"
+        MouseArea { anchors.fill: parent }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 48, 560)
+            height: 250
+            radius: 16
+            color: EzTheme.surface
+            border.color: EzTheme.accent
+            border.width: 1
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 22
+                spacing: 12
+                Text {
+                    Layout.fillWidth: true
+                    text: root.pendingXaeroWaypointCount + " Xaero-Waypoint" + (root.pendingXaeroWaypointCount === 1 ? " erkannt" : "s erkannt")
+                    font.family: EzTheme.fontFamily; font.pixelSize: 18; font.bold: true; color: EzTheme.text
+                }
+                Text {
+                    Layout.fillWidth: true; wrapMode: Text.WordWrap
+                    text: "In EzClient-Waypoints umwandeln? Dann werden Xaero Minimap/World Map und deren Daten nicht in das neue Profil kopiert."
+                    font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textSecondary
+                }
+                Text {
+                    Layout.fillWidth: true; wrapMode: Text.WordWrap
+                    text: "Das originale NoRisk-Profil „" + root.pendingNoriskProfileName + "“ wird nicht verändert."
+                    font.family: EzTheme.fontFamily; font.pixelSize: 11; font.bold: true; color: EzTheme.accentLight
+                }
+                Item { Layout.fillHeight: true }
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 10
+                    Item { Layout.fillWidth: true }
+                    EzButton { text: "Xaero behalten"; Layout.preferredWidth: 140; onClicked: root.importNoRisk(root.pendingNoriskProfileId, false) }
+                    EzButton { text: "In EzClient umwandeln"; primary: true; Layout.preferredWidth: 180; onClicked: root.importNoRisk(root.pendingNoriskProfileId, true) }
+                }
             }
         }
     }
@@ -753,10 +813,12 @@ Item {
                                         maximumLineCount: 1
                                     }
                                     Text {
-                                        text: ((modelData.ramMb || 4096) / 1024).toFixed(1).replace(".0", "") + " GB RAM"
+                                        text: modelData.hasXaeroWaypoints
+                                              ? modelData.xaeroWaypointCount + " Xaero-Waypoint" + (modelData.xaeroWaypointCount === 1 ? " erkannt" : "s erkannt")
+                                              : ((modelData.ramMb || 4096) / 1024).toFixed(1).replace(".0", "") + " GB RAM"
                                         font.family: EzTheme.fontFamily
                                         font.pixelSize: 9
-                                        color: EzTheme.textSubtle
+                                        color: modelData.hasXaeroWaypoints ? EzTheme.accentLight : EzTheme.textSubtle
                                     }
                                 }
 
@@ -766,7 +828,7 @@ Item {
                                     mcFont: true
                                     Layout.preferredHeight: 36
                                     Layout.preferredWidth: 112
-                                    onClicked: root.importNoRisk(modelData.id)
+                                    onClicked: root.requestNoRiskImport(modelData)
                                 }
                             }
 
@@ -1463,7 +1525,7 @@ Item {
                         tagColor: EzTheme.accent
                         tagTextColor: "#000000"
                         sub: EzI18n.currentLanguage === "en" ? "Optimized client environment with the managed core stack" : "Optimierte Client-Umgebung mit verwaltetem Core-Stack"
-                        mods: "EzClient Vollversion · Sodium · Lithium · Iris Shaders"
+                        mods: "EzClient Vollversion · Sodium · Lithium"
                         selected: root.selectedPreset === "ezclient"
                         onClicked: {
                             root.newLoader = "Fabric"
@@ -1479,7 +1541,7 @@ Item {
                         tagColor: EzTheme.surface3
                         tagTextColor: EzTheme.text
                         sub: "Stabiles Fabric-Profil ohne EzClient Core"
-                        mods: "Sodium · Lithium · Iris Shaders"
+                        mods: "Sodium · Lithium"
                         selected: root.selectedPreset === "performance"
                         onClicked: {
                             root.newLoader = "Fabric"

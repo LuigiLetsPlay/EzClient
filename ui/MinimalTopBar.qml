@@ -83,20 +83,23 @@ Rectangle {
             Popup {
                 id: profPopup
                 y: profilePill.height + 7
-                width: 320
-                height: Math.min((profileController && profileController.profileModel ? profileController.profileModel.rowCount() : 1) * 52 + 30, 360)
+                width: 460
+                height: Math.min(Math.ceil(pList.count / 2) * pList.cellHeight + 30, 360)
                 padding: 8
                 closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
                 background: Rectangle { radius: 12; color: EzTheme.surface; border.width: 1; border.color: EzTheme.borderLight }
 
-                contentItem: ListView {
+                contentItem: GridView {
                     id: pList
+                    cellWidth: (width - 14) / 2
+                    cellHeight: 56
+                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn }
                     clip: true
                     model: profileController ? profileController.profileModel : null
                     boundsBehavior: Flickable.StopAtBounds
 
                     delegate: Rectangle {
-                        width: pList.width
+                        width: pList.cellWidth - 4
                         height: 46
                         radius: 8
                         color: (model.profileId === profileController.activeId) ? EzTheme.surfaceActive : (pItemMouse.containsMouse ? EzTheme.surface3 : "transparent")
@@ -127,7 +130,7 @@ Rectangle {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                profileController.switchProfile(model.profileId)
+                                profileController.selectProfile(model.profileId)
                                 profPopup.close()
                             }
                         }

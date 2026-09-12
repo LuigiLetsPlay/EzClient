@@ -13,6 +13,14 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.phys.BlockHitResult;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
 import java.util.Optional;
 
 @Mixin(MultiPlayerGameMode.class)
@@ -43,6 +51,34 @@ public class MultiPlayerGameModeMixin {
         ComboCounterModule comboModule = ModuleManager.getInstance().getComboCounterModule();
         if (comboModule != null && comboModule.isEnabled() && target instanceof Player) {
             ComboCounterModule.onPlayerAttack();
+        }
+    }
+
+    @Inject(method = "startDestroyBlock", at = @At("HEAD"), cancellable = true)
+    private void ezclient$onStartDestroyBlock(BlockPos loc, Direction face, CallbackInfoReturnable<Boolean> cir) {
+        if (app.ezclient.gui.BlockSelectionOverlay.isActive()) {
+            cir.setReturnValue(false);
+        }
+    }
+
+    @Inject(method = "continueDestroyBlock", at = @At("HEAD"), cancellable = true)
+    private void ezclient$onContinueDestroyBlock(BlockPos loc, Direction face, CallbackInfoReturnable<Boolean> cir) {
+        if (app.ezclient.gui.BlockSelectionOverlay.isActive()) {
+            cir.setReturnValue(false);
+        }
+    }
+
+    @Inject(method = "useItemOn", at = @At("HEAD"), cancellable = true)
+    private void ezclient$onUseItemOn(LocalPlayer player, InteractionHand hand, BlockHitResult hitResult, CallbackInfoReturnable<InteractionResult> cir) {
+        if (app.ezclient.gui.BlockSelectionOverlay.isActive()) {
+            cir.setReturnValue(InteractionResult.PASS);
+        }
+    }
+
+    @Inject(method = "useItem", at = @At("HEAD"), cancellable = true)
+    private void ezclient$onUseItem(Player player, InteractionHand hand, CallbackInfoReturnable<InteractionResult> cir) {
+        if (app.ezclient.gui.BlockSelectionOverlay.isActive()) {
+            cir.setReturnValue(InteractionResult.PASS);
         }
     }
 }

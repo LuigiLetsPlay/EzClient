@@ -35,6 +35,11 @@ public final class ComboCounterModule extends HudModule {
     }
 
     @Override
+    public String getDescription() {
+        return "Zählt aufeinanderfolgende Treffer gegen Gegner und visualisiert Combos im HUD.";
+    }
+
+    @Override
     public Identifier getIcon() {
         return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/crosshair.png");
     }
@@ -84,20 +89,32 @@ public final class ComboCounterModule extends HudModule {
     public void setSoundFeedback(boolean soundFeedback) { this.soundFeedback = soundFeedback; ConfigManager.save(); }
 
     @Override
+    public int color() {
+        if (milestoneColors) {
+            Minecraft client = Minecraft.getInstance();
+            boolean editor = client != null && (EzScreenBridge.current(client) instanceof HudEditorScreen || EzScreenBridge.current(client) instanceof HudSettingsScreen);
+            int current;
+            if (editor) {
+                current = 7;
+            } else {
+                long now = System.currentTimeMillis();
+                long windowMs = (long) (resetWindowSeconds * 1000.0f);
+                current = (now - lastHitTime <= windowMs) ? comboCount : 0;
+            }
+            if (current >= 15) return 0xFFFF55FF;
+            if (current >= 10) return 0xFFFFAA00;
+            if (current >= 5)  return 0xFFFFFFFF;
+            if (current >= 3)  return 0xFFFFFF55;
+        }
+        return super.color();
+    }
+
+    @Override
     protected String value(Minecraft client) {
         long now = System.currentTimeMillis();
         long windowMs = (long) (resetWindowSeconds * 1000.0f);
         int current = (now - lastHitTime <= windowMs) ? comboCount : 0;
-
-        String colorCode = "";
-        if (milestoneColors && current > 0) {
-            if (current >= 15) colorCode = "§d"; // Pink/Rainbow
-            else if (current >= 10) colorCode = "§6"; // Gold
-            else if (current >= 5) colorCode = "§f"; // Silver/White
-            else if (current >= 3) colorCode = "§e"; // Bronze/Yellow
-        }
-
-        return colorCode + displayFormat.format(current);
+        return displayFormat.format(current);
     }
 
     @Override
@@ -108,9 +125,7 @@ public final class ComboCounterModule extends HudModule {
     @Override
     public String displayText(Minecraft client, boolean editor) {
         if (editor) {
-            int current = 7;
-            String colorCode = milestoneColors ? "§6" : "";
-            return colorCode + displayFormat.format(current);
+            return displayFormat.format(7);
         }
         return displayText(client);
     }

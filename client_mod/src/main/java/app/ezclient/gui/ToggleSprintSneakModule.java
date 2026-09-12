@@ -42,6 +42,11 @@ public final class ToggleSprintSneakModule extends HudModule {
     }
 
     @Override
+    public String getDescription() {
+        return "Ermöglicht umschaltbares Sprinten und Schleichen mit Statusanzeige im HUD.";
+    }
+
+    @Override
     public Identifier getIcon() {
         return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/auto_sprint.png");
     }
@@ -178,12 +183,18 @@ public final class ToggleSprintSneakModule extends HudModule {
     @Override
     public int getWidth(Minecraft client) {
         if (client == null || client.font == null) return 80;
-        return client.font.width(displayText(client)) + 8;
+        return client.font.width(displayText(client)) + CONTENT_PADDING_X * 2;
+    }
+
+    @Override
+    public int getWidth(Minecraft client, boolean editor) {
+        if (client == null || client.font == null) return 80;
+        return client.font.width(displayText(client, editor)) + CONTENT_PADDING_X * 2;
     }
 
     @Override
     public int getHeight(Minecraft client) {
-        return 14;
+        return 9 + CONTENT_PADDING_Y * 2;
     }
 
     @Override
@@ -218,12 +229,12 @@ public final class ToggleSprintSneakModule extends HudModule {
 
         String text = displayText(client, editor);
 
-        int totalW = (client != null && client.font != null) ? client.font.width(text) + 8 : 80;
+        int totalW = (client != null && client.font != null) ? client.font.width(text) + CONTENT_PADDING_X * 2 : 80;
         int totalH = getHeight(client);
 
         renderBackgroundAndBorder(graphics, 0, 0, totalW, totalH);
 
-        graphics.text(client.font, text, 4, 3, color());
+        graphics.text(client.font, text, CONTENT_PADDING_X, CONTENT_PADDING_Y, color());
         graphics.pose().popMatrix();
     }
 }

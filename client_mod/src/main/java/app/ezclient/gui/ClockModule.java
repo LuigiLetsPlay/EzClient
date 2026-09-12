@@ -32,6 +32,11 @@ public final class ClockModule extends HudModule {
         super("Clock", "HUD", false, 6, 112, "Time: ", "");
     }
 
+    @Override
+    public String getDescription() {
+        return "Zeigt die lokale Uhrzeit in einem frei wählbaren Zeitformat an.";
+    }
+
     public ClockFormat getClockFormat() { return clockFormat; }
     public void setClockFormat(ClockFormat clockFormat) {
         this.clockFormat = clockFormat;
@@ -52,7 +57,14 @@ public final class ClockModule extends HudModule {
 
     @Override
     public String displayText(Minecraft client) {
-        return (showPrefix ? "Time: " : "") + value(client);
+        return (showPrefix ? app.ezclient.util.EzI18n.get("ezclient.hud.clock.prefix") : "") + value(client);
+    }
+
+    @Override
+    public String displayText(Minecraft client, boolean editor) {
+        LocalTime previewTime = LocalTime.of(14, 37, 24);
+        String value = editor ? clockFormat.format(previewTime) : value(client);
+        return (showPrefix ? app.ezclient.util.EzI18n.get("ezclient.hud.clock.prefix") : "") + value;
     }
 
     @Override

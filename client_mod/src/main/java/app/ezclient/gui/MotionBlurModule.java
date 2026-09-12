@@ -29,6 +29,11 @@ public final class MotionBlurModule extends Module {
     }
 
     @Override
+    public String getDescription() {
+        return "Erzeugt bei Kamerabewegung einen einstellbaren Bewegungsunschärfe-Effekt mit FPS-Schutz.";
+    }
+
+    @Override
     public boolean hasSettings() {
         return true;
     }

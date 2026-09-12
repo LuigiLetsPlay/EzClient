@@ -35,6 +35,11 @@ public final class ReachModule extends HudModule {
     }
 
     @Override
+    public String getDescription() {
+        return "Zeigt die Distanz des letzten erfolgreichen Angriffs an.";
+    }
+
+    @Override
     public Identifier getIcon() {
         return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/crosshair.png");
     }

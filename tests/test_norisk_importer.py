@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from backend.models.types import ProfileData
-from backend.services.norisk_importer import discover_norisk_profiles, import_norisk_files
+from backend.services.norisk_importer import discover_norisk_profiles, discover_xaero_waypoints, import_norisk_files
 
 
 def test_discovers_only_profiles_with_real_directories(tmp_path: Path):
@@ -20,6 +20,52 @@ def test_discovers_only_profiles_with_real_directories(tmp_path: Path):
     assert profiles[0]["name"] == "My Profile"
     assert profiles[0]["loader"] == "Fabric"
     assert profiles[0]["ramMb"] == 6144
+
+
+def test_detects_and_converts_xaero_waypoints_without_touching_source(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("backend.services.norisk_importer._enrich_mod_metadata", lambda *args, **kwargs: None)
+    source = tmp_path / "Crack Attack 2"
+    waypoint_file = source / "xaero" / "minimap" / "Multiplayer_cracky2.blueface.dev" / "dim%0" / "mw$default_1.txt"
+    waypoint_file.parent.mkdir(parents=True)
+    original = "waypoint:Home:H:957:65:4616:5:false:0:gui.xaero_default:false:0:1:true\n"
+    waypoint_file.write_text(original, encoding="utf-8")
+    xaero_config = source / "config" / "xaero" / "minimap" / "client.cfg"
+    xaero_config.parent.mkdir(parents=True)
+    xaero_config.write_text("unchanged", encoding="utf-8")
+    xaero_jar = source / "mods" / "xaerominimap.jar"
+    xaero_jar.parent.mkdir(parents=True)
+    xaero_jar.write_bytes(b"PK xaero")
+    norisk_waypoints = source / "NoRiskClient" / "waypoints" / "Multiplayer_cracky2.blueface.dev" / "mw0,1,0" / "the_nether.json"
+    norisk_waypoints.parent.mkdir(parents=True)
+    norisk_payload = {"sets": {"default": {"waypoints": [{
+        "id": "nether-id", "name": "Nether Portal", "x": 493, "y": 86, "z": -554,
+        "color": 5592405, "disabled": False
+    }]}}}
+    norisk_waypoints.write_text(json.dumps(norisk_payload), encoding="utf-8")
+
+    detected = discover_xaero_waypoints(source)
+    assert len(detected) == 2
+    by_name = {point["name"]: point for point in detected}
+    assert by_name["Home"]["world"] == "server:cracky2.blueface.dev"
+    assert by_name["Home"]["dimension"] == "minecraft:overworld"
+    assert by_name["Nether Portal"]["dimension"] == "minecraft:the_nether"
+    assert by_name["Nether Portal"]["color"] < 0
+
+    destination = tmp_path / "destination"
+    profile = ProfileData(id="converted", name="Crack Attack 2", minecraft_version="26.2", loader="Fabric")
+    monkeypatch.setattr(type(profile), "path", property(lambda self: destination))
+    import_norisk_files({"path": str(source), "norisk_root": str(tmp_path)}, profile, convert_xaero_waypoints=True)
+
+    config = json.loads((destination / "config" / "ezclient.json").read_text(encoding="utf-8"))
+    converted = config["feature_Waypoints"]["waypoints"]
+    assert len(converted) == 2
+    assert {point["name"] for point in converted} == {"Home", "Nether Portal"}
+    assert not (destination / "xaero").exists()
+    assert not (destination / "config" / "xaero").exists()
+    assert not (destination / "mods" / "xaerominimap.jar").exists()
+    assert waypoint_file.read_text(encoding="utf-8") == original
+    assert json.loads(norisk_waypoints.read_text(encoding="utf-8")) == norisk_payload
+    assert xaero_config.read_text(encoding="utf-8") == "unchanged"
 
 
 def test_import_copies_portable_content_but_not_norisk_internals(tmp_path: Path, monkeypatch):
@@ -192,3 +238,80 @@ def test_batch_enrich_mod_metadata(tmp_path: Path, monkeypatch):
     assert profile.mods[1].icon_url == "https://cf.png"
 
 
+
+def test_import_downloads_exact_version_and_preserves_config(tmp_path, monkeypatch):
+    import hashlib
+    from backend.services import norisk_importer as importer
+    source = tmp_path / "source"
+    (source / "config").mkdir(parents=True)
+    config = b'{"custom":true}\r\n'
+    (source / "config" / "settings.json").write_bytes(config)
+    destination = tmp_path / "destination"
+    profile = ProfileData(id="exact", name="Exact", minecraft_version="26.2")
+    monkeypatch.setattr(ProfileData, "path", property(lambda self: destination))
+    monkeypatch.setattr(importer, "_enrich_mod_metadata", lambda *a, **k: None)
+    payload = b"exact pinned artifact"
+    sha = hashlib.sha256(payload).hexdigest()
+    requests = []
+    def get_json(url):
+        requests.append(url)
+        return {"id": "v123", "files": [{"filename": "fabric-api.jar", "url": "https://example.test/exact.jar", "hashes": {"sha256": sha}}]}
+    monkeypatch.setattr(importer, "get_json", get_json)
+    downloads = []
+    def download(url, target, use_cache=True):
+        downloads.append((url, use_cache))
+        target.write_bytes(payload)
+        return True
+    monkeypatch.setattr(importer, "download_file", download)
+    mod = {"source": {"type": "modrinth", "project_id": "P7dR8mSH", "version_id": "v123", "filename": "fabric-api.jar"}}
+    importer.import_norisk_files({"path": str(source), "norisk_root": str(tmp_path), "raw": {"mods": [mod, mod]}}, profile)
+    assert requests == ["https://api.modrinth.com/v2/version/v123"]
+    assert downloads == [("https://example.test/exact.jar", False)]
+    assert len(profile.mods) == 1 and profile.mods[0].pinned
+    assert (destination / "config" / "settings.json").read_bytes() == config
+    assert profile.mods[0].hashes["sha256"] == sha
+
+
+def test_import_deduplicates_different_filenames_by_fabric_id(tmp_path, monkeypatch):
+    import zipfile
+    from backend.services import norisk_importer as importer
+    source = tmp_path / "source"
+    (source / "mods").mkdir(parents=True)
+    for name in ("fabric-api-1.jar", "fabric-api-copy.jar", "fabric-api-third.jar"):
+        with zipfile.ZipFile(source / "mods" / name, "w") as jar:
+            jar.writestr("fabric.mod.json", json.dumps({"id": "fabric-api", "version": "1", "name": "Fabric API"}))
+    destination = tmp_path / "destination"
+    profile = ProfileData(id="dedup", name="Dedup", minecraft_version="26.2")
+    monkeypatch.setattr(ProfileData, "path", property(lambda self: destination))
+    monkeypatch.setattr(importer, "_enrich_mod_metadata", lambda *a, **k: None)
+    importer.import_norisk_files({"path": str(source), "norisk_root": str(tmp_path)}, profile)
+    assert len(profile.mods) == 1
+    assert len(list(profile.mods_path.glob("*.jar"))) == 1
+
+
+def test_pinned_missing_mod_does_not_resolve_latest(tmp_path, monkeypatch):
+    import hashlib
+    from backend.models.types import ModData
+    from backend.services import mod_downloader as downloader
+    from backend.services import norisk_importer as importer
+    profile = ProfileData(id="pinned", name="Pinned", minecraft_version="26.2", profile_type="raw")
+    monkeypatch.setattr(ProfileData, "path", property(lambda self: tmp_path))
+    payload = b"exact pinned bytes"
+    profile.mods = [ModData("project", "test", "Test", "exact", "Latest", "test.jar",
+                           pinned=True, hashes={"sha256": hashlib.sha256(payload).hexdigest()})]
+    calls = []
+    def resolve(*args):
+        calls.append(args)
+        return {"url": "https://example.test/exact.jar"}
+    monkeypatch.setattr(importer, "_resolve_exact_file", resolve)
+    def download(url, target, use_cache=True):
+        assert not use_cache
+        target.write_bytes(payload)
+        return True
+    monkeypatch.setattr(downloader, "download_file", download)
+    class NoLatest:
+        def get_project_versions(self, *a, **k):
+            raise AssertionError("must never resolve latest")
+    assert downloader.sync_profile_mods(profile, service=NoLatest()) == {}
+    assert calls[0][2] == "exact"
+    assert (profile.mods_path / "test.jar").read_bytes() == payload

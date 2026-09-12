@@ -18,6 +18,7 @@ import net.minecraft.resources.Identifier;
 import app.ezclient.gui.ConfigManager;
 import app.ezclient.gui.EzClientScreen;
 import app.ezclient.gui.EzHubScreen;
+import app.ezclient.gui.EzKeyBindings;
 import app.ezclient.gui.EzScreenBridge;
 import app.ezclient.gui.HudEditorScreen;
 import app.ezclient.gui.HudRenderer;
@@ -25,6 +26,7 @@ import app.ezclient.gui.ModuleManager;
 import app.ezclient.cosmetics.CommunityPresence;
 import app.ezclient.cosmetics.CommunityCapeManager;
 import app.ezclient.render.ConnectedGlassModel;
+import net.minecraft.network.chat.Component;
 
 /**
  * EzClient Core Mod
@@ -33,14 +35,15 @@ import app.ezclient.render.ConnectedGlassModel;
  * - First-Launch Performance & PvP Optimization (Fast Graphics, 8 Chunks, No Shadows/Clouds, Biome Blend 0, 120 FPS default)
  */
 public class EzClientMod implements ClientModInitializer {
-    public static final String CLIENT_VERSION = "2.0.1";
-    public static final String CLIENT_TITLE = "EzClient 2.0.1";
+    public static final String CLIENT_VERSION = "2.1.0";
+    public static final String CLIENT_TITLE = "EzClient 2.1.0";
     private static volatile boolean running = true;
     private static Path ezClientDataDir = null;
 
     private static boolean isZooming = false;
     private static boolean lastGuiKeyState = false;
     private static boolean iconApplied = false;
+    private static final Map<String, Boolean> moduleKeyStates = new HashMap<>();
 
     public static boolean isZooming() {
         return isZooming;
@@ -80,6 +83,8 @@ public class EzClientMod implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         ConnectedGlassModel.register();
+        registerBuiltinResourcePacks();
+        app.ezclient.gui.ItemIconHelper.ensureComponentsBound();
         Path dataDir = getEzClientDataDir();
         log("========================================");
         log("EzClient Core Mod v" + CLIENT_VERSION + " initializing...");
@@ -87,12 +92,16 @@ public class EzClientMod implements ClientModInitializer {
         log("========================================");
 
         ConfigManager.load();
+        EzKeyBindings.init();
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STARTED.register(client ->
             client.getSoundManager().addListener(app.ezclient.gui.FeatureModule.get(app.ezclient.gui.SoundEnhancerModule.class)));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            EzKeyBindings.syncFromControls(client);
             if (client.getWindow() != null) {
-                boolean isGuiKeyDown = InputConstants.isKeyDown(client.getWindow(), GLFW.GLFW_KEY_RIGHT_SHIFT);
+                int hubKey = EzKeyBindings.getKeyCode(EzKeyBindings.KEY_HUB);
+                if (hubKey <= 0) hubKey = GLFW.GLFW_KEY_RIGHT_SHIFT;
+                boolean isGuiKeyDown = InputConstants.isKeyDown(client.getWindow(), hubKey);
                 if (isGuiKeyDown && !lastGuiKeyState) {
                     if (EzScreenBridge.current(client) instanceof EzHubScreen || EzScreenBridge.current(client) instanceof HudEditorScreen) {
                         EzScreenBridge.set(client, null);
@@ -102,24 +111,102 @@ public class EzClientMod implements ClientModInitializer {
                 }
                 lastGuiKeyState = isGuiKeyDown;
             }
+
+            if (EzKeyBindings.KEY_HUD_EDITOR != null) {
+                while (EzKeyBindings.KEY_HUD_EDITOR.consumeClick()) {
+                    if (EzScreenBridge.current(client) instanceof HudEditorScreen) {
+                        EzScreenBridge.set(client, null);
+                    } else if (EzScreenBridge.current(client) == null && client.level != null && client.player != null) {
+                        EzScreenBridge.set(client, new HudEditorScreen(null));
+                    }
+                }
+            }
+
+            if (EzKeyBindings.KEY_COPY_COORDINATES != null) {
+                while (EzKeyBindings.KEY_COPY_COORDINATES.consumeClick()) {
+                    if (client.player != null) {
+                        String text = String.format(Locale.ROOT, "X: %.1f Y: %.1f Z: %.1f", client.player.getX(), client.player.getY(), client.player.getZ());
+                        client.keyboardHandler.setClipboard(text);
+                        client.player.sendOverlayMessage(Component.literal("§a[EzClient] Koordinaten kopiert: " + text));
+                    }
+                }
+            }
+
+            if (EzKeyBindings.KEY_FULLBRIGHT != null) {
+                while (EzKeyBindings.KEY_FULLBRIGHT.consumeClick()) {
+                    var fullbright = ModuleManager.getInstance().getFullbrightModule();
+                    if (fullbright != null) {
+                        fullbright.toggle();
+                        ConfigManager.save();
+                        if (client.player != null) {
+                            client.player.sendOverlayMessage(Component.literal("§e[EzClient] Fullbright: " + (fullbright.isEnabled() ? "§aAktiviert" : "§cDeaktiviert")));
+                        }
+                    }
+                }
+            }
+
+            if (EzKeyBindings.KEY_WAYPOINT_MANAGER != null) {
+                while (EzKeyBindings.KEY_WAYPOINT_MANAGER.consumeClick()) {
+                    var waypoints = app.ezclient.gui.FeatureModule.get(app.ezclient.gui.WaypointsModule.class);
+                    if (waypoints != null && client.player != null) {
+                        if (EzScreenBridge.current(client) instanceof app.ezclient.gui.WaypointScreen) {
+                            EzScreenBridge.set(client, null);
+                        } else if (EzScreenBridge.current(client) == null) {
+                            if (app.ezclient.gui.BlockSelectionOverlay.isActive()) {
+                                app.ezclient.gui.BlockSelectionOverlay.cancel(client);
+                            }
+                            EzScreenBridge.set(client, new app.ezclient.gui.WaypointScreen(null, waypoints));
+                        }
+                    }
+                }
+            }
+
+            if (EzKeyBindings.KEY_QUICK_WAYPOINT != null) {
+                while (EzKeyBindings.KEY_QUICK_WAYPOINT.consumeClick()) {
+                    var waypoints = app.ezclient.gui.FeatureModule.get(app.ezclient.gui.WaypointsModule.class);
+                    if (waypoints != null && client.player != null && EzScreenBridge.current(client) == null && !app.ezclient.gui.BlockSelectionOverlay.isActive()) {
+                        waypoints.quick(client);
+                    }
+                }
+            }
+
+            if (EzScreenBridge.current(client) == null && client.player != null && client.getWindow() != null) {
+                for (app.ezclient.gui.Module m : ModuleManager.getInstance().getModules()) {
+                    int k = m.getKeyBind();
+                    if (k != -1 && !(m instanceof app.ezclient.gui.ZoomModule) && !(m instanceof app.ezclient.gui.FreelookModule) && !(m instanceof app.ezclient.gui.WaypointsModule) && !(m instanceof app.ezclient.gui.CoordinatesModule) && !(m instanceof app.ezclient.gui.FullbrightModule)) {
+                        boolean down = isKeyOrMouseDown(client.getWindow(), k);
+                        boolean wasDown = moduleKeyStates.getOrDefault(m.getName(), false);
+                        if (down && !wasDown) {
+                            m.toggle();
+                            ConfigManager.save();
+                            client.player.sendOverlayMessage(Component.literal("§e[EzClient] " + m.getDisplayName() + ": " + (m.isEnabled() ? "§aAktiviert" : "§cDeaktiviert")));
+                        }
+                        moduleKeyStates.put(m.getName(), down);
+                    }
+                }
+            }
             boolean currentlyZooming = ModuleManager.getInstance().getZoomModule().isEnabled() && 
                                        ModuleManager.getInstance().getZoomModule().getKeyBind() != -1 && 
                                        client.getWindow() != null && 
-                                       InputConstants.isKeyDown(client.getWindow(), ModuleManager.getInstance().getZoomModule().getKeyBind());
+                                       isKeyOrMouseDown(client.getWindow(), ModuleManager.getInstance().getZoomModule().getKeyBind());
             if (currentlyZooming && !isZooming) {
                 ModuleManager.getInstance().getZoomModule().resetToDefault();
             }
             isZooming = currentlyZooming;
             
-            // Enforce clean "EzClient" title & icon once upon window initialization
+            // Enforce clean "EzClient" title & icon once upon window initialization, and bring Minecraft to focus
             if (!iconApplied && client.getWindow() != null) {
                 long window = client.getWindow().handle();
-                GLFW.glfwSetWindowTitle(window, CLIENT_TITLE);
-                applyWindowIcon(window);
+                applyEarlyWindowProperties(window);
+                try {
+                    GLFW.glfwFocusWindow(window);
+                    GLFW.glfwRequestWindowAttention(window);
+                } catch (Throwable ignored) {}
                 iconApplied = true;
             }
             
             app.ezclient.gui.KeystrokesModule.updateClicks(client);
+            app.ezclient.gui.BlockSelectionOverlay.onClientTick(client);
             
             for (app.ezclient.gui.Module m : ModuleManager.getInstance().getModules()) {
                 m.onTick();
@@ -154,6 +241,8 @@ public class EzClientMod implements ClientModInitializer {
             if (client.player == null) return;
             app.ezclient.gui.HudModule.beginRenderFrame(System.currentTimeMillis());
             for (var hud : ModuleManager.getInstance().getHudModules()) HudRenderer.draw(graphics, hud, false);
+            app.ezclient.gui.WorldVisuals.renderWaypointsHud(graphics, client);
+            app.ezclient.gui.BlockSelectionOverlay.renderHud(graphics, client);
         });
 
         // 1. Sync & update persistent client config in .ezclient/config/client_settings.json
@@ -316,10 +405,19 @@ public class EzClientMod implements ClientModInitializer {
 
     // startWindowDaemon removed
 
+    public static void applyEarlyWindowProperties(long window) {
+        if (window == 0L) return;
+        try {
+            GLFW.glfwSetWindowTitle(window, CLIENT_TITLE);
+        } catch (Throwable ignored) {}
+        applyWindowIcon(window);
+    }
+
     /**
-     * Creates and loads a vibrant green EzClient icon buffer into GLFW.
+     * Creates and loads multi-resolution EzClient icons (16, 32, 48, 64, 128, 256) into GLFW.
      */
-    private void applyWindowIcon(long window) {
+    public static void applyWindowIcon(long window) {
+        if (window == 0L) return;
         try {
             java.io.InputStream is = EzClientMod.class.getResourceAsStream("/assets/ezclient/icon.png");
             if (is == null) {
@@ -329,34 +427,69 @@ public class EzClientMod implements ClientModInitializer {
             java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(is);
             is.close();
 
-            int width = img.getWidth();
-            int height = img.getHeight();
-            int[] pixelsRaw = img.getRGB(0, 0, width, height, null, 0, width);
-            ByteBuffer pixels = MemoryUtil.memAlloc(width * height * 4);
+            int[] targetSizes = new int[]{16, 32, 48, 64, 128, 256};
+            GLFWImage.Buffer imageBuffer = GLFWImage.malloc(targetSizes.length);
+            java.util.List<ByteBuffer> allocatedBuffers = new java.util.ArrayList<>();
 
-            for (int i = 0; i < pixelsRaw.length; i++) {
-                int pixel = pixelsRaw[i];
-                pixels.put((byte) ((pixel >> 16) & 0xFF)); // R
-                pixels.put((byte) ((pixel >> 8) & 0xFF));  // G
-                pixels.put((byte) (pixel & 0xFF));         // B
-                pixels.put((byte) ((pixel >> 24) & 0xFF)); // A
+            for (int idx = 0; idx < targetSizes.length; idx++) {
+                int size = targetSizes[idx];
+                java.awt.image.BufferedImage scaled = new java.awt.image.BufferedImage(size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                java.awt.Graphics2D g = scaled.createGraphics();
+                g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g.drawImage(img, 0, 0, size, size, null);
+                g.dispose();
+
+                int[] pixelsRaw = scaled.getRGB(0, 0, size, size, null, 0, size);
+                ByteBuffer pixels = MemoryUtil.memAlloc(size * size * 4);
+
+                for (int p : pixelsRaw) {
+                    pixels.put((byte) ((p >> 16) & 0xFF)); // R
+                    pixels.put((byte) ((p >> 8) & 0xFF));  // G
+                    pixels.put((byte) (p & 0xFF));         // B
+                    pixels.put((byte) ((p >> 24) & 0xFF)); // A
+                }
+                pixels.flip();
+                allocatedBuffers.add(pixels);
+
+                imageBuffer.position(idx);
+                imageBuffer.width(size);
+                imageBuffer.height(size);
+                imageBuffer.pixels(pixels);
             }
-            pixels.flip();
-
-            GLFWImage.Buffer imageBuffer = GLFWImage.malloc(1);
             imageBuffer.position(0);
-            imageBuffer.width(width);
-            imageBuffer.height(height);
-            imageBuffer.pixels(pixels);
 
             GLFW.glfwSetWindowIcon(window, imageBuffer);
             imageBuffer.free();
-            MemoryUtil.memFree(pixels);
-            System.out.println("[EzClient] Custom EzClient window icon loaded from assets!");
+            for (ByteBuffer bb : allocatedBuffers) {
+                MemoryUtil.memFree(bb);
+            }
+            System.out.println("[EzClient] Custom multi-resolution EzClient window icons loaded immediately!");
         } catch (Throwable t) {
             System.out.println("[EzClient] Note: Native icon set fallback handled: " + t.getMessage());
         }
     }
 
-    // startNarratorDismissDaemon removed
+    private static void registerBuiltinResourcePacks() {
+        try {
+            net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("ezclient").ifPresent(container -> {
+                net.fabricmc.fabric.api.resource.ResourceManagerHelper.registerBuiltinResourcePack(
+                    Identifier.fromNamespaceAndPath("ezclient", "glowing_ores"),
+                    container,
+                    net.minecraft.network.chat.Component.literal("EzClient Glowing Ores (Border)"),
+                    net.fabricmc.fabric.api.resource.ResourcePackActivationType.DEFAULT_ENABLED
+                );
+            });
+        } catch (Throwable t) {
+            log("Note: Built-in resource pack registration: " + t.getMessage());
+        }
+    }
+
+    public static boolean isKeyOrMouseDown(com.mojang.blaze3d.platform.Window window, int code) {
+        if (window == null || code == -1) return false;
+        if (code <= -100) {
+            int button = -code - 100;
+            return GLFW.glfwGetMouseButton(window.handle(), button) == GLFW.GLFW_PRESS;
+        }
+        return InputConstants.isKeyDown(window, code);
+    }
 }

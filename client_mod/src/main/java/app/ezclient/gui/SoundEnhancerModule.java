@@ -18,13 +18,13 @@ public final class SoundEnhancerModule extends FeatureModule implements SoundEve
     }
     public SoundEnhancerModule() {
         super("Sound Subtitles Enhancer", true, 180);
-        flag("arrows", "Directional arrows", true);
-        option("highlight", "Highlight sound IDs containing", "tnt,anvil,ender_pearl", 0, 0);
-        option("whitelist", "Only sound IDs containing (empty=all)", "", 0, 0);
-        colorOption("highlightColor", "Highlight color", "FFFFAA33");
-        option("rainVolume", "Rain volume", 1.0, 0, 2); option("stepVolume", "Footstep volume", 1.0, 0, 2);
-        option("customSound", "Custom sound ID contains", "", 0, 0); option("customVolume", "Custom sound volume", 1.0, 0, 2);
-        option("duration", "Subtitle seconds", 3.0, 1, 10);
+        flag("Darstellung", "arrows", "Directional arrows", "Zeigt die Richtung der Soundquelle.", true);
+        option("Filter", "highlight", "Highlight sound IDs containing", "Kommagetrennte Soundteile für hervorgehobene Hinweise.", "tnt,anvil,ender_pearl", 0, 0);
+        option("Filter", "whitelist", "Only sound IDs containing (empty=all)", "Beschränkt Hinweise auf passende Sound-IDs.", "", 0, 0);
+        colorOption("Farbe", "highlightColor", "Highlight color", "Farbe wichtiger Soundhinweise.", "FFFFAA33");
+        option("Lautstärke", "rainVolume", "Rain volume", "Lokaler Lautstärkefaktor für Regen.", 1.0, 0, 2); option("Lautstärke", "stepVolume", "Footstep volume", "Lokaler Lautstärkefaktor für Schritte.", 1.0, 0, 2);
+        option("Lautstärke", "customSound", "Custom sound ID contains", "Sound-ID, für die ein eigener Faktor gelten soll.", "", 0, 0); option("Lautstärke", "customVolume", "Custom sound volume", "Lautstärkefaktor für den benutzerdefinierten Sound.", 1.0, 0, 2);
+        option("Darstellung", "duration", "Subtitle seconds", "Sichtbarkeitsdauer eines Soundhinweises.", 3.0, 1, 10);
     }
     private boolean matches(String id, String list) {
         for (String part : list.split(",")) if (!part.isBlank() && id.contains(part.trim().toLowerCase(Locale.ROOT))) return true;

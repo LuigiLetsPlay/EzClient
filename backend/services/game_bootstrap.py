@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import threading
 import time
 import urllib.request
@@ -25,7 +26,7 @@ _DOWNLOAD_LOCKS_GUARD = threading.Lock()
 
 
 def _json(url: str) -> dict:
-    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/2.0.1"})
+    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/2.1.0"})
     with urllib.request.urlopen(request, timeout=30) as response:
         return json.loads(response.read().decode("utf-8"))
 
@@ -55,7 +56,7 @@ def _download_locked(url: str, target: Path, sha1: str = "", expected_size: int 
     temporary = target.with_name(
         f"{target.name}.{os.getpid()}.{threading.get_ident()}.part"
     )
-    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/2.0.1"})
+    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/2.1.0"})
     try:
         with urllib.request.urlopen(request, timeout=60) as response, temporary.open("wb") as output:
             while chunk := response.read(1024 * 256):
@@ -223,6 +224,16 @@ def _download_assets_parallel(
     )
 
 
+def _parse_loader_version(version_str: str) -> tuple[int, ...]:
+    match = re.search(r"fabric-loader-([0-9.]+)", version_str) or re.search(r"([0-9.]+)", version_str)
+    if match:
+        try:
+            return tuple(int(x) for x in match.group(1).split(".") if x.isdigit())
+        except ValueError:
+            pass
+    return (0,)
+
+
 def ensure_game_ready(profile: ProfileData, mc_dir: Path, notify: Callable[[str], None]) -> None:
     """Download Mojang/Fabric files once; no official launcher is involved."""
     version = profile.minecraft_version
@@ -232,8 +243,28 @@ def ensure_game_ready(profile: ProfileData, mc_dir: Path, notify: Callable[[str]
     vanilla_data = json.loads(vanilla_json.read_text(encoding="utf-8")) if has_vanilla else {}
     vanilla_libraries_ready = has_vanilla and _libraries_are_ready(mc_dir, vanilla_data.get("libraries", []))
     loader_name = profile.loader.lower()
-    loader_pattern = f"fabric-loader-*-{version}/*.json" if loader_name == "fabric" else f"{version}-forge-*/*.json"
-    loader_files = list((mc_dir / "versions").glob(loader_pattern)) if loader_name in ("fabric", "forge") else []
+    if loader_name == "fabric":
+        all_loader_files = list((mc_dir / "versions").glob(f"fabric-loader-*-{version}/*.json"))
+        all_loader_files.sort(key=lambda p: _parse_loader_version(p.parent.name), reverse=True)
+        requested = str(getattr(profile, "loader_version", "") or "").strip()
+        if requested:
+            req_tuple = _parse_loader_version(requested)
+            loader_files = [p for p in all_loader_files if _parse_loader_version(p.parent.name) >= req_tuple]
+        elif version.startswith("26."):
+            # 26.x modern Fabric mods (like Kotlin 1.14.1+) require at least Fabric Loader 0.19.5
+            loader_files = [p for p in all_loader_files if _parse_loader_version(p.parent.name) >= (0, 19, 5)]
+        else:
+            loader_files = all_loader_files
+    elif loader_name == "forge":
+        requested = str(getattr(profile, "loader_version", "") or "").strip()
+        if requested:
+            forge_id = requested if requested.startswith(f"{version}-forge-") else f"{version}-forge-{requested}"
+            candidate = mc_dir / "versions" / forge_id / f"{forge_id}.json"
+            loader_files = [candidate] if candidate.is_file() else []
+        else:
+            loader_files = list((mc_dir / "versions").glob(f"{version}-forge-*/*.json"))
+    else:
+        loader_files = []
     has_loader = bool(loader_files)
     loader_libraries_ready = False
     if has_loader:
@@ -292,6 +323,7 @@ def ensure_game_ready(profile: ProfileData, mc_dir: Path, notify: Callable[[str]
         fabric_dir.mkdir(parents=True, exist_ok=True)
         (fabric_dir / f"{fabric_id}.json").write_text(json.dumps(fabric, indent=2), encoding="utf-8")
         _download_libraries(mc_dir, fabric.get("libraries", []), notify, "Fabric-Bibliotheken")
+        profile.loader_version = loader_version
     elif profile.loader.lower() == "forge":
         notify("Installiere Forge und benötigte Bibliotheken …")
         try:
@@ -299,7 +331,12 @@ def ensure_game_ready(profile: ProfileData, mc_dir: Path, notify: Callable[[str]
             from backend.services.java_runtime import install_required_java
             from backend.services.minecraft_versions import required_java
 
-            forge_version = minecraft_launcher_lib.forge.find_forge_version(version)
+            requested = str(getattr(profile, "loader_version", "") or "").strip()
+            if profile.profile_type == "raw" and not requested:
+                raise RuntimeError("Das Modpack nennt keine exakte Forge-Version.")
+            forge_version = (
+                requested if requested.startswith(f"{version}-forge-") else f"{version}-{requested}"
+            ) if requested else minecraft_launcher_lib.forge.find_forge_version(version)
             if not forge_version:
                 raise RuntimeError(f"Für Minecraft {version} ist keine Forge-Version verfügbar.")
             java_bin = install_required_java(mc_dir, required_java(version), notify)

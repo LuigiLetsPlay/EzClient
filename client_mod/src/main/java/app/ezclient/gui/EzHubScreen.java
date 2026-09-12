@@ -3,6 +3,7 @@ package app.ezclient.gui;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -16,12 +17,20 @@ import java.util.List;
  * spacious module cards with toggle dots, and clean bottom action bar.
  */
 public final class EzHubScreen extends Screen {
-    private static final int HUB_WIDTH = 360;
-    private static final int HUB_HEIGHT = 250;
-    private static final int GRID_GAP = 6;
-    private static final int CARD_MIN_WIDTH = 58;
-    private static final int CARD_HEIGHT = 58;
-    private static final int MODULE_ICON_SIZE = 23;
+    private static final int HUB_WIDTH = 300;
+    private static final int HUB_HEIGHT = 210;
+    private static final int SIDEBAR_WIDTH = 60;
+    private static final int GRID_GAP = 5;
+    private static final int CARD_MIN_WIDTH = 44;
+    private static final int CARD_HEIGHT = 32;
+    private static final int MODULE_ICON_SIZE = 12;
+    private static final int SEARCH_WIDTH = 140;
+    private static final int SEARCH_HEIGHT = 13;
+    private static final int HUD_BUTTON_WIDTH = 45;
+    private static final int HUD_BUTTON_HEIGHT = 14;
+    private static final int PILL_WIDTH = 44;
+    private static final int PILL_HEIGHT = 14;
+    private static final int PILL_GAP = 4;
     private static final String[] FILTERS = {"All", "HUD", "Movement", "Render"};
     private static final Identifier EZCLIENT_ICON = Identifier.fromNamespaceAndPath("ezclient", "textures/icons/ezclient.png");
 
@@ -29,6 +38,7 @@ public final class EzHubScreen extends Screen {
     private String selectedFilter = "All";
     private String searchQuery = "";
     private EditBox searchBox;
+    private EzButton overallButton;
     private EzButton hudEditorButton;
 
     private int panelX, panelY;
@@ -44,6 +54,7 @@ public final class EzHubScreen extends Screen {
 
     // Pill button hover tracking
     private int hoveredPillIndex = -1;
+    private Module listeningModule = null;
 
     public EzHubScreen(Screen parent) {
         super(app.ezclient.util.EzI18n.comp("ezclient.hub.title"));
@@ -55,12 +66,12 @@ public final class EzHubScreen extends Screen {
         panelWidth = Math.min(HUB_WIDTH, width - 48);
         panelHeight = Math.min(HUB_HEIGHT, height - 48);
         panelX = (width - panelWidth) / 2;
-        panelY = (height - panelHeight) / 2;
         animProgress = 0.0;
+        panelY = (int) ((height - panelHeight) / 2.0 - 8 * (1.0 - animProgress));
 
         // ── Top Search Box (right-aligned in header, next to close button) ──
-        int searchW = 86;
-        searchBox = new EditBox(font, panelX + panelWidth - searchW - 28, panelY + 9, searchW, 16, Component.literal("Search"));
+        int searchW = Math.min(SEARCH_WIDTH, panelWidth - SIDEBAR_WIDTH - 38);
+        searchBox = new EditBox(font, panelX + panelWidth - searchW - 28, panelY + 11, searchW, SEARCH_HEIGHT, Component.literal("Search"));
         searchBox.setHint(app.ezclient.util.EzI18n.comp("ezclient.hub.search_hint"));
         searchBox.setValue(searchQuery);
         searchBox.setResponder(text -> {
@@ -70,13 +81,22 @@ public final class EzHubScreen extends Screen {
         });
         addRenderableWidget(searchBox);
 
-        // ── Bottom Action Bar: HUD Layout Editor Button ──
-        int hudBtnW = 135;
-        int hudBtnH = 20;
-        hudEditorButton = new EzButton(
-                panelX + panelWidth - hudBtnW - 12, panelY + panelHeight - hudBtnH - 9,
+        // ── Bottom Action Bar: Overall & HUD Layout Editor Buttons ──
+        int hudBtnW = HUD_BUTTON_WIDTH;
+        int hudBtnH = HUD_BUTTON_HEIGHT;
+        int overallBtnY = panelY + panelHeight - (hudBtnH * 2) - 10;
+        overallButton = new EzButton(
+                panelX + (SIDEBAR_WIDTH - hudBtnW) / 2, overallBtnY,
                 hudBtnW, hudBtnH,
-                app.ezclient.util.EzI18n.comp("ezclient.hub.hud_editor_btn"), true,
+                Component.literal("Overall"), true,
+                b -> EzScreenBridge.set(minecraft, new OverallHudSettingsScreen(this))
+        );
+        addRenderableWidget(overallButton);
+
+        hudEditorButton = new EzButton(
+                panelX + (SIDEBAR_WIDTH - hudBtnW) / 2, panelY + panelHeight - hudBtnH - 6,
+                hudBtnW, hudBtnH,
+                Component.literal("HUD Editor"), true,
                 b -> EzScreenBridge.set(minecraft, new HudEditorScreen(this))
         );
         addRenderableWidget(hudEditorButton);
@@ -97,43 +117,57 @@ public final class EzHubScreen extends Screen {
             }
             list.add(m);
         }
+        list.sort((a, b) -> {
+            if (a.isFavorite() != b.isFavorite()) {
+                return a.isFavorite() ? -1 : 1;
+            }
+            return a.getDisplayName().compareToIgnoreCase(b.getDisplayName());
+        });
         return list;
     }
 
     @Override
     public boolean mouseClicked(MouseButtonEvent e, boolean doubleClick) {
+        if (listeningModule != null && e.button() != 0) {
+            EzKeyBindings.applyModuleKeyBind(listeningModule, -100 - e.button());
+            listeningModule = null;
+            return true;
+        }
+
         // ── Close button (top right) ──
         if (e.button() == 0) {
-            int closeX = panelX + panelWidth - 22;
-            int closeY = panelY + 10;
-            if (e.x() >= closeX && e.x() <= closeX + 14 && e.y() >= closeY && e.y() <= closeY + 14) {
+            int closeX = panelX + panelWidth - 19;
+            int closeY = panelY + 11;
+            if (e.x() >= closeX && e.x() <= closeX + 11 && e.y() >= closeY && e.y() <= closeY + 11) {
                 onClose();
                 return true;
             }
         }
 
+
+
         // ── Check category pill button clicks (Row 2 at panelY + 36) ──
         if (e.button() == 0) {
-            int pillY = panelY + 36;
-            int pillH = 16;
-            int pillX = panelX + 12;
+            int pillY = panelY + 37;
+            int pillH = PILL_HEIGHT;
+            int pillX = panelX + 8;
             for (int i = 0; i < FILTERS.length; i++) {
                 String label = app.ezclient.util.EzI18n.get("ezclient.category." + FILTERS[i].toLowerCase(), FILTERS[i]);
-                int pillW = font.width(label) + 10;
+                int pillW = PILL_WIDTH;
                 if (e.x() >= pillX && e.x() <= pillX + pillW && e.y() >= pillY && e.y() <= pillY + pillH) {
                     selectedFilter = FILTERS[i];
                     targetScrollOffset = 0.0;
                     scrollOffset = 0.0;
                     return true;
                 }
-                pillX += pillW + 4;
+                pillY += pillH + PILL_GAP;
             }
         }
 
-        int contentX = panelX + 12;
-        int contentY = panelY + 64;
-        int contentWidth = panelWidth - 24;
-        int contentHeight = panelHeight - 104;
+        int contentX = panelX + SIDEBAR_WIDTH + 8;
+        int contentY = panelY + 32;
+        int contentWidth = panelWidth - SIDEBAR_WIDTH - 16;
+        int contentHeight = panelHeight - 40;
 
         int gap = GRID_GAP;
         int columns = Math.max(1, (contentWidth + gap) / (CARD_MIN_WIDTH + gap));
@@ -167,10 +201,27 @@ public final class EzHubScreen extends Screen {
                     if (cy + cardHeight < contentY || cy > contentY + contentHeight) continue;
 
                     if (e.x() >= cx && e.x() <= cx + cardWidth && e.y() >= cy && e.y() <= cy + cardHeight) {
-                        // Check if left clicked on top-left gear icon
-                        boolean gearHit = e.x() >= cx && e.x() <= cx + 18 && e.y() >= cy && e.y() <= cy + 18;
-                        if (module.hasSettings() && gearHit) {
-                            openModuleSettings(module);
+                        // Check if Shift was held: Shift+Left Click on ANY card toggles hotkey listening!
+                        if (isShiftDown()) {
+                            listeningModule = (listeningModule == module ? null : module);
+                            return true;
+                        }
+
+                        // Check if left clicked on top-right star (Favorite toggle)
+                        boolean starHit = e.x() >= cx + cardWidth - 13 && e.x() <= cx + cardWidth && e.y() >= cy && e.y() <= cy + 13;
+                        if (starHit) {
+                            module.setFavorite(!module.isFavorite());
+                            return true;
+                        }
+
+                        // Check if left clicked on top-left icon (⚙ Settings or ◉ Vorschau)
+                        boolean gearHit = e.x() >= cx && e.x() <= cx + 14 && e.y() >= cy && e.y() <= cy + 14;
+                        if (gearHit) {
+                            if (module.hasSettings()) {
+                                openModuleSettings(module);
+                            } else if (module.hasPreview()) {
+                                EzScreenBridge.set(minecraft, new ModulePreviewScreen(this, module));
+                            }
                             return true;
                         }
 
@@ -182,7 +233,7 @@ public final class EzHubScreen extends Screen {
             }
         }
 
-        // Right click -> Settings
+        // Right click -> Settings or Live Preview
         if (e.button() == 1) {
             if (e.x() >= contentX && e.x() <= contentX + contentWidth && e.y() >= contentY && e.y() <= contentY + contentHeight) {
                 List<Module> filtered = getFilteredModules();
@@ -198,8 +249,31 @@ public final class EzHubScreen extends Screen {
                     if (e.x() >= cx && e.x() <= cx + cardWidth && e.y() >= cy && e.y() <= cy + cardHeight) {
                         if (module.hasSettings()) {
                             openModuleSettings(module);
-                            return true;
+                        } else if (module.hasPreview()) {
+                            EzScreenBridge.set(minecraft, new ModulePreviewScreen(this, module));
                         }
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Middle click -> Toggle quick hotkey assignment directly on module card
+        if (e.button() == 2) {
+            if (e.x() >= contentX && e.x() <= contentX + contentWidth && e.y() >= contentY && e.y() <= contentY + contentHeight) {
+                List<Module> filtered = getFilteredModules();
+                for (int i = 0; i < filtered.size(); i++) {
+                    Module module = filtered.get(i);
+                    int col = i % columns;
+                    int row = i / columns;
+                    int cx = contentX + col * (cardWidth + gap);
+                    int cy = (int) (contentY + row * (cardHeight + gap) - scrollOffset);
+
+                    if (cy + cardHeight < contentY || cy > contentY + contentHeight) continue;
+
+                    if (e.x() >= cx && e.x() <= cx + cardWidth && e.y() >= cy && e.y() <= cy + cardHeight) {
+                        listeningModule = (listeningModule == module ? null : module);
+                        return true;
                     }
                 }
             }
@@ -209,15 +283,29 @@ public final class EzHubScreen extends Screen {
     }
 
     @Override
+    public boolean keyPressed(KeyEvent event) {
+        if (listeningModule != null) {
+            if (event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE || event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE || event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_DELETE) {
+                EzKeyBindings.applyModuleKeyBind(listeningModule, -1);
+            } else {
+                EzKeyBindings.applyModuleKeyBind(listeningModule, event.key());
+            }
+            listeningModule = null;
+            return true;
+        }
+        return super.keyPressed(event);
+    }
+
+    @Override
     public boolean mouseDragged(MouseButtonEvent e, double dx, double dy) {
         if (isDraggingScrollbar && maxScroll > 0) {
-            int contentHeight = panelHeight - 104;
-            int contentWidth = panelWidth - 24;
+            int contentHeight = panelHeight - 40;
+            int contentWidth = panelWidth - SIDEBAR_WIDTH - 16;
             int gap = GRID_GAP;
             int columns = Math.max(1, (contentWidth + gap) / (CARD_MIN_WIDTH + gap));
             int totalRows = (getFilteredModules().size() + columns - 1) / columns;
             int totalHeight = totalRows * (CARD_HEIGHT + gap);
-            int thumbH = Math.max(20, (int) (contentHeight * ((double) contentHeight / totalHeight)));
+            int thumbH = Math.max(15, (int) (contentHeight * ((double) contentHeight / totalHeight)));
             double travel = contentHeight - thumbH;
             if (travel > 0) {
                 double deltaNorm = dy / travel;
@@ -240,7 +328,7 @@ public final class EzHubScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
-        if (maxScroll > 0 && mouseX >= panelX && mouseX <= panelX + panelWidth && mouseY >= panelY + 60 && mouseY <= panelY + panelHeight - 36) {
+        if (maxScroll > 0 && mouseX >= panelX + SIDEBAR_WIDTH && mouseX <= panelX + panelWidth && mouseY >= panelY + 32 && mouseY <= panelY + panelHeight - 8) {
             targetScrollOffset = Math.max(0, Math.min(maxScroll, targetScrollOffset - vertical * 30.0));
             return true;
         }
@@ -250,7 +338,7 @@ public final class EzHubScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         // Keep the world visible with a sleek dark backdrop
-        graphics.fill(0, 0, width, height, 0x26000000);
+        EzUi.backdrop(graphics, width, height);
 
         // Smooth scroll interpolation (Easing)
         scrollOffset += (targetScrollOffset - scrollOffset) * 0.28;
@@ -269,72 +357,66 @@ public final class EzHubScreen extends Screen {
         panelX = targetX;
         panelY = (int) (targetY - 8 * (1.0 - animProgress));
 
-        int closeX = panelX + panelWidth - 22;
-        int searchW = 86;
+        int closeX = panelX + panelWidth - 19;
+        int searchW = Math.min(SEARCH_WIDTH, panelWidth - SIDEBAR_WIDTH - 38);
         searchBox.setWidth(searchW);
-        searchBox.setX(closeX - searchW - 8);
-        searchBox.setY(panelY + 9);
+        searchBox.setHeight(SEARCH_HEIGHT);
+        searchBox.setX(panelX + panelWidth - searchW - 28);
+        searchBox.setY(panelY + 11);
 
-        int hudBtnW = 135;
-        int hudBtnH = 20;
+        int hudBtnW = HUD_BUTTON_WIDTH;
+        int hudBtnH = HUD_BUTTON_HEIGHT;
+        if (overallButton != null) {
+            overallButton.setWidth(hudBtnW);
+            overallButton.setHeight(hudBtnH);
+            overallButton.setX(panelX + (SIDEBAR_WIDTH - hudBtnW) / 2);
+            overallButton.setY(panelY + panelHeight - (hudBtnH * 2) - 10);
+        }
         hudEditorButton.setWidth(hudBtnW);
         hudEditorButton.setHeight(hudBtnH);
-        hudEditorButton.setX(panelX + panelWidth - hudBtnW - 12);
-        hudEditorButton.setY(panelY + panelHeight - hudBtnH - 8);
+        hudEditorButton.setX(panelX + (SIDEBAR_WIDTH - hudBtnW) / 2);
+        hudEditorButton.setY(panelY + panelHeight - hudBtnH - 6);
 
         // Glass Panel Container
         EzUi.panel(graphics, panelX, panelY, panelWidth, panelHeight);
 
-        // ── Row 1: Header (Logo + Title + Version Badge + Search + Close) ──
-        int logoX = panelX + 12;
-        int logoY = panelY + 8;
-        // Icon background circle
-        EzUi.roundedRect(graphics, logoX, logoY, 20, 20, 10, 0xFF14221B);
-        ModuleIconRenderer.drawTexture(graphics, EZCLIENT_ICON, logoX + 2, logoY + 2, 16);
-        // Title
-        graphics.text(font, "EzClient", logoX + 24, logoY + 6, EzUi.TEXT_WHITE);
-
-        // Version badge
-        String version = "v2.0.1";
-        int vBadgeW = font.width(version) + 6;
-        int vBadgeX = logoX + 24 + font.width("EzClient") + 4;
-        EzUi.roundedRect(graphics, vBadgeX, logoY + 4, vBadgeW, 12, 3, 0xFF1A2630);
-        graphics.centeredText(font, Component.literal(version), vBadgeX + vBadgeW / 2, logoY + 6, EzUi.ACCENT_EMERALD);
+        // Compact navigation sidebar; content has no separate topbar or footer.
+        graphics.fill(panelX + SIDEBAR_WIDTH, panelY + 8, panelX + SIDEBAR_WIDTH + 1, panelY + panelHeight - 8, EzUi.BORDER_SUBTLE);
+        int logoX = panelX + 22, logoY = panelY + 11;
+        EzUi.roundedRect(graphics, logoX, logoY, 15, 15, 2, 0xFF15181C);
+        ModuleIconRenderer.drawTexture(graphics, EZCLIENT_ICON, logoX + 1, logoY + 1, 13);
 
         // Close button (top right, minimal X)
-        int closeY = panelY + 10;
-        boolean closeHovered = mouseX >= closeX && mouseX <= closeX + 14 && mouseY >= closeY && mouseY <= closeY + 14;
+        int closeY = panelY + 11;
+        boolean closeHovered = mouseX >= closeX && mouseX <= closeX + 11 && mouseY >= closeY && mouseY <= closeY + 11;
         if (closeHovered) {
-            EzUi.roundedRect(graphics, closeX - 2, closeY - 2, 18, 18, 4, 0xFF2A1520);
+            EzUi.roundedRect(graphics, closeX - 2, closeY - 2, 15, 15, 3, 0xFF2A1520);
         }
-        graphics.centeredText(font, Component.literal("✕"), closeX + 7, closeY + 3, closeHovered ? 0xFFEF4444 : EzUi.TEXT_MUTED);
+        drawScaledCenteredText(graphics, Component.literal("✕"), closeX + 5.5f, closeY + 1.5f, 0.72f,
+                closeHovered ? 0xFFEF4444 : EzUi.TEXT_MUTED);
 
-        // ── Row 2: Category Filter Tabs (Single clean section) ──
-        int pillX = panelX + 12;
-        int pillY = panelY + 34;
-        int pillH = 16;
+        int pillX = panelX + 8;
+        int pillY = panelY + 37;
+        int pillH = PILL_HEIGHT;
         hoveredPillIndex = -1;
         for (int i = 0; i < FILTERS.length; i++) {
             String label = app.ezclient.util.EzI18n.get("ezclient.category." + FILTERS[i].toLowerCase(), FILTERS[i]);
-            int pillW = font.width(label) + 10;
+            int pillW = PILL_WIDTH;
             boolean active = selectedFilter.equals(FILTERS[i]);
             boolean hovered = mouseX >= pillX && mouseX <= pillX + pillW && mouseY >= pillY && mouseY <= pillY + pillH;
             if (hovered) hoveredPillIndex = i;
 
             EzUi.pillButton(graphics, pillX, pillY, pillW, pillH, active, hovered);
             int textColor = active ? EzUi.TEXT_WHITE : (hovered ? EzUi.TEXT_LIGHT : EzUi.TEXT_MUTED);
-            graphics.centeredText(font, Component.literal(label), pillX + pillW / 2, pillY + 4, textColor);
-            pillX += pillW + 4;
+            drawScaledCenteredText(graphics, Component.literal(label), pillX + pillW / 2.0f, pillY + 2.5f, 0.72f, textColor);
+            pillY += pillH + PILL_GAP;
         }
 
-        // Single Separator below filters with generous margin
-        graphics.fill(panelX + 12, panelY + 56, panelX + panelWidth - 12, panelY + 57, EzUi.BORDER_SUBTLE);
-
         // ── Row 3: Module Cards Grid ──
-        int contentX = panelX + 12;
-        int contentY = panelY + 66;
-        int contentWidth = panelWidth - 24;
-        int contentHeight = panelHeight - 106;
+        int contentX = panelX + SIDEBAR_WIDTH + 8;
+        int contentY = panelY + 32;
+        int contentWidth = panelWidth - SIDEBAR_WIDTH - 16;
+        int contentHeight = panelHeight - 40;
 
         int gap = GRID_GAP;
         int columns = Math.max(1, (contentWidth + gap) / (CARD_MIN_WIDTH + gap));
@@ -364,30 +446,38 @@ public final class EzHubScreen extends Screen {
 
             // Compact icon, sized for the five-column module grid.
             ModuleIconRenderer.draw(graphics, module,
-                    cx + (cardWidth - MODULE_ICON_SIZE) / 2, cy + 7, MODULE_ICON_SIZE);
+                    cx + (cardWidth - MODULE_ICON_SIZE) / 2, cy + 5, MODULE_ICON_SIZE);
 
             // Name (scaled down only as much as needed so neighboring cards never overlap).
             String moduleName = module.getDisplayName();
-            float labelScale = Math.min(0.82f,
+            float labelScale = Math.min(0.62f,
                     (cardWidth - 6.0f) / Math.max(1.0f, font.width(moduleName)));
             graphics.pose().pushMatrix();
-            graphics.pose().translate(cx + cardWidth / 2.0f, cy + cardHeight - 17.0f);
+            graphics.pose().translate(cx + cardWidth / 2.0f, cy + cardHeight - 11.0f);
             graphics.pose().scale(labelScale, labelScale);
             graphics.centeredText(font, Component.literal(moduleName), 0, 0, EzUi.TEXT_LIGHT);
             graphics.pose().popMatrix();
 
             // Toggle dot indicator (bottom right)
-            EzUi.toggleDot(graphics, cx + cardWidth - 10, cy + cardHeight - 10, module.isEnabled());
+            drawCompactToggleDot(graphics, cx + cardWidth - 8, cy + cardHeight - 8, module.isEnabled());
 
-            // Settings gear icon (top-left) with clean text brightness highlight (no white box)
-            if (hovered && module.hasSettings()) {
-                boolean gearHovered = mouseX >= cx && mouseX <= cx + 18 && mouseY >= cy && mouseY <= cy + 18;
-                if (gearHovered) {
-                    graphics.text(font, "⚙", cx + 4, cy + 3, 0xFFFFFFFF);
-                } else {
-                    graphics.text(font, "⚙", cx + 4, cy + 3, 0x8094A3B8);
-                }
+            // Favorite star icon (top-right)
+            if (module.isFavorite() || hovered) {
+                boolean starHovered = mouseX >= cx + cardWidth - 13 && mouseX <= cx + cardWidth && mouseY >= cy && mouseY <= cy + 13;
+                String starIcon = module.isFavorite() ? "★" : "☆";
+                int starColor = module.isFavorite() ? 0xFFFFD700 : (starHovered ? 0xFFFFEA79 : 0x8094A3B8);
+                drawScaledText(graphics, starIcon, cx + cardWidth - 10, cy + 2, 0.65f, starColor);
             }
+
+            // Settings gear icon (top-left) or Live Preview eye icon
+            if (module.hasSettings() || module.hasPreview()) {
+                boolean iconHovered = mouseX >= cx && mouseX <= cx + 14 && mouseY >= cy && mouseY <= cy + 14;
+                String icon = module.hasSettings() ? "⚙" : "◉";
+                int iconColor = iconHovered ? 0xFFFFFFFF : (hovered ? 0x8094A3B8 : 0x4094A3B8);
+                drawScaledText(graphics, icon, cx + 3, cy + 2, 0.65f, iconColor);
+            }
+
+
         }
 
         graphics.disableScissor();
@@ -397,42 +487,62 @@ public final class EzHubScreen extends Screen {
             int trackX = panelX + panelWidth - 8;
             int trackY = contentY;
             int trackH = contentHeight;
-            int thumbH = Math.max(20, (int) (trackH * ((double) trackH / totalHeight)));
+            int thumbH = Math.max(15, (int) (trackH * ((double) trackH / totalHeight)));
             int thumbY = trackY + (int) ((scrollOffset / maxScroll) * (trackH - thumbH));
 
             boolean sbHovered = mouseX >= trackX - 2 && mouseX <= trackX + 6 && mouseY >= trackY && mouseY <= trackY + trackH;
             // Track
-            EzUi.roundedRect(graphics, trackX, trackY, 4, trackH, 2, 0x20FFFFFF);
+            EzUi.roundedRect(graphics, trackX, trackY, 3, trackH, 1, 0x20FFFFFF);
             // Thumb
-            EzUi.roundedRect(graphics, trackX, thumbY, 4, thumbH, 2, sbHovered || isDraggingScrollbar ? EzUi.ACCENT_EMERALD_HOVER : EzUi.ACCENT_EMERALD);
+            EzUi.roundedRect(graphics, trackX, thumbY, 3, thumbH, 1, sbHovered || isDraggingScrollbar ? EzUi.ACCENT_EMERALD_HOVER : EzUi.ACCENT_EMERALD);
         }
-
-        // ── Row 4: Bottom Bar ──
-        int bottomBarY = panelY + panelHeight - 34;
-        graphics.fill(panelX + 12, bottomBarY - 2, panelX + panelWidth - 12, bottomBarY - 1, EzUi.BORDER_SUBTLE);
-
-        // Active modules count (left)
-        int activeCount = 0;
-        for (Module m : ModuleManager.getInstance().getModules()) {
-            if (m.isEnabled()) activeCount++;
-        }
-        String activeText = app.ezclient.util.EzI18n.get("ezclient.hub.active_modules", activeCount);
-        int badgeW = font.width(activeText) + 10;
-        EzUi.roundedRect(graphics, panelX + 12, bottomBarY + 3, badgeW, 16, 4, 0xFF14221B);
-        graphics.text(font, activeText, panelX + 17, bottomBarY + 7, EzUi.ACCENT_EMERALD);
 
         // Empty state
         if (filtered.isEmpty()) {
-            graphics.centeredText(font, app.ezclient.util.EzI18n.comp("ezclient.hub.no_modules"),
-                    panelX + panelWidth / 2, panelY + panelHeight / 2 - 10, EzUi.TEXT_MUTED);
+            drawScaledCenteredText(graphics, app.ezclient.util.EzI18n.comp("ezclient.hub.no_modules"),
+                    panelX + panelWidth / 2.0f, panelY + panelHeight / 2.0f - 8, 0.75f, EzUi.TEXT_MUTED);
         }
+
+
 
         super.extractRenderState(graphics, mouseX, mouseY, delta);
     }
 
+    private void drawScaledCenteredText(GuiGraphicsExtractor graphics, Component text,
+                                         float centerX, float y, float scale, int color) {
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(centerX, y);
+        graphics.pose().scale(scale, scale);
+        graphics.centeredText(font, text, 0, 0, color);
+        graphics.pose().popMatrix();
+    }
+
+    private void drawScaledText(GuiGraphicsExtractor graphics, String text,
+                                float x, float y, float scale, int color) {
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(x, y);
+        graphics.pose().scale(scale, scale);
+        graphics.text(font, text, 0, 0, color);
+        graphics.pose().popMatrix();
+    }
+
+    private static void drawCompactToggleDot(GuiGraphicsExtractor graphics, int x, int y, boolean on) {
+        int color = on ? EzUi.ACCENT_EMERALD : 0xFF3A4050;
+        EzUi.roundedRect(graphics, x, y, 5, 5, 2, color);
+        if (on) {
+            EzUi.roundedRect(graphics, x - 1, y - 1, 7, 7, 3, 0x205B8F6A);
+        }
+    }
+
     private void openModuleSettings(Module module) {
         if (minecraft == null) return;
-        if (module instanceof FeatureModule feature) {
+        if (module instanceof CrosshairModule crosshair) {
+            EzScreenBridge.set(minecraft, new CrosshairPaintScreen(this, crosshair));
+        } else if (module instanceof KeystrokesModule ks) {
+            EzScreenBridge.set(minecraft, new KeystrokesSettingsScreen(this, ks));
+        } else if (module instanceof WaypointsModule waypoints) {
+            EzScreenBridge.set(minecraft, new WaypointScreen(this, waypoints));
+        } else if (module instanceof FeatureModule feature) {
             EzScreenBridge.set(minecraft, new FeatureSettingsScreen(this, feature));
         } else if (module instanceof HudModule hud) {
             EzScreenBridge.set(minecraft, new HudSettingsScreen(this, hud));
@@ -446,6 +556,13 @@ public final class EzHubScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    private boolean isShiftDown() {
+        if (minecraft == null || minecraft.getWindow() == null) return false;
+        long handle = minecraft.getWindow().handle();
+        return org.lwjgl.glfw.GLFW.glfwGetKey(handle, org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_SHIFT) == org.lwjgl.glfw.GLFW.GLFW_PRESS
+                || org.lwjgl.glfw.GLFW.glfwGetKey(handle, org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT_SHIFT) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
     }
 
     @Override

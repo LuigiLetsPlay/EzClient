@@ -3,8 +3,13 @@ package app.ezclient.gui;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.Identifier;
 
-/** Live JVM memory indicator with configurable format presets. */
-public final class MemoryModule extends HudModule {
+import java.util.List;
+
+/**
+ * Live JVM memory indicator with configurable format presets,
+ * declarative FeatureModule options, dynamic warning colors, and unified color picker support.
+ */
+public final class MemoryModule extends FeatureModule {
     public enum MemoryFormat {
         USED_MAX("Used/Max"),
         PERCENTAGE("Percent"),
@@ -16,24 +21,67 @@ public final class MemoryModule extends HudModule {
         public String getLabel() { return label; }
     }
 
-    private MemoryFormat memoryFormat = MemoryFormat.USED_MAX;
-    private boolean showPrefix = true;
-
     public MemoryModule() {
-        super("Memory", "Performance", false, 6, 128, "RAM: ", "");
+        super("Memory", true, 128);
+        option("Darstellung", "format", "Format", "Darstellungsformat für den belegten Arbeitsspeicher.",
+                "Used/Max", 0, 0, "Used/Max", "Percent", "Used", "Free");
+        option("Darstellung", "prefix", "Präfix", "Text vor dem angezeigten Speicherwert.", "RAM: ", 0, 0);
+        flag("Darstellung", "colorWarning", "Dynamische Warnfarbe", "Färbt die Anzeige bei hoher Speicherauslastung orange bzw. rot ein.", true);
+        colorOption("Farben", "textColor", "Textfarbe", "Farbe des Anzeigetextes.", "FFFFFFFF");
+        flag("Farben", "chroma", "Chroma-Effekt", "Animiert den Text im flüssigen Regenbogen-Verlauf.", false);
     }
 
-    public MemoryFormat getMemoryFormat() { return memoryFormat; }
+    @Override
+    public boolean hasPreview() {
+        return false;
+    }
+
+    @Override
+    public String getDescription() {
+        return "Zeigt die aktuelle Speicherbelegung des Minecraft-Clients im HUD an.";
+    }
+
+    public MemoryFormat getMemoryFormat() {
+        String fmt = text("format");
+        for (MemoryFormat f : MemoryFormat.values()) {
+            if (f.getLabel().equalsIgnoreCase(fmt) || f.name().equalsIgnoreCase(fmt)) return f;
+        }
+        return MemoryFormat.USED_MAX;
+    }
+
     public void setMemoryFormat(MemoryFormat memoryFormat) {
-        this.memoryFormat = memoryFormat;
-        ConfigManager.save();
+        set("format", memoryFormat != null ? memoryFormat.getLabel() : "Used/Max");
     }
 
-    public boolean isShowPrefix() { return showPrefix; }
+    public boolean isShowPrefix() {
+        return !text("prefix").isEmpty();
+    }
+
     public void setShowPrefix(boolean showPrefix) {
-        this.showPrefix = showPrefix;
-        setPrefix(showPrefix ? "RAM: " : "");
-        ConfigManager.save();
+        set("prefix", showPrefix ? "RAM: " : "");
+    }
+
+    @Override
+    public int color() {
+        return color(0);
+    }
+
+    @Override
+    public int color(long offsetMs) {
+        if (flag("chroma")) {
+            return tint("textColor", true);
+        }
+        if (flag("colorWarning")) {
+            Runtime runtime = Runtime.getRuntime();
+            long total = runtime.totalMemory();
+            long free = runtime.freeMemory();
+            long used = (total - free) / (1024L * 1024L);
+            long max = runtime.maxMemory() / (1024L * 1024L);
+            double ratio = max > 0 ? (double) used / (double) max : 0;
+            if (ratio > 0.85) return 0xFFFF4444; // Warning red
+            if (ratio > 0.70) return 0xFFFFAA00; // Caution orange
+        }
+        return tint("textColor", false);
     }
 
     @Override
@@ -44,7 +92,7 @@ public final class MemoryModule extends HudModule {
         long used = (total - free) / (1024L * 1024L);
         long max = runtime.maxMemory() / (1024L * 1024L);
 
-        return switch (memoryFormat) {
+        return switch (getMemoryFormat()) {
             case USED_MAX -> used + " / " + max + " MB";
             case PERCENTAGE -> {
                 int pct = max > 0 ? (int) ((used * 100) / max) : 0;
@@ -59,22 +107,29 @@ public final class MemoryModule extends HudModule {
     }
 
     @Override
-    public String displayText(Minecraft client) {
-        return (showPrefix ? "RAM: " : "") + value(client);
-    }
-
-    @Override
-    public String displayText(Minecraft client, boolean editor) {
+    public List<String> lines(Minecraft client, boolean editor) {
+        String pfx = text("prefix");
         if (editor) {
-            String val = switch (memoryFormat) {
+            String val = switch (getMemoryFormat()) {
                 case USED_MAX -> "1450 / 4096 MB";
                 case PERCENTAGE -> "35%";
                 case USED_ONLY -> "1450 MB";
                 case FREE -> "2646 MB";
             };
-            return (showPrefix ? "RAM: " : "") + val;
+            return List.of(pfx + val);
         }
-        return displayText(client);
+        return List.of(pfx + value(client));
+    }
+
+    @Override
+    public String displayText(Minecraft client) {
+        return displayText(client, false);
+    }
+
+    @Override
+    public String displayText(Minecraft client, boolean editor) {
+        List<String> rows = lines(client, editor);
+        return rows.isEmpty() ? "" : rows.get(0);
     }
 
     @Override
@@ -82,3 +137,4 @@ public final class MemoryModule extends HudModule {
         return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/memory.png");
     }
 }
+

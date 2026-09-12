@@ -9,7 +9,7 @@ Rectangle {
     border.width: 1
 
     property string statusText: "● Online  ·  Modrinth API Connected"
-    property string launcherStatus: "● Official Launcher Ready"
+    property string launcherStatus: "● Direktstart bereit"
 
     RowLayout {
         anchors.fill: parent
@@ -35,7 +35,7 @@ Rectangle {
         Item { Layout.fillWidth: true }
 
         Text {
-            text: "EzClient v" + (typeof updateController !== "undefined" && updateController ? updateController.currentVersion : "2.0.1")
+            text: "EzClient v" + (typeof updateController !== "undefined" && updateController ? updateController.currentVersion : "2.1.0")
             font.family: EzTheme.fontFamily
             font.pixelSize: 9
             color: EzTheme.textSubtle

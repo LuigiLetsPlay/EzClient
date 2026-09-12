@@ -7,6 +7,10 @@ Item {
     id: root
 
     property bool isInitialized: false
+    // Details deliberately replace the library content instead of consuming the filter column.
+    property bool detailsOpen: false
+    property bool modpackInstalling: false
+    property string modpackInstallStatus: ""
     property var pendingDeleteMod: null
     property var pendingDeleteDeps: []
 
@@ -22,13 +26,28 @@ Item {
 
     property var pendingShaderMod: null
 
+    function openModDetails(modItem) {
+        if (!modItem || !modrinthController) return
+        modrinthController.selectMod(modItem)
+        detailsOpen = true
+    }
+
+    function closeModDetails() {
+        detailsOpen = false
+    }
+
     function triggerInstall(modItem) {
-        if (!modItem) return
+        if (!modItem || !profileController) return
         var pType = modItem.project_type || (modrinthController ? modrinthController.projectType : "mod")
         if (pType === "modpack") {
-            var slug = modItem.slug || modItem.project_id || modItem.id || ""
-            var title = modItem.title || modItem.name || slug
-            profileController.installModpack(slug, title, "")
+            // CurseForge needs its numeric project id; Modrinth accepts this id as well.
+            var projectId = modItem.project_id || modItem.id || modItem.slug || ""
+            var title = modItem.title || modItem.name || projectId
+            var source = modItem.source || (modrinthController ? modrinthController.source : "modrinth")
+            if (source === "all") source = "modrinth"
+            modpackInstalling = true
+            modpackInstallStatus = "Erstelle Profil für „" + title + "“…"
+            profileController.installModpack(projectId, title, source)
             return
         }
         if (pType === "shader" && profileController && !profileController.isIrisInstalled()) {
@@ -52,7 +71,8 @@ Item {
             file,
             modItem.author || "Modrinth",
             modItem.description || "",
-            modItem.icon_url || ""
+            modItem.icon_url || "",
+            modItem.source || (modrinthController ? modrinthController.source : "modrinth")
         )
     }
 
@@ -69,6 +89,8 @@ Item {
                 modrinthController.setMcVersion(actVer)
             }
         }
+        var sideIdx = sideVersionCombo.find(modrinthController.mcVersion)
+        if (sideIdx >= 0) sideVersionCombo.currentIndex = sideIdx
         isInitialized = true
         if (root.curResults.length === 0) {
             modrinthController.search()
@@ -84,6 +106,10 @@ Item {
                 var idx = versionCombo.find(modrinthController.mcVersion)
                 if (idx >= 0 && versionCombo.currentIndex !== idx) {
                     versionCombo.currentIndex = idx
+                }
+                var sideIdx = sideVersionCombo.find(modrinthController.mcVersion)
+                if (sideIdx >= 0 && sideVersionCombo.currentIndex !== sideIdx) {
+                    sideVersionCombo.currentIndex = sideIdx
                 }
             }
         }
@@ -126,6 +152,14 @@ Item {
                 arr.splice(idx, 1)
                 root.pendingInstalls = arr
             }
+        }
+        function onModpackInstallProgress(progress, message) {
+            root.modpackInstalling = true
+            root.modpackInstallStatus = message || "Modpack wird eingerichtet…"
+        }
+        function onModpackInstallFinished(profileId, success, message) {
+            root.modpackInstalling = false
+            root.modpackInstallStatus = success ? "Profil erstellt: " + message : "Profil konnte nicht erstellt werden: " + message
         }
     }
 
@@ -282,7 +316,10 @@ Item {
                                 font: parent.font
                                 color: EzTheme.textSubtle
                                 visible: parent.text === ""
+                                anchors.left: parent.left
+                                anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
+                                elide: Text.ElideRight
                             }
 
                             Timer {
@@ -348,6 +385,7 @@ Item {
                 // Version filter
                 EzComboBox {
                     id: versionCombo
+                    visible: false // The persistent filter column owns these controls.
                     model: modrinthController ? modrinthController.gameVersions : []
                     Layout.preferredWidth: 110
                     Layout.preferredHeight: 32
@@ -362,6 +400,7 @@ Item {
                 // Category filter
                 EzComboBox {
                     id: categoryCombo
+                    visible: false
                     model: ["All", "Optimization", "Utility", "Library", "Adventure", "Decoration", "Technology", "Storage", "Food", "Magic"]
                     Layout.preferredWidth: 120
                     Layout.preferredHeight: 32
@@ -376,6 +415,7 @@ Item {
                 // Sort filter
                 EzComboBox {
                     id: sortCombo
+                    visible: false
                     model: ["relevance", "downloads", "follows", "newest", "updated"]
                     Layout.preferredWidth: 115
                     Layout.preferredHeight: 32
@@ -412,6 +452,7 @@ Item {
             Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                visible: !root.detailsOpen
                 color: EzTheme.bg
                 clip: true
 
@@ -455,6 +496,27 @@ Item {
                         }
                     }
 
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: root.modpackInstallStatus === "" ? 0 : 30
+                        visible: root.modpackInstallStatus !== ""
+                        color: root.modpackInstalling ? EzTheme.surfaceActive : EzTheme.surface2
+                        border.color: root.modpackInstalling ? EzTheme.accent : EzTheme.border
+                        border.width: 1
+
+                        Text {
+                            anchors.fill: parent
+                            anchors.leftMargin: 14
+                            anchors.rightMargin: 14
+                            verticalAlignment: Text.AlignVCenter
+                            text: root.modpackInstallStatus
+                            elide: Text.ElideRight
+                            font.family: EzTheme.fontFamily
+                            font.pixelSize: 10
+                            color: root.modpackInstalling ? EzTheme.accentLight : EzTheme.textSecondary
+                        }
+                    }
+
                     // Empty State
                     ColumnLayout {
                         Layout.fillWidth: true
@@ -493,6 +555,26 @@ Item {
                         clip: true
                         spacing: 1
                         model: root.curResults
+
+                        ScrollBar.vertical: ScrollBar {
+                            id: modrinthScrollBar
+                            policy: ScrollBar.AsNeeded
+                            width: 10
+                            contentItem: Rectangle {
+                                implicitWidth: 6
+                                radius: 3
+                                color: modrinthScrollBar.pressed ? EzTheme.accent : (modrinthScrollBar.hovered ? EzTheme.accentLight : "#4A5568")
+                            }
+                            background: Rectangle {
+                                implicitWidth: 10
+                                color: "#111722"
+                                radius: 4
+                            }
+                        }
+
+                        AutoscrollOverlay {
+                            target: resultsList
+                        }
 
                         onContentYChanged: {
                             if (!root.curLoading && root.curResults.length > 0 && root.curResults.length < root.curTotalHits) {
@@ -582,7 +664,7 @@ Item {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.ArrowCursor
-                                onClicked: modrinthController.selectMod(modelData)
+                                onClicked: root.openModDetails(modelData)
                             }
 
                             RowLayout {
@@ -702,6 +784,7 @@ Item {
                                     Layout.preferredWidth: implicitWidth
                                     Layout.preferredHeight: 30
                                     radius: 6
+                                    clip: true
                                     color: resultItem.isPending ? "#808080" : (resultItem.isInstalled ? "#14281E" : (cInstMouse.containsMouse ? EzTheme.accentHover : EzTheme.accent))
                                     border.color: resultItem.isInstalled && !resultItem.isPending ? EzTheme.accent : "transparent"
                                     border.width: 1
@@ -710,6 +793,9 @@ Item {
                                     Text {
                                         id: cInstText
                                         anchors.centerIn: parent
+                                        width: Math.min(parent.width - 12, implicitWidth)
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
                                         text: resultItem.isPending ? "Lädt…" : (resultItem.isInstalled ? (window.integratedMods && window.integratedMods.indexOf(modelData.slug) !== -1 ? "Integriert" : "Installiert") : ((modelData.project_type || modrinthController.projectType) === "modpack" ? "Profil erstellen" : "Installieren"))
                                         font.family: EzTheme.mcFontFamily
                                         font.pixelSize: 11
@@ -738,13 +824,105 @@ Item {
             Rectangle {
                 Layout.preferredWidth: 1
                 Layout.fillHeight: true
+                visible: !root.detailsOpen
                 color: EzTheme.border
             }
 
             // ══════════════ RIGHT: INSPECTOR PANEL ══════════════
+            // Persistent library filters. Mod details are now a separate view, so this
+            // column never gets replaced while a user is browsing results.
             Rectangle {
-                Layout.preferredWidth: Math.min(420, Math.max(340, Math.floor(root.width * 0.36)))
+                Layout.preferredWidth: Math.min(300, Math.max(240, Math.floor(root.width * 0.25)))
                 Layout.fillHeight: true
+                visible: !root.detailsOpen
+                color: EzTheme.surface
+                border.color: EzTheme.border
+                border.width: 1
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    spacing: 12
+
+                    Text {
+                        text: "FILTER"
+                        font.family: EzTheme.mcFontFamily
+                        font.pixelSize: 13
+                        font.bold: true
+                        color: EzTheme.text
+                    }
+
+                    Text {
+                        text: "Grenze die Erweiterungsbibliothek gezielt ein."
+                        font.family: EzTheme.fontFamily
+                        font.pixelSize: 10
+                        color: EzTheme.textMuted
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+
+                    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: EzTheme.border }
+
+                    Text { text: "Minecraft-Version"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textSecondary }
+                    EzComboBox {
+                        id: sideVersionCombo
+                        model: modrinthController ? modrinthController.gameVersions : []
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 34
+                        onCurrentTextChanged: {
+                            if (root.isInitialized && modrinthController && modrinthController.mcVersion !== currentText) {
+                                modrinthController.setMcVersion(currentText)
+                                modrinthController.search()
+                            }
+                        }
+                    }
+
+                    Text { text: "Kategorie"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textSecondary }
+                    EzComboBox {
+                        model: ["All", "Optimization", "Utility", "Library", "Adventure", "Decoration", "Technology", "Storage", "Food", "Magic"]
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 34
+                        onCurrentTextChanged: {
+                            if (root.isInitialized) {
+                                modrinthController.setCategory(currentText)
+                                modrinthController.search()
+                            }
+                        }
+                    }
+
+                    Text { text: "Sortierung"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textSecondary }
+                    EzComboBox {
+                        model: ["relevance", "downloads", "follows", "newest", "updated"]
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 34
+                        onCurrentTextChanged: {
+                            if (root.isInitialized) {
+                                modrinthController.setSort(currentText)
+                                modrinthController.search()
+                            }
+                        }
+                    }
+
+                    Item { Layout.fillHeight: true }
+
+                    EzButton {
+                        text: "Filter zurücksetzen"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 34
+                        onClicked: {
+                            modrinthController.setCategory("All")
+                            modrinthController.setSort("relevance")
+                            modrinthController.search()
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.preferredWidth: -1
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: root.detailsOpen
                 color: EzTheme.surface
                 clip: true
 
@@ -798,6 +976,14 @@ Item {
                                 anchors.fill: parent
                                 anchors.margins: 14
                                 spacing: 12
+
+                                EzButton {
+                                    text: "‹ Zurück"
+                                    mcFont: true
+                                    Layout.preferredWidth: 92
+                                    Layout.preferredHeight: 32
+                                    onClicked: root.closeModDetails()
+                                }
 
                                 // Icon
                                 Rectangle {
@@ -1148,7 +1334,12 @@ Item {
                                         if (!profileController) return false;
                                         var dummy = profileController.installedMods;
                                         var selSlug = root.selMod ? (root.selMod.project_id || root.selMod.slug || "") : "";
-                                        return profileController.isModInstalled(selSlug, root.selMod ? (root.selMod.title || "") : "");
+                                        return profileController.isModInstalled(
+                                            selSlug,
+                                            root.selMod ? (root.selMod.slug || "") : "",
+                                            root.selMod ? (root.selMod.title || "") : "",
+                                            ""
+                                        );
                                     }
                                     property bool isPending: {
                                         var s = root.selMod ? (root.selMod.project_id || root.selMod.slug || root.selMod.id || "") : ""

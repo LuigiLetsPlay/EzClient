@@ -335,25 +335,27 @@ ApplicationWindow {
         }
         function onLaunchStatusChanged(statusText, isError) {
             if (!isError) {
-                // Open live logs window as early as preparation starts!
-                var isStarting = statusText.indexOf("Vorbereitung") >= 0 ||
-                                 statusText.indexOf("wird vorbereitet") >= 0 ||
-                                 statusText.indexOf("Synchronisiere") >= 0 ||
-                                 statusText.indexOf("Minecraft läuft") >= 0 ||
-                                 statusText.indexOf("Launcher wird gestartet") >= 0 ||
-                                 statusText.indexOf("Spiel gestartet") >= 0 ||
-                                 statusText.indexOf("Starte") >= 0 ||
-                                 statusText.indexOf("gestartet") >= 0
-                if (isStarting) {
-                    if (profileController && profileController.showLiveLogs) {
+                var isPrep = statusText.indexOf("Vorbereitung") >= 0 ||
+                             statusText.indexOf("wird vorbereitet") >= 0 ||
+                             statusText.indexOf("Synchronisiere") >= 0
+                var isRunning = statusText.indexOf("Minecraft läuft") >= 0 ||
+                                statusText.indexOf("Launcher wird gestartet") >= 0 ||
+                                statusText.indexOf("Spiel gestartet") >= 0 ||
+                                statusText.indexOf("Starte") >= 0 ||
+                                statusText.indexOf("gestartet") >= 0
+                if (isPrep) {
+                    if (profileController && profileController.showLiveLogs && !globalLiveLogsWindow.visible) {
                         globalLiveLogsWindow.show()
                         globalLiveLogsWindow.showNormal()
-                        globalLiveLogsWindow.raise()
-                        globalLiveLogsWindow.requestActivate()
-                        if (profileController.closeOnLaunch) {
-                            window.hide()
-                        }
-                    } else if (profileController && profileController.closeOnLaunch) {
+                    }
+                } else if (isRunning) {
+                    if (profileController && profileController.showLiveLogs && !globalLiveLogsWindow.visible) {
+                        globalLiveLogsWindow.show()
+                        globalLiveLogsWindow.showNormal()
+                    }
+                    if (profileController && profileController.closeOnLaunch) {
+                        window.hide()
+                    } else if (profileController && (profileController.minimizeToTray || profileController.minimizeOnLaunch)) {
                         window.showMinimized()
                     }
                 } else if (statusText.indexOf("Spiel beendet") >= 0) {
