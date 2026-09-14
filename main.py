@@ -9,6 +9,21 @@ try:
 except ImportError:
     pyi_splash = None
 
+# Ensure PySide6 and shiboken6 package directories are added to Windows DLL search path
+if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
+    try:
+        import importlib.util
+        spec = importlib.util.find_spec("PySide6")
+        if spec and spec.origin:
+            pyside_pkg = Path(spec.origin).resolve().parent
+            if pyside_pkg.is_dir():
+                os.add_dll_directory(str(pyside_pkg))
+            shiboken_pkg = pyside_pkg.parent / "shiboken6"
+            if shiboken_pkg.is_dir():
+                os.add_dll_directory(str(shiboken_pkg))
+    except Exception:
+        pass
+
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont
 from PySide6.QtCore import QUrl, Qt, QTimer, QSize
