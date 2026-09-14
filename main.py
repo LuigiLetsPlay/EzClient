@@ -9,8 +9,10 @@ try:
 except ImportError:
     pyi_splash = None
 
-# Ensure PySide6, shiboken6, and internal runtime DLL directories are added to Windows DLL search path
-if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
+# Global list to retain os.add_dll_directory references (prevent immediate garbage collection / removal)
+_DLL_DIRECTORIES = []
+
+if sys.platform == "win32":
     # 1. PyInstaller frozen application
     if getattr(sys, "frozen", False):
         base_dirs = [
@@ -24,21 +26,44 @@ if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
                 for sub in ("", "PySide6", "shiboken6"):
                     target = bp / sub if sub else bp
                     if target.is_dir():
-                        try:
-                            os.add_dll_directory(str(target))
-                        except Exception:
-                            pass
-    # 2. Direct Python script execution
+                        if hasattr(os, "add_dll_directory"):
+                            try:
+                                _DLL_DIRECTORIES.append(os.add_dll_directory(str(target)))
+                            except Exception:
+                                pass
+                        os.environ["PATH"] = str(target) + os.pathsep + os.environ.get("PATH", "")
+
+    # 2. Locate PySide6 & shiboken6 and preload core DLLs
     try:
         import importlib.util
         spec = importlib.util.find_spec("PySide6")
         if spec and spec.origin:
             pyside_pkg = Path(spec.origin).resolve().parent
-            if pyside_pkg.is_dir():
-                os.add_dll_directory(str(pyside_pkg))
             shiboken_pkg = pyside_pkg.parent / "shiboken6"
-            if shiboken_pkg.is_dir():
-                os.add_dll_directory(str(shiboken_pkg))
+            for d in (pyside_pkg, shiboken_pkg):
+                if d.is_dir():
+                    if hasattr(os, "add_dll_directory"):
+                        try:
+                            _DLL_DIRECTORIES.append(os.add_dll_directory(str(d)))
+                        except Exception:
+                            pass
+                    os.environ["PATH"] = str(d) + os.pathsep + os.environ.get("PATH", "")
+
+            # Pre-load core DLLs directly from absolute paths in dependency order
+            # This ensures Windows binds to PySide6's own DLLs and not system-wide / outdated DLLs
+            dll_preload_candidates = [
+                shiboken_pkg / "shiboken6.abi3.dll",
+                pyside_pkg / "Qt6Core.dll",
+                pyside_pkg / "Qt6Gui.dll",
+                pyside_pkg / "Qt6Widgets.dll",
+                pyside_pkg / "pyside6.abi3.dll",
+            ]
+            for dll in dll_preload_candidates:
+                if dll.is_file():
+                    try:
+                        ctypes.CDLL(str(dll))
+                    except Exception:
+                        pass
     except Exception:
         pass
 
