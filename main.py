@@ -13,13 +13,36 @@ except ImportError:
 _DLL_DIRECTORIES = []
 
 if sys.platform == "win32":
+    try:
+        # Suppress Windows modal "Entry Point Not Found" / "DLL Not Found" error dialogs during pre-flight checks
+        ctypes.windll.kernel32.SetErrorMode(0x0001 | 0x0002)
+    except Exception:
+        pass
+
     # 1. PyInstaller frozen application
     if getattr(sys, "frozen", False):
         base_dirs = [
             getattr(sys, "_MEIPASS", None),
-            Path(sys.executable).resolve().parent,
             Path(sys.executable).resolve().parent / "_internal",
+            Path(sys.executable).resolve().parent,
         ]
+        # Remove any stray/rogue ICU DLLs in application directory that break Windows Qt dynamic linking
+        for b in base_dirs:
+            if b:
+                bp = Path(b)
+                for rogue_pattern in ("icu*.dll", "icudt*.dll"):
+                    for rogue_file in bp.glob(rogue_pattern):
+                        try:
+                            rogue_file.unlink()
+                        except Exception:
+                            pass
+                    pyside_sub = bp / "PySide6"
+                    if pyside_sub.is_dir():
+                        for rogue_file in pyside_sub.glob(rogue_pattern):
+                            try:
+                                rogue_file.unlink()
+                            except Exception:
+                                pass
         for b in base_dirs:
             if b:
                 bp = Path(b)
@@ -32,6 +55,24 @@ if sys.platform == "win32":
                             except Exception:
                                 pass
                         os.environ["PATH"] = str(target) + os.pathsep + os.environ.get("PATH", "")
+
+        for b in base_dirs:
+            if b:
+                bp = Path(b)
+                candidates = [
+                    bp / "shiboken6" / "shiboken6.abi3.dll",
+                    bp / "shiboken6.abi3.dll",
+                    bp / "PySide6" / "Qt6Core.dll",
+                    bp / "PySide6" / "Qt6Gui.dll",
+                    bp / "PySide6" / "Qt6Widgets.dll",
+                    bp / "PySide6" / "pyside6.abi3.dll",
+                ]
+                for dll in candidates:
+                    if dll.is_file():
+                        try:
+                            ctypes.CDLL(str(dll))
+                        except Exception:
+                            pass
 
     # 2. Locate PySide6 & shiboken6 and preload core DLLs
     try:

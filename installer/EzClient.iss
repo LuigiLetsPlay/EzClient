@@ -44,6 +44,17 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "startmenuicon"; Description: "Startmenü-Verknüpfung erstellen"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce; Languages: german
 Name: "startmenuicon"; Description: "Create Start Menu shortcut"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce; Languages: english
 
+[InstallDelete]
+Type: files; Name: "{app}\_internal\icu*.dll"
+Type: files; Name: "{app}\_internal\icudt*.dll"
+Type: files; Name: "{app}\_internal\icuin*.dll"
+Type: files; Name: "{app}\_internal\PySide6\icu*.dll"
+Type: files; Name: "{app}\_internal\PySide6\icudt*.dll"
+Type: files; Name: "{app}\_internal\PySide6\icuin*.dll"
+Type: files; Name: "{app}\icu*.dll"
+Type: files; Name: "{app}\_internal\backend\assets\EzClient-2.0.*.jar"
+Type: files; Name: "{app}\_internal\backend\assets\EzClient-2.1.*.jar"
+
 [Files]
 Source: "..\dist\EzClient\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 

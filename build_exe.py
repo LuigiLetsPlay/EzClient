@@ -104,6 +104,19 @@ def build_exe():
             if pyside_target.is_dir():
                 shutil.copy2(dll, pyside_target / dll.name)
 
+    # Ensure no stray or rogue ICU DLLs ever get packaged
+    for rogue in runtime_dir.glob("icu*.dll"):
+        try:
+            rogue.unlink()
+        except Exception:
+            pass
+    if pyside_target.is_dir():
+        for rogue in pyside_target.glob("icu*.dll"):
+            try:
+                rogue.unlink()
+            except Exception:
+                pass
+
     if dist_exe.exists():
         try:
             from tools.sign_tool import sign_binary
