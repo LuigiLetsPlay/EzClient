@@ -50,6 +50,7 @@ public final class EzScreenBridge {
     private static boolean isEzClientScreen(Screen screen) {
         return screen instanceof EzClientScreen
                 || screen instanceof EzHubScreen
+                || screen instanceof EzAccountScreen
                 || screen instanceof HudEditorScreen
                 || screen instanceof ScrollingSettingsScreen
                 || screen instanceof ModuleSettingsScreen

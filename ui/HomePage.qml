@@ -503,7 +503,7 @@ Item {
                 ColumnLayout {
                     spacing: -1
                     Text {
-                        text: homeRoot.isLaunching ? "WEITERE INSTANZ" : EzI18n.t("home_play", "SPIELEN")
+                        text: homeRoot.isLaunching ? EzI18n.text("WEITERE INSTANZ") : EzI18n.t("home_play", "SPIELEN")
                         font.family: EzTheme.mcFontFamily
                         font.pixelSize: 19
                         font.bold: true
@@ -700,7 +700,7 @@ Item {
         anchors.right: parent.right
         anchors.rightMargin: 24
         y: Math.max(40, Math.round(parent.height * 0.22))
-        width: isCollapsed ? 38 : 276
+        width: isCollapsed ? 38 : 310
         height: isCollapsed ? 38 : (serverContentCol.implicitHeight + 24)
 
         property bool isAddingServer: false
@@ -737,7 +737,7 @@ Item {
             }
 
             ToolTip.visible: collapsedMouse.containsMouse
-            ToolTip.text: "Server-Schnellstart einblenden"
+            ToolTip.text: EzI18n.text("Server-Schnellstart einblenden")
             ToolTip.delay: 300
 
             MouseArea {
@@ -756,7 +756,7 @@ Item {
             id: expandedCard
             anchors.right: parent.right
             visible: !recentServersWidget.isCollapsed
-            width: 276
+            width: 310
             height: serverContentCol.implicitHeight + 24
             radius: 14
             color: "#E60B0F15"
@@ -823,7 +823,7 @@ Item {
                         }
 
                         ToolTip.visible: plusMouse.containsMouse
-                        ToolTip.text: recentServersWidget.isAddingServer ? "Schließen" : "Server hinzufügen"
+                        ToolTip.text: recentServersWidget.isAddingServer ? EzI18n.text("Schließen") : EzI18n.text("Server hinzufügen")
                         ToolTip.delay: 300
 
                         MouseArea {
@@ -873,7 +873,7 @@ Item {
                         }
 
                         ToolTip.visible: Boolean(refListMouse.containsMouse)
-                        ToolTip.text: "Serverliste, Status & Bilder aktualisieren"
+                        ToolTip.text: EzI18n.text("Serverliste, Status & Bilder aktualisieren")
                         ToolTip.delay: 300
 
                         MouseArea {
@@ -909,7 +909,7 @@ Item {
                         }
 
                         ToolTip.visible: Boolean(sugMouse.containsMouse)
-                        ToolTip.text: parent.suggestedOn ? "Vorgeschlagene Server ausblenden (Rechtsklick: Wiederherstellen)" : "Vorgeschlagene Server einblenden"
+                        ToolTip.text: parent.suggestedOn ? EzI18n.text("Vorgeschlagene Server ausblenden (Rechtsklick: Wiederherstellen)") : EzI18n.text("Vorgeschlagene Server einblenden")
                         ToolTip.delay: 300
 
                         MouseArea {
@@ -952,7 +952,7 @@ Item {
                         }
 
                         ToolTip.visible: Boolean(resetMouse.containsMouse)
-                        ToolTip.text: "Ausgeblendete Vorschläge wiederherstellen"
+                        ToolTip.text: EzI18n.text("Ausgeblendete Vorschläge wiederherstellen")
                         ToolTip.delay: 300
 
                         MouseArea {
@@ -987,7 +987,7 @@ Item {
                         }
 
                         ToolTip.visible: eyeMouse.containsMouse
-                        ToolTip.text: "Schnellstart ausblenden"
+                        ToolTip.text: EzI18n.text("Schnellstart ausblenden")
                         ToolTip.delay: 300
 
                         MouseArea {
@@ -1028,7 +1028,7 @@ Item {
                         spacing: 8
 
                         Text {
-                            text: "SERVER HINZUFÜGEN"
+                            text: EzI18n.text("SERVER HINZUFÜGEN")
                             font.family: EzTheme.mcFontFamily
                             font.pixelSize: 10
                             font.bold: true
@@ -1057,7 +1057,7 @@ Item {
                                 clip: true
 
                                 Text {
-                                    text: "Adresse (z. B. hypixel.net)"
+                                    text: EzI18n.text("Adresse (z. B. hypixel.net)")
                                     font.family: parent.font.family
                                     font.pixelSize: parent.font.pixelSize
                                     color: "#5A6E82"
@@ -1094,7 +1094,7 @@ Item {
                                 clip: true
 
                                 Text {
-                                    text: "Name (optional)"
+                                    text: EzI18n.text("Name (optional)")
                                     font.family: parent.font.family
                                     font.pixelSize: parent.font.pixelSize
                                     color: "#5A6E82"
@@ -1124,7 +1124,7 @@ Item {
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "Abbrechen"
+                                    text: EzI18n.text("Abbrechen")
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 10
                                     color: EzTheme.textMuted
@@ -1153,7 +1153,7 @@ Item {
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "Speichern"
+                                    text: EzI18n.text("Speichern")
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 10
                                     font.bold: true
@@ -1194,6 +1194,7 @@ Item {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 52
                         radius: 10
+                        clip: true
                         readonly property bool cardHovered: Boolean(srvMouse.containsMouse || statusHoverMouse.containsMouse || addCustomMouse.containsMouse || delMouse.containsMouse || upMouse.containsMouse || downMouse.containsMouse || playHoverMouse.containsMouse)
                         color: cardHovered ? "#1A2533" : "#0F1620"
                         border.color: cardHovered ? EzTheme.accent : "#1E2835"
@@ -1241,10 +1242,12 @@ Item {
                             // Server Name & IP
                             ColumnLayout {
                                 Layout.fillWidth: true
+                                Layout.minimumWidth: 0
                                 spacing: 2
 
                                 RowLayout {
                                     Layout.fillWidth: true
+                                    Layout.minimumWidth: 0
                                     spacing: 4
 
                                     Text {
@@ -1255,6 +1258,7 @@ Item {
                                         color: serverRowCard.cardHovered ? EzTheme.accentLight : EzTheme.text
                                         elide: Text.ElideRight
                                         Layout.fillWidth: true
+                                        Layout.minimumWidth: 0
                                     }
 
                                     // Yellow Star for Suggested Servers
@@ -1276,7 +1280,7 @@ Item {
                                         }
 
                                         ToolTip.visible: Boolean(starTipMouse.containsMouse)
-                                        ToolTip.text: "Vorschlag (zuletzt gespielt)"
+                                        ToolTip.text: EzI18n.text("Vorschlag (zuletzt gespielt)")
                                         ToolTip.delay: 300
 
                                         MouseArea {
@@ -1289,6 +1293,7 @@ Item {
 
                                 RowLayout {
                                     Layout.fillWidth: true
+                                    Layout.minimumWidth: 0
                                     spacing: 6
 
                                     Text {
@@ -1298,6 +1303,7 @@ Item {
                                         color: EzTheme.textMuted
                                         elide: Text.ElideRight
                                         Layout.fillWidth: true
+                                        Layout.minimumWidth: 0
                                     }
 
                                     // Online / Player Count Status Badge
@@ -1305,6 +1311,7 @@ Item {
                                         id: statusBadge
                                         Layout.preferredHeight: 16
                                         Layout.preferredWidth: statusRow.implicitWidth + 8
+                                        Layout.maximumWidth: 105
                                         radius: 4
                                         color: {
                                             if (modelData.online === true) return "#10281E"
@@ -1402,7 +1409,7 @@ Item {
                             // Move Up Button (▲) - only for custom servers
                             Rectangle {
                                 id: moveUpBtn
-                                visible: modelData.is_custom === true
+                                visible: modelData.is_custom === true && serverRowCard.cardHovered
                                 Layout.preferredWidth: 18
                                 Layout.preferredHeight: 18
                                 radius: 9
@@ -1411,7 +1418,7 @@ Item {
                                 color: upMouse.containsMouse ? "#2A3644" : "transparent"
                                 border.color: upMouse.containsMouse ? EzTheme.accent : "#222D39"
                                 border.width: 1
-                                opacity: serverRowCard.cardHovered ? (canMoveUp ? 1.0 : 0.3) : 0.0
+                                opacity: canMoveUp ? 1.0 : 0.3
 
                                 Behavior on opacity { NumberAnimation { duration: 120 } }
 
@@ -1423,7 +1430,7 @@ Item {
                                 }
 
                                 ToolTip.visible: Boolean(upMouse.containsMouse && moveUpBtn.canMoveUp)
-                                ToolTip.text: "Nach oben verschieben"
+                                ToolTip.text: EzI18n.text("Nach oben verschieben")
                                 ToolTip.delay: 300
 
                                 MouseArea {
@@ -1442,7 +1449,7 @@ Item {
                             // Move Down Button (▼) - only for custom servers
                             Rectangle {
                                 id: moveDownBtn
-                                visible: modelData.is_custom === true
+                                visible: modelData.is_custom === true && serverRowCard.cardHovered
                                 Layout.preferredWidth: 18
                                 Layout.preferredHeight: 18
                                 radius: 9
@@ -1451,7 +1458,7 @@ Item {
                                 color: downMouse.containsMouse ? "#2A3644" : "transparent"
                                 border.color: downMouse.containsMouse ? EzTheme.accent : "#222D39"
                                 border.width: 1
-                                opacity: serverRowCard.cardHovered ? (canMoveDown ? 1.0 : 0.3) : 0.0
+                                opacity: canMoveDown ? 1.0 : 0.3
 
                                 Behavior on opacity { NumberAnimation { duration: 120 } }
 
@@ -1463,7 +1470,7 @@ Item {
                                 }
 
                                 ToolTip.visible: Boolean(downMouse.containsMouse && moveDownBtn.canMoveDown)
-                                ToolTip.text: "Nach unten verschieben"
+                                ToolTip.text: EzI18n.text("Nach unten verschieben")
                                 ToolTip.delay: 300
 
                                 MouseArea {
@@ -1482,16 +1489,14 @@ Item {
                             // Add to Custom Servers Button (+) - only for suggested servers
                             Rectangle {
                                 id: addCustomBtn
-                                visible: modelData.is_custom !== true
+                                visible: modelData.is_custom !== true && serverRowCard.cardHovered
                                 Layout.preferredWidth: 20
                                 Layout.preferredHeight: 20
                                 radius: 10
                                 color: addCustomMouse.containsMouse ? "#143322" : "transparent"
                                 border.color: addCustomMouse.containsMouse ? "#22C55E" : "transparent"
                                 border.width: 1
-                                opacity: serverRowCard.cardHovered ? 1.0 : 0.0
-
-                                Behavior on opacity { NumberAnimation { duration: 120 } }
+                                opacity: 1.0
 
                                 Image {
                                     anchors.centerIn: parent
@@ -1503,7 +1508,7 @@ Item {
                                 }
 
                                 ToolTip.visible: Boolean(addCustomMouse.containsMouse)
-                                ToolTip.text: "Zu meinen Servern hinzufügen"
+                                ToolTip.text: EzI18n.text("Zu meinen Servern hinzufügen")
                                 ToolTip.delay: 300
 
                                 MouseArea {
@@ -1521,15 +1526,14 @@ Item {
 
                             // Remove / Delete Button (✕)
                             Rectangle {
+                                visible: serverRowCard.cardHovered
                                 Layout.preferredWidth: 20
                                 Layout.preferredHeight: 20
                                 radius: 10
                                 color: delMouse.containsMouse ? "#3D141A" : "transparent"
                                 border.color: delMouse.containsMouse ? "#E53E3E" : "transparent"
                                 border.width: 1
-                                opacity: serverRowCard.cardHovered ? 1.0 : 0.0
-
-                                Behavior on opacity { NumberAnimation { duration: 120 } }
+                                opacity: 1.0
 
                                 Image {
                                     anchors.centerIn: parent
@@ -1541,7 +1545,7 @@ Item {
                                 }
 
                                 ToolTip.visible: Boolean(delMouse.containsMouse)
-                                ToolTip.text: modelData.is_custom ? "Server löschen" : "Vorschlag ausblenden"
+                                ToolTip.text: modelData.is_custom ? EzI18n.text("Server löschen") : EzI18n.text("Vorschlag ausblenden")
                                 ToolTip.delay: 300
 
                                 MouseArea {
@@ -1561,6 +1565,7 @@ Item {
                             Rectangle {
                                 Layout.preferredWidth: 26
                                 Layout.preferredHeight: 26
+                                Layout.alignment: Qt.AlignVCenter
                                 radius: 13
                                 color: (playHoverMouse.containsMouse || serverRowCard.cardHovered) ? EzTheme.accent : "#18212C"
                                 border.color: (playHoverMouse.containsMouse || serverRowCard.cardHovered) ? EzTheme.accentLight : "#253240"
@@ -1577,7 +1582,7 @@ Item {
                                 }
 
                                 ToolTip.visible: Boolean(playHoverMouse.containsMouse)
-                                ToolTip.text: "Sofort beitreten: " + modelData.ip
+                                ToolTip.text: EzI18n.text("Sofort beitreten: ") + modelData.ip
                                 ToolTip.delay: 300
 
                                 MouseArea {
@@ -1625,7 +1630,7 @@ Item {
                         spacing: 8
 
                         Text {
-                            text: "Keine Server vorhanden"
+                            text: EzI18n.text("Keine Server vorhanden")
                             font.family: EzTheme.mcFontFamily
                             font.pixelSize: 11
                             font.bold: true
@@ -1647,7 +1652,7 @@ Item {
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "+ Hinzufügen"
+                                    text: EzI18n.text("+ Hinzufügen")
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 10
                                     font.bold: true
@@ -1673,7 +1678,7 @@ Item {
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "Vorschläge laden"
+                                    text: EzI18n.text("Vorschläge laden")
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 10
                                     color: EzTheme.textMuted

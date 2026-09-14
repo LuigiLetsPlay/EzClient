@@ -27,7 +27,7 @@ public class ModuleSettingsScreen extends ScrollingSettingsScreen {
     }
 
     private AbstractWidget described(AbstractWidget widget, String description) {
-        widget.setTooltip(Tooltip.create(Component.literal(description)));
+        widget.setTooltip(Tooltip.create(Component.literal(app.ezclient.util.EzI18n.text(description))));
         return widget;
     }
 
@@ -82,26 +82,16 @@ public class ModuleSettingsScreen extends ScrollingSettingsScreen {
                 panelX + panelWidth - 26, panelY + 6, 18, 16,
                 Component.literal("✕"), false, ignored -> onClose()
         ));
-        int sidebarY = panelY + 66;
+        int sidebarY = panelY + 102;
         if (module.hasPreview()) {
             addFixedWidget(new EzButton(panelX + 6, sidebarY, SETTINGS_SIDEBAR_WIDTH - 12, 18,
-                    Component.literal("Vorschau"), false, ignored -> EzScreenBridge.set(minecraft, new ModulePreviewScreen(this, module))));
+                    Component.literal(app.ezclient.util.EzI18n.text("Vorschau")), false, ignored -> EzScreenBridge.set(minecraft, new ModulePreviewScreen(this, module))));
             sidebarY += 22;
         }
 
-        String hotkeyLabel;
-        if (isListeningForHotkey) {
-            hotkeyLabel = "Taste: …";
-        } else if (module.getKeyBind() > 0 || module.getKeyBind() <= -100) {
-            hotkeyLabel = "Key: " + EzKeyBindings.getKeyOrMouseName(module.getKeyBind());
-        } else {
-            hotkeyLabel = "Taste: Keine";
-        }
-        addFixedWidget(described(new EzButton(
-                panelX + 6, sidebarY, SETTINGS_SIDEBAR_WIDTH - 12, 18,
-                Component.literal(hotkeyLabel), isListeningForHotkey,
-                b -> { isListeningForHotkey = !isListeningForHotkey; rebuildWidgets(); }
-        ), "Tastenkombination / Hotkey für dieses Modul belegen (ESC zum Löschen)"));
+        addFixedWidget(new EzHotkeyButton(panelX + 6, panelY + 66,
+                SETTINGS_SIDEBAR_WIDTH - 12, module.getKeyBind(), isListeningForHotkey,
+                () -> { isListeningForHotkey = !isListeningForHotkey; rebuildWidgets(); }));
 
         int curY = panelY + 38;
         int fullW = settingsContentWidth(panelWidth);
@@ -156,7 +146,7 @@ public class ModuleSettingsScreen extends ScrollingSettingsScreen {
 
             addRenderableWidget(described(new EzToggleSwitch(
                     col1X, curY, btnW, 16,
-                    Component.literal("Titel"), scoreboard.isShowTitle(),
+                    Component.literal(app.ezclient.util.EzI18n.text("Titel")), scoreboard.isShowTitle(),
                     b -> { scoreboard.setShowTitle(b); ConfigManager.save(); }
             ), scoreboard.getSettingDescription("title")));
             addRenderableWidget(described(new EzToggleSwitch(
@@ -501,7 +491,7 @@ public class ModuleSettingsScreen extends ScrollingSettingsScreen {
         // A module-local reset is shared by every legacy settings panel.
         addFixedWidget(new EzButton(
                 settingsContentLeft(panelX), panelY + panelHeight - 24, 100, 16,
-                Component.literal("Zurücksetzen"), false,
+                Component.literal(app.ezclient.util.EzI18n.text("Zurücksetzen")), false,
                 b -> { resetOpenModule(); rebuildWidgets(); }
         ));
         addFixedWidget(new EzButton(
@@ -516,7 +506,7 @@ public class ModuleSettingsScreen extends ScrollingSettingsScreen {
         EzUi.backdrop(g, width, height);
         EzUi.panel(g, panelX, panelY, panelWidth, panelHeight);
 
-        g.text(font, app.ezclient.util.EzI18n.get("ezclient.module_settings.title", module.getDisplayName()), settingsContentLeft(panelX), panelY + 10, EzUi.TEXT_WHITE);
+        g.text(font, EzUi.fitText(getTitle(), panelWidth - SETTINGS_SIDEBAR_WIDTH - 42), settingsContentLeft(panelX), panelY + 10, EzUi.TEXT_WHITE);
 
         g.fill(settingsContentLeft(panelX), panelY + 28, panelX + panelWidth - 8, panelY + 29, EzUi.BORDER_SUBTLE);
         renderSettingsSidebar(g, panelX, panelY, panelHeight, module.getDisplayName());

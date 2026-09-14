@@ -3,6 +3,8 @@ import sys
 import argparse
 import shutil
 import subprocess
+import json
+import zipfile
 from pathlib import Path
 
 FROZEN_EZCLIENT_VERSION = "2.0.0"
@@ -59,6 +61,11 @@ def build_ezclient_jar(include_frozen: bool = False, frozen_only: bool = False) 
         if not main_jars:
             raise FileNotFoundError(f"No built jar found in {libs_dir}")
         main_jar = max(main_jars, key=lambda jar: jar.stat().st_mtime)
+        with zipfile.ZipFile(main_jar) as archive:
+            metadata = json.loads(archive.read("fabric.mod.json"))
+        declared_target = metadata.get("depends", {}).get("minecraft", "")
+        if metadata.get("version") != target_version or declared_target not in (target, "~" + target, "=" + target):
+            raise RuntimeError(f"Artifact metadata mismatch for {target}: {metadata.get('version')} / {declared_target}")
         output = assets_out / f"EzClient-{target_version}+{target}.jar"
         shutil.copy2(main_jar, output)
         outputs[target] = output

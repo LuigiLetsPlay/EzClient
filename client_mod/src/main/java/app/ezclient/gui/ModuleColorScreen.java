@@ -62,7 +62,7 @@ public final class ModuleColorScreen extends Screen {
         int footerY = panelY + panelHeight - 25, half = (contentWidth - 6) / 2;
         addRenderableWidget(new EzButton(fieldX, footerY, half, 18, Component.literal("Übernehmen"), true,
             button -> { setter.accept(color); onClose(); }));
-        addRenderableWidget(new EzButton(fieldX + half + 6, footerY, half, 18, Component.literal("Abbrechen"), false,
+        addRenderableWidget(new EzButton(fieldX + half + 6, footerY, half, 18, Component.literal(app.ezclient.util.EzI18n.text("Abbrechen")), false,
             button -> onClose()));
     }
 
@@ -202,7 +202,7 @@ public final class ModuleColorScreen extends Screen {
         EzUi.roundedRect(g, logoX, logoY, 20, 20, 3, 0xFF15181C);
         ModuleIconRenderer.drawTexture(g, ScrollingSettingsScreen.SETTINGS_LOGO, logoX + 2, logoY + 2, 16);
         EzUi.roundedRect(g, panelX + 6, panelY + 43, sidebar - 12, 18, 2, EzUi.BG_CARD_ACTIVE);
-        g.centeredText(font, Component.literal("Farbe"), panelX + sidebar / 2, panelY + 48, EzUi.TEXT_LIGHT);
+        g.centeredText(font, Component.literal(app.ezclient.util.EzI18n.text("Farbe")), panelX + sidebar / 2, panelY + 48, EzUi.TEXT_LIGHT);
     }
     @Override public void removed() { EzCursor.setPointer(false); super.removed(); }
     @Override public void onClose() { EzScreenBridge.set(minecraft, parent); }

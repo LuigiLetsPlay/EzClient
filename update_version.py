@@ -18,6 +18,15 @@ REPO_ROOT = Path(__file__).resolve().parent
 
 RELATIVE_FILES = [
     "README.md",
+    "PROJECT_GUIDE.md",
+    "file_version_info.txt",
+    "build_exe.bat",
+    "server.py",
+    "server/server.py",
+    "client_detector_plugin/pom.xml",
+    "client_detector_plugin/src/main/resources/plugin.yml",
+    "website/package.json",
+    "website/package-lock.json",
     # Java Client Mod
     "client_mod/src/main/java/app/ezclient/EzClientMod.java",
     "client_mod/src/main/java/app/ezclient/gui/EzHubScreen.java",
@@ -83,6 +92,10 @@ def update_version(old_ver: str, new_ver: str) -> None:
 
         try:
             content = target_path.read_text(encoding="utf-8")
+            if rel_path == "file_version_info.txt":
+                version_parts = new_ver.split("-", 1)[0].split("+", 1)[0].split(".")
+                numeric = ", ".join(version_parts + ["0"])
+                content = re.sub(r"(filevers|prodvers)=\([^)]*\)", lambda m: m[1] + "=(" + numeric + ")", content)
             if old_ver in content:
                 new_content = content.replace(old_ver, new_ver)
                 target_path.write_text(new_content, encoding="utf-8")

@@ -441,7 +441,7 @@ Rectangle {
                 spacing: 6
                 Image { source: "icons/zap.svg"; width: 12; height: 12; fillMode: Image.PreserveAspectFit }
                 Text {
-                    text: "Update v" + (profileController ? profileController.ezClientLatestVersion : "2.1.0")
+                    text: "Update v" + (profileController ? profileController.ezClientLatestVersion : "2.2.0")
                     font.family: EzTheme.mcFontFamily
                     font.pixelSize: 10
                     font.bold: true
@@ -529,7 +529,7 @@ Rectangle {
 
             ToolTip.visible: accMouse.containsMouse && root.width < 1100 && !accPopup.opened
             ToolTip.delay: 350
-            ToolTip.text: "Konto · " + root.accountUser
+            ToolTip.text: EzI18n.text("Konto · ") + root.accountUser
 
             // Account Management Popup
             Popup {
@@ -619,7 +619,7 @@ Rectangle {
                                 ColumnLayout {
                                     Layout.fillWidth: true; spacing: 0
                                     Text { text: modelData.username; color: EzTheme.text; font.pixelSize: 11; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
-                                    Text { text: modelData.active ? "Aktiv" : "Zum Wechseln anklicken"; color: modelData.active ? EzTheme.accentLight : EzTheme.textMuted; font.pixelSize: 9 }
+                                    Text { text: modelData.active ? EzI18n.text("Aktiv") : EzI18n.text("Zum Wechseln anklicken"); color: modelData.active ? EzTheme.accentLight : EzTheme.textMuted; font.pixelSize: 9 }
                                 }
                                 Rectangle {
                                     width: 26; height: 26; radius: 6
@@ -653,7 +653,7 @@ Rectangle {
                             spacing: 8
                             Image { source: "icons/user.svg"; width: 14; height: 14; fillMode: Image.PreserveAspectFit }
                             Text {
-                                text: "+  Account hinzufügen"
+                                text: EzI18n.text("+  Account hinzufügen")
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 12
                                 font.bold: true
@@ -689,7 +689,7 @@ Rectangle {
                             spacing: 8
                             Image { source: "icons/user.svg"; width: 14; height: 14; fillMode: Image.PreserveAspectFit }
                             Text {
-                                text: "Skin ändern (Mojang API)"
+                                text: EzI18n.text("Skin ändern (Mojang API)")
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 11
                                 font.bold: true

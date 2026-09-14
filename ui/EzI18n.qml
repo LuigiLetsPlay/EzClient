@@ -1,4 +1,5 @@
 import QtQuick 2.15
+import "DisplayText.js" as DisplayText
 
 pragma Singleton
 
@@ -441,8 +442,12 @@ QtObject {
             return translations[lang][key]
         }
         if (translations["de"] && translations["de"][key] !== undefined) {
-            return translations["de"][key]
+            return text(translations["de"][key])
         }
-        return fallback || key
+        return text(fallback || key)
+    }
+
+    function text(value) {
+        return DisplayText.text(value, currentLanguage || "de")
     }
 }

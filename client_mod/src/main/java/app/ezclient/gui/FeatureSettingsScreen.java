@@ -36,14 +36,14 @@ public final class FeatureSettingsScreen extends ScrollingSettingsScreen {
     @Override protected int scrollBottom() { return panelY + panelHeight - 32; }
 
     public FeatureSettingsScreen(Screen parent, FeatureModule module) {
-        super(Component.literal(module.getName() + " " + app.ezclient.util.EzI18n.get("ezclient.module_settings.title").replace("%s ", "").trim()));
+        super(Component.literal(module.getDisplayName() + " " + app.ezclient.util.EzI18n.get("ezclient.module_settings.title").replace("%s ", "").trim()));
         this.parent = parent;
         this.module = module;
     }
 
     private <T extends AbstractWidget> T described(T widget, String description) {
         if (description != null && !description.isBlank()) {
-            widget.setTooltip(Tooltip.create(Component.literal(description)));
+            widget.setTooltip(Tooltip.create(Component.literal(app.ezclient.util.EzI18n.text(description))));
         }
         return widget;
     }
@@ -77,35 +77,25 @@ public final class FeatureSettingsScreen extends ScrollingSettingsScreen {
         ), "Modul aktivieren / deaktivieren"));
 
         // Fixed sidebar preview button if module has live preview
-        int sidebarY = panelY + 66;
+        int sidebarY = panelY + 102;
         if (module.hasPreview()) {
             addFixedWidget(new EzButton(
                     panelX + 6, sidebarY, SETTINGS_SIDEBAR_WIDTH - 12, 18,
-                    Component.literal("Vorschau"), false,
+                    Component.literal(app.ezclient.util.EzI18n.text("Vorschau")), false,
                     ignored -> EzScreenBridge.set(minecraft, new ModulePreviewScreen(this, module))
             ));
             sidebarY += 22;
         }
 
         // Fixed sidebar Hotkey button
-        String hotkeyLabel;
-        if (isListeningForHotkey) {
-            hotkeyLabel = "Taste: …";
-        } else if (module.getKeyBind() > 0 || module.getKeyBind() <= -100) {
-            hotkeyLabel = "Key: " + EzKeyBindings.getKeyOrMouseName(module.getKeyBind());
-        } else {
-            hotkeyLabel = "Taste: Keine";
-        }
-        addFixedWidget(described(new EzButton(
-                panelX + 6, sidebarY, SETTINGS_SIDEBAR_WIDTH - 12, 18,
-                Component.literal(hotkeyLabel), isListeningForHotkey,
-                b -> { isListeningForHotkey = !isListeningForHotkey; rebuildWidgets(); }
-        ), "Tastenkombination / Hotkey für dieses Modul belegen (ESC zum Löschen)"));
+        addFixedWidget(new EzHotkeyButton(panelX + 6, panelY + 66,
+                SETTINGS_SIDEBAR_WIDTH - 12, module.getKeyBind(), isListeningForHotkey,
+                () -> { isListeningForHotkey = !isListeningForHotkey; rebuildWidgets(); }));
 
         // Fixed bottom footer buttons
         addFixedWidget(new EzButton(
                 settingsContentLeft(panelX), panelY + panelHeight - 24, 100, 16,
-                Component.literal("Zurücksetzen"), false,
+                Component.literal(app.ezclient.util.EzI18n.text("Zurücksetzen")), false,
                 b -> { resetOpenModule(); rebuildWidgets(); }
         ));
         addFixedWidget(new EzButton(
@@ -124,37 +114,44 @@ public final class FeatureSettingsScreen extends ScrollingSettingsScreen {
         if (module instanceof HitboxModule hitbox) {
             addRenderableWidget(described(new EzButton(
                     col1X, curY, fullW, 18,
-                    Component.literal("Entity-Regeln konfigurieren …"), false,
+                    Component.literal(app.ezclient.util.EzI18n.text("Entity-Regeln konfigurieren …")), false,
                     b -> EzScreenBridge.set(minecraft, new EntityTypeSettingsScreen(this, hitbox))
             ), "Öffnet detaillierte Hitbox-Regeln für alle Entity-Typen"));
             curY += 22;
         } else if (module instanceof BlockOverlayModule blockOverlay) {
             addRenderableWidget(described(new EzButton(
                     col1X, curY, fullW, 18,
-                    Component.literal("Block-Regeln konfigurieren …"), false,
+                    Component.literal(app.ezclient.util.EzI18n.text("Block-Regeln konfigurieren …")), false,
                     b -> EzScreenBridge.set(minecraft, new BlockSettingsScreen(this, blockOverlay))
             ), "Öffnet individuelle Kontur- und Füllregeln pro Block"));
             curY += 22;
         } else if (module instanceof DamageTintModule damageTint) {
             addRenderableWidget(described(new EzButton(
                     col1X, curY, fullW, 18,
-                    Component.literal("Entity-Regeln konfigurieren …"), false,
+                    Component.literal(app.ezclient.util.EzI18n.text("Entity-Regeln konfigurieren …")), false,
                     b -> EzScreenBridge.set(minecraft, new DamageTintEntityScreen(this, damageTint))
             ), "Öffnet individuelle Schadensfarben pro Entity-Typ"));
             curY += 22;
         } else if (module instanceof WaypointsModule waypoints) {
             addRenderableWidget(described(new EzButton(
                     col1X, curY, fullW, 18,
-                    Component.literal("Waypoint Manager öffnen …"), false,
+                    Component.literal(app.ezclient.util.EzI18n.text("Waypoint Manager öffnen …")), false,
                     b -> EzScreenBridge.set(minecraft, new WaypointScreen(this, waypoints))
             ), "Wegpunkte verwalten, bearbeiten und teleportieren"));
             curY += 22;
         } else if (module instanceof ParticleCustomizerModule particles) {
             addRenderableWidget(described(new EzButton(
                     col1X, curY, fullW, 18,
-                    Component.literal("Partikel-Typen verwalten …"), false,
+                    Component.literal(app.ezclient.util.EzI18n.text("Partikel-Typen verwalten …")), false,
                     b -> EzScreenBridge.set(minecraft, new ParticleTypesScreen(this, particles))
             ), "Öffnet eine durchsuchbare Liste aller Minecraft-Partikeltypen"));
+            curY += 22;
+        } else if (module instanceof ItemModelModule itemModel) {
+            addRenderableWidget(described(new EzButton(
+                    col1X, curY, fullW, 18,
+                    Component.literal(app.ezclient.util.EzI18n.text("Item-Modelle konfigurieren …")), false,
+                    b -> EzScreenBridge.set(minecraft, new ItemModelScreen(this, itemModel))
+            ), "Position, Drehung und Größe pro Item für First Person, Boden und GUI einstellen"));
             curY += 22;
         }
 
@@ -167,7 +164,7 @@ public final class FeatureSettingsScreen extends ScrollingSettingsScreen {
             if (catOptions.isEmpty()) continue;
 
             // Category Header with line
-            addRenderableWidget(new CategoryHeader(col1X, curY, fullW, 14, Component.literal(cat.toUpperCase(Locale.ROOT))));
+            addRenderableWidget(new CategoryHeader(col1X, curY, fullW, 14, Component.literal(app.ezclient.util.EzI18n.text(cat).toUpperCase(Locale.ROOT))));
             curY += 16;
 
             int col = 0;
@@ -258,7 +255,7 @@ public final class FeatureSettingsScreen extends ScrollingSettingsScreen {
 
     private AbstractWidget createChoiceButton(int x, int y, int width, FeatureModule.Option option) {
         String current = module.text(option.key());
-        String label = "‹ " + option.label() + ": " + current + " ›";
+        String label = "‹ " + option.label() + ": " + app.ezclient.util.EzI18n.text(current) + " ›";
         EzButton btn = new EzButton(x, y, width, 16, Component.literal(label), true, b -> {
             int idx = Arrays.asList(option.choices()).indexOf(module.text(option.key()));
             if (idx < 0) idx = 0;
@@ -281,10 +278,10 @@ public final class FeatureSettingsScreen extends ScrollingSettingsScreen {
         double max = option.max();
         double val = module.number(option.key());
         double norm = max > min ? (val - min) / (max - min) : 0;
-        boolean isInt = (min % 1 == 0) && (max % 1 == 0) && (max - min >= 4);
+        boolean isInt = option.initial() instanceof Integer || option.initial() instanceof Long;
         return new EzSlider(
                 x, y, width, 18, norm,
-                v -> module.set(option, min + v * (max - min)),
+                v -> module.setTransient(option, min + v * (max - min)),
                 v -> {
                     double currentVal = min + v * (max - min);
                     String formatted = isInt
@@ -333,10 +330,10 @@ public final class FeatureSettingsScreen extends ScrollingSettingsScreen {
         EzUi.backdrop(g, width, height);
         EzUi.panel(g, panelX, panelY, panelWidth, panelHeight);
 
-        g.text(font, Component.literal(module.getName() + " " + app.ezclient.util.EzI18n.get("ezclient.module_settings.title").replace("%s ", "").trim()), settingsContentLeft(panelX), panelY + 10, EzUi.TEXT_WHITE);
+        g.text(font, EzUi.fitText(getTitle(), panelWidth - SETTINGS_SIDEBAR_WIDTH - 70), settingsContentLeft(panelX), panelY + 10, EzUi.TEXT_WHITE);
 
         g.fill(settingsContentLeft(panelX), panelY + 28, panelX + panelWidth - 8, panelY + 29, EzUi.BORDER_SUBTLE);
-        renderSettingsSidebar(g, panelX, panelY, panelHeight, module.getName());
+        renderSettingsSidebar(g, panelX, panelY, panelHeight, module.getDisplayName());
 
         super.extractSettings(g, mx, my, d);
     }
@@ -362,7 +359,7 @@ public final class FeatureSettingsScreen extends ScrollingSettingsScreen {
         @Override
         public void extractWidgetRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
             var font = Minecraft.getInstance().font;
-            Component message = getMessage();
+            Component message = EzUi.fitText(getMessage(), getWidth());
             g.text(font, message, getX(), getY() + (getHeight() - 8) / 2, EzUi.TEXT_MUTED);
             int textW = font.width(message);
             int lineStartX = getX() + textW + 6;

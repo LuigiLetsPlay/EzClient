@@ -83,14 +83,9 @@ public abstract class ScrollingSettingsScreen extends Screen {
         ModuleIconRenderer.drawTexture(g, SETTINGS_LOGO, logoX + 2, logoY + 2, 16);
         if (section != null && !section.isBlank()) {
             EzUi.roundedRect(g, panelX + 6, panelY + 43, sbWidth - 12, 18, 2, EzUi.BG_CARD_ACTIVE);
-            g.centeredText(font, Component.literal(shorten(section, 10)), panelX + sbWidth / 2,
+            g.centeredText(font, EzUi.fitText(Component.literal(app.ezclient.util.EzI18n.text(section)), sbWidth - 20), panelX + sbWidth / 2,
                     panelY + 48, EzUi.TEXT_LIGHT);
         }
-    }
-
-    private static String shorten(String value, int max) {
-        if (value == null || value.length() <= max) return value == null ? "Modul" : value;
-        return value.substring(0, Math.max(1, max - 1)) + "…";
     }
 
     protected final <T extends AbstractWidget> T addFixedWidget(T widget) {

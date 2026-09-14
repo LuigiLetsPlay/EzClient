@@ -21,7 +21,7 @@ public final class ModulePreviewScreen extends Screen {
     private final Module module;
 
     public ModulePreviewScreen(Screen parent, Module module) {
-        super(Component.literal("Live-Vorschau"));
+        super(Component.literal(app.ezclient.util.EzI18n.text("Live-Vorschau")));
         this.parent = parent;
         this.module = module;
     }
@@ -705,13 +705,13 @@ public final class ModulePreviewScreen extends Screen {
         EzUi.roundedRect(g, listX, listY, listW, 18, 3, 0x1AFFFFFF);
         g.outline(listX, listY, listW, 18, EzUi.BORDER_SUBTLE);
         g.text(font, Component.literal("› Schritte (Gras)"), listX + 8, listY + 5, 0xFFFFFFFF);
-        g.text(font, Component.literal("Rechts"), listX + listW - 45, listY + 5, EzUi.TEXT_MUTED);
+        g.text(font, Component.literal(app.ezclient.util.EzI18n.text("Rechts")), listX + listW - 45, listY + 5, EzUi.TEXT_MUTED);
 
         listY += 22;
         EzUi.roundedRect(g, listX, listY, listW, 18, 3, 0x1AFFFFFF);
         g.outline(listX, listY, listW, 18, EzUi.BORDER_SUBTLE);
         g.text(font, Component.literal("‹ Truhe öffnen"), listX + 8, listY + 5, 0xFFFFFFFF);
-        g.text(font, Component.literal("Links"), listX + listW - 38, listY + 5, EzUi.TEXT_MUTED);
+        g.text(font, Component.literal(app.ezclient.util.EzI18n.text("Links")), listX + listW - 38, listY + 5, EzUi.TEXT_MUTED);
 
         String row1 = "Richtungspfeile: " + (sound.flag("arrows") ? "Aktiviert" : "Aus")
                 + "  ·  Dauer: " + String.format(Locale.ROOT, "%.1fs", sound.number("duration"));
@@ -877,7 +877,7 @@ public final class ModulePreviewScreen extends Screen {
         String info = "Faktor: " + String.format(Locale.ROOT, "%.1fx", zoom.getZoomLevel())
                 + "  ·  Sanfter Zoom: " + (zoom.isSmoothZoom() ? "An" : "Aus");
         g.centeredText(font, Component.literal(info), cardX + cardW / 2, cardY + 104, EzUi.TEXT_WHITE);
-        g.centeredText(font, Component.literal("Maus-Skalierung: " + (zoom.isMouseSensitivityScaling() ? "Aktiv" : "Inaktiv")), cardX + cardW / 2, cardY + 118, EzUi.TEXT_MUTED);
+        g.centeredText(font, Component.literal("Maus-Skalierung: " + (zoom.isMouseSensitivityScaling() ? app.ezclient.util.EzI18n.text("Aktiv") : "Inaktiv")), cardX + cardW / 2, cardY + 118, EzUi.TEXT_MUTED);
         g.centeredText(font, Component.literal("Erlaubt stufenlose Vergrößerung per Zoom-Taste"), cardX + cardW / 2, cardY + 130, EzUi.TEXT_DIM);
     }
 

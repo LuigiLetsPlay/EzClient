@@ -336,7 +336,7 @@ class ProfileStore:
             mc_ver = str(raw.get("minecraft_version", ""))
             is_active_26 = mc_ver.startswith("26.")
             loader_l = str(raw.get("loader", "")).lower()
-            if profile_type not in {"ezclient", "raw"}:
+            if profile_type not in {"ezclient", "performance", "raw"}:
                 originally_managed = bool({"ezclient", "ezclient-core"} & integrated)
                 had_managed_stack = any(
                     str(item.get("slug", "")).lower() in {"sodium", "lithium", "iris"}
@@ -362,8 +362,10 @@ class ProfileStore:
                     raw["profile_type"] = "ezclient"
                     needs_save = True
 
-            if profile_type == "ezclient":
+            if profile_type in {"ezclient", "performance"}:
                 expected_templates = performance_mods_for_version(str(raw.get("minecraft_version", "")))
+                if profile_type == "performance":
+                    expected_templates = [mod for mod in expected_templates if mod.slug != "ezclient"]
                 expected_slugs = {mod.slug.lower() for mod in expected_templates}
                 old_managed = {str(value).lower() for value in raw.get("managed_core_mods", [])}
                 incompatible = old_managed - expected_slugs

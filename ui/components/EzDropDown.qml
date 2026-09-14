@@ -162,11 +162,12 @@ Item {
                         font.bold: index === dd.currentIndex
                         color: index === dd.currentIndex ? EzTheme.accentLight : (optMouse.containsMouse ? EzTheme.text : EzTheme.textSecondary)
                         Layout.fillWidth: true
+                        elide: Text.ElideRight
                         Behavior on color { ColorAnimation { duration: 90 } }
                         
                         ToolTip {
                             visible: optMouse.containsMouse && dd.formatEzClientSupported && dd.isEzClientSupported(modelData)
-                            text: "EzClient verfügbar für diese Version"
+                            text: EzI18n.text("EzClient verfügbar für diese Version")
                             delay: 200
                         }
                     }

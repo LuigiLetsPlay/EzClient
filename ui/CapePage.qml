@@ -7,6 +7,8 @@ Item {
     id: root
     signal navigate(string route)
     property string reportedCapeId: ""
+    property string deleteCapeId: ""
+    property string deleteCapeTitle: ""
     readonly property string activeCommunityCapeUrl: typeof accountController !== "undefined" && accountController ? accountController.activeCommunityCapeUrl : ""
     readonly property var account: (typeof accountController !== "undefined" && accountController) ? accountController : null
     property string previewCapeUrl: ""
@@ -34,12 +36,12 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 2
                 Text { text: "Cape Community"; font.family: EzTheme.mcFontFamily; font.pixelSize: 22; font.bold: true; color: EzTheme.text }
-                Text { text: "Wähle ein Cape oder teile dein eigenes mit der EzClient-Community."; font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textSecondary; elide: Text.ElideRight; Layout.fillWidth: true }
+                Text { text: EzI18n.text("Wähle ein Cape oder teile dein eigenes mit der EzClient-Community."); font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textSecondary; elide: Text.ElideRight; Layout.fillWidth: true }
             }
             EzButton { text: "Editor"; onClicked: root.navigate("cape_editor") }
-            EzButton { text: "Aktualisieren"; onClicked: accountController.refreshCapeCommunity() }
+            EzButton { text: EzI18n.text("Aktualisieren"); onClicked: accountController.refreshCapeCommunity() }
             EzButton {
-                text: "Zurücksetzen"
+                text: EzI18n.text("Zurücksetzen")
                 enabled: root.account && (root.account.capeTextureUrl !== "" || root.activeCommunityCapeUrl !== "")
                 onClicked: root.account.resetCustomCape()
             }
@@ -57,18 +59,18 @@ Item {
                 }
                 ColumnLayout {
                     Layout.fillWidth: true; spacing: 5
-                    Text { text: "Dein aktives Cape"; font.family: EzTheme.mcFontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
-                    Text { text: "Das Cape erscheint im Home-Skin und wird beim Spielstart verwendet."; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: EzTheme.textSecondary; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                    Text { text: EzI18n.text("Dein aktives Cape"); font.family: EzTheme.mcFontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
+                    Text { text: EzI18n.text("Das Cape erscheint im Home-Skin und wird beim Spielstart verwendet."); font.family: EzTheme.fontFamily; font.pixelSize: 11; color: EzTheme.textSecondary; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                 }
                 EzButton { text: "Editor"; onClicked: root.navigate("cape_editor") }
                 EzButton {
-                    text: "PNG auswählen & bearbeiten"
+                    text: EzI18n.text("PNG auswählen & bearbeiten")
                     onClicked: {
                         var capeUrl = accountController.pickCapeFile()
                         if (capeUrl && capeUrl !== "") root.navigate("cape_editor")
                     }
                 }
-                EzButton { text: "Veröffentlichen"; enabled: root.account && root.account.capeTextureUrl !== ""; onClicked: publishDialog.open() }
+                EzButton { text: EzI18n.text("Veröffentlichen"); enabled: root.account && root.account.capeTextureUrl !== ""; onClicked: publishDialog.open() }
             }
         }
 
@@ -122,12 +124,17 @@ Item {
                                     Layout.preferredHeight: 16; Layout.preferredWidth: 42; radius: 4; color: "#16A34A"
                                     Text { anchors.centerIn: parent; text: "ANIM"; font.pixelSize: 9; font.bold: true; color: "#FFF" }
                                 }
+                                Rectangle {
+                                    visible: !!(modelData.isOwnCape || (root.account && root.account.isMyCape(modelData.owner_uuid)))
+                                    Layout.preferredHeight: 16; Layout.preferredWidth: 44; radius: 4; color: "#6366F1"
+                                    Text { anchors.centerIn: parent; text: EzI18n.text("DEINS"); font.pixelSize: 8; font.bold: true; color: "#FFF" }
+                                }
                             }
                             RowLayout {
                                 Layout.fillWidth: true
-                                Text { text: "von " + (modelData.owner || "EzClient Spieler"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted; Layout.fillWidth: true; elide: Text.ElideRight }
+                                Text { text: EzI18n.text("von ") + (modelData.owner || "EzClient Spieler"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted; Layout.fillWidth: true; elide: Text.ElideRight }
                                 EzButton {
-                                    text: root.activeCommunityCapeUrl === (modelData.imageUrl || "") ? "Aktiv" : "Nutzen"
+                                    text: root.activeCommunityCapeUrl === (modelData.imageUrl || "") ? EzI18n.text("Aktiv") : EzI18n.text("Nutzen")
                                     primary: root.activeCommunityCapeUrl === (modelData.imageUrl || "")
                                     onClicked: {
                                         if (root.activeCommunityCapeUrl === (modelData.imageUrl || "")) return
@@ -135,7 +142,38 @@ Item {
                                     }
                                 }
                             }
-                            Text { text: "Melden"; color: EzTheme.textMuted; font.pixelSize: 10; MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { root.reportedCapeId = modelData.id; reportDialog.open() } } }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                Text {
+                                    visible: !(modelData.isOwnCape || (root.account && root.account.isMyCape(modelData.owner_uuid)))
+                                    text: EzI18n.text("Melden")
+                                    color: EzTheme.textMuted
+                                    font.pixelSize: 10
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: { root.reportedCapeId = modelData.id; reportDialog.open() }
+                                    }
+                                }
+                                Item { Layout.fillWidth: true }
+                                Text {
+                                    visible: !!(modelData.isOwnCape || (root.account && root.account.isMyCape(modelData.owner_uuid)))
+                                    text: EzI18n.text("🗑 Löschen")
+                                    color: "#F87171"
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            root.deleteCapeId = modelData.id
+                                            root.deleteCapeTitle = modelData.title || "Community Cape"
+                                            deleteCapeDialog.open()
+                                        }
+                                    }
+                                }
+                            }
                         }
                         MouseArea { id: cardMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor; z: -1 }
                     }
@@ -166,7 +204,7 @@ Item {
                 color: "#990F0B18"; border.color: EzTheme.border
                 Text {
                     id: hintLabel; anchors.centerIn: parent
-                    text: "3D-Ansicht · Ziehen: Drehen · Rad: Zoom"
+                    text: EzI18n.text("3D-Ansicht · Ziehen: Drehen · Rad: Zoom")
                     font.pixelSize: 11; color: EzTheme.textSecondary
                 }
             }
@@ -179,26 +217,72 @@ Item {
     }
 
     Dialog {
-        id: publishDialog; modal: true; anchors.centerIn: parent; width: 380; title: "Cape veröffentlichen"
+        id: publishDialog; modal: true; anchors.centerIn: parent; width: 380; title: EzI18n.text("Cape veröffentlichen")
         background: Rectangle { radius: 14; color: EzTheme.surface2; border.color: EzTheme.border }
         contentItem: ColumnLayout {
             spacing: 12
-            Text { text: "Gib deinem Cape einen Namen. Es wird unter deinem Minecraft-Namen veröffentlicht."; color: EzTheme.textSecondary; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 12 }
-            TextField { id: capeTitle; Layout.fillWidth: true; placeholderText: "Mein Cape"; color: EzTheme.text; background: Rectangle { radius: 7; color: EzTheme.surface3; border.color: EzTheme.border } }
+            Text { text: EzI18n.text("Gib deinem Cape einen Namen. Es wird unter deinem Minecraft-Namen veröffentlicht."); color: EzTheme.textSecondary; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 12 }
+            TextField { id: capeTitle; Layout.fillWidth: true; placeholderText: EzI18n.text("Mein Cape"); color: EzTheme.text; background: Rectangle { radius: 7; color: EzTheme.surface3; border.color: EzTheme.border } }
         }
-        footer: DialogButtonBox { Button { text: "Abbrechen"; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole } Button { text: "Veröffentlichen"; DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole } }
+        footer: DialogButtonBox { Button { text: EzI18n.text("Abbrechen"); DialogButtonBox.buttonRole: DialogButtonBox.RejectRole } Button { text: EzI18n.text("Veröffentlichen"); DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole } }
         onAccepted: accountController.publishCape(capeTitle.text)
     }
 
     Dialog {
-        id: reportDialog; modal: true; anchors.centerIn: parent; width: 380; title: "Cape melden"
+        id: reportDialog; modal: true; anchors.centerIn: parent; width: 380; title: EzI18n.text("Cape melden")
         background: Rectangle { radius: 14; color: EzTheme.surface2; border.color: EzTheme.border }
         contentItem: ColumnLayout {
             spacing: 12
-            Text { text: "Beschreibe bitte kurz, warum dieses Cape gemeldet wird."; color: EzTheme.textSecondary; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 12 }
-            TextArea { id: reportReason; Layout.fillWidth: true; Layout.preferredHeight: 90; placeholderText: "Grund der Meldung"; color: EzTheme.text; wrapMode: TextEdit.Wrap; background: Rectangle { radius: 7; color: EzTheme.surface3; border.color: EzTheme.border } }
+            Text { text: EzI18n.text("Beschreibe bitte kurz, warum dieses Cape gemeldet wird."); color: EzTheme.textSecondary; wrapMode: Text.WordWrap; Layout.fillWidth: true; font.pixelSize: 12 }
+            TextArea { id: reportReason; Layout.fillWidth: true; Layout.preferredHeight: 90; placeholderText: EzI18n.text("Grund der Meldung"); color: EzTheme.text; wrapMode: TextEdit.Wrap; background: Rectangle { radius: 7; color: EzTheme.surface3; border.color: EzTheme.border } }
         }
-        footer: DialogButtonBox { Button { text: "Abbrechen"; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole } Button { text: "Melden"; DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole } }
+        footer: DialogButtonBox { Button { text: EzI18n.text("Abbrechen"); DialogButtonBox.buttonRole: DialogButtonBox.RejectRole } Button { text: EzI18n.text("Melden"); DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole } }
         onAccepted: accountController.reportCape(root.reportedCapeId, reportReason.text)
+    }
+
+    Dialog {
+        id: deleteCapeDialog
+        modal: true
+        anchors.centerIn: parent
+        width: 380
+        title: EzI18n.text("Cape löschen")
+        background: Rectangle {
+            radius: 14
+            color: EzTheme.surface2
+            border.color: "#EF4444"
+            border.width: 1
+        }
+        contentItem: ColumnLayout {
+            spacing: 12
+            Text {
+                text: EzI18n.text("Möchtest du das Cape \"") + root.deleteCapeTitle + EzI18n.text("\" wirklich endgültig aus der Community entfernen?")
+                color: EzTheme.text
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                font.pixelSize: 13
+            }
+            Text {
+                text: EzI18n.text("Dieser Vorgang kann nicht rückgängig gemacht werden.")
+                color: "#FCA5A5"
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                font.pixelSize: 11
+            }
+        }
+        footer: DialogButtonBox {
+            Button {
+                text: EzI18n.text("Abbrechen")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+            Button {
+                text: EzI18n.text("Endgültig löschen")
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+        }
+        onAccepted: {
+            if (root.deleteCapeId) {
+                accountController.deleteCommunityCape(root.deleteCapeId)
+            }
+        }
     }
 }

@@ -30,6 +30,15 @@ public final class EzUi {
 
     private EzUi() {}
 
+    /** Fit long labels without making the font unreadably small. */
+    public static Component fitText(Component message, int available) {
+        var font = Minecraft.getInstance().font;
+        if (font.width(message) <= available) return message;
+        String suffix = "…";
+        return Component.literal(font.plainSubstrByWidth(message.getString(), Math.max(0, available - font.width(suffix))) + suffix)
+                .setStyle(message.getStyle());
+    }
+
     public static void roundedRect(GuiGraphicsExtractor g, int x, int y, int width, int height, int radius, int color) {
         int r = Math.max(0, Math.min(radius, Math.min(width, height) / 2));
         if (r == 0) {

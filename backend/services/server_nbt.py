@@ -7,10 +7,12 @@ import io
 import re
 import gzip
 import struct
+import time
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 COLOR_CODE_PATTERN = re.compile(r"§[0-9a-fk-orA-FK-OR]")
+_PLAYED_SERVERS_CACHE: Dict[str, Tuple[float, float, List[Dict[str, str]]]] = {}
 
 
 def clean_minecraft_formatting(text: str) -> str:
@@ -183,6 +185,16 @@ def get_actually_played_servers(
     filters out ad/dummy servers, and matches against servers.dat to preserve custom names and icons.
     Returns at most `limit` items (default 3), strictly ordered by recency.
     """
+    cache_key = f"{profile_path}:{limit}:{tuple(launcher_history or [])}"
+    now = time.time()
+    latest_log_path = profile_path / "logs" / "latest.log"
+    latest_mtime = latest_log_path.stat().st_mtime if latest_log_path.is_file() else 0.0
+
+    if cache_key in _PLAYED_SERVERS_CACHE:
+        cached_time, cached_mtime, cached_res = _PLAYED_SERVERS_CACHE[cache_key]
+        if now - cached_time < 5.0 or (latest_mtime > 0 and cached_mtime == latest_mtime):
+            return [dict(x) for x in cached_res]
+
     played_ips: List[str] = []
     seen_ips = set()
 
@@ -228,7 +240,8 @@ def get_actually_played_servers(
                         raw_bytes = log_file.read_bytes()
                         content = gzip.decompress(raw_bytes).decode("utf-8", errors="ignore")
                     else:
-                        content = log_file.read_text(encoding="utf-8", errors="ignore")
+                        with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
+                            content = f.read()
 
                     lines = content.splitlines()
                     # Reverse line iteration so most recent connection in each file is found first
@@ -254,6 +267,7 @@ def get_actually_played_servers(
                     pass
 
     if not played_ips:
+        _PLAYED_SERVERS_CACHE[cache_key] = (now, latest_mtime, [])
         return []
 
     # 3. Match against servers.dat to get custom names and icons
@@ -288,6 +302,7 @@ def get_actually_played_servers(
             "icon": icon
         })
 
+    _PLAYED_SERVERS_CACHE[cache_key] = (now, latest_mtime, [dict(x) for x in results])
     return results
 
 

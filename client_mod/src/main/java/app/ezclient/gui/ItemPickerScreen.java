@@ -79,7 +79,7 @@ public final class ItemPickerScreen extends Screen {
         // Search Bar
         int searchW = panelWidth - 24;
         searchBox = new EditBox(font, panelX + 12, panelY + 26, searchW, 18, Component.literal("Suchen …"));
-        searchBox.setHint(Component.literal("Item / Block suchen (z. B. Bett, Eimer) …"));
+        searchBox.setHint(Component.literal(app.ezclient.util.EzI18n.text("Item / Block suchen (z. B. Bett, Eimer) …")));
         searchBox.setValue(query);
         searchBox.setMaxLength(80);
         searchBox.setResponder(text -> {
@@ -91,7 +91,7 @@ public final class ItemPickerScreen extends Screen {
         // Cancel button in footer
         int footerY = panelY + panelHeight - 22;
         addRenderableWidget(new EzButton(panelX + panelWidth - 72, footerY, 60, 16,
-                Component.literal("Abbrechen"), false, b -> onClose()));
+                Component.literal(app.ezclient.util.EzI18n.text("Abbrechen")), false, b -> onClose()));
 
         updateFilter();
     }

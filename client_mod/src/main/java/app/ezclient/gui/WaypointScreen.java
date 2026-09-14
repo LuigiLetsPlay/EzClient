@@ -92,13 +92,12 @@ public final class WaypointScreen extends ScrollingSettingsScreen {
                 Component.literal("⚙"), false, b -> EzScreenBridge.set(minecraft, new FeatureSettingsScreen(this, module))));
 
         // Waypoints Manager Hotkey button
-        String hkText = isListeningForHotkey ? "Taste: …" : (module.getKeyBind() > 0 || module.getKeyBind() <= -100 ? "Key: " + EzKeyBindings.getKeyOrMouseName(module.getKeyBind()) : "Key: M");
-        addFixedWidget(new EzButton(panelX + panelWidth - 102, panelY + 6, 60, 16,
-                Component.literal(hkText), isListeningForHotkey,
-                b -> { isListeningForHotkey = !isListeningForHotkey; rebuildWidgets(); }));
+        addFixedWidget(new EzHotkeyButton(panelX + 6, panelY + 66,
+                SETTINGS_SIDEBAR_WIDTH - 12, module.getKeyBind(), isListeningForHotkey,
+                () -> { isListeningForHotkey = !isListeningForHotkey; rebuildWidgets(); }));
 
         // Module enabled toggle switch in header
-        EzToggleSwitch modToggle = new EzToggleSwitch(panelX + panelWidth - 132, panelY + 8, 26, 12, module.isEnabled(),
+        EzToggleSwitch modToggle = new EzToggleSwitch(panelX + panelWidth - 72, panelY + 8, 26, 12, module.isEnabled(),
                 val -> { module.setEnabled(val); rebuildWidgets(); });
         addFixedWidget(modToggle);
 
@@ -106,7 +105,7 @@ public final class WaypointScreen extends ScrollingSettingsScreen {
         int addBtnWidth = 54;
         int searchWidth = innerWidth - addBtnWidth - 4;
         searchBox = new EditBox(font, x0, panelY + 26, searchWidth, 16, Component.literal("Suchen …"));
-        searchBox.setHint(Component.literal("Waypoint suchen …"));
+        searchBox.setHint(Component.literal(app.ezclient.util.EzI18n.text("Waypoint suchen …")));
         searchBox.setValue(search);
         searchBox.setMaxLength(80);
         searchBox.setResponder(value -> {
@@ -135,7 +134,7 @@ public final class WaypointScreen extends ScrollingSettingsScreen {
         positionButton.active = hasActiveWorld();
         addFixedWidget(positionButton);
         addFixedWidget(new EzButton(x0 + (btnW + 4) * 2, footerY, innerWidth - (btnW + 4) * 2, 16,
-                Component.literal("Zurück"), false, button -> onClose()));
+                Component.literal(app.ezclient.util.EzI18n.text("Zurück")), false, button -> onClose()));
     }
 
     private void populateManagerList() {
@@ -274,7 +273,7 @@ public final class WaypointScreen extends ScrollingSettingsScreen {
         int y = scrollTop() + 2;
 
         // Row 1: Name Field
-        nameField = new EditBox(font, x0, y, innerWidth, 18, Component.literal("Name"));
+        nameField = new EditBox(font, x0, y, innerWidth, 18, Component.literal(app.ezclient.util.EzI18n.text("Name")));
         nameField.setHint(Component.literal("Waypoint Name"));
         nameField.setValue(draftName != null ? draftName : (point == null ? "" : point.name()));
         nameField.setMaxLength(80);
@@ -371,8 +370,8 @@ public final class WaypointScreen extends ScrollingSettingsScreen {
 
         // Footer Actions
         int footerY = panelY + panelHeight - 24;
-        addFixedWidget(new EzButton(x0, footerY, half, 18, Component.literal("Speichern"), true, button -> save()));
-        addFixedWidget(new EzButton(x0 + half + 4, footerY, half, 18, Component.literal("Abbrechen"), false,
+        addFixedWidget(new EzButton(x0, footerY, half, 18, Component.literal(app.ezclient.util.EzI18n.text("Speichern")), true, button -> save()));
+        addFixedWidget(new EzButton(x0 + half + 4, footerY, half, 18, Component.literal(app.ezclient.util.EzI18n.text("Abbrechen")), false,
                 button -> { editor = false; draftLoaded = false; rebuildWidgets(); }));
     }
 

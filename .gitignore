@@ -89,3 +89,4 @@ chat_comp.txt
 game.json
 options.txt
 run_java*.bat
+client_detector_plugin/target/*.jar

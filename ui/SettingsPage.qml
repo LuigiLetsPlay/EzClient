@@ -54,7 +54,7 @@ Item {
                         Layout.fillWidth: true
                         spacing: 2
                         Text {
-                            text: EzI18n.t("settings_lang", "Sprache") + " / Language"
+                            text: "Sprache / Language"
                             font.family: EzTheme.mcFontFamily
                             font.pixelSize: 13
                             font.bold: true
@@ -145,8 +145,8 @@ Item {
                     anchors.fill: parent; anchors.margins: 14; spacing: 14
                     ColumnLayout {
                         Layout.fillWidth: true; spacing: 2
-                        Text { text: "Theme-Farbe"; font.family: EzTheme.mcFontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
-                        Text { text: "Akzentfarbe für Buttons, Auswahl und Hervorhebungen"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
+                        Text { text: EzI18n.text("Theme-Farbe"); font.family: EzTheme.mcFontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
+                        Text { text: EzI18n.text("Akzentfarbe für Buttons, Auswahl und Hervorhebungen"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
                     }
                     Row {
                         Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
@@ -182,12 +182,14 @@ Item {
             // Custom Background Setting Card
             EzSurface {
                 Layout.fillWidth: true
-                implicitHeight: 76
+                implicitHeight: root.width < 850 ? 132 : 76
 
-                RowLayout {
+                GridLayout {
                     anchors.fill: parent
                     anchors.margins: 14
-                    spacing: 14
+                    columns: root.width < 850 ? 2 : 3
+                    columnSpacing: 14
+                    rowSpacing: 10
 
                     Rectangle {
                         width: 44; height: 44; radius: 8
@@ -228,14 +230,14 @@ Item {
                         Layout.fillWidth: true
                         spacing: 2
                         Text {
-                            text: "Hintergrundbild (Hauptmenü)"
+                            text: EzI18n.text("Hintergrundbild (Hauptmenü)")
                             font.family: EzTheme.mcFontFamily
                             font.pixelSize: 13
                             font.bold: true
                             color: EzTheme.text
                         }
                         Text {
-                            text: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage) ? "Eigenes Bild oder Clip aktiv · " + Math.round((profileController.customBackgroundOpacity || 0.6) * 100) + "% Deckkraft" : "Standard Minecraft Artwork aktiv"
+                            text: (typeof profileController !== "undefined" && profileController && profileController.customBackgroundImage) ? EzI18n.text("Eigenes Bild oder Clip aktiv · ") + Math.round((profileController.customBackgroundOpacity || 0.6) * 100) + EzI18n.text("% Deckkraft") : EzI18n.text("Standard Minecraft Artwork aktiv")
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 10
                             color: EzTheme.textMuted
@@ -243,11 +245,12 @@ Item {
                     }
 
                     RowLayout {
+                        Layout.columnSpan: root.width < 850 ? 2 : 1
                         Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                         spacing: 8
 
                         EzButton {
-                            text: "Anpassen & Vorschau…"
+                            text: EzI18n.text("Anpassen & Vorschau…")
                             mcFont: true
                             primary: true
                             implicitHeight: 32
@@ -255,7 +258,7 @@ Item {
                         }
 
                         EzButton {
-                            text: "Video auswählen…"
+                            text: EzI18n.text("Video auswählen…")
                             mcFont: true
                             implicitHeight: 32
                             onClicked: {
@@ -264,7 +267,7 @@ Item {
                         }
 
                         EzButton {
-                            text: "Zurücksetzen"
+                            text: EzI18n.text("Zurücksetzen")
                             mcFont: true
                             implicitHeight: 32
                             danger: true
@@ -338,13 +341,13 @@ Item {
                             onClicked: if (profileController) profileController.setAppFontMode("minecraft")
                         }
                         EzButton {
-                            text: "Gemischt"
+                            text: EzI18n.text("Gemischt")
                             implicitHeight: 32
                             primary: parent.activeFontMode === "mixed"
                             onClicked: if (profileController) profileController.setAppFontMode("mixed")
                         }
                         EzButton {
-                            text: "Standard"
+                            text: EzI18n.text("Standard")
                             implicitHeight: 32
                             primary: parent.activeFontMode === "standard"
                             onClicked: if (profileController) profileController.setAppFontMode("standard")
@@ -414,14 +417,14 @@ Item {
                         spacing: 8
 
                         EzButton {
-                            text: (typeof accountController !== "undefined" && accountController && accountController.hasAccount) ? "Account wechseln" : EzI18n.t("settings_login_btn", "Konto anmelden")
+                            text: (typeof accountController !== "undefined" && accountController && accountController.hasAccount) ? EzI18n.text("Account wechseln") : EzI18n.t("settings_login_btn", "Konto anmelden")
                             mcFont: true
                             Layout.preferredHeight: 32
                             onClicked: if (typeof accountController !== "undefined" && accountController) accountController.openLoginDialog()
                         }
 
                         EzButton {
-                            text: "Sitzung aktualisieren"
+                            text: EzI18n.text("Sitzung aktualisieren")
                             visible: typeof accountController !== "undefined" && accountController && accountController.hasAccount
                             Layout.preferredHeight: 32
                             onClicked: if (typeof accountController !== "undefined" && accountController) accountController.refresh()
@@ -575,7 +578,7 @@ Item {
                             Text { text: EzI18n.t("settings_ram_allocation", "Zugewiesener Arbeitsspeicher für Minecraft"); font.family: EzTheme.mcFontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
                             Text {
                                 readonly property int totalGb: (profileController && profileController.systemTotalRamGb) ? profileController.systemTotalRamGb : 16
-                                text: "System gesamt: " + totalGb + " GB RAM · Empfohlen: 4–8 GB für flüssiges Spielen"
+                                text: EzI18n.text("System gesamt: ") + totalGb + EzI18n.text(" GB RAM · Empfohlen: 4–8 GB für flüssiges Spielen")
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 10
                                 color: EzTheme.textMuted
@@ -737,7 +740,7 @@ Item {
                     spacing: 0
 
                     EzToggleRow {
-                        label: "Server-Schnellstart auf Home anzeigen"
+                        label: EzI18n.text("Server-Schnellstart auf Home anzeigen")
                         sub: "Zeigt eine Schnellstart-Leiste mit eigenen und vorgeschlagenen Servern für Sofort-Beitritt auf der Startseite"
                         toggleValue: profileController ? profileController.showRecentServersHome : true
                         onToggled: function(val) { if (profileController) profileController.setShowRecentServersHome(val) }
@@ -746,7 +749,7 @@ Item {
                     Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border; opacity: 0.6; Layout.topMargin: 8; Layout.bottomMargin: 8 }
 
                     EzToggleRow {
-                        label: "Vorgeschlagene Server auf Home anzeigen"
+                        label: EzI18n.text("Vorgeschlagene Server auf Home anzeigen")
                         sub: "Zeigt automatisch Server-Empfehlungen und zuletzt gespielte Server aus Minecraft in der Schnellstartleiste an"
                         toggleValue: profileController ? profileController.showSuggestedServersHome : true
                         onToggled: function(val) { if (profileController) profileController.setShowSuggestedServersHome(val) }
@@ -755,7 +758,7 @@ Item {
                     Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border; opacity: 0.6; Layout.topMargin: 8; Layout.bottomMargin: 8 }
 
                     EzToggleRow {
-                        label: "Live-Logs Konsole beim Spielstart anzeigen"
+                        label: EzI18n.text("Live-Logs Konsole beim Spielstart anzeigen")
                         sub: "Öffnet das moderne Terminal-Fenster mit Syntax-Highlighting, Filter-Pills und Echtzeit-Statistiken"
                         toggleValue: profileController ? profileController.showLiveLogs : true
                         onToggled: function(val) { if (profileController) profileController.setShowLiveLogs(val) }
@@ -833,7 +836,7 @@ Item {
             Item { height: 8 }
 
             Text {
-                text: "EzClient verwaltet nur die Laufzeiten, die Minecraft 1.8 bis 26.2 tatsächlich benötigt. Beim Spielstart wird automatisch die passende Version gewählt."
+                text: EzI18n.text("EzClient verwaltet nur die Laufzeiten, die Minecraft 1.8 bis 26.2 tatsächlich benötigt. Beim Spielstart wird automatisch die passende Version gewählt.")
                 font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted
                 wrapMode: Text.WordWrap; Layout.fillWidth: true
             }
@@ -862,14 +865,14 @@ Item {
                                 RowLayout {
                                     Text { text: modelData.label; font.family: EzTheme.fontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
                                     Rectangle { width: statusText.implicitWidth + 12; height: 18; radius: 9; color: modelData.installed ? "#183C2A" : EzTheme.surface3
-                                        Text { id: statusText; anchors.centerIn: parent; text: modelData.installed ? "INSTALLIERT" : "NICHT INSTALLIERT"; font.family: EzTheme.fontFamily; font.pixelSize: 8; font.bold: true; color: modelData.installed ? EzTheme.accentLight : EzTheme.textSubtle }
+                                        Text { id: statusText; anchors.centerIn: parent; text: modelData.installed ? EzI18n.text("INSTALLIERT") : EzI18n.text("NICHT INSTALLIERT"); font.family: EzTheme.fontFamily; font.pixelSize: 8; font.bold: true; color: modelData.installed ? EzTheme.accentLight : EzTheme.textSubtle }
                                     }
                                 }
                                 Text { text: modelData.path; font.family: EzTheme.fontFamily; font.pixelSize: 9; color: EzTheme.textMuted; elide: Text.ElideMiddle; Layout.fillWidth: true }
                             }
-                            EzButton { text: "Ordner"; Layout.preferredWidth: 72; Layout.preferredHeight: 30; onClicked: profileController.openJavaLocation(modelData.major) }
-                            EzButton { text: modelData.installed ? "Neu installieren" : "Installieren"; Layout.preferredWidth: 142; Layout.minimumWidth: 142; Layout.preferredHeight: 32; primary: !modelData.installed; onClicked: modelData.installed ? profileController.reinstallJava(modelData.major) : profileController.installJava(modelData.major) }
-                            EzButton { visible: modelData.managed; text: "Löschen"; Layout.preferredWidth: 72; Layout.preferredHeight: 30; onClicked: profileController.deleteJava(modelData.major) }
+                            EzButton { text: EzI18n.text("Ordner"); Layout.preferredWidth: 72; Layout.preferredHeight: 30; onClicked: profileController.openJavaLocation(modelData.major) }
+                            EzButton { text: modelData.installed ? EzI18n.text("Neu installieren") : EzI18n.text("Installieren"); Layout.preferredWidth: 142; Layout.minimumWidth: 142; Layout.preferredHeight: 32; primary: !modelData.installed; onClicked: modelData.installed ? profileController.reinstallJava(modelData.major) : profileController.installJava(modelData.major) }
+                            EzButton { visible: modelData.managed; text: EzI18n.text("Löschen"); Layout.preferredWidth: 72; Layout.preferredHeight: 30; onClicked: profileController.deleteJava(modelData.major) }
                         }
                     }
                 }

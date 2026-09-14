@@ -100,7 +100,7 @@ Item {
                                 spacing: 4
                                 Text {
                                     id: backText
-                                    text: "← Zurück zu allen Profilen"
+                                    text: EzI18n.text("← Zurück zu allen Profilen")
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 11
                                     font.bold: true
@@ -147,7 +147,7 @@ Item {
                             Text {
                                 id: activeBadgeTxt
                                 anchors.centerIn: parent
-                                text: root.isInspectedActive ? "● AKTIV" : "INAKTIV"
+                                text: root.isInspectedActive ? EzI18n.text("● AKTIV") : EzI18n.text("INAKTIV")
                                 font.family: EzTheme.mcFontFamily
                                 font.pixelSize: 9
                                 font.bold: true
@@ -169,7 +169,7 @@ Item {
                                 spacing: 4
                                 Text {
                                     id: iconChangeTxt
-                                    text: "✎ Icon ändern"
+                                    text: EzI18n.text("✎ Icon ändern")
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 9
                                     font.bold: true
@@ -246,7 +246,7 @@ Item {
 
                     // "Als aktives Profil wählen" button (shown when inspecting non-active profile)
                     EzButton {
-                        text: "Als aktiv festlegen"
+                        text: EzI18n.text("Als aktiv festlegen")
                         primary: true
                         visible: !root.isInspectedActive
                         Layout.preferredHeight: 38
@@ -314,7 +314,7 @@ Item {
                         }
 
                         ToolTip.visible: fldMouse.containsMouse
-                        ToolTip.text: "Profil-Ordner öffnen"
+                        ToolTip.text: EzI18n.text("Profil-Ordner öffnen")
                         ToolTip.delay: 300
 
                         MouseArea {
@@ -349,7 +349,7 @@ Item {
                         }
 
                         ToolTip.visible: dupMouse.containsMouse
-                        ToolTip.text: "Profil duplizieren"
+                        ToolTip.text: EzI18n.text("Profil duplizieren")
                         ToolTip.delay: 300
 
                         MouseArea {
@@ -386,15 +386,15 @@ Item {
 
                 Repeater {
                     model: root.supportsMods ? [
-                        { tabId: "overview", label: "Übersicht", icon: "home.svg" },
+                        { tabId: "overview", label: EzI18n.text("Übersicht"), icon: "home.svg" },
                         { tabId: "mods", label: "Mods (" + root.inspectedModsCount + ")", icon: "mods.svg" },
                         { tabId: "shaders", label: "Shader (" + root.shaderList.length + ")", icon: "sparkles.svg" },
                         { tabId: "resourcepacks", label: "Resource Packs (" + root.resourcePackList.length + ")", icon: "box.svg" },
-                        { tabId: "settings", label: "Einstellungen", icon: "settings.svg" }
+                        { tabId: "settings", label: EzI18n.text("Einstellungen"), icon: "settings.svg" }
                     ] : [
-                        { tabId: "overview", label: "Übersicht", icon: "home.svg" },
+                        { tabId: "overview", label: EzI18n.text("Übersicht"), icon: "home.svg" },
                         { tabId: "resourcepacks", label: "Resource Packs (" + root.resourcePackList.length + ")", icon: "box.svg" },
-                        { tabId: "settings", label: "Einstellungen", icon: "settings.svg" }
+                        { tabId: "settings", label: EzI18n.text("Einstellungen"), icon: "settings.svg" }
                     ]
 
                     Rectangle {
@@ -515,9 +515,9 @@ Item {
                                     ColumnLayout {
                                         Layout.fillWidth: true
                                         spacing: 2
-                                        Text { text: "Installierte Mods"; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: EzTheme.textMuted }
+                                        Text { text: EzI18n.text("Installierte Mods"); font.family: EzTheme.fontFamily; font.pixelSize: 11; color: EzTheme.textMuted }
                                         Text { text: root.inspectedModsCount + " Mods"; font.family: EzTheme.mcFontFamily; font.pixelSize: 16; font.bold: true; color: EzTheme.text }
-                                        Text { text: "Verwalten & hinzufügen →"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.accentLight }
+                                        Text { text: EzI18n.text("Verwalten & hinzufügen →"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.accentLight }
                                     }
                                 }
 
@@ -559,9 +559,9 @@ Item {
                                     ColumnLayout {
                                         Layout.fillWidth: true
                                         spacing: 2
-                                        Text { text: "Shader-Engine"; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: EzTheme.textMuted }
+                                        Text { text: EzI18n.text("Shader-Engine"); font.family: EzTheme.fontFamily; font.pixelSize: 11; color: EzTheme.textMuted }
                                         Text {
-                                            text: root.activeShaderName ? root.activeShaderName : (root.shaderList.length > 0 ? root.shaderList.length + " Shader verfügbar" : "Kein Shader aktiv")
+                                            text: root.activeShaderName ? root.activeShaderName : (root.shaderList.length > 0 ? root.shaderList.length + EzI18n.text(" Shader verfügbar") : EzI18n.text("Kein Shader aktiv"))
                                             font.family: EzTheme.mcFontFamily
                                             font.pixelSize: 14
                                             font.bold: true
@@ -569,7 +569,7 @@ Item {
                                             elide: Text.ElideRight
                                             Layout.fillWidth: true
                                         }
-                                        Text { text: "Shader wechseln →"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.accentLight }
+                                        Text { text: EzI18n.text("Shader wechseln →"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.accentLight }
                                     }
                                 }
 
@@ -612,7 +612,7 @@ Item {
                                         spacing: 2
                                         Text { text: "Resource Packs"; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: EzTheme.textMuted }
                                         Text { text: root.resourcePackList.length + " Packs"; font.family: EzTheme.mcFontFamily; font.pixelSize: 16; font.bold: true; color: EzTheme.text }
-                                        Text { text: "Packs verwalten →"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.accentLight }
+                                        Text { text: EzI18n.text("Packs verwalten →"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.accentLight }
                                     }
                                 }
 
@@ -632,7 +632,7 @@ Item {
                             spacing: 6
 
                             Text {
-                                text: "PROFIL & SYSTEM-DETAILS"
+                                text: EzI18n.text("PROFIL & SYSTEM-DETAILS")
                                 font.family: EzTheme.mcFontFamily
                                 font.pixelSize: 11
                                 font.bold: true
@@ -651,7 +651,7 @@ Item {
 
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Text { text: "Minecraft Version"; font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textMuted; Layout.preferredWidth: 160 }
+                                        Text { text: EzI18n.text("Minecraft Version"); font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textMuted; Layout.preferredWidth: 160 }
                                         Text { text: root.inspectedVersion + " (" + root.inspectedLoader + ")"; font.family: "Consolas, monospace"; font.pixelSize: 12; font.bold: true; color: EzTheme.text; Layout.fillWidth: true }
                                     }
 
@@ -659,7 +659,7 @@ Item {
 
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Text { text: "Java Laufzeit"; font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textMuted; Layout.preferredWidth: 160 }
+                                        Text { text: EzI18n.text("Java Laufzeit"); font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textMuted; Layout.preferredWidth: 160 }
                                         Text { text: "Adoptium OpenJDK 25 (64-Bit Server VM)"; font.family: "Consolas, monospace"; font.pixelSize: 12; font.bold: true; color: EzTheme.text; Layout.fillWidth: true }
                                     }
 
@@ -667,15 +667,15 @@ Item {
 
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Text { text: "Zuletzt gespielt"; font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textMuted; Layout.preferredWidth: 160 }
-                                        Text { text: root.inspectedLastPlayed && root.inspectedLastPlayed !== "Never" ? root.inspectedLastPlayed : "Noch keine Spielzeit verzeichnet"; font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textSecondary; Layout.fillWidth: true }
+                                        Text { text: EzI18n.text("Zuletzt gespielt"); font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textMuted; Layout.preferredWidth: 160 }
+                                        Text { text: root.inspectedLastPlayed && root.inspectedLastPlayed !== "Never" ? root.inspectedLastPlayed : EzI18n.text("Noch keine Spielzeit verzeichnet"); font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textSecondary; Layout.fillWidth: true }
                                     }
 
                                     Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border }
 
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Text { text: "Speicherort"; font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textMuted; Layout.preferredWidth: 160 }
+                                        Text { text: EzI18n.text("Speicherort"); font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textMuted; Layout.preferredWidth: 160 }
                                         Text { text: root.inspectedGameDir; font.family: "Consolas, monospace"; font.pixelSize: 11; color: EzTheme.textSecondary; elide: Text.ElideMiddle; Layout.fillWidth: true }
                                     }
                                 }
@@ -688,7 +688,7 @@ Item {
                             spacing: 6
 
                             Text {
-                                text: "SCHNELLZUGRIFF & ORDNER"
+                                text: EzI18n.text("SCHNELLZUGRIFF & ORDNER")
                                 font.family: EzTheme.mcFontFamily
                                 font.pixelSize: 11
                                 font.bold: true
@@ -719,7 +719,7 @@ Item {
                                         ColumnLayout {
                                             spacing: 2
                                             Text { text: "Screenshots"; font.family: EzTheme.fontFamily; font.pixelSize: 12; font.bold: true; color: EzTheme.text }
-                                            Text { text: "Bilder & Screenshots öffnen"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
+                                            Text { text: EzI18n.text("Bilder & Screenshots öffnen"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
                                         }
                                     }
                                     MouseArea {
@@ -749,7 +749,7 @@ Item {
                                         Image { source: "icons/file-text.svg"; width: 20; height: 20; fillMode: Image.PreserveAspectFit }
                                         ColumnLayout {
                                             spacing: 2
-                                            Text { text: "Crash- & Spiel-Logs"; font.family: EzTheme.fontFamily; font.pixelSize: 12; font.bold: true; color: EzTheme.text }
+                                            Text { text: EzI18n.text("Crash- & Spiel-Logs"); font.family: EzTheme.fontFamily; font.pixelSize: 12; font.bold: true; color: EzTheme.text }
                                             Text { text: "latest.log & Crash-Dateien"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
                                         }
                                     }
@@ -780,8 +780,8 @@ Item {
                                         Image { source: "icons/copy.svg"; width: 20; height: 20; fillMode: Image.PreserveAspectFit }
                                         ColumnLayout {
                                             spacing: 2
-                                            Text { text: "Settings übertragen"; font.family: EzTheme.fontFamily; font.pixelSize: 12; font.bold: true; color: EzTheme.text }
-                                            Text { text: "Optionen von Profil kopieren"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
+                                            Text { text: EzI18n.text("Settings übertragen"); font.family: EzTheme.fontFamily; font.pixelSize: 12; font.bold: true; color: EzTheme.text }
+                                            Text { text: EzI18n.text("Optionen von Profil kopieren"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
                                         }
                                     }
                                     MouseArea {
@@ -842,7 +842,7 @@ Item {
                                         onTextChanged: root.modSearchQuery = text.trim().toLowerCase()
 
                                         Text {
-                                            text: "Mods filtern…"
+                                            text: EzI18n.text("Mods filtern…")
                                             font.family: EzTheme.fontFamily
                                             font.pixelSize: 12
                                             color: EzTheme.textMuted
@@ -857,7 +857,7 @@ Item {
                             }
 
                             EzButton {
-                                text: "Mod-Ordner öffnen"
+                                text: EzI18n.text("Mod-Ordner öffnen")
                                 Layout.preferredHeight: 34
                                 onClicked: {
                                     if (profileController) profileController.openFolder("mods")
@@ -865,7 +865,7 @@ Item {
                             }
 
                             EzButton {
-                                text: "+ Mods entdecken"
+                                text: EzI18n.text("+ Mods entdecken")
                                 primary: true
                                 Layout.preferredHeight: 34
                                 onClicked: {
@@ -982,7 +982,7 @@ Item {
 
                                                 Text {
                                                     id: pVerTxt
-                                                    text: model.version || "Latest"
+                                                    text: model.version || EzI18n.text("Latest")
                                                     font.family: "Consolas, monospace"
                                                     font.pixelSize: 9
                                                     font.bold: true
@@ -992,7 +992,7 @@ Item {
                                             }
 
                                             Text {
-                                                text: "von " + (model.author || "Modrinth")
+                                                text: EzI18n.text("von ") + (model.author || "Modrinth")
                                                 font.family: EzTheme.fontFamily
                                                 font.pixelSize: 10
                                                 color: EzTheme.textMuted
@@ -1003,7 +1003,7 @@ Item {
                                         }
 
                                         Text {
-                                            text: model.description || "Keine Beschreibung hinterlegt"
+                                            text: model.description || EzI18n.text("Keine Beschreibung hinterlegt")
                                             font.family: EzTheme.fontFamily
                                             font.pixelSize: 10
                                             color: EzTheme.textMuted
@@ -1088,7 +1088,7 @@ Item {
                         RowLayout {
                             Layout.fillWidth: true
                             Text {
-                                text: root.shaderList.length + " Shaderpacks in diesem Profil"
+                                text: root.shaderList.length + EzI18n.text(" Shaderpacks in diesem Profil")
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 13
                                 font.bold: true
@@ -1096,7 +1096,7 @@ Item {
                             }
                             Item { Layout.fillWidth: true }
                             EzButton {
-                                text: "Shader deaktivieren"
+                                text: EzI18n.text("Shader deaktivieren")
                                 visible: root.activeShaderName !== ""
                                 Layout.preferredHeight: 30
                                 onClicked: {
@@ -1104,14 +1104,14 @@ Item {
                                 }
                             }
                             EzButton {
-                                text: "Ordner öffnen"
+                                text: EzI18n.text("Ordner öffnen")
                                 Layout.preferredHeight: 30
                                 onClicked: {
                                     if (profileController) profileController.openShaderPacksFolder()
                                 }
                             }
                             EzButton {
-                                text: "+ Shader im Store suchen"
+                                text: EzI18n.text("+ Shader im Store suchen")
                                 primary: true
                                 Layout.preferredHeight: 30
                                 onClicked: {
@@ -1147,14 +1147,14 @@ Item {
                                     Layout.fillWidth: true
                                     spacing: 2
                                     Text {
-                                        text: "Aktiver Shader: " + (root.activeShaderName ? root.activeShaderName : "Standard (Kein Shader aktiv)")
+                                        text: EzI18n.text("Aktiver Shader: ") + (root.activeShaderName ? root.activeShaderName : EzI18n.text("Standard (Kein Shader aktiv)"))
                                         font.family: EzTheme.mcFontFamily
                                         font.pixelSize: 12
                                         font.bold: true
                                         color: root.activeShaderName ? EzTheme.accentLight : EzTheme.textSecondary
                                     }
                                     Text {
-                                        text: root.activeShaderName ? "Iris Shader-Engine rendert aktuell dieses Preset" : "Wähle unten einen Shader aus oder lade neue herunter."
+                                        text: root.activeShaderName ? EzI18n.text("Iris Shader-Engine rendert aktuell dieses Preset") : EzI18n.text("Wähle unten einen Shader aus oder lade neue herunter.")
                                         font.family: EzTheme.fontFamily
                                         font.pixelSize: 10
                                         color: EzTheme.textMuted
@@ -1229,7 +1229,7 @@ Item {
                                                 Text {
                                                     id: actShTxt
                                                     anchors.centerIn: parent
-                                                    text: "AKTIV"
+                                                    text: EzI18n.text("AKTIV")
                                                     font.family: EzTheme.mcFontFamily
                                                     font.pixelSize: 8
                                                     font.bold: true
@@ -1247,7 +1247,7 @@ Item {
 
                                     // Activate / Select Shader Button
                                     EzButton {
-                                        text: modelData.isActive ? "Aktiv" : "Aktivieren"
+                                        text: modelData.isActive ? EzI18n.text("Aktiv") : EzI18n.text("Aktivieren")
                                         primary: !modelData.isActive
                                         enabled: !modelData.isActive && modelData.enabled
                                         Layout.preferredHeight: 30
@@ -1315,7 +1315,7 @@ Item {
                                     opacity: 0.5
                                 }
                                 Text {
-                                    text: "Noch keine Shaderpacks in diesem Profil installiert."
+                                    text: EzI18n.text("Noch keine Shaderpacks in diesem Profil installiert.")
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 13
                                     font.bold: true
@@ -1323,14 +1323,14 @@ Item {
                                     Layout.alignment: Qt.AlignHCenter
                                 }
                                 Text {
-                                    text: "Lade beliebte Shader wie Complementary, BSL oder Iris Shaders herunter."
+                                    text: EzI18n.text("Lade beliebte Shader wie Complementary, BSL oder Iris Shaders herunter.")
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 11
                                     color: EzTheme.textMuted
                                     Layout.alignment: Qt.AlignHCenter
                                 }
                                 EzButton {
-                                    text: "Shader im Store entdecken"
+                                    text: EzI18n.text("Shader im Store entdecken")
                                     primary: true
                                     Layout.alignment: Qt.AlignHCenter
                                     Layout.preferredHeight: 30
@@ -1355,7 +1355,7 @@ Item {
                         RowLayout {
                             Layout.fillWidth: true
                             Text {
-                                text: root.resourcePackList.length + " Resource Packs in diesem Profil"
+                                text: root.resourcePackList.length + EzI18n.text(" Resource Packs in diesem Profil")
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 13
                                 font.bold: true
@@ -1363,14 +1363,14 @@ Item {
                             }
                             Item { Layout.fillWidth: true }
                             EzButton {
-                                text: "Ordner öffnen"
+                                text: EzI18n.text("Ordner öffnen")
                                 Layout.preferredHeight: 30
                                 onClicked: {
                                     if (profileController) profileController.openResourcePacksFolder()
                                 }
                             }
                             EzButton {
-                                text: "+ Packs durchsuchen"
+                                text: EzI18n.text("+ Packs durchsuchen")
                                 primary: true
                                 Layout.preferredHeight: 30
                                 onClicked: {
@@ -1505,7 +1505,7 @@ Item {
                                     opacity: 0.5
                                 }
                                 Text {
-                                    text: "Noch keine Resource Packs in diesem Profil installiert."
+                                    text: EzI18n.text("Noch keine Resource Packs in diesem Profil installiert.")
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 12
                                     color: EzTheme.textMuted
@@ -1545,14 +1545,14 @@ Item {
                                     Layout.fillWidth: true
                                     spacing: 3
                                     Text {
-                                        text: "Minecraft-Einstellungen übertragen"
+                                        text: EzI18n.text("Minecraft-Einstellungen übertragen")
                                         font.family: EzTheme.mcFontFamily
                                         font.pixelSize: 13
                                         font.bold: true
                                         color: EzTheme.text
                                     }
                                     Text {
-                                        text: "Kopiere Tastenbelegungen, Video- & Audio-Optionen, Shader & Sodium-Settings aus einem anderen Profil."
+                                        text: EzI18n.text("Kopiere Tastenbelegungen, Video- & Audio-Optionen, Shader & Sodium-Settings aus einem anderen Profil.")
                                         font.family: EzTheme.fontFamily
                                         font.pixelSize: 10
                                         color: EzTheme.textMuted
@@ -1560,7 +1560,7 @@ Item {
                                 }
 
                                 EzButton {
-                                    text: "Settings übertragen…"
+                                    text: EzI18n.text("Settings übertragen…")
                                     primary: true
                                     Layout.preferredWidth: 190
                                     Layout.minimumWidth: 190
@@ -1592,12 +1592,12 @@ Item {
                                 ColumnLayout {
                                     Layout.fillWidth: true
                                     spacing: 2
-                                    Text { text: "Speicherort auf Festplatte"; font.family: EzTheme.mcFontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
+                                    Text { text: EzI18n.text("Speicherort auf Festplatte"); font.family: EzTheme.mcFontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
                                     Text { text: root.inspectedGameDir; font.family: "Consolas, monospace"; font.pixelSize: 10; color: EzTheme.textMuted; elide: Text.ElideMiddle; Layout.fillWidth: true }
                                 }
 
                                 EzButton {
-                                    text: "Ordner öffnen"
+                                    text: EzI18n.text("Ordner öffnen")
                                     Layout.preferredWidth: 190
                                     Layout.minimumWidth: 190
                                     Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
@@ -1630,8 +1630,8 @@ Item {
                                 ColumnLayout {
                                     Layout.fillWidth: true
                                     spacing: 2
-                                    Text { text: "Profil löschen"; font.family: EzTheme.mcFontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.danger }
-                                    Text { text: "Entfernt dieses Profil und alle darin gespeicherten Mods unwiderruflich."; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
+                                    Text { text: EzI18n.text("Profil löschen"); font.family: EzTheme.mcFontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.danger }
+                                    Text { text: EzI18n.text("Entfernt dieses Profil und alle darin gespeicherten Mods unwiderruflich."); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
                                 }
 
                                 Rectangle {
@@ -1646,7 +1646,7 @@ Item {
                                     Behavior on color { ColorAnimation { duration: 100 } }
 
                                     Text {
-                                        text: "Löschen"
+                                        text: EzI18n.text("Löschen")
                                         font.family: EzTheme.mcFontFamily
                                         font.pixelSize: 11
                                         font.bold: true
@@ -1710,7 +1710,7 @@ Item {
             spacing: 12
 
             Text {
-                text: "Minecraft-Einstellungen übertragen"
+                text: EzI18n.text("Minecraft-Einstellungen übertragen")
                 font.family: EzTheme.mcFontFamily
                 font.pixelSize: 14
                 font.bold: true
@@ -1718,7 +1718,7 @@ Item {
             }
 
             Text {
-                text: "Wähle das Quellprofil aus, dessen Optionen (options.txt, Sodium, Shader, Keybinds) nach '" + root.inspectedName + "' kopiert werden sollen:"
+                text: EzI18n.text("Wähle das Quellprofil aus, dessen Optionen (options.txt, Sodium, Shader, Keybinds) nach '") + root.inspectedName + EzI18n.text("' kopiert werden sollen:")
                 font.family: EzTheme.fontFamily
                 font.pixelSize: 11
                 color: EzTheme.textMuted
@@ -1751,13 +1751,13 @@ Item {
                 Item { Layout.fillWidth: true }
 
                 EzButton {
-                    text: "Abbrechen"
+                    text: EzI18n.text("Abbrechen")
                     Layout.preferredHeight: 34
                     onClicked: copySettingsModal.close()
                 }
 
                 EzButton {
-                    text: "Jetzt übertragen"
+                    text: EzI18n.text("Jetzt übertragen")
                     primary: true
                     Layout.preferredHeight: 34
                     onClicked: {

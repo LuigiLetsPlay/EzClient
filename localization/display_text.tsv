@@ -1,0 +1,364 @@
+# German display text<TAB>English display text. Technical IDs and saved option values remain stable.
+Abbrechen	Cancel
+Aktiv	Active
+AKTIV	ACTIVE
+INAKTIV	INACTIVE
+Aktivieren	Enable
+Aktualisieren	Refresh
+Alle	All
+Anmelden	Sign in
+Auswählen	Select
+Bibliothek	Library
+Bestätigen	Confirm
+Einstellungen	Settings
+Entfernen	Remove
+Fertig	Done
+Hinzufügen	Add
+Installieren	Install
+Installiert	Installed
+INSTALLIERT	INSTALLED
+INTEGRIERT	BUILT IN
+Integriert	Built in
+Löschen	Delete
+Lädt…	Loading…
+Name	Name
+Neu	New
+Öffnen	Open
+Ordner	Folder
+Ordner öffnen	Open folder
+Schließen	Close
+Speichern	Save
+Spielen	Play
+Suchen	Search
+Unbekannt	Unknown
+Unbekannter Fehler	Unknown error
+Verwerfen	Discard
+Veröffentlichen	Publish
+Versionen	Versions
+Vorschau	Preview
+Wählen	Select
+Zurück	Back
+Zurücksetzen	Reset
+Übersicht	Overview
+Links	Left
+Rechts	Right
+Oben	Top
+Unten	Bottom
+Rückseite	Back side
+Vorderseite	Front side
+Gemischt	Mixed
+Standard	Default
+Live-Vorschau	Live preview
+Filter zurücksetzen	Reset filters
+Filter:	Filter:
+Sortierung	Sort order
+Kategorie	Category
+Keine Ergebnisse	No results
+Mehr laden…	Load more…
+Lade weitere Inhalte…	Loading more content…
+Gewählt: 	Selected: 
+von 	by 
+ erkannt	 detected
+ ein…	 up…
+% Deckkraft	% opacity
+Theme-Farbe	Theme color
+Akzentfarbe für Buttons, Auswahl und Hervorhebungen	Accent color for buttons, selections and highlights
+Hintergrundbild (Hauptmenü)	Main menu background
+Hintergrundbild anpassen	Customize background
+Eigenes Bild oder Clip aktiv · 	Custom image or clip active · 
+Standard Minecraft Artwork aktiv	Default Minecraft artwork active
+Anpassen & Vorschau…	Customize & preview…
+Video auswählen…	Select video…
+Anderes Bild wählen	Choose another image
+Neues Bild wählen…	Choose new image…
+Wähle ein individuelles Wallpaper für das EzClient-Hauptmenü	Choose a custom wallpaper for the EzClient main menu
+Bild-Skalierung (Fit Mode):	Image scaling (fit mode):
+Deckkraft & Helligkeit:	Opacity & brightness:
+Einpassen (Contain)	Fit (contain)
+Ausfüllen (Cover)	Fill (cover)
+Gestreckt (Stretch)	Stretch
+Standard Artwork	Default artwork
+Speichern & Anwenden	Save & apply
+Einstellung gespeichert	Setting saved
+System gesamt: 	System total: 
+ GB RAM · Empfohlen: 4–8 GB für flüssiges Spielen	 GB RAM · Recommended: 4–8 GB for smooth gameplay
+Java Laufzeit	Java runtime
+EzClient verwaltet nur die Laufzeiten, die Minecraft 1.8 bis 26.2 tatsächlich benötigt. Beim Spielstart wird automatisch die passende Version gewählt.	EzClient manages the Java runtimes required by Minecraft 1.8 to 26.2. The appropriate version is selected automatically when you launch the game.
+Live-Logs Konsole beim Spielstart anzeigen	Show live logs when launching the game
+Server-Schnellstart auf Home anzeigen	Show quick server launch on Home
+Vorgeschlagene Server auf Home anzeigen	Show suggested servers on Home
+Minecraft-Einstellungen übertragen	Transfer Minecraft settings
+Kopiere Tastenbelegungen, Video- & Audio-Optionen, Shader & Sodium-Settings aus einem anderen Profil.	Copy key bindings, video and audio options, shaders and Sodium settings from another profile.
+Settings übertragen…	Transfer settings…
+Settings übertragen	Transfer settings
+Optionen von Profil kopieren	Copy options from profile
+Jetzt übertragen	Transfer now
+Wähle das Quellprofil aus, dessen Optionen (options.txt, Sodium, Shader, Keybinds) nach '	Choose the source profile whose options (options.txt, Sodium, shaders, key bindings) will be copied to '
+' kopiert werden sollen:	':
+Crash- & Spiel-Logs	Crash & game logs
+Bilder & Screenshots öffnen	Open images & screenshots
+SCHNELLZUGRIFF & ORDNER	QUICK ACCESS & FOLDERS
+PROFIL & SYSTEM-DETAILS	PROFILE & SYSTEM DETAILS
+Speicherort	Location
+Speicherort auf Festplatte	Location on disk
+Sitzung aktualisieren	Refresh session
+Account wechseln	Switch account
+Konto wechseln	Switch account
+Kontoeinstellungen	Account settings
+Account auswählen	Select account
+Aktiver Account	Active account
+Aktiven Account abmelden	Sign out active account
+Microsoft-Konto verbunden	Microsoft account connected
+Konto · 	Account · 
++  Account hinzufügen	+ Add account
+Offline-Profil	Offline profile
+WEITERE INSTANZ	ANOTHER INSTANCE
+Willkommen zurück	Welcome back
+Standard Profil	Default profile
+Dein Spiel ist nur einen Klick entfernt	Your game is just one click away
+Server-Schnellstart einblenden	Show quick server launch
+Server hinzufügen	Add server
+SERVER HINZUFÜGEN	ADD SERVER
+Adresse (z. B. hypixel.net)	Address (e.g. hypixel.net)
+Name (optional)	Name (optional)
+Serverliste, Status & Bilder aktualisieren	Refresh server list, status & images
+Vorgeschlagene Server ausblenden (Rechtsklick: Wiederherstellen)	Hide suggested servers (right-click to restore)
+Vorgeschlagene Server einblenden	Show suggested servers
+Ausgeblendete Vorschläge wiederherstellen	Restore hidden suggestions
+Schnellstart ausblenden	Hide quick launch
+Vorschlag (zuletzt gespielt)	Suggestion (recently played)
+Nach oben verschieben	Move up
+Nach unten verschieben	Move down
+Vorschlag ausblenden	Hide suggestion
+Vorschläge laden	Load suggestions
+Zu meinen Servern hinzufügen	Add to my servers
+Server löschen	Delete server
+Sofort beitreten: 	Join now: 
+Keine Server vorhanden	No servers available
+Zuletzt gespielt	Last played
+Noch keine Spielzeit verzeichnet	No playtime recorded yet
+Nie	Never
+Minecraft Start-Fehler	Minecraft launch error
+Das Spiel konnte nicht gestartet werden oder ist abgestürzt.	The game could not start or has crashed.
+Fehler kopieren	Copy error
+Keine Log-Ausgabe vorhanden.	No log output available.
+Logs kopieren	Copy Logs
+Logs durchsuchen…	Search logs…
+Leeren	Clear
+Alle anzeigen	ALL
+Folgen	Following
+Neueste	Latest
+Instanzen (	Instances (
+ ZEILEN	 LINES
+ERWEITERUNGEN	EXTENSIONS
+ Erweiterungen im aktiven Profil (	 extensions in the active profile (
+Grenze die Erweiterungsbibliothek gezielt ein.	Filter the extension library to find what you need.
+Mods filtern…	Filter mods…
+Alle updaten	Update all
+Integrierte ausblenden	Hide built-in mods
+Integriert: 	Built in: 
+Installiert: 	Installed: 
+Installierte Mods	Installed mods
+Wähle einen Mod für Details	Select a mod for details
+Keine Beschreibung hinterlegt	No description provided
+Wichtige Kern-Modifikation	Important core mod
+Klicken für Modrinth-Details und Beschreibung…	Click for Modrinth details and description…
+Mod-Ordner öffnen	Open mods folder
++ Mods entdecken	+ Discover mods
+Abhängigkeits-Warnung	Dependency warning
+Warnung: Die Mod '	Warning: The mod '
+' wird von folgenden installierten Mods benötigt: 	' is required by the following installed mods: 
+.\n\nDas Löschen kann zu Spielabstürzen führen.	.\n\nDeleting it may cause the game to crash.
+Trotzdem löschen	Delete anyway
+Lade Modrinth-Daten…	Loading Modrinth data…
+Lade Versionen von Modrinth…	Loading versions from Modrinth…
+Version wechseln: 	Switch version: 
+Wähle ein offizielles Release aus der Modrinth API:	Select a published release from Modrinth:
+Keine Versionen im aktuellen Filter gefunden	No versions found with the current filter
+Keine Release-Versionen (stelle Filter auf 'Alle')	No release versions (set the filter to 'All')
+Neu installieren	Reinstall
+Modrinth · Autor: 	Modrinth · Author: 
+NICHT INSTALLIERT	NOT INSTALLED
+MINECRAFT VERSIONEN	MINECRAFT VERSIONS
+Wähle zuerst eine Generation und danach die genaue Version	Choose a version family, then the exact version
+Version suchen…	Search versions…
+UNTERVERSION	PATCH VERSION
+SPIELVARIANTE	GAME TYPE
+Minecraft-Version	Minecraft version
+Minecraft Version	Minecraft version
+EzClient verfügbar für diese Version	EzClient available for this version
+Profil erstellen	Create profile
+Neues Profil	New profile
+Eigenes Profil	Custom profile
+Neues Standard-Profil erstellen →	Create a new default profile →
+Profilname (optional)	Profile name (optional)
+Profil-Assistent	Profile wizard
+Wie möchtest du starten?	How would you like to start?
+Ein sauberes Profil in wenigen Schritten erstellen.	Create a fresh profile in a few simple steps.
+Version und Loader frei wählen – ohne EzClient-Vorgaben.	Choose your version and loader freely.
+Modpacks aus der Bibliothek entdecken und spielen.	Discover and play modpacks from the library.
+Vorhandene Profile samt Mods und Einstellungen übernehmen.	Import existing profiles with their mods and settings.
+Modpack installieren	Install modpack
+Profil wird eingerichtet …	Setting up profile…
+Prüfe Profil-Kompatibilität …	Checking profile compatibility…
+Profil fertiggestellt!	Profile ready!
+Profil konnte nicht eingerichtet werden	Could not set up profile
+Richte 	Setting 
+Profil duplizieren	Duplicate profile
+Profil löschen	Delete profile
+Profil wirklich löschen?	Delete this profile?
+Möchtest du das folgende Profil wirklich dauerhaft entfernen?	Do you want to permanently delete the following profile?
+Dies kann nicht mehr rückgängig gemacht werden! Alle installierten Mods, Konfigurationen und lokalen Daten dieses Profils werden vollständig und unwiederbringlich gelöscht.	This cannot be undone. All installed mods, settings and local data in this profile will be permanently deleted.
+Entfernt dieses Profil und alle darin gespeicherten Mods unwiderruflich.	Permanently deletes this profile and all mods stored in it.
+Unwiderrufliche Aktion	Irreversible action
+Endgültig löschen	Delete permanently
+Profil-Ordner öffnen	Open profile folder
+← Zurück zu allen Profilen	← Back to all profiles
+‹ Zurück	‹ Back
+▶ SPIELEN	▶ PLAY
+● AKTIV	● ACTIVE
+Verwalten & hinzufügen →	Manage & add →
+Packs verwalten →	Manage packs →
++ Packs durchsuchen	+ Browse packs
+ Resource Packs in diesem Profil	 resource packs in this profile
+Noch keine Resource Packs in diesem Profil installiert.	No resource packs installed in this profile yet.
+ Shaderpacks in diesem Profil	 shader packs in this profile
+Noch keine Shaderpacks in diesem Profil installiert.	No shader packs installed in this profile yet.
+ Shader verfügbar	 shaders available
+Aktiver Shader: 	Active shader: 
+Kein Shader aktiv	No shader active
+Standard (Kein Shader aktiv)	Default (no shader active)
+Shader deaktivieren	Disable shader
+Shader wechseln →	Change shader →
+Shader im Store entdecken	Discover shaders in the store
++ Shader im Store suchen	+ Browse shaders in the store
+Wähle unten einen Shader aus oder lade neue herunter.	Select a shader below or download new ones.
+Lade beliebte Shader wie Complementary, BSL oder Iris Shaders herunter.	Download popular shaders such as Complementary or BSL.
+Shader-Engine	Shader engine
+Iris & Shader installieren	Install Iris & shader
+Nur Shader installieren	Install shader only
+Möchtest du Iris Shaders automatisch mitinstallieren?	Would you like to install Iris Shaders automatically?
+Shader benötigen eine Shader-Engine wie Iris, um in Minecraft dargestellt zu werden.	Shaders require a shader engine such as Iris to render in Minecraft.
+Iris Shaders Mod empfohlen	Iris Shaders mod recommended
+Iris Shader-Engine rendert aktuell dieses Preset	The Iris shader engine renders this preset
+NoRisk-Profile übernehmen?	Import NoRisk profiles?
+NoRiskClient-Profil übernehmen	Import NoRiskClient profile
+Wähle ein lokal installiertes Profil aus.	Select a locally installed profile.
+Wähle ein vorhandenes Profil. Spielstände, Einstellungen und Mods werden in ein neues EzClient-Profil kopiert.	Select an existing profile. Saves, settings and mods are copied into a new EzClient profile.
+Gefundene Profile	Profiles found
+Keine lokal installierten NoRiskClient-Profile gefunden.	No locally installed NoRiskClient profiles found.
+Stelle sicher, dass NoRiskClient auf diesem PC installiert ist und Profile angelegt wurden.	Make sure NoRiskClient is installed on this PC and has existing profiles.
+Keine Sorge: Das originale NoRisk-Profil wird nicht verändert.	The original NoRisk profile will remain unchanged.
+Das originale NoRisk-Profil „	The original NoRisk profile “
+“ wird nicht verändert.	” will remain unchanged.
+EzClient-Performancepaket hinzufügen	Add EzClient performance pack
+Installiert nur kompatible Komponenten; EzClient Core nur auf geprüften Versionen.	Installs compatible components; EzClient Core is included only on supported versions.
+✨ EzClient Performance & Core Mod hinzufügen (Empfohlen)	✨ Add EzClient performance & core mod (recommended)
+⚡ NoRiskClient erkannt	⚡ NoRiskClient detected
+Von NoRiskClient	From NoRiskClient
+Unbenanntes NoRisk-Profil	Unnamed NoRisk profile
+Erneut suchen	Search again
+Suche läuft…	Searching…
+Importieren	Import
+Importiert …	Importing…
+In EzClient umwandeln	Convert to EzClient
+Xaero behalten	Keep Xaero
+In EzClient-Waypoints umwandeln? Dann werden Xaero Minimap/World Map und deren Daten nicht in das neue Profil kopiert.	Convert to EzClient waypoints? Xaero Minimap/World Map and their data will then be excluded from the new profile.
+Möchtest du die Waypoints aus „	Do you want to convert the waypoints from “
+“ in EzClient-Waypoints umwandeln? Bei der Konvertierung werden Xaero Minimap/World Map und deren Daten nicht in das neue Profil kopiert.	” to EzClient waypoints? Xaero Minimap/World Map and their data will then be excluded from the new profile.
+Profil-Icon anpassen	Customize profile icon
+Dieses Icon wird in der Profilübersicht, Titelleiste und Startseite angezeigt.	This icon appears in the profile list, title bar and home page.
+Wähle ein Icon aus oder lade ein eigenes Bild (PNG) hoch.	Choose an icon or upload a custom PNG image.
+Eigenes PNG-Bild	Custom PNG image
+Eigenes PNG…	Custom PNG…
+Standard (Initialen)	Default (initials)
+Standard-Initialen	Default initials
+Grasblock	Grass block
+Sandblock	Sand block
+Kompass	Compass
+Netherstern	Nether star
+Feuerzeug	Flint and steel
+Trank	Potion
+Uhr	Clock
+Stern	Star
+✎ Icon ändern	✎ Change icon
+Skin Verwaltung	Skin management
+Skin Vorschau	Skin preview
+Skin ändern	Change skin
+Skin ändern (Mojang API)	Change skin (Mojang API)
+Wähle einen neuen Skin oder speichere deinen aktuellen.	Choose a new skin or save your current one.
+Minecraft Name...	Minecraft name...
+Name für die Bibliothek...	Library name...
+Meine Skin-Bibliothek	My skin library
+1. Skin in Vorschau laden	1. Load skin into preview
+2. Skin anwenden	2. Apply skin
+3. In Bibliothek speichern (Nur für aktiven Skin)	3. Save to library (active skin only)
+Diesen Skin jetzt für deinen Account übernehmen.	Apply this skin to your account now.
+Dieser Skin ist bereits aktiv.	This skin is already active.
+Als aktiv festlegen	Set as active
+Nutzen	Use
+Zum Wechseln anklicken	Click to change
+3D-Ansicht · Ziehen: Drehen · Rad: Zoom	3D view · Drag to rotate · Scroll to zoom
+Ziehen: 360°  •  Mausrad: Zoom	Drag: 360°  •  Scroll: zoom
+3D-Animation	3D animation
+Stehen	Idle
+Laufen	Walk
+Rennen	Run
+Klassisch	Classic
+Schmal	Slim
+DEINS	YOURS
+Mein Cape	My cape
+Dein aktives Cape	Your active cape
+Cape-Studio	Cape studio
+Cape veröffentlichen	Publish cape
+Cape löschen	Delete cape
+Cape melden	Report cape
+Cape-Datei hier ablegen	Drop cape file here
+Cape-Name	Cape name
+Cape-Seiten (6 Flächen)	Cape sides (6 faces)
+Hauptseite (Außen)	Outer side
+Innenseite (Körper)	Inner side
+Wähle ein Cape oder teile dein eigenes mit der EzClient-Community.	Choose a cape or share your own with the EzClient community.
+Das Cape erscheint im Home-Skin und wird beim Spielstart verwendet.	The cape appears on your home-page skin and is used when the game launches.
+Das Cape wird nach „Bestätigen & hochladen“ aktiviert und im Spiel sichtbar.	The cape is activated and becomes visible in game after you select “Confirm & upload”.
+Bestätigen & hochladen	Confirm & upload
+Wird hochgeladen …	Uploading…
+Gib deinem Cape einen Namen. Es wird unter deinem Minecraft-Namen veröffentlicht.	Name your cape. It will be published under your Minecraft name.
+Mindestens 3, maximal 48 Zeichen	Between 3 and 48 characters
+/48 Zeichen	/48 characters
+z. B. MeinCape	e.g. MyCape
+Grund der Meldung	Reason for report
+Beschreibe bitte kurz, warum dieses Cape gemeldet wird.	Briefly describe why you are reporting this cape.
+Melden	Report
+Dieser Vorgang kann nicht rückgängig gemacht werden.	This action cannot be undone.
+Möchtest du das Cape \"	Do you want to permanently remove the cape "
+\" wirklich endgültig aus der Community entfernen?	" from the community?
+PNG auswählen & bearbeiten	Select & edit PNG
+Bild laden	Load image
+Bild hochladen	Upload image
+Bild aktiv	Image active
+Bild entfernen (Pencil aktivieren)	Remove image (enable pencil)
+Neues Bild	New image
++ Bild	+ Image
++ Hinzufügen	+ Add
+ℹ Bild/GIF auf dieser Seite aktiv. Pencil ist hier pausiert.	ℹ Image/GIF active on this side. Pencil is paused here.
+Pencil aktiv	Pencil active
+Stiftgröße: 	Brush size: 
+Zeichnung leeren	Clear drawing
+Fläche füllen	Fill face
+Auf alle Seiten anwenden	Apply to all sides
+Farbe wählen	Choose color
+Vorlagen:	Templates:
+(Wähle ein Preset oder eigenes Bild)	(Choose a preset or custom image)
+Ausschnitt	Crop
+Ausschnitt zentrieren	Center crop
+Animation wird vorbereitet …	Preparing animation…
+Vorschau lädt …	Loading preview…
+Vorschau wird geladen …	Loading preview…
+Minecraft 64x32 Vollcape aktiv: Alle 6 Seiten werden 1:1 original gerendert.	Full 64x32 Minecraft cape active: all 6 sides render at their original size.
+Grid an	Grid on
+Grid aus	Grid off
+Feuer	Fire
+Gras	Grass
+ODER	OR
+🗑 Löschen	🗑 Delete

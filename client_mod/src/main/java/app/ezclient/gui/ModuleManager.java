@@ -98,7 +98,7 @@ public final class ModuleManager {
         this.modules.add(this.autoGgModule);
 
         // HUD modules collection cached for rendering loop
-        this.modules.addAll(List.of(new HitboxModule(), new ItemPhysicsModule(), new TimeWeatherModule(),
+        this.modules.addAll(List.of(new HitboxModule(), new ItemPhysicsModule(), new ItemModelModule(), new TimeWeatherModule(),
                 new ParticleCustomizerModule(), new BlockOverlayModule(), new BossBarModule(), new BedwarsModule(),
                 new NameplateModule(), new WaypointsModule(), new SoundEnhancerModule(),
                 new GlowingOresModule(), new NoFogModule(), new SaturationModule(), new FreelookModule(),

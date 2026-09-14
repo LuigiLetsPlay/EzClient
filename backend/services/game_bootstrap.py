@@ -26,7 +26,7 @@ _DOWNLOAD_LOCKS_GUARD = threading.Lock()
 
 
 def _json(url: str) -> dict:
-    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/2.1.0"})
+    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/2.2.0"})
     with urllib.request.urlopen(request, timeout=30) as response:
         return json.loads(response.read().decode("utf-8"))
 
@@ -46,23 +46,22 @@ def _download_locked(url: str, target: Path, sha1: str = "", expected_size: int 
     if target.is_file():
         file_size = target.stat().st_size
         if file_size > 0:
-            # Fast path: if size matches and we have a hash, skip the expensive
-            # SHA1 read for files that are almost certainly correct.
-            if expected_size > 0 and file_size == expected_size:
-                return False
-            if not sha1 or hashlib.sha1(target.read_bytes()).hexdigest() == sha1:
+            size_matches = not expected_size or file_size == expected_size
+            if size_matches and (not sha1 or hashlib.sha1(target.read_bytes()).hexdigest() == sha1):
                 return False
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(
         f"{target.name}.{os.getpid()}.{threading.get_ident()}.part"
     )
-    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/2.1.0"})
+    request = urllib.request.Request(url, headers={"User-Agent": "EzClient/2.2.0"})
     try:
         with urllib.request.urlopen(request, timeout=60) as response, temporary.open("wb") as output:
             while chunk := response.read(1024 * 256):
                 output.write(chunk)
         if sha1 and hashlib.sha1(temporary.read_bytes()).hexdigest() != sha1:
             raise RuntimeError(f"Prüfsumme stimmt nicht: {target.name}")
+        if expected_size and temporary.stat().st_size != expected_size:
+            raise RuntimeError(f"Dateigröße stimmt nicht: {target.name}")
         os.replace(temporary, target)
         return True
     finally:
@@ -94,10 +93,31 @@ def _library_artifact(library: dict) -> dict:
     return {"url": f"{base_url}/{path}", "path": path, "sha1": library.get("sha1", "")}
 
 
-def _libraries_are_ready(mc_dir: Path, libraries: list[dict]) -> bool:
+def _native_artifact(library: dict) -> dict:
+    system = {"Windows": "windows", "Darwin": "osx", "Linux": "linux"}.get(platform.system(), "")
+    classifier = str(library.get("natives", {}).get(system, "")).replace("${arch}", "64" if platform.machine().endswith("64") else "32")
+    if not classifier:
+        return {}
+    artifact = library.get("downloads", {}).get("classifiers", {}).get(classifier, {})
+    return artifact or (_library_artifact(library) if not library.get("downloads", {}).get("artifact") else {})
+
+
+def _library_artifacts(libraries: list[dict]) -> list[dict]:
+    from backend.services.direct_launch import is_rule_allowed
+    artifacts = {}
     for library in libraries:
-        artifact = _library_artifact(library)
-        if artifact and not (mc_dir / "libraries" / artifact["path"]).is_file():
+        if not is_rule_allowed(library):
+            continue
+        for artifact in (_library_artifact(library), _native_artifact(library)):
+            if artifact and artifact.get("path") and artifact.get("url"):
+                artifacts[artifact["path"]] = artifact
+    return list(artifacts.values())
+
+
+def _libraries_are_ready(mc_dir: Path, libraries: list[dict]) -> bool:
+    for artifact in _library_artifacts(libraries):
+        path = mc_dir / "libraries" / artifact["path"]
+        if not path.is_file() or path.stat().st_size == 0:
             return False
     return True
 
@@ -105,8 +125,7 @@ def _libraries_are_ready(mc_dir: Path, libraries: list[dict]) -> bool:
 def _download_libraries(
     mc_dir: Path, libraries: list[dict], notify: Callable[[str], None], label: str
 ) -> None:
-    artifacts = [_library_artifact(library) for library in libraries]
-    artifacts = [item for item in artifacts if item]
+    artifacts = _library_artifacts(libraries)
     total = len(artifacts)
     if total == 0:
         return
@@ -211,11 +230,7 @@ def _download_assets_parallel(
     with ThreadPoolExecutor(max_workers=min(_ASSET_WORKERS, total)) as pool:
         futures = [pool.submit(_do_asset, a) for a in asset_list]
         for future in as_completed(futures):
-            try:
-                future.result()
-            except Exception as exc:
-                # Log but don't abort - retry missing assets on next launch
-                print(f"[GameBootstrap] Asset download failed: {exc}")
+            future.result()
 
     elapsed = time.monotonic() - start_time
     notify(
@@ -240,7 +255,11 @@ def ensure_game_ready(profile: ProfileData, mc_dir: Path, notify: Callable[[str]
     vanilla_dir = mc_dir / "versions" / version
     vanilla_json = vanilla_dir / f"{version}.json"
     has_vanilla = vanilla_json.exists() and (vanilla_dir / f"{version}.jar").exists()
-    vanilla_data = json.loads(vanilla_json.read_text(encoding="utf-8")) if has_vanilla else {}
+    try:
+        vanilla_data = json.loads(vanilla_json.read_text(encoding="utf-8")) if has_vanilla else {}
+    except (OSError, ValueError):
+        has_vanilla = False
+        vanilla_data = {}
     vanilla_libraries_ready = has_vanilla and _libraries_are_ready(mc_dir, vanilla_data.get("libraries", []))
     loader_name = profile.loader.lower()
     if loader_name == "fabric":
@@ -249,20 +268,18 @@ def ensure_game_ready(profile: ProfileData, mc_dir: Path, notify: Callable[[str]
         requested = str(getattr(profile, "loader_version", "") or "").strip()
         if requested:
             req_tuple = _parse_loader_version(requested)
-            loader_files = [p for p in all_loader_files if _parse_loader_version(p.parent.name) >= req_tuple]
+            loader_files = [p for p in all_loader_files if (
+                _parse_loader_version(p.parent.name) == req_tuple if profile.profile_type == "raw"
+                else _parse_loader_version(p.parent.name) >= req_tuple)]
         elif version.startswith("26."):
             # 26.x modern Fabric mods (like Kotlin 1.14.1+) require at least Fabric Loader 0.19.5
             loader_files = [p for p in all_loader_files if _parse_loader_version(p.parent.name) >= (0, 19, 5)]
         else:
             loader_files = all_loader_files
     elif loader_name == "forge":
+        from backend.services.loader_versions import installed_forge_metadata
         requested = str(getattr(profile, "loader_version", "") or "").strip()
-        if requested:
-            forge_id = requested if requested.startswith(f"{version}-forge-") else f"{version}-forge-{requested}"
-            candidate = mc_dir / "versions" / forge_id / f"{forge_id}.json"
-            loader_files = [candidate] if candidate.is_file() else []
-        else:
-            loader_files = list((mc_dir / "versions").glob(f"{version}-forge-*/*.json"))
+        loader_files = installed_forge_metadata(mc_dir, version, requested)
     else:
         loader_files = []
     has_loader = bool(loader_files)
@@ -313,7 +330,11 @@ def ensure_game_ready(profile: ProfileData, mc_dir: Path, notify: Callable[[str]
         fabric_meta = LEGACY_FABRIC_META if legacy_fabric else FABRIC_META
         notify("Installiere Legacy-Fabric-Komponenten…" if legacy_fabric else "Installiere Fabric-Komponenten…")
         loaders = _json(f"{fabric_meta}/{version}")
-        loader = next((item for item in loaders if item.get("loader", {}).get("stable")), loaders[0] if loaders else None)
+        requested = str(getattr(profile, "loader_version", "") or "").strip()
+        if profile.profile_type == "raw" and requested:
+            loader = next((item for item in loaders if item.get("loader", {}).get("version") == requested), None)
+        else:
+            loader = next((item for item in loaders if item.get("loader", {}).get("stable")), loaders[0] if loaders else None)
         if not loader:
             raise RuntimeError(f"Kein Fabric-Loader für Minecraft {version} verfügbar.")
         loader_version = loader["loader"]["version"]
@@ -332,11 +353,8 @@ def ensure_game_ready(profile: ProfileData, mc_dir: Path, notify: Callable[[str]
             from backend.services.minecraft_versions import required_java
 
             requested = str(getattr(profile, "loader_version", "") or "").strip()
-            if profile.profile_type == "raw" and not requested:
-                raise RuntimeError("Das Modpack nennt keine exakte Forge-Version.")
-            forge_version = (
-                requested if requested.startswith(f"{version}-forge-") else f"{version}-{requested}"
-            ) if requested else minecraft_launcher_lib.forge.find_forge_version(version)
+            from backend.services.loader_versions import forge_coordinate
+            forge_version = forge_coordinate(version, requested) if requested else minecraft_launcher_lib.forge.find_forge_version(version)
             if not forge_version:
                 raise RuntimeError(f"Für Minecraft {version} ist keine Forge-Version verfügbar.")
             java_bin = install_required_java(mc_dir, required_java(version), notify)
@@ -346,6 +364,7 @@ def ensure_game_ready(profile: ProfileData, mc_dir: Path, notify: Callable[[str]
                 callback={"setStatus": notify, "setProgress": lambda _value: None, "setMax": lambda _value: None},
                 java=str(java_bin),
             )
+            profile.loader_version = forge_version
         except ImportError as exc:
             raise RuntimeError("Forge-Unterstützung fehlt. Bitte minecraft-launcher-lib installieren.") from exc
     notify("Minecraft-Dateien sind vorbereitet.")

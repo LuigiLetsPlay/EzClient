@@ -12,6 +12,7 @@ def test_presence_exposes_verified_client_type(monkeypatch):
         "uuid": "12345678-1234-4234-8234-123456789abc",
         "username": "Nora",
         "client": "norisk",
+        "version": "",
     }]
 
 

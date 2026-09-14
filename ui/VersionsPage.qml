@@ -58,19 +58,19 @@ Item {
     RowLayout {
         anchors.fill: parent; anchors.margins: 22; spacing: 20
         ColumnLayout {
-            Layout.fillWidth: true; Layout.fillHeight: true; spacing: 16
-            RowLayout {
+            Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.fillHeight: true; spacing: 16
+            ColumnLayout {
                 Layout.fillWidth: true
-                ColumnLayout { spacing: 3
-                    Text { text: "MINECRAFT VERSIONEN"; font.family: EzTheme.mcFontFamily; font.pixelSize: 19; font.bold: true; color: EzTheme.text }
-                    Text { text: "Wähle zuerst eine Generation und danach die genaue Version"; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: EzTheme.textMuted }
+                ColumnLayout { Layout.fillWidth: true; spacing: 3
+                    Text { Layout.fillWidth: true; elide: Text.ElideRight; text: EzI18n.text("MINECRAFT VERSIONEN"); font.family: EzTheme.mcFontFamily; font.pixelSize: 19; font.bold: true; color: EzTheme.text }
+                    Text { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: EzI18n.text("Wähle zuerst eine Generation und danach die genaue Version"); font.family: EzTheme.fontFamily; font.pixelSize: 11; color: EzTheme.textMuted }
                 }
                 Item { Layout.fillWidth: true }
-                Rectangle { width: 230; height: 38; radius: 11; color: EzTheme.surface; border.color: search.activeFocus ? EzTheme.accent : EzTheme.border
+                Rectangle { Layout.fillWidth: true; height: 38; radius: 11; color: EzTheme.surface; border.color: search.activeFocus ? EzTheme.accent : EzTheme.border
                     RowLayout { anchors.fill: parent; anchors.margins: 11; spacing: 8
                         Image { source: "icons/search.svg"; width: 14; height: 14; opacity: .55 }
                         TextInput { id: search; Layout.fillWidth: true; color: EzTheme.text; font.family: EzTheme.fontFamily; font.pixelSize: 11; verticalAlignment: TextInput.AlignVCenter; clip: true
-                            Text { anchors.left: parent.left; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideRight; visible: parent.text === ""; text: "Version suchen…"; color: EzTheme.textSubtle; font: parent.font }
+                            Text { anchors.left: parent.left; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideRight; visible: parent.text === ""; text: EzI18n.text("Version suchen…"); color: EzTheme.textSubtle; font: parent.font }
                         }
                     }
                 }
@@ -78,7 +78,7 @@ Item {
             GridView {
                 id: familyGrid
                 Layout.fillWidth: true; Layout.fillHeight: true; clip: true
-                readonly property int columns: Math.max(2, Math.floor(width / 215))
+                readonly property int columns: Math.max(1, Math.floor(width / 215))
                 cellWidth: width / columns; cellHeight: 154; model: root.families
                 delegate: Item {
                     width: familyGrid.cellWidth; height: familyGrid.cellHeight
@@ -123,9 +123,13 @@ Item {
         }
 
         Rectangle {
-            Layout.preferredWidth: 350; Layout.fillHeight: true; radius: 16; color: EzTheme.surface; border.color: EzTheme.border
+            Layout.preferredWidth: root.width < 900 ? 300 : 350; Layout.fillHeight: true; radius: 16; color: EzTheme.surface; border.color: EzTheme.border
+            ScrollView {
+                id: detailsScroll
+                anchors.fill: parent; anchors.margins: 18; clip: true
+                contentWidth: availableWidth
             ColumnLayout {
-                anchors.fill: parent; anchors.margins: 18; spacing: 13
+                width: detailsScroll.availableWidth; spacing: 13
                 Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 156; radius: 13; clip: true
                     Image {
                         anchors.fill: parent
@@ -140,8 +144,8 @@ Item {
                         Text { visible: root.selectedRelease.hasEzClient; text: root.selectedRelease.supportLabel || "EzClient Compatible"; font.family: EzTheme.fontFamily; font.pixelSize: 9; color: "#FFD76A" }
                     }
                 }
-                Text { text: "UNTERVERSION"; font.family: EzTheme.mcFontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
-                Flow { Layout.fillWidth: true; Layout.preferredHeight: 90; spacing: 6
+                Text { text: EzI18n.text("UNTERVERSION"); font.family: EzTheme.mcFontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
+                Flow { Layout.fillWidth: true; Layout.preferredHeight: childrenRect.height; spacing: 6
                     Repeater { model: root.releases
                         Rectangle { width: releaseLabel.implicitWidth + (modelData.hasEzClient ? 14 : 0) + 18; height: 29; radius: 8; color: index === root.selectedReleaseIndex ? EzTheme.accent : EzTheme.surface2; border.color: index === root.selectedReleaseIndex ? EzTheme.accent : EzTheme.border
                             Row {
@@ -157,7 +161,7 @@ Item {
                         }
                     }
                 }
-                Text { text: "SPIELVARIANTE"; font.family: EzTheme.mcFontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
+                Text { text: EzI18n.text("SPIELVARIANTE"); font.family: EzTheme.mcFontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
                 RowLayout { Layout.fillWidth: true; spacing: 8
                     Repeater { model: [ { id: "EzClient", label: "EzClient", icon: "assets/logo.svg" }, { id: "Fabric", label: "Fabric", icon: "assets/fabric-logo.png" }, { id: "Vanilla", label: "Vanilla", icon: "icons/loader-vanilla.svg" }, { id: "Forge", label: "Forge", icon: "icons/forge.svg" } ]
                         Rectangle {
@@ -173,16 +177,16 @@ Item {
                         }
                     }
                 }
-                Item { Layout.fillHeight: true }
                 Rectangle { Layout.fillWidth: true; height: 40; radius: 9; color: EzTheme.bg; border.color: nameInput.activeFocus ? EzTheme.accent : EzTheme.border
                     TextInput { id: nameInput; anchors.fill: parent; anchors.margins: 11; color: EzTheme.text; font.family: EzTheme.fontFamily; font.pixelSize: 11; verticalAlignment: TextInput.AlignVCenter
-                        Text { visible: parent.text === ""; anchors.verticalCenter: parent.verticalCenter; text: "Profilname (optional)"; color: EzTheme.textSubtle; font: parent.font }
+                        Text { visible: parent.text === ""; anchors.verticalCenter: parent.verticalCenter; text: EzI18n.text("Profilname (optional)"); color: EzTheme.textSubtle; font: parent.font }
                     }
                 }
-                Text { visible: root.creatingProfile; Layout.fillWidth: true; text: root.creationStatus || "Prüfe Profil-Kompatibilität …"; horizontalAlignment: Text.AlignHCenter; font.family: EzTheme.fontFamily; font.pixelSize: 9; color: EzTheme.textMuted }
-                EzButton { Layout.fillWidth: true; Layout.preferredHeight: 44; primary: true; enabled: !root.creatingProfile; text: root.creatingProfile ? "Profil wird eingerichtet …" : "Profil erstellen"
+                Text { visible: root.creatingProfile; Layout.fillWidth: true; text: root.creationStatus || EzI18n.text("Prüfe Profil-Kompatibilität …"); horizontalAlignment: Text.AlignHCenter; font.family: EzTheme.fontFamily; font.pixelSize: 9; color: EzTheme.textMuted }
+                EzButton { Layout.fillWidth: true; Layout.preferredHeight: 44; primary: true; enabled: !root.creatingProfile; text: root.creatingProfile ? EzI18n.text("Profil wird eingerichtet …") : EzI18n.text("Profil erstellen")
                     onClicked: { var version = root.selectedRelease.version; if (!version) return; var preset = root.selectedLoader === "EzClient" ? "ezclient" : (root.selectedLoader === "Fabric" ? "performance" : "raw"); var loader = root.selectedLoader === "EzClient" ? "Fabric" : root.selectedLoader; var generatedName = nameInput.text.trim() || root.selectedLoader + " " + version; var profIcon = preset === "ezclient" ? "ezclient" : (loader === "Fabric" ? "box" : (loader === "Forge" ? "forge" : "vanilla")); root.creatingProfile = true; root.creationStatus = "Prüfe Loader und Mods …"; profileController.createAndOnboard(generatedName, version, loader, preset, [], profIcon) }
                 }
+            }
             }
         }
     }

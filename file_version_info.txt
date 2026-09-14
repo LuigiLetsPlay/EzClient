@@ -18,12 +18,12 @@ VSVersionInfo(
           [
             StringStruct('CompanyName', 'Luigi / EzClient'),
             StringStruct('FileDescription', 'EzClient Minecraft Launcher'),
-            StringStruct('FileVersion', '2.1.0.0'),
+            StringStruct('FileVersion', '2.2.0.0'),
             StringStruct('InternalName', 'EzClient'),
             StringStruct('LegalCopyright', 'Copyright (c) 2026 Luigi / EzClient'),
             StringStruct('OriginalFilename', 'EzClient.exe'),
             StringStruct('ProductName', 'EzClient'),
-            StringStruct('ProductVersion', '2.1.0.0')
+            StringStruct('ProductVersion', '2.2.0.0')
           ]
         ),
         StringTable(
@@ -31,12 +31,12 @@ VSVersionInfo(
           [
             StringStruct('CompanyName', 'Luigi / EzClient'),
             StringStruct('FileDescription', 'EzClient Minecraft Launcher'),
-            StringStruct('FileVersion', '2.1.0.0'),
+            StringStruct('FileVersion', '2.2.0.0'),
             StringStruct('InternalName', 'EzClient'),
             StringStruct('LegalCopyright', 'Copyright (c) 2026 Luigi / EzClient'),
             StringStruct('OriginalFilename', 'EzClient.exe'),
             StringStruct('ProductName', 'EzClient'),
-            StringStruct('ProductVersion', '2.1.0.0')
+            StringStruct('ProductVersion', '2.2.0.0')
           ]
         )
       ]

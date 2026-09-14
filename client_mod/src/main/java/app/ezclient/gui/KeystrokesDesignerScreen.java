@@ -166,7 +166,7 @@ public final class KeystrokesDesignerScreen extends Screen {
             }
         }));
 
-        addRenderableWidget(new EzButton(canvasX + (btnW + btnGap) * 2, toolY1, remW, toolRowH, Component.literal("Löschen"), false, b -> {
+        addRenderableWidget(new EzButton(canvasX + (btnW + btnGap) * 2, toolY1, remW, toolRowH, Component.literal(app.ezclient.util.EzI18n.text("Löschen")), false, b -> {
             if (selected != null) {
                 module.removeElement(selected.id());
                 selected = module.elements().isEmpty() ? null : module.elements().getFirst();
@@ -217,7 +217,7 @@ public final class KeystrokesDesignerScreen extends Screen {
         switch (activeTab) {
             case ELEMENT -> {
                 if (selected != null) {
-                    labelInput = new EditBox(font, x, y, w, 18, Component.literal("Beschriftung"));
+                    labelInput = new EditBox(font, x, y, w, 18, Component.literal(app.ezclient.util.EzI18n.text("Beschriftung")));
                     labelInput.setMaxLength(32);
                     labelInput.setValue(selected.label());
                     labelInput.setResponder(val -> module.setElementLabel(selected, val));
@@ -233,7 +233,7 @@ public final class KeystrokesDesignerScreen extends Screen {
 
                     if (selected.binding() == KeystrokesModule.Binding.CUSTOM) {
                         addInspectorWidget(new EzButton(x, y, w, 18,
-                                Component.literal(listeningForKey ? "Taste drücken …" : "Taste: " + keyName(selected.keyCode())),
+                                Component.literal(listeningForKey ? app.ezclient.util.EzI18n.text("Taste drücken …") : app.ezclient.util.EzI18n.text("Taste: ") + keyName(selected.keyCode())),
                                 listeningForKey, b -> {
                             listeningForKey = true;
                             rebuildWidgets();
@@ -472,7 +472,7 @@ public final class KeystrokesDesignerScreen extends Screen {
         mY += 28;
 
         // Row 5: Cancel
-        addRenderableWidget(new EzButton(mInnerX, mY, mInnerW, 20, Component.literal("Abbrechen"), false, b -> {
+        addRenderableWidget(new EzButton(mInnerX, mY, mInnerW, 20, Component.literal(app.ezclient.util.EzI18n.text("Abbrechen")), false, b -> {
             bindingPickerOpen = false;
             rebuildWidgets();
         }));

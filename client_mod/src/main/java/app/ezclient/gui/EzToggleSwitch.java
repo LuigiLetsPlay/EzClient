@@ -27,7 +27,11 @@ public final class EzToggleSwitch extends AbstractButton {
 
     public EzToggleSwitch(int x, int y, int width, int height, Component label, boolean initialState, Consumer<Boolean> onToggle) {
         super(x, y, width, height, label == null ? Component.empty() : label);
-        this.label = label;
+        this.label = label == null ? null : Component.literal(app.ezclient.util.EzI18n.text(label.getString())).withStyle(label.getStyle());
+        if (this.label != null) {
+            setMessage(this.label);
+            setTooltip(net.minecraft.client.gui.components.Tooltip.create(this.label));
+        }
         this.state = initialState;
         this.onToggle = onToggle;
     }
@@ -49,7 +53,7 @@ public final class EzToggleSwitch extends AbstractButton {
             var font = Minecraft.getInstance().font;
             int textColor = hovered ? EzUi.TEXT_WHITE : EzUi.TEXT_LIGHT;
             int textY = getY() + (getHeight() - 8) / 2;
-            graphics.text(font, label, getX(), textY, textColor);
+            graphics.text(font, EzUi.fitText(label, Math.max(1, getWidth() - 30)), getX(), textY, textColor);
 
             int swW = 24;
             int swH = 13;

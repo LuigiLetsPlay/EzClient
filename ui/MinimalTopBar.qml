@@ -22,11 +22,13 @@ Rectangle {
     RowLayout {
         anchors.fill: parent; anchors.leftMargin: 20; spacing: 11; z: 1
         ColumnLayout {
+            Layout.fillWidth: true
+            Layout.minimumWidth: 0
             spacing: 0
-            Text { text: root.routeLabels[root.currentRoute] || "EzClient"; font.family: EzTheme.fontFamily; font.pixelSize: 14; font.bold: true; color: EzTheme.text }
-            Text { text: root.currentRoute === "home" ? "Dein Spiel ist nur einen Klick entfernt" : "EzClient Launcher"; font.family: EzTheme.fontFamily; font.pixelSize: 9; color: EzTheme.textMuted }
+            Text { Layout.fillWidth: true; elide: Text.ElideRight; text: root.currentRoute === "profiles" ? EzI18n.t("nav_profiles", "Profile") : EzI18n.text(root.routeLabels[root.currentRoute] || "EzClient"); font.family: EzTheme.fontFamily; font.pixelSize: 14; font.bold: true; color: EzTheme.text }
+            Text { text: root.currentRoute === "home" ? EzI18n.text("Dein Spiel ist nur einen Klick entfernt") : "EzClient Launcher"; font.family: EzTheme.fontFamily; font.pixelSize: 9; color: EzTheme.textMuted }
         }
-        Item { Layout.fillWidth: true }
+        Item { Layout.preferredWidth: 0 }
 
         // Active Profile Quick-Switcher Pill
         Rectangle {
@@ -167,7 +169,7 @@ Rectangle {
                 contentItem: ColumnLayout {
                     spacing: 5
                     Text { text: root.accountUser; font.family: EzTheme.fontFamily; font.pixelSize: 13; font.bold: true; color: EzTheme.text }
-                    Text { text: root.accountOnline ? "Microsoft-Konto verbunden" : "Offline-Profil"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: root.accountOnline ? EzTheme.accentLight : EzTheme.textMuted }
+                    Text { text: root.accountOnline ? EzI18n.text("Microsoft-Konto verbunden") : EzI18n.text("Offline-Profil"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: root.accountOnline ? EzTheme.accentLight : EzTheme.textMuted }
                     Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border }
 
                     Repeater {
@@ -184,7 +186,7 @@ Rectangle {
                                 ColumnLayout {
                                     Layout.fillWidth: true; spacing: 0
                                     Text { text: modelData.username; font.family: EzTheme.fontFamily; font.pixelSize: 11; font.bold: true; color: EzTheme.text; elide: Text.ElideRight; Layout.fillWidth: true }
-                                    Text { text: modelData.active ? "Aktiver Account" : "Account auswählen"; font.pixelSize: 9; color: modelData.active ? EzTheme.accentLight : EzTheme.textMuted }
+                                    Text { text: modelData.active ? EzI18n.text("Aktiver Account") : EzI18n.text("Account auswählen"); font.pixelSize: 9; color: modelData.active ? EzTheme.accentLight : EzTheme.textMuted }
                                 }
                                 Rectangle {
                                     width: 25; height: 25; radius: 6; color: removeSavedMouse.containsMouse ? "#3B1119" : "transparent"
@@ -198,10 +200,10 @@ Rectangle {
                     Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border }
                     Repeater {
                         model: [
-                            { label: "+  Account hinzufügen", action: "login", danger: false },
-                            { label: "Skin ändern", action: "skin", danger: false },
-                            { label: "Kontoeinstellungen", action: "settings", danger: false },
-                            { label: "Aktiven Account abmelden", action: "logout", danger: true }
+                            { label: EzI18n.text("+  Account hinzufügen"), action: "login", danger: false },
+                            { label: EzI18n.text("Skin ändern"), action: "skin", danger: false },
+                            { label: EzI18n.text("Kontoeinstellungen"), action: "settings", danger: false },
+                            { label: EzI18n.text("Aktiven Account abmelden"), action: "logout", danger: true }
                         ]
                         Rectangle {
                             Layout.fillWidth: true; height: 34; radius: 7; color: accountActionMouse.containsMouse ? (modelData.danger ? "#3B1119" : EzTheme.surfaceHover) : "transparent"

@@ -8,7 +8,7 @@ import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
 /** Compact, clean settings screen for Zoom with configurable Hotkey. */
-public final class ZoomSettingsScreen extends Screen {
+public final class ZoomSettingsScreen extends ScrollingSettingsScreen {
     private final Screen parent;
     private int panelX;
     private int panelY;
@@ -24,25 +24,22 @@ public final class ZoomSettingsScreen extends Screen {
     @Override
     protected void init() {
         ZoomModule zoom = ModuleManager.getInstance().getZoomModule();
-        panelWidth = Math.min(ScrollingSettingsScreen.SETTINGS_WIDTH, width - 48);
-        panelHeight = Math.min(ScrollingSettingsScreen.SETTINGS_HEIGHT, height - 48);
+        panelWidth = settingsPanelWidth();
+        panelHeight = settingsPanelHeight();
         panelX = (width - panelWidth) / 2;
         panelY = (height - panelHeight) / 2;
 
-        addRenderableWidget(new EzButton(panelX + panelWidth - 26, panelY + 6, 18, 16,
+        addFixedWidget(new EzButton(panelX + panelWidth - 26, panelY + 6, 18, 16,
                 Component.literal("✕"), false, ignored -> onClose()));
-        addRenderableWidget(new EzButton(panelX + 6, panelY + 43, ScrollingSettingsScreen.SETTINGS_SIDEBAR_WIDTH - 12, 18,
-                Component.literal("Vorschau"), false, ignored -> EzScreenBridge.set(minecraft, new ModulePreviewScreen(this, zoom))));
+        addFixedWidget(new EzButton(panelX + 6, panelY + 102, ScrollingSettingsScreen.SETTINGS_SIDEBAR_WIDTH - 12, 18,
+                Component.literal(app.ezclient.util.EzI18n.text("Vorschau")), false, ignored -> EzScreenBridge.set(minecraft, new ModulePreviewScreen(this, zoom))));
 
-        String sbHkText = isListeningForHotkey ? "Taste: …" : (zoom.getKeyBind() > 0 || zoom.getKeyBind() <= -100 ? "Key: " + EzKeyBindings.getKeyOrMouseName(zoom.getKeyBind()) : "Taste: Keine");
-        addRenderableWidget(new EzButton(panelX + 6, panelY + 65, ScrollingSettingsScreen.SETTINGS_SIDEBAR_WIDTH - 12, 18,
-                Component.literal(sbHkText), isListeningForHotkey, ignored -> {
-                    isListeningForHotkey = !isListeningForHotkey;
-                    rebuildWidgets();
-                }));
+        addFixedWidget(new EzHotkeyButton(panelX + 6, panelY + 66,
+                SETTINGS_SIDEBAR_WIDTH - 12, zoom.getKeyBind(), isListeningForHotkey,
+                () -> { isListeningForHotkey = !isListeningForHotkey; rebuildWidgets(); }));
 
         int controlX = panelX + ScrollingSettingsScreen.SETTINGS_SIDEBAR_WIDTH + 8;
-        int controlWidth = panelWidth - ScrollingSettingsScreen.SETTINGS_SIDEBAR_WIDTH - 16;
+        int controlWidth = settingsContentWidth(panelWidth);
         int halfWidth = (controlWidth - 6) / 2;
         int y = panelY + 44;
 
@@ -77,18 +74,17 @@ public final class ZoomSettingsScreen extends Screen {
                     rebuildWidgets();
                 }));
 
-        addRenderableWidget(new EzButton(controlX, panelY + panelHeight - 24, controlWidth, 16,
+        addFixedWidget(new EzButton(controlX, panelY + panelHeight - 24, controlWidth, 16,
                 app.ezclient.util.EzI18n.comp("ezclient.zoom.back"), false, ignored -> onClose()));
     }
 
-    private String getKeyName(int key) {
-        if (isListeningForHotkey) return "Taste: …";
-        if (key <= 0 && key > -100) return "Taste: Keine";
-        return "Key: " + EzKeyBindings.getKeyOrMouseName(key);
-    }
+    @Override protected int scrollLeft() { return settingsContentLeft(panelX); }
+    @Override protected int scrollTop() { return panelY + 34; }
+    @Override protected int scrollRight() { return panelX + panelWidth - 8; }
+    @Override protected int scrollBottom() { return panelY + panelHeight - 32; }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent e, boolean doubleClick) {
+    protected boolean settingsMouseClicked(MouseButtonEvent e, boolean doubleClick) {
         if (isListeningForHotkey && e.button() != 0) {
             ZoomModule zoom = ModuleManager.getInstance().getZoomModule();
             int code = -100 - e.button();
@@ -97,7 +93,7 @@ public final class ZoomSettingsScreen extends Screen {
             rebuildWidgets();
             return true;
         }
-        return super.mouseClicked(e, doubleClick);
+        return super.settingsMouseClicked(e, doubleClick);
     }
 
     @Override
@@ -131,7 +127,7 @@ public final class ZoomSettingsScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+    protected void extractSettings(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         EzUi.backdrop(graphics, width, height);
 
         EzUi.panel(graphics, panelX, panelY, panelWidth, panelHeight);
@@ -152,7 +148,7 @@ public final class ZoomSettingsScreen extends Screen {
 
         graphics.fill(panelX + sidebar + 8, panelY + 28, panelX + panelWidth - 8, panelY + 29, EzUi.BORDER_SUBTLE);
 
-        super.extractRenderState(graphics, mouseX, mouseY, delta);
+        super.extractSettings(graphics, mouseX, mouseY, delta);
         boolean hover = children().stream().filter(child -> child instanceof net.minecraft.client.gui.components.AbstractWidget)
                 .map(child -> (net.minecraft.client.gui.components.AbstractWidget) child)
                 .anyMatch(widget -> widget.active && widget.visible && mouseX >= widget.getX() && mouseX < widget.getX() + widget.getWidth()

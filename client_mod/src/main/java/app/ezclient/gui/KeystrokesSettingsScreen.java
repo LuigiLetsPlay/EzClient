@@ -40,7 +40,7 @@ public final class KeystrokesSettingsScreen extends ScrollingSettingsScreen {
 
     private <T extends AbstractWidget> T described(T widget, String description) {
         if (description != null && !description.isBlank()) {
-            widget.setTooltip(Tooltip.create(Component.literal(description)));
+            widget.setTooltip(Tooltip.create(Component.literal(app.ezclient.util.EzI18n.text(description))));
         }
         return widget;
     }
@@ -69,25 +69,14 @@ public final class KeystrokesSettingsScreen extends ScrollingSettingsScreen {
         ), "Keystrokes aktivieren / deaktivieren"));
 
         // Fixed sidebar Hotkey button
-        int sidebarY = panelY + 66;
-        String hotkeyLabel;
-        if (isListeningForHotkey) {
-            hotkeyLabel = "Taste: …";
-        } else if (module.getKeyBind() > 0 || module.getKeyBind() <= -100) {
-            hotkeyLabel = "Key: " + EzKeyBindings.getKeyOrMouseName(module.getKeyBind());
-        } else {
-            hotkeyLabel = "Taste: Keine";
-        }
-        addFixedWidget(described(new EzButton(
-                panelX + 6, sidebarY, SETTINGS_SIDEBAR_WIDTH - 12, 18,
-                Component.literal(hotkeyLabel), isListeningForHotkey,
-                b -> { isListeningForHotkey = !isListeningForHotkey; rebuildWidgets(); }
-        ), "Tastenkombination / Hotkey für Keystrokes festlegen (ESC zum Löschen)"));
+        addFixedWidget(new EzHotkeyButton(panelX + 6, panelY + 66,
+                SETTINGS_SIDEBAR_WIDTH - 12, module.getKeyBind(), isListeningForHotkey,
+                () -> { isListeningForHotkey = !isListeningForHotkey; rebuildWidgets(); }));
 
         // Fixed bottom footer buttons
         addFixedWidget(new EzButton(
                 settingsContentLeft(panelX), panelY + panelHeight - 24, 100, 16,
-                Component.literal("Zurücksetzen"), false,
+                Component.literal(app.ezclient.util.EzI18n.text("Zurücksetzen")), false,
                 b -> {
                     module.resetSettings();
                     ConfigManager.save();
@@ -349,7 +338,7 @@ public final class KeystrokesSettingsScreen extends ScrollingSettingsScreen {
         EzUi.backdrop(g, width, height);
         EzUi.panel(g, panelX, panelY, panelWidth, panelHeight);
 
-        g.text(font, Component.literal("Keystrokes " + app.ezclient.util.EzI18n.get("ezclient.module_settings.title").replace("%s ", "").trim()),
+        g.text(font, EzUi.fitText(getTitle(), panelWidth - SETTINGS_SIDEBAR_WIDTH - 70),
                 settingsContentLeft(panelX), panelY + 10, EzUi.TEXT_WHITE);
 
         g.fill(settingsContentLeft(panelX), panelY + 28, panelX + panelWidth - 8, panelY + 29, EzUi.BORDER_SUBTLE);

@@ -78,6 +78,7 @@ public final class CommunityCapeManager {
     /** Applies a server-sent cape update for one player without waiting for the periodic scan. */
     public static void refreshPlayer(UUID player) {
         if (player == null) return;
+        REMOTE_KEYS.remove(player);
         VISIBLE_CAPES.add(player);
         refreshNearby(List.of(player));
     }
@@ -379,6 +380,11 @@ public final class CommunityCapeManager {
     private static NativeImage bakeCapeFace(BufferedImage source) {
         NativeImage atlas = new NativeImage(256, 128, true);
         double sourceRatio = source.getWidth() / (double) Math.max(1, source.getHeight());
+        if (Math.abs(sourceRatio - 2.0) < 0.05) {
+            blitScaled(source, atlas, 0, 0, source.getWidth(), source.getHeight(), 0, 0, 256, 128);
+            populateElytraAndMakeOpaque(atlas);
+            return atlas;
+        }
         double targetRatio = 10.0 / 16.0;
         int sx = 0, sy = 0, sw = source.getWidth(), sh = source.getHeight();
         if (sourceRatio > targetRatio) { sw = Math.max(1, (int) Math.round(sh * targetRatio)); sx = (source.getWidth() - sw) / 2; }

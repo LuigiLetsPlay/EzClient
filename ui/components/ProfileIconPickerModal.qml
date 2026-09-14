@@ -20,16 +20,16 @@ Item {
     signal iconSelected(string icon)
 
     readonly property var presetIcons: [
-        { id: "grass-block", label: "Grasblock", icon: "grass-block" },
-        { id: "sand-block", label: "Sandblock", icon: "sand-block" },
+        { id: "grass-block", label: EzI18n.text("Grasblock"), icon: "grass-block" },
+        { id: "sand-block", label: EzI18n.text("Sandblock"), icon: "sand-block" },
         { id: "norisk", label: "NoRisk", icon: "norisk" },
         { id: "ezclient", label: "EzClient", icon: "ezclient" },
         { id: "tnt", label: "TNT", icon: "tnt" },
-        { id: "potion", label: "Trank", icon: "potion" },
-        { id: "clock", label: "Uhr", icon: "clock" },
-        { id: "compass", label: "Kompass", icon: "compass" },
-        { id: "star", label: "Netherstern", icon: "star" },
-        { id: "flint", label: "Feuerzeug", icon: "flint" }
+        { id: "potion", label: EzI18n.text("Trank"), icon: "potion" },
+        { id: "clock", label: EzI18n.text("Uhr"), icon: "clock" },
+        { id: "compass", label: EzI18n.text("Kompass"), icon: "compass" },
+        { id: "star", label: EzI18n.text("Netherstern"), icon: "star" },
+        { id: "flint", label: EzI18n.text("Feuerzeug"), icon: "flint" }
     ]
 
     function open(profId, currentIcon, name) {
@@ -82,14 +82,14 @@ Item {
                     spacing: 2
 
                     Text {
-                        text: "Profil-Icon anpassen"
+                        text: EzI18n.text("Profil-Icon anpassen")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 18
                         font.bold: true
                         color: EzTheme.text
                     }
                     Text {
-                        text: "Wähle ein Icon aus oder lade ein eigenes Bild (PNG) hoch."
+                        text: EzI18n.text("Wähle ein Icon aus oder lade ein eigenes Bild (PNG) hoch.")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
                         color: EzTheme.textMuted
@@ -140,7 +140,7 @@ Item {
                     spacing: 4
 
                     Text {
-                        text: root.selectedIcon ? (root.selectedIcon.indexOf("file:") >= 0 ? "Eigenes PNG-Bild" : ("Gewählt: " + root.selectedIcon)) : "Standard-Initialen"
+                        text: root.selectedIcon ? (root.selectedIcon.indexOf("file:") >= 0 ? EzI18n.text("Eigenes PNG-Bild") : (EzI18n.text("Gewählt: ") + root.selectedIcon)) : EzI18n.text("Standard-Initialen")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 13
                         font.bold: true
@@ -148,7 +148,7 @@ Item {
                     }
 
                     Text {
-                        text: "Dieses Icon wird in der Profilübersicht, Titelleiste und Startseite angezeigt."
+                        text: EzI18n.text("Dieses Icon wird in der Profilübersicht, Titelleiste und Startseite angezeigt.")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 10
                         color: EzTheme.textMuted
@@ -158,7 +158,7 @@ Item {
                 }
 
                 EzButton {
-                    text: "Eigenes PNG…"
+                    text: EzI18n.text("Eigenes PNG…")
                     Layout.preferredHeight: 34
                     Layout.preferredWidth: 125
                     onClicked: {
@@ -175,7 +175,7 @@ Item {
             Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border }
 
             Text {
-                text: "Vorlagen:"
+                text: EzI18n.text("Vorlagen:")
                 font.family: EzTheme.fontFamily
                 font.pixelSize: 12
                 font.bold: true
@@ -261,7 +261,7 @@ Item {
                 spacing: 10
 
                 EzButton {
-                    text: "Standard (Initialen)"
+                    text: EzI18n.text("Standard (Initialen)")
                     Layout.preferredHeight: 36
                     Layout.preferredWidth: 140
                     onClicked: {
@@ -272,14 +272,14 @@ Item {
                 Item { Layout.fillWidth: true }
 
                 EzButton {
-                    text: "Abbrechen"
+                    text: EzI18n.text("Abbrechen")
                     Layout.preferredHeight: 36
                     Layout.preferredWidth: 100
                     onClicked: root.close()
                 }
 
                 EzButton {
-                    text: "Speichern"
+                    text: EzI18n.text("Speichern")
                     primary: true
                     Layout.preferredHeight: 36
                     Layout.preferredWidth: 110

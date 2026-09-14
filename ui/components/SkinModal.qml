@@ -101,8 +101,8 @@ Item {
 
     Rectangle {
         anchors.centerIn: parent
-        width: Math.min(840, parent.width - 32)
-        height: Math.min(640, parent.height - 24)
+        width: Math.min(880, parent.width - 24)
+        height: Math.min(680, parent.height - 24)
         radius: 16
         color: "#12141C"
         border.color: EzTheme.borderLight
@@ -154,7 +154,7 @@ Item {
 
                     Text {
                         Layout.alignment: Qt.AlignHCenter
-                        text: "Skin Vorschau"
+                        text: EzI18n.text("Skin Vorschau")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 18
                         font.bold: true
@@ -190,7 +190,7 @@ Item {
                             Text {
                                 id: badgeTxt
                                 anchors.centerIn: parent
-                                text: skinModal.isApplied ? "Aktiv" : "Vorschau"
+                                text: skinModal.isApplied ? EzI18n.text("Aktiv") : EzI18n.text("Vorschau")
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 10
                                 font.bold: true
@@ -217,13 +217,13 @@ Item {
                                 Rectangle {
                                     Layout.fillWidth: true; Layout.fillHeight: true; radius: 6
                                     color: skinModal.skinVariant === "classic" ? EzTheme.accent : "transparent"
-                                    Text { anchors.centerIn: parent; text: "Classic"; font.pixelSize: 11; font.bold: true; color: skinModal.skinVariant === "classic" ? "#000" : EzTheme.textSecondary }
+                                    Text { anchors.centerIn: parent; text: EzI18n.text("Classic"); font.pixelSize: 11; font.bold: true; color: skinModal.skinVariant === "classic" ? "#000" : EzTheme.textSecondary }
                                     MouseArea { anchors.fill: parent; onClicked: skinModal.skinVariant = "classic" }
                                 }
                                 Rectangle {
                                     Layout.fillWidth: true; Layout.fillHeight: true; radius: 6
                                     color: skinModal.skinVariant === "slim" ? EzTheme.accent : "transparent"
-                                    Text { anchors.centerIn: parent; text: "Slim"; font.pixelSize: 11; font.bold: true; color: skinModal.skinVariant === "slim" ? "#000" : EzTheme.textSecondary }
+                                    Text { anchors.centerIn: parent; text: EzI18n.text("Slim"); font.pixelSize: 11; font.bold: true; color: skinModal.skinVariant === "slim" ? "#000" : EzTheme.textSecondary }
                                     MouseArea { anchors.fill: parent; onClicked: skinModal.skinVariant = "slim" }
                                 }
                             }
@@ -242,19 +242,19 @@ Item {
                                 Rectangle {
                                     Layout.fillWidth: true; Layout.fillHeight: true; radius: 6
                                     color: skinModal.currentAnim === "idle" ? EzTheme.surfaceActive : "transparent"
-                                    Text { anchors.centerIn: parent; text: "Idle"; font.pixelSize: 10; font.family: EzTheme.mcFontFamily; color: EzTheme.text }
+                                    Text { anchors.centerIn: parent; text: EzI18n.text("Idle"); font.pixelSize: 10; font.family: EzTheme.mcFontFamily; color: EzTheme.text }
                                     MouseArea { anchors.fill: parent; onClicked: { skinModal.currentAnim = "idle"; modalSkin3D.setAnim("idle") } }
                                 }
                                 Rectangle {
                                     Layout.fillWidth: true; Layout.fillHeight: true; radius: 6
                                     color: skinModal.currentAnim === "walk" ? EzTheme.surfaceActive : "transparent"
-                                    Text { anchors.centerIn: parent; text: "Walk"; font.pixelSize: 10; font.family: EzTheme.mcFontFamily; color: EzTheme.text }
+                                    Text { anchors.centerIn: parent; text: EzI18n.text("Walk"); font.pixelSize: 10; font.family: EzTheme.mcFontFamily; color: EzTheme.text }
                                     MouseArea { anchors.fill: parent; onClicked: { skinModal.currentAnim = "walk"; modalSkin3D.setAnim("walk") } }
                                 }
                                 Rectangle {
                                     Layout.fillWidth: true; Layout.fillHeight: true; radius: 6
                                     color: skinModal.currentAnim === "run" ? EzTheme.surfaceActive : "transparent"
-                                    Text { anchors.centerIn: parent; text: "Run"; font.pixelSize: 10; font.family: EzTheme.mcFontFamily; color: EzTheme.text }
+                                    Text { anchors.centerIn: parent; text: EzI18n.text("Run"); font.pixelSize: 10; font.family: EzTheme.mcFontFamily; color: EzTheme.text }
                                     MouseArea { anchors.fill: parent; onClicked: { skinModal.currentAnim = "run"; modalSkin3D.setAnim("run") } }
                                 }
                             }
@@ -271,34 +271,48 @@ Item {
 
             // ════ RIGHT COLUMN: ACTIONS & LIBRARY ════
             ScrollView {
+                id: skinScroll
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                contentWidth: availableWidth
                 clip: true
+                contentWidth: availableWidth
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                ScrollBar.vertical: ScrollBar {
+                    id: skinScrollBar
+                    policy: ScrollBar.AsNeeded
+                    contentItem: Rectangle {
+                        implicitWidth: 6
+                        implicitHeight: 100
+                        radius: 3
+                        color: skinScrollBar.pressed ? EzTheme.accent : (skinScrollBar.hovered ? EzTheme.accentLight : "#4A5568")
+                    }
+                }
 
                 ColumnLayout {
-                    width: parent.width
-                    spacing: 24
-                    anchors.margins: 24
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
+                    width: skinScroll.availableWidth - 36
+                    x: 18
+                    spacing: 20
+
+                    Item { Layout.preferredHeight: 4 }
 
                     // Header
                     ColumnLayout {
+                        Layout.fillWidth: true
                         spacing: 4
                         Text {
-                            text: "Skin Verwaltung"
+                            text: EzI18n.text("Skin Verwaltung")
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 22
                             font.bold: true
                             color: EzTheme.text
                         }
                         Text {
-                            text: "Wähle einen neuen Skin oder speichere deinen aktuellen."
+                            text: EzI18n.text("Wähle einen neuen Skin oder speichere deinen aktuellen.")
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 13
                             color: EzTheme.textSecondary
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
                         }
                     }
 
@@ -339,7 +353,7 @@ Item {
                             spacing: 12
 
                             Text {
-                                text: "1. Skin in Vorschau laden"
+                                text: EzI18n.text("1. Skin in Vorschau laden")
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 14
                                 font.bold: true
@@ -363,7 +377,7 @@ Item {
                                         TextField {
                                             id: usernameInput
                                             Layout.fillWidth: true
-                                            placeholderText: "Minecraft Name..."
+                                            placeholderText: EzI18n.text("Minecraft Name...")
                                             placeholderTextColor: "#646E82"
                                             color: "#FFF"
                                             font.pixelSize: 12
@@ -373,7 +387,7 @@ Item {
                                         Rectangle {
                                             width: 70; height: 28; radius: 6
                                             color: fetchBtnMouse.containsMouse ? EzTheme.surfaceActive : EzTheme.surface3
-                                            Text { anchors.centerIn: parent; text: "Suchen"; color: EzTheme.text; font.pixelSize: 11; font.bold: true }
+                                            Text { anchors.centerIn: parent; text: EzI18n.text("Suchen"); color: EzTheme.text; font.pixelSize: 11; font.bold: true }
                                             MouseArea {
                                                 id: fetchBtnMouse
                                                 anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
@@ -387,7 +401,7 @@ Item {
                                     }
                                 }
 
-                                Text { text: "ODER"; font.pixelSize: 11; color: EzTheme.textSecondary; font.bold: true }
+                                Text { text: EzI18n.text("ODER"); font.pixelSize: 11; color: EzTheme.textSecondary; font.bold: true }
 
                                 // Upload Button
                                 Rectangle {
@@ -395,7 +409,7 @@ Item {
                                     color: uploadBtnMouse.containsMouse ? EzTheme.surfaceActive : EzTheme.surface3
                                     border.color: EzTheme.border
                                     border.width: 1
-                                    Text { anchors.centerIn: parent; text: "Bild hochladen"; color: EzTheme.text; font.pixelSize: 12; font.bold: true }
+                                    Text { anchors.centerIn: parent; text: EzI18n.text("Bild hochladen"); color: EzTheme.text; font.pixelSize: 12; font.bold: true }
                                     MouseArea {
                                         id: uploadBtnMouse
                                         anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
@@ -437,14 +451,14 @@ Item {
                                 Layout.fillWidth: true
                                 spacing: 2
                                 Text {
-                                    text: "2. Skin anwenden"
+                                    text: EzI18n.text("2. Skin anwenden")
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 14
                                     font.bold: true
                                     color: EzTheme.text
                                 }
                                 Text {
-                                    text: skinModal.isApplied ? "Dieser Skin ist bereits aktiv." : "Diesen Skin jetzt für deinen Account übernehmen."
+                                    text: skinModal.isApplied ? EzI18n.text("Dieser Skin ist bereits aktiv.") : EzI18n.text("Diesen Skin jetzt für deinen Account übernehmen.")
                                     font.pixelSize: 11
                                     color: EzTheme.textSecondary
                                 }
@@ -457,7 +471,7 @@ Item {
                                 border.width: 1
                                 Text {
                                     anchors.centerIn: parent
-                                    text: skinModal.isApplied ? "Aktiv" : "Auswählen"
+                                    text: skinModal.isApplied ? EzI18n.text("Aktiv") : EzI18n.text("Auswählen")
                                     color: skinModal.isApplied ? "#80EEAA" : "#000"
                                     font.pixelSize: 13
                                     font.bold: true
@@ -499,11 +513,12 @@ Item {
                                 Layout.fillWidth: true
                                 Text {
                                     Layout.fillWidth: true
-                                    text: "3. In Bibliothek speichern (Nur für aktiven Skin)"
+                                    text: EzI18n.text("3. In Bibliothek speichern (Nur für aktiven Skin)")
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 14
                                     font.bold: true
                                     color: EzTheme.text
+                                    wrapMode: Text.WordWrap
                                 }
                             }
 
@@ -521,7 +536,7 @@ Item {
                                     TextField {
                                         id: saveNameInput
                                         anchors.fill: parent; anchors.margins: 4
-                                        placeholderText: "Name für die Bibliothek..."
+                                        placeholderText: EzI18n.text("Name für die Bibliothek...")
                                         placeholderTextColor: "#646E82"
                                         color: "#FFF"
                                         font.pixelSize: 12
@@ -537,7 +552,7 @@ Item {
                                     border.width: 1
                                     Text {
                                         anchors.centerIn: parent
-                                        text: "Speichern"
+                                        text: EzI18n.text("Speichern")
                                         color: skinModal.isApplied ? EzTheme.text : EzTheme.textSecondary
                                         font.pixelSize: 12
                                         font.bold: true
@@ -564,7 +579,7 @@ Item {
                         spacing: 12
                         
                         Text {
-                            text: "Meine Skin-Bibliothek"
+                            text: EzI18n.text("Meine Skin-Bibliothek")
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 16
                             font.bold: true
@@ -576,7 +591,7 @@ Item {
                             id: libraryGrid
                             Layout.fillWidth: true
                             Layout.preferredHeight: Math.max(120, Math.ceil(count / 4) * 110)
-                            cellWidth: (parent.width - 36) / 4
+                            cellWidth: Math.floor((width - 8) / 4)
                             cellHeight: 110
                             clip: true
                             interactive: false

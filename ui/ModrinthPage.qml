@@ -189,7 +189,7 @@ Item {
                     spacing: 4
                     Repeater {
                         model: [
-                            { id: "all",        label: "Alle",        icon: "icons/globe.svg" },
+                            { id: "all",        label: EzI18n.text("Alle"),        icon: "icons/globe.svg" },
                             { id: "modrinth",   label: "Modrinth",   icon: "icons/box.svg" },
                             { id: "curseforge", label: "CurseForge", icon: "icons/flame.svg" }
                         ]
@@ -486,7 +486,7 @@ Item {
                             }
 
                             Text {
-                                text: root.curLoading ? "Suche läuft…" : (root.curTotalHits > 0 ? (root.curTotalHits + " Mods") : "0 Mods")
+                                text: root.curLoading ? EzI18n.text("Suche läuft…") : (root.curTotalHits > 0 ? (root.curTotalHits + " Mods") : "0 Mods")
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 11
                                 font.bold: true
@@ -536,7 +536,7 @@ Item {
                         }
 
                         Text {
-                            text: "Keine Ergebnisse"
+                            text: EzI18n.text("Keine Ergebnisse")
                             font.family: EzTheme.mcFontFamily
                             font.pixelSize: 13
                             color: EzTheme.textSubtle
@@ -607,7 +607,7 @@ Item {
                                 }
 
                                 Text {
-                                    text: root.curLoading ? "Lade weitere Inhalte…" : "Mehr laden…"
+                                    text: root.curLoading ? EzI18n.text("Lade weitere Inhalte…") : EzI18n.text("Mehr laden…")
                                     font.family: EzTheme.mcFontFamily
                                     font.pixelSize: 11
                                     font.bold: true
@@ -750,7 +750,7 @@ Item {
                                             Text {
                                                 id: instText
                                                 anchors.centerIn: parent
-                                                text: (window.integratedMods && window.integratedMods.indexOf(modelData.slug) !== -1 ? "Integriert" : EzI18n.t("modrinth_installed", "Installiert"))
+                                                text: (window.integratedMods && window.integratedMods.indexOf(modelData.slug) !== -1 ? EzI18n.text("Integriert") : EzI18n.t("modrinth_installed", "Installiert"))
                                                 font.family: EzTheme.mcFontFamily
                                                 font.pixelSize: 9
                                                 font.bold: true
@@ -796,7 +796,7 @@ Item {
                                         width: Math.min(parent.width - 12, implicitWidth)
                                         horizontalAlignment: Text.AlignHCenter
                                         elide: Text.ElideRight
-                                        text: resultItem.isPending ? "Lädt…" : (resultItem.isInstalled ? (window.integratedMods && window.integratedMods.indexOf(modelData.slug) !== -1 ? "Integriert" : "Installiert") : ((modelData.project_type || modrinthController.projectType) === "modpack" ? "Profil erstellen" : "Installieren"))
+                                        text: resultItem.isPending ? EzI18n.text("Lädt…") : (resultItem.isInstalled ? (window.integratedMods && window.integratedMods.indexOf(modelData.slug) !== -1 ? EzI18n.text("Integriert") : EzI18n.text("Installiert")) : ((modelData.project_type || modrinthController.projectType) === "modpack" ? EzI18n.text("Profil erstellen") : EzI18n.text("Installieren")))
                                         font.family: EzTheme.mcFontFamily
                                         font.pixelSize: 11
                                         font.bold: true
@@ -853,7 +853,7 @@ Item {
                     }
 
                     Text {
-                        text: "Grenze die Erweiterungsbibliothek gezielt ein."
+                        text: EzI18n.text("Grenze die Erweiterungsbibliothek gezielt ein.")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 10
                         color: EzTheme.textMuted
@@ -863,7 +863,7 @@ Item {
 
                     Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: EzTheme.border }
 
-                    Text { text: "Minecraft-Version"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textSecondary }
+                    Text { text: EzI18n.text("Minecraft-Version"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textSecondary }
                     EzComboBox {
                         id: sideVersionCombo
                         model: modrinthController ? modrinthController.gameVersions : []
@@ -877,7 +877,7 @@ Item {
                         }
                     }
 
-                    Text { text: "Kategorie"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textSecondary }
+                    Text { text: EzI18n.text("Kategorie"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textSecondary }
                     EzComboBox {
                         model: ["All", "Optimization", "Utility", "Library", "Adventure", "Decoration", "Technology", "Storage", "Food", "Magic"]
                         Layout.fillWidth: true
@@ -890,7 +890,7 @@ Item {
                         }
                     }
 
-                    Text { text: "Sortierung"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textSecondary }
+                    Text { text: EzI18n.text("Sortierung"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textSecondary }
                     EzComboBox {
                         model: ["relevance", "downloads", "follows", "newest", "updated"]
                         Layout.fillWidth: true
@@ -906,7 +906,7 @@ Item {
                     Item { Layout.fillHeight: true }
 
                     EzButton {
-                        text: "Filter zurücksetzen"
+                        text: EzI18n.text("Filter zurücksetzen")
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
                         onClicked: {
@@ -942,7 +942,7 @@ Item {
                     }
 
                     Text {
-                        text: "Wähle einen Mod für Details"
+                        text: EzI18n.text("Wähle einen Mod für Details")
                         font.family: EzTheme.mcFontFamily
                         font.pixelSize: 12
                         color: EzTheme.textSubtle
@@ -978,7 +978,7 @@ Item {
                                 spacing: 12
 
                                 EzButton {
-                                    text: "‹ Zurück"
+                                    text: EzI18n.text("‹ Zurück")
                                     mcFont: true
                                     Layout.preferredWidth: 92
                                     Layout.preferredHeight: 32
@@ -1027,7 +1027,7 @@ Item {
                                     }
 
                                     Text {
-                                        text: "by " + (root.selMod ? (root.selMod.author || "Modrinth") : "Modrinth")
+                                        text: EzI18n.text("by ") + (root.selMod ? (root.selMod.author || "Modrinth") : "Modrinth")
                                         font.family: EzTheme.fontFamily
                                         font.pixelSize: 10
                                         color: EzTheme.textMuted
@@ -1064,7 +1064,7 @@ Item {
                                 spacing: 8
 
                                 EzButton {
-                                    text: installBanner.isInstalled ? (window.integratedMods && window.integratedMods.indexOf(root.selMod ? root.selMod.slug : "") !== -1 ? "Integriert" : EzI18n.t("modrinth_installed", "Installiert")) : EzI18n.t("modrinth_install", "Installieren")
+                                    text: installBanner.isInstalled ? (window.integratedMods && window.integratedMods.indexOf(root.selMod ? root.selMod.slug : "") !== -1 ? EzI18n.text("Integriert") : EzI18n.t("modrinth_installed", "Installiert")) : EzI18n.t("modrinth_install", "Installieren")
                                     primary: !installBanner.isInstalled
                                     mcFont: true
                                     Layout.fillWidth: true
@@ -1430,7 +1430,7 @@ Item {
                             visible: root.curVersions.length === 0 && root.selectedProjectId !== ""
 
                             Text {
-                                text: root.curVersionFilter === "release" ? "Keine Release-Versionen (stelle Filter auf 'Alle')" : "Lade Versionen von Modrinth…"
+                                text: root.curVersionFilter === "release" ? EzI18n.text("Keine Release-Versionen (stelle Filter auf 'Alle')") : EzI18n.text("Lade Versionen von Modrinth…")
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 11
                                 color: EzTheme.textMuted
@@ -1480,15 +1480,15 @@ Item {
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 2
-                    Text { text: "Abhängigkeits-Warnung"; font.family: EzTheme.mcFontFamily; font.pixelSize: 15; font.bold: true; color: EzTheme.danger }
-                    Text { text: "Wichtige Kern-Modifikation"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
+                    Text { text: EzI18n.text("Abhängigkeits-Warnung"); font.family: EzTheme.mcFontFamily; font.pixelSize: 15; font.bold: true; color: EzTheme.danger }
+                    Text { text: EzI18n.text("Wichtige Kern-Modifikation"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
                 }
             }
 
             Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border }
 
             Text {
-                text: "Warnung: Die Mod '" + (root.pendingDeleteMod ? (root.pendingDeleteMod.title || root.pendingDeleteMod.name || "") : "") + "' wird von folgenden installierten Mods benötigt: " + root.pendingDeleteDeps.join(", ") + ".\n\nDas Löschen kann zu Spielabstürzen führen."
+                text: EzI18n.text("Warnung: Die Mod '") + (root.pendingDeleteMod ? (root.pendingDeleteMod.title || root.pendingDeleteMod.name || "") : "") + EzI18n.text("' wird von folgenden installierten Mods benötigt: ") + root.pendingDeleteDeps.join(", ") + EzI18n.text(".\n\nDas Löschen kann zu Spielabstürzen führen.")
                 font.family: EzTheme.fontFamily
                 font.pixelSize: 11
                 color: EzTheme.text
@@ -1504,14 +1504,14 @@ Item {
                 spacing: 10
 
                 EzButton {
-                    text: "Abbrechen"
+                    text: EzI18n.text("Abbrechen")
                     Layout.fillWidth: true
                     Layout.preferredHeight: 34
                     onClicked: depWarningModal.close()
                 }
 
                 EzButton {
-                    text: "Trotzdem löschen"
+                    text: EzI18n.text("Trotzdem löschen")
                     danger: true
                     mcFont: true
                     Layout.fillWidth: true
@@ -1576,14 +1576,14 @@ Item {
                     ColumnLayout {
                         spacing: 2
                         Text {
-                            text: "Iris Shaders Mod empfohlen"
+                            text: EzI18n.text("Iris Shaders Mod empfohlen")
                             font.family: EzTheme.mcFontFamily
                             font.pixelSize: 14
                             font.bold: true
                             color: "#38BDF8"
                         }
                         Text {
-                            text: "Shader benötigen eine Shader-Engine wie Iris, um in Minecraft dargestellt zu werden."
+                            text: EzI18n.text("Shader benötigen eine Shader-Engine wie Iris, um in Minecraft dargestellt zu werden.")
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 11
                             color: EzTheme.textSecondary
@@ -1596,7 +1596,7 @@ Item {
                 Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border }
 
                 Text {
-                    text: "Möchtest du Iris Shaders automatisch mitinstallieren?"
+                    text: EzI18n.text("Möchtest du Iris Shaders automatisch mitinstallieren?")
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 12
                     font.bold: true
@@ -1610,7 +1610,7 @@ Item {
                     spacing: 10
 
                     EzButton {
-                        text: "Nur Shader installieren"
+                        text: EzI18n.text("Nur Shader installieren")
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
                         onClicked: {
@@ -1622,7 +1622,7 @@ Item {
                     }
 
                     EzButton {
-                        text: "Iris & Shader installieren"
+                        text: EzI18n.text("Iris & Shader installieren")
                         primary: true
                         iconSource: "check.svg"
                         mcFont: true

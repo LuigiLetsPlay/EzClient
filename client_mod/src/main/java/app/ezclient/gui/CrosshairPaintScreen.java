@@ -37,6 +37,7 @@ public final class CrosshairPaintScreen extends Screen {
     private int gridX, gridY;
     private boolean painting;
     private boolean paintValue;
+    private boolean isListeningForHotkey;
 
     public CrosshairPaintScreen(Screen parent, CrosshairModule crosshair) {
         this(parent, crosshair, null, null);
@@ -167,7 +168,7 @@ public final class CrosshairPaintScreen extends Screen {
             // Row 4: Tools (Leeren / Kreuz)
             int toolBtnW = (rightW - 4) / 2;
             addRenderableWidget(new EzButton(rightX, toolsY, toolBtnW, 18,
-                    Component.literal("Leeren"), false,
+                    Component.literal(app.ezclient.util.EzI18n.text("Leeren")), false,
                     b -> {
                         crosshair.clearPaint();
                         ConfigManager.save();
@@ -180,7 +181,7 @@ public final class CrosshairPaintScreen extends Screen {
             // Row 5: Target rules for any Entity and Block
             int rulesY = toolsY + 22;
             addRenderableWidget(new EzButton(rightX, rulesY, rightW, 18,
-                    Component.literal("Ziel-Regeln (Entity & Block) …"), false,
+                    Component.literal(app.ezclient.util.EzI18n.text("Ziel-Regeln (Entity & Block) …")), false,
                     b -> {
                         if (minecraft != null) {
                             EzScreenBridge.set(minecraft, new CrosshairTargetSettingsScreen(this, crosshair));
@@ -206,7 +207,7 @@ public final class CrosshairPaintScreen extends Screen {
             int toolsY = colorRowY + 40;
             int toolBtnW = (rightW - 4) / 3;
             addRenderableWidget(new EzButton(rightX, toolsY, toolBtnW, 18,
-                    Component.literal("Leeren"), false,
+                    Component.literal(app.ezclient.util.EzI18n.text("Leeren")), false,
                     b -> {
                         clearTargetPixels();
                         rebuildWidgets();
@@ -243,9 +244,15 @@ public final class CrosshairPaintScreen extends Screen {
                     }));
         }
 
+        if (!isTargetRule) {
+            addRenderableWidget(new EzHotkeyButton(gridX, panelY + 204, CrosshairModule.PAINT_SIZE * CELL,
+                    crosshair.getKeyBind(), isListeningForHotkey,
+                    () -> { isListeningForHotkey = !isListeningForHotkey; rebuildWidgets(); }));
+        }
+
         // Done button
         addRenderableWidget(new EzButton(rightX, panelY + panelHeight - 24, rightW, 18,
-                Component.literal("Fertig"), true,
+                Component.literal(app.ezclient.util.EzI18n.text("Fertig")), true,
                 b -> onClose()));
     }
 
@@ -310,6 +317,12 @@ public final class CrosshairPaintScreen extends Screen {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        if (isListeningForHotkey && event.button() != 0) {
+            EzKeyBindings.applyModuleKeyBind(crosshair, -100 - event.button());
+            isListeningForHotkey = false;
+            rebuildWidgets();
+            return true;
+        }
         if (event.button() == 0 || event.button() == 1) {
             paintValue = event.button() == 0;
             if (paint(event.x(), event.y(), paintValue)) {
@@ -341,6 +354,18 @@ public final class CrosshairPaintScreen extends Screen {
         }
 
         return super.mouseClicked(event, doubleClick);
+    }
+
+    @Override
+    public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+        if (isListeningForHotkey) {
+            int key = event.key();
+            EzKeyBindings.applyModuleKeyBind(crosshair, key == 256 || key == 259 || key == 261 ? -1 : key);
+            isListeningForHotkey = false;
+            rebuildWidgets();
+            return true;
+        }
+        return super.keyPressed(event);
     }
 
     @Override
@@ -437,7 +462,7 @@ public final class CrosshairPaintScreen extends Screen {
         EzUi.roundedRect(g, rightX, previewBoxY, rightW, previewBoxH, 4, 0xEE090D12);
         g.outline(rightX, previewBoxY, rightW, previewBoxH, EzUi.BORDER_SUBTLE);
 
-        g.text(font, Component.literal("Live-Vorschau"), rightX + 6, previewBoxY + 5, EzUi.TEXT_DIM, false);
+        g.text(font, Component.literal(app.ezclient.util.EzI18n.text("Live-Vorschau")), rightX + 6, previewBoxY + 5, EzUi.TEXT_DIM, false);
 
         int previewCenterX = rightX + rightW / 2;
         int previewCenterY = previewBoxY + previewBoxH / 2 + 2;

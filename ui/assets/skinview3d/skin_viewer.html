@@ -141,10 +141,10 @@
 
   let capeAnimTimer = null;
   let capeAnimImg = null;
-  let capeAnimCanvas = null;
-  let capeAnimCtx = null;
+  let capeAnimGeneration = 0;
 
   function stopCapeAnimation() {
+    capeAnimGeneration++;
     if (capeAnimTimer) {
       clearInterval(capeAnimTimer);
       capeAnimTimer = null;
@@ -154,11 +154,19 @@
 
   function setCape(capeUrl) {
     stopCapeAnimation();
+    currentAnimSheet = "";
     if (!skinViewer) return;
     if (!capeUrl) {
       skinViewer.resetCape();
     } else {
-      skinViewer.loadCape(capeUrl);
+      const generation = capeAnimGeneration;
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        if (generation === capeAnimGeneration) skinViewer.loadCape(img);
+      };
+      img.onerror = () => console.warn("Cape preview could not be loaded");
+      img.src = capeUrl;
     }
   }
 
@@ -169,17 +177,18 @@
     if (!skinViewer || !sheetUrl) return;
 
     currentAnimSheet = sheetUrl;
+    const generation = capeAnimGeneration;
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
-      if (currentAnimSheet !== sheetUrl) return;
+      if (generation !== capeAnimGeneration || currentAnimSheet !== sheetUrl) return;
       capeAnimImg = img;
       const count = Math.max(1, Number(frameCount) || 1);
       const fFps = Math.max(1, Math.min(60, Number(fps) || 12));
       const cols = Math.max(1, Number(columns) || count);
       const fw = Math.max(1, Number(frameW) || 256);
       const fh = Math.max(1, Number(frameH) || 128);
-      const intervalMs = Math.max(16, Math.round(1000 / fFps));
+      const intervalMs = 1000 / fFps;
 
       if (skinViewer.capeCanvas) {
         skinViewer.capeCanvas.width = fw;
@@ -193,7 +202,8 @@
         skinViewer.playerObject.elytra.material.needsUpdate = true;
       }
 
-      let currentFrame = 0;
+      const startTime = performance.now();
+      let currentFrame = -1;
 
       function renderFrame(idx) {
         if (!skinViewer || !capeAnimImg || !skinViewer.capeCanvas) return;
@@ -217,16 +227,19 @@
         }
       }
 
-      renderFrame(0);
-
       capeAnimTimer = setInterval(() => {
-        if (!skinViewer || !capeAnimImg) {
+        if (generation !== capeAnimGeneration || !skinViewer || !capeAnimImg) {
           stopCapeAnimation();
           return;
         }
-        currentFrame = (currentFrame + 1) % count;
-        renderFrame(currentFrame);
-      }, intervalMs);
+        const nextFrame = Math.floor((performance.now() - startTime) / intervalMs) % count;
+        if (nextFrame !== currentFrame) {
+          currentFrame = nextFrame;
+          renderFrame(currentFrame);
+        }
+      }, Math.max(16, Math.min(50, intervalMs / 2)));
+      renderFrame(0);
+      currentFrame = 0;
     };
     img.src = sheetUrl;
   }

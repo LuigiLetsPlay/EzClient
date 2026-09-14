@@ -256,7 +256,7 @@ public final class OverallHudSettingsScreen extends Screen {
         // Reset Button (Bottom Right)
         addRenderableWidget(new EzButton(
                 panelX + panelWidth - 76, panelY + panelHeight - 26, 64, 16,
-                Component.literal("Reset"), false,
+                Component.literal(app.ezclient.util.EzI18n.text("Reset")), false,
                 b -> showResetConfirmation = true
         ));
     }
@@ -484,10 +484,10 @@ public final class OverallHudSettingsScreen extends Screen {
             g.centeredText(font, Component.literal("Dies überschreibt alle Module!"), diaX + diaW / 2, diaY + 32, 0xFFA0A0A0);
 
             EzUi.roundedRect(g, diaX + 14, diaY + 52, 100, 20, 3, 0xFFCC3333);
-            g.centeredText(font, Component.literal("Zurücksetzen"), diaX + 64, diaY + 58, 0xFFFFFFFF);
+            g.centeredText(font, Component.literal(app.ezclient.util.EzI18n.text("Zurücksetzen")), diaX + 64, diaY + 58, 0xFFFFFFFF);
 
             EzUi.roundedRect(g, diaX + 126, diaY + 52, 100, 20, 3, 0xFF2A3441);
-            g.centeredText(font, Component.literal("Abbrechen"), diaX + 176, diaY + 58, 0xFFFFFFFF);
+            g.centeredText(font, Component.literal(app.ezclient.util.EzI18n.text("Abbrechen")), diaX + 176, diaY + 58, 0xFFFFFFFF);
         }
     }
 

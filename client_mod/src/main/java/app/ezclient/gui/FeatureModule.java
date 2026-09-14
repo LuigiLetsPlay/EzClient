@@ -8,9 +8,18 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 /** Declarative, validated settings shared by the third module package. */
 public abstract class FeatureModule extends HudModule {
     private static final Map<Class<?>, FeatureModule> INSTANCES = new java.util.concurrent.ConcurrentHashMap<>();
-    public record Option(String key, String label, Object initial, double min, double max, String[] choices) {}
+    public record Option(String key, String label, Object initial, double min, double max, String[] choices) {
+        @Override public String label() {
+            String suffix = " #AARRGGBB";
+            return label.endsWith(suffix)
+                    ? app.ezclient.util.EzI18n.text(label.substring(0, label.length() - suffix.length())) + suffix
+                    : app.ezclient.util.EzI18n.text(label);
+        }
+    }
     /** Presentation metadata lives beside values so old configs and old modules remain compatible. */
-    public record SettingInfo(String category, String description) {}
+    public record SettingInfo(String category, String description) {
+        @Override public String description() { return app.ezclient.util.EzI18n.text(description); }
+    }
     private final List<Option> options = new ArrayList<>();
     private final Map<String, Object> values = new LinkedHashMap<>();
     private final Map<String, SettingInfo> settingInfo = new LinkedHashMap<>();

@@ -78,19 +78,9 @@ public final class HudSettingsScreen extends Screen {
                 Component.literal("✕"), false, ignored -> onClose()
         ));
 
-        String hotkeyLabel;
-        if (isListeningForHotkey) {
-            hotkeyLabel = "Taste: …";
-        } else if (module.getKeyBind() > 0 || module.getKeyBind() <= -100) {
-            hotkeyLabel = "Key: " + EzKeyBindings.getKeyOrMouseName(module.getKeyBind());
-        } else {
-            hotkeyLabel = "Taste: Keine";
-        }
-        addRenderableWidget(new EzButton(
-                panelX + panelWidth - 110, panelY + 6, 80, 16,
-                Component.literal(hotkeyLabel), isListeningForHotkey,
-                b -> { isListeningForHotkey = !isListeningForHotkey; rebuildWidgets(); }
-        ));
+        addRenderableWidget(new EzHotkeyButton(panelX + 12, panelY + 38, 124,
+                module.getKeyBind(), isListeningForHotkey,
+                () -> { isListeningForHotkey = !isListeningForHotkey; rebuildWidgets(); }));
 
         // ── LEFT SIDE: Box & Border toggles under preview ──
         int prevX = panelX + 12;
@@ -785,7 +775,7 @@ public final class HudSettingsScreen extends Screen {
                     b -> { timer.set("pauseMenus", !timer.flag("pauseMenus")); rebuildWidgets(); }
             ));
         } else {
-            EditBox prefix = new EditBox(font, rightX + 36, row1Y, 80, 16, Component.literal("Prefix"));
+            EditBox prefix = new EditBox(font, rightX + 36, row1Y, 80, 16, Component.literal(app.ezclient.util.EzI18n.text("Prefix")));
             prefix.setValue(module.getPrefix());
             prefix.setResponder(module::setPrefix);
             addRenderableWidget(prefix);
@@ -1309,14 +1299,14 @@ public final class HudSettingsScreen extends Screen {
         g.pose().pushMatrix();
         g.pose().translate(panelX + 14, panelY + 9);
         g.pose().scale(1.15f, 1.15f);
-        g.text(font, app.ezclient.util.EzI18n.get("ezclient.hud_settings.title", module.getDisplayName()), 0, 0, EzUi.TEXT_WHITE);
+        g.text(font, EzUi.fitText(getTitle(), (int) ((panelWidth - 48) / 1.15f)), 0, 0, EzUi.TEXT_WHITE);
         g.pose().popMatrix();
 
         g.fill(panelX + 14, panelY + 28, panelX + panelWidth - 14, panelY + 29, EzUi.BORDER_SUBTLE);
 
         // ── LEFT SIDE: Preview Box ──
         int prevX = panelX + 12;
-        int prevY = panelY + 38;
+        int prevY = panelY + 74;
         int prevW = 124;
         int previewButtonY = panelY + panelHeight - 44;
         int prevH = Math.max(80, previewButtonY - prevY - 4);

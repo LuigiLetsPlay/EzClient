@@ -76,14 +76,14 @@ Rectangle {
                 ColumnLayout {
                     spacing: 2
                     Text {
-                        text: "Hintergrundbild anpassen"
+                        text: EzI18n.text("Hintergrundbild anpassen")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 16
                         font.bold: true
                         color: EzTheme.text
                     }
                     Text {
-                        text: "Wähle ein individuelles Wallpaper für das EzClient-Hauptmenü"
+                        text: EzI18n.text("Wähle ein individuelles Wallpaper für das EzClient-Hauptmenü")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
                         color: EzTheme.textSecondary
@@ -167,7 +167,7 @@ Rectangle {
                         Layout.alignment: Qt.AlignHCenter
                         width: 110; height: 26; radius: 13
                         color: "#22C96E"
-                        Text { text: "▶ SPIELEN"; font.family: EzTheme.fontFamily; font.pixelSize: 10; font.bold: true; color: "#000"; anchors.centerIn: parent }
+                        Text { text: EzI18n.text("▶ SPIELEN"); font.family: EzTheme.fontFamily; font.pixelSize: 10; font.bold: true; color: "#000"; anchors.centerIn: parent }
                     }
                 }
 
@@ -177,7 +177,7 @@ Rectangle {
                     height: 22; width: 92; radius: 4
                     color: "#C0000000"
                     border.color: EzTheme.borderLight; border.width: 1
-                    Text { text: "Live-Vorschau"; color: EzTheme.accentLight; font.pixelSize: 10; anchors.centerIn: parent; font.bold: true }
+                    Text { text: EzI18n.text("Live-Vorschau"); color: EzTheme.accentLight; font.pixelSize: 10; anchors.centerIn: parent; font.bold: true }
                 }
             }
 
@@ -187,7 +187,7 @@ Rectangle {
                 spacing: 10
 
                 EzButton {
-                    text: "Neues Bild wählen…"
+                    text: EzI18n.text("Neues Bild wählen…")
                     mcFont: false
                     implicitHeight: 34
                     Layout.fillWidth: true
@@ -200,7 +200,7 @@ Rectangle {
                 }
 
                 EzButton {
-                    text: "Standard Artwork"
+                    text: EzI18n.text("Standard Artwork")
                     mcFont: false
                     implicitHeight: 34
                     danger: true
@@ -219,7 +219,7 @@ Rectangle {
                 spacing: 6
 
                 Text {
-                    text: "Bild-Skalierung (Fit Mode):"
+                    text: EzI18n.text("Bild-Skalierung (Fit Mode):")
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 11
                     font.bold: true
@@ -232,9 +232,9 @@ Rectangle {
 
                     Repeater {
                         model: [
-                            { id: "PreserveAspectCrop", label: "Ausfüllen (Cover)" },
-                            { id: "PreserveAspectFit", label: "Einpassen (Contain)" },
-                            { id: "Stretch", label: "Gestreckt (Stretch)" }
+                            { id: "PreserveAspectCrop", label: EzI18n.text("Ausfüllen (Cover)") },
+                            { id: "PreserveAspectFit", label: EzI18n.text("Einpassen (Contain)") },
+                            { id: "Stretch", label: EzI18n.text("Gestreckt (Stretch)") }
                         ]
 
                         Rectangle {
@@ -274,7 +274,7 @@ Rectangle {
                 RowLayout {
                     Layout.fillWidth: true
                     Text {
-                        text: "Deckkraft & Helligkeit:"
+                        text: EzI18n.text("Deckkraft & Helligkeit:")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
                         font.bold: true
@@ -310,14 +310,14 @@ Rectangle {
                 Item { Layout.fillWidth: true }
 
                 EzButton {
-                    text: "Abbrechen"
+                    text: EzI18n.text("Abbrechen")
                     implicitHeight: 38
                     Layout.preferredWidth: 100
                     onClicked: bgModal.close()
                 }
 
                 EzButton {
-                    text: "Speichern & Anwenden"
+                    text: EzI18n.text("Speichern & Anwenden")
                     primary: true
                     implicitHeight: 38
                     Layout.preferredWidth: 180

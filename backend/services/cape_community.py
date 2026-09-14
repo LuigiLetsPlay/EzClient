@@ -234,3 +234,76 @@ def activate_cape(cape_id: str, owner: str, owner_uuid: str, token: str, access_
     with urllib.request.urlopen(request, timeout=10) as response:
         return json.loads(response.read())
 
+
+def delete_cape(
+    cape_id: str,
+    owner: str,
+    owner_uuid: str,
+    token: str = "",
+    access_token: str = "",
+) -> dict:
+    """Delete a player's own cape from the community server with strict token/session verification."""
+    if not re.fullmatch(r"[a-f0-9-]{36}", cape_id):
+        raise ValueError("Ungültige Cape-ID.")
+    canonical_uuid = normalize_player_uuid(owner_uuid)
+
+    payload = {
+        "cape_id": cape_id,
+        "owner": owner,
+        "owner_uuid": canonical_uuid,
+        "token": token or "",
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": f"EzClient/{APP_VERSION}",
+        "X-Player-UUID": canonical_uuid,
+    }
+
+    if urllib.parse.urlparse(_base_url()).scheme == "https" and access_token:
+        headers["Authorization"] = f"Bearer {access_token}"
+    elif not token and access_token:
+        try:
+            with urllib.request.urlopen(f"{_base_url()}/capes/challenge", timeout=8) as response:
+                challenge = json.load(response)["challenge"]
+            if re.fullmatch(r"[a-f0-9]{40}", challenge):
+                proof = json.dumps({
+                    "accessToken": access_token,
+                    "selectedProfile": canonical_uuid.replace("-", ""),
+                    "serverId": challenge,
+                }).encode()
+                join = urllib.request.Request(
+                    "https://sessionserver.mojang.com/session/minecraft/join",
+                    data=proof,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(join, timeout=10):
+                    pass
+                payload["challenge"] = challenge
+        except Exception:
+            pass
+
+    if token:
+        headers["X-EzClient-Cape-Token"] = token
+
+    data = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        f"{_base_url()}/capes/{urllib.parse.quote(cape_id)}/delete",
+        data=data,
+        method="POST",
+        headers=headers,
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        try:
+            err_data = json.loads(exc.read().decode("utf-8"))
+            err_msg = err_data.get("error") or str(exc)
+        except Exception:
+            err_msg = str(exc)
+        raise ValueError(err_msg)
+
+

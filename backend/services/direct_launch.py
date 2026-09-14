@@ -129,7 +129,7 @@ def is_rule_allowed(rule_obj: dict[str, Any]) -> bool:
 
     return allowed
 
-def find_version_meta(mc_dir: Path, mc_version: str, loader: str = "Fabric") -> Tuple[Optional[Path], dict[str, Any], Optional[Path], dict[str, Any]]:
+def find_version_meta(mc_dir: Path, mc_version: str, loader: str = "Fabric", loader_version: str = "") -> Tuple[Optional[Path], dict[str, Any], Optional[Path], dict[str, Any]]:
     """
     Finds and parses the version JSONs for Fabric Loader and inherited Vanilla base version.
     Returns: (fabric_path, fabric_json, vanilla_path, vanilla_json)
@@ -144,20 +144,22 @@ def find_version_meta(mc_dir: Path, mc_version: str, loader: str = "Fabric") -> 
     if loader.lower() == "fabric":
         # 1. Exact match with mc_version
         candidates = list(versions_dir.glob(f"fabric-loader-*-{mc_version}"))
-        if not candidates:
-            # 2. General fabric match
-            candidates = list(versions_dir.glob("fabric-loader-*"))
+        if loader_version:
+            candidates = [path for path in candidates if path.name == f"fabric-loader-{loader_version}-{mc_version}"]
         if candidates:
             from backend.services.game_bootstrap import _parse_loader_version
             candidates.sort(key=lambda p: _parse_loader_version(p.name), reverse=True)
-            chosen = candidates[0]
-            json_file = chosen / f"{chosen.name}.json"
-            if json_file.exists():
+            for chosen in candidates:
+                json_file = chosen / f"{chosen.name}.json"
                 try:
+                    candidate_data = json.loads(json_file.read_text(encoding="utf-8"))
+                    if candidate_data.get("inheritsFrom") != mc_version:
+                        continue
                     fabric_path = json_file
-                    fabric_data = json.loads(json_file.read_text(encoding="utf-8"))
-                except Exception:
-                    pass
+                    fabric_data = candidate_data
+                    break
+                except (OSError, ValueError):
+                    continue
 
     # Vanilla base version resolution
     inherits = fabric_data.get("inheritsFrom", mc_version) if fabric_data else mc_version
@@ -190,12 +192,12 @@ def extract_natives(mc_dir: Path, libraries: list[dict[str, Any]], natives_dir: 
         native_artifact = None
         native_map = lib.get("natives", {})
         if native_map:
-            from backend.services.game_bootstrap import _library_artifact
+            from backend.services.game_bootstrap import _native_artifact
 
             platform_key = "windows" if is_win else ("osx" if sys.platform == "darwin" else "linux")
             if native_map.get(platform_key):
                 is_native = True
-                native_artifact = _library_artifact(lib)
+                native_artifact = _native_artifact(lib)
         if is_win:
             if ":natives-windows" in name:
                 if "-arm64" not in name and not (name.endswith("-x86") or ":natives-windows-x86:" in name):
@@ -219,9 +221,8 @@ def extract_natives(mc_dir: Path, libraries: list[dict[str, Any]], natives_dir: 
                             if member.endswith(".dll") or member.endswith(".so") or member.endswith(".dylib"):
                                 fname = Path(member).name
                                 target = natives_dir / fname
-                                if not target.exists():
-                                    with zf.open(member) as src, open(target, "wb") as dst:
-                                        shutil.copyfileobj(src, dst)
+                                with zf.open(member) as src, open(target, "wb") as dst:
+                                    shutil.copyfileobj(src, dst)
                 except Exception as e:
                     print(f"[DirectLaunch] Native extraction warning for {name}: {e}")
 
@@ -355,19 +356,12 @@ def launch_minecraft_direct(
                 notify("Microsoft-Anmeldung mit einer Minecraft-Java-Lizenz ist zum Starten erforderlich.")
                 return None
             requested = str(getattr(profile, "loader_version", "") or "").strip()
-            if profile.profile_type == "raw" and not requested:
-                notify("Das Modpack nennt keine exakte Forge-Version.")
-                return None
-            expected_id = (
-                requested if requested.startswith(f"{profile.minecraft_version}-forge-")
-                else f"{profile.minecraft_version}-forge-{requested}"
-            ) if requested else ""
-            expected_dir = mc / "versions" / expected_id if expected_id else None
-            forge_versions = [expected_dir] if expected_dir and expected_dir.is_dir() else list((mc / "versions").glob(f"{profile.minecraft_version}-forge-*"))
+            from backend.services.loader_versions import installed_forge_metadata
+            forge_versions = installed_forge_metadata(mc, profile.minecraft_version, requested)
             if not forge_versions:
                 notify("Forge wurde nicht vollständig installiert.")
                 return None
-            installed_version = expected_id or max(forge_versions, key=lambda path: path.stat().st_mtime).name
+            installed_version = forge_versions[0].parent.name
             java_bin = install_required_java(mc, required_java(profile.minecraft_version), notify)
             command = minecraft_launcher_lib.command.get_minecraft_command(
                 installed_version,
@@ -423,11 +417,16 @@ def launch_minecraft_direct(
     # 1. Version and libraries lookup
     notify(f"Suche Version {profile.minecraft_version} & Fabric-Dateien…")
     fabric_file, fabric_data, vanilla_file, vanilla_data = find_version_meta(
-        mc, profile.minecraft_version, profile.loader
+        mc, profile.minecraft_version, profile.loader,
+        profile.loader_version if profile.profile_type == "raw" else "",
     )
 
     if not vanilla_data and not fabric_data:
         notify(f"Fehler: Keine Spieldateien für {profile.minecraft_version} in .minecraft/versions gefunden.")
+        return None
+
+    if profile.loader.lower() == "fabric" and not fabric_data:
+        notify(f"Fehler: Fabric für Minecraft {profile.minecraft_version} wurde nicht vollständig installiert.")
         return None
 
     inherits = fabric_data.get("inheritsFrom", profile.minecraft_version) if fabric_data else profile.minecraft_version
@@ -457,7 +456,7 @@ def launch_minecraft_direct(
         name = lib.get("name", "")
 
         # Native-only entries belong in java.library.path, not on the Java classpath.
-        if ":natives-" in name or lib.get("natives"):
+        if ":natives-" in name or (lib.get("natives") and not lib.get("downloads", {}).get("artifact")):
             continue
 
         # Fabric metadata comes first. Keep its replacement when both metadata
@@ -508,26 +507,36 @@ def launch_minecraft_direct(
     asset_index = vanilla_data.get("assetIndex", {}).get("id", inherits)
     main_class = fabric_data.get("mainClass", "net.fabricmc.loader.impl.launch.knot.KnotClient") if fabric_data else vanilla_data.get("mainClass", "net.minecraft.client.main.Main")
 
+    # Dynamic initial heap to avoid expensive heap resizing during mod loading
+    init_ram = max(2048, min(ram, 4096)) if ram >= 2048 else ram
+    # Dynamic compiler threads: on <=4 core CPUs, 2 compiler threads prevents starving worker threads
+    cpu_count = os.cpu_count() or 4
+    ci_compilers = max(2, min(4, cpu_count // 2 if cpu_count <= 4 else cpu_count - 2))
+
     # Ultra-Fast High-Performance JVM Flags (Instant-Boot + Zero Stutter)
     jvm_args = [
         java_bin,
         f"-Xmx{ram}M",
-        f"-Xms512M",
+        f"-Xms{init_ram}M",
         "-XX:+UnlockExperimentalVMOptions",
         "-XX:+UseG1GC",
         "-XX:G1NewSizePercent=20",
         "-XX:G1ReservePercent=20",
         "-XX:MaxGCPauseMillis=30",
-        "-XX:G1HeapRegionSize=32M",
         "-XX:+ParallelRefProcEnabled",
         "-XX:+OptimizeStringConcat",
-        "-XX:+UseStringDeduplication",
-        "-XX:CICompilerCount=4",
+        f"-XX:CICompilerCount={ci_compilers}",
         "-XX:+TieredCompilation",
         "-XX:+PerfDisableSharedMem",
         "-XX:+DisableExplicitGC",
         "-Djava.lang.invoke.stringConcat=BC_SB",
         "-Dlog4j2.formatMsgNoLookups=true",
+        "-Dfabric.log.disableAnsi=true",
+    ]
+    if required_java_major >= 17:
+        jvm_args.append("--enable-native-access=ALL-UNNAMED")
+
+    jvm_args.extend([
         f"-Dfabric.modsFolder={profile.mods_path}",
         f"-Dfabric.gameVersion={profile.minecraft_version}",
         "-Dfabric.development=false",
@@ -542,9 +551,7 @@ def launch_minecraft_direct(
         f"-Dminecraft.launcher.version={APP_VERSION}",
         "-cp", classpath_str,
         main_class,
-    ]
-    if required_java_major >= 17:
-        jvm_args.insert(17, "--enable-native-access=ALL-UNNAMED")
+    ])
 
     game_args = [
         "--username", session.username,

@@ -579,6 +579,21 @@ class CapeHandler(BaseHTTPRequestHandler):
         except (ValueError, TypeError, AttributeError) as exc:
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
 
+    def do_OPTIONS(self) -> None:
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-EzClient-Cape-Token, X-Player-UUID")
+        self.end_headers()
+
+    def do_DELETE(self) -> None:
+        path = urlparse(self.path).path.rstrip("/")
+        del_match = re.fullmatch(r"/api/capes/([a-f0-9-]{36})(?:/delete)?", path)
+        if del_match:
+            self.delete_cape(del_match.group(1))
+            return
+        self.send_json(HTTPStatus.NOT_FOUND, {"error": "Route nicht gefunden"})
+
     def do_POST(self) -> None:
         path = urlparse(self.path).path.rstrip("/")
         if path == "/api/presence":
@@ -589,6 +604,10 @@ class CapeHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/capes/deactivate":
             self.deactivate_cape()
+            return
+        del_match = re.fullmatch(r"/api/capes/([a-f0-9-]{36})/delete", path)
+        if del_match:
+            self.delete_cape(del_match.group(1))
             return
         if path == "/api/reports":
             self.create_report()
@@ -703,6 +722,99 @@ class CapeHandler(BaseHTTPRequestHandler):
         except (ValueError, json.JSONDecodeError) as exc:
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
 
+    def delete_cape(self, cape_id: str) -> None:
+        if not allow_request(self.client_address[0], 30, 60):
+            self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Zu viele Anfragen"})
+            return
+        if not re.fullmatch(r"[a-f0-9-]{36}", cape_id):
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Ungültige Cape-ID"})
+            return
+
+        capes = load_capes()
+        target_cape = next((c for c in capes if c.get("id") == cape_id), None)
+        if not target_cape:
+            self.send_json(HTTPStatus.NOT_FOUND, {"error": "Cape nicht gefunden"})
+            return
+
+        try:
+            target_owner_uuid = normalize_player_uuid(target_cape.get("owner_uuid", ""))
+        except ValueError:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Ungültige Cape-Besitzer-Daten"})
+            return
+        target_clean_uuid = target_owner_uuid.replace("-", "").lower()
+
+        length = int(self.headers.get("Content-Length", "0"))
+        payload = {}
+        if 0 < length <= 4096:
+            try:
+                payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            except Exception:
+                pass
+
+        req_owner_uuid_raw = payload.get("owner_uuid", "") or self.headers.get("X-Player-UUID", "")
+        if not req_owner_uuid_raw:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Spieler-UUID erforderlich"})
+            return
+        try:
+            req_owner_uuid = normalize_player_uuid(req_owner_uuid_raw)
+        except ValueError:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Ungültige Spieler-UUID"})
+            return
+
+        # 1. STRICT AUTHORIZATION: Cape owner must match requester
+        if req_owner_uuid.lower() != target_owner_uuid.lower():
+            self.send_json(HTTPStatus.FORBIDDEN, {"error": "Du kannst nur deine eigenen Capes löschen."})
+            return
+
+        # 2. STRICT AUTHENTICATION: Ownership Token or Session Verification
+        provided_token = clean_text(payload.get("token", "") or self.headers.get("X-EzClient-Cape-Token", ""), 64)
+        stored_tokens = load_tokens()
+        stored_token = stored_tokens.get(target_clean_uuid, "")
+
+        token_valid = bool(stored_token and provided_token and hmac.compare_digest(stored_token, provided_token))
+
+        if not token_valid:
+            bearer = bearer_token(self.headers)
+            owner_name = clean_text(payload.get("owner", "") or target_cape.get("owner", ""), 32)
+            challenge = str(payload.get("challenge", ""))
+            authenticated = (
+                verify_minecraft_access_token(bearer, owner_name, target_owner_uuid)
+                if bearer
+                else (verify_session_proof(challenge, owner_name, target_owner_uuid) if challenge else False)
+            )
+            if not authenticated:
+                self.send_json(
+                    HTTPStatus.FORBIDDEN,
+                    {"error": "Berechtigung verweigert: Cape-Besitz konnte nicht bestätigt werden."}
+                )
+                return
+
+        # 3. Execution: Remove image files
+        (IMAGE_DIR / f"{cape_id}.png").unlink(missing_ok=True)
+        (IMAGE_DIR / f"{cape_id}.gif").unlink(missing_ok=True)
+
+        # 4. Update selections if active/selected
+        with SELECTION_LOCK:
+            selections = load_selections()
+            deselected_players = [p for p, c in selections.items() if c == cape_id]
+            for p in deselected_players:
+                selections[p] = None
+            if deselected_players:
+                temporary = ROOT / "selections.tmp"
+                temporary.write_text(json.dumps(selections), encoding="utf-8")
+                temporary.replace(ROOT / "selections.json")
+                for p in deselected_players:
+                    broadcast({"type": "cape", "player_uuid": p, "cape_id": None})
+
+        # 5. Remove from database
+        remaining = [c for c in capes if c.get("id") != cape_id]
+        save_capes(remaining)
+
+        # 6. Broadcast event
+        broadcast({"type": "cape_deleted", "cape_id": cape_id, "owner_uuid": target_owner_uuid})
+
+        self.send_json(HTTPStatus.OK, {"ok": True, "deleted_cape_id": cape_id})
+
     def update_presence(self) -> None:
         if not allow_request(self.client_address[0], 90, 60):
             self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Zu viele Anfragen"})
@@ -729,7 +841,7 @@ class CapeHandler(BaseHTTPRequestHandler):
             with STATE_LOCK:
                 PRESENCE[player_id] = (time.monotonic(), username, client, clean_text(str(payload.get("version", "")), 32))
             broadcast({"type": "presence", "uuid": player_id, "client": client, "version": clean_text(str(payload.get("version", "")), 32)})
-            self.send_json(HTTPStatus.OK, {"ok": True, "expires_in": PRESENCE_TTL_SECONDS, "version": "2.1.0"})
+            self.send_json(HTTPStatus.OK, {"ok": True, "expires_in": PRESENCE_TTL_SECONDS, "version": "2.2.0"})
         except (ValueError, json.JSONDecodeError):
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Ungültige Präsenz"})
 

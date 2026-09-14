@@ -76,8 +76,8 @@ public final class DamageTintEntityScreen extends ScrollingSettingsScreen {
 
         int resetWidth = 46;
         int searchWidth = contentWidth - resetWidth - 4;
-        searchBox = new EditBox(font, left, panelY + 26, searchWidth, 16, Component.literal("Entity suchen …"));
-        searchBox.setHint(Component.literal("Entity suchen …"));
+        searchBox = new EditBox(font, left, panelY + 26, searchWidth, 16, Component.literal(app.ezclient.util.EzI18n.text("Entity suchen …")));
+        searchBox.setHint(Component.literal(app.ezclient.util.EzI18n.text("Entity suchen …")));
         searchBox.setValue(search);
         searchBox.setMaxLength(80);
         searchBox.setResponder(val -> {
@@ -87,7 +87,7 @@ public final class DamageTintEntityScreen extends ScrollingSettingsScreen {
         addFixedWidget(searchBox);
 
         addFixedWidget(new EzButton(left + searchWidth + 4, panelY + 26, resetWidth, 16,
-                Component.literal("Reset"), false, b -> {
+                Component.literal(app.ezclient.util.EzI18n.text("Reset")), false, b -> {
             module.clearEntityRules();
             populateRows();
         }));
@@ -126,7 +126,7 @@ public final class DamageTintEntityScreen extends ScrollingSettingsScreen {
 
             // Mode Toggle Button: [ Default ] or [ Custom ]
             EzButton modeBtn = new EzButton(left + contentWidth - 84, y + 2, 48, 14,
-                    Component.literal(isCustom ? "Custom" : "Default"), isCustom, b -> {
+                    Component.literal(isCustom ? "Custom" : app.ezclient.util.EzI18n.text("Default")), isCustom, b -> {
                 if (isCustom) {
                     module.removeEntityRule(key);
                 } else {

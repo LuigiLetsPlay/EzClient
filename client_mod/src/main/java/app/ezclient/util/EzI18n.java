@@ -16,11 +16,20 @@ import java.util.Map;
 public final class EzI18n {
     private static final Map<String, String> DE_MAP = new HashMap<>();
     private static final Map<String, String> EN_MAP = new HashMap<>();
+    private static final Map<String, String> DE_TO_EN = new HashMap<>();
+    private static final Map<String, String> EN_TO_DE = new HashMap<>();
     private static boolean initialized = false;
 
     static {
         loadLanguage("de_de", DE_MAP);
         loadLanguage("en_us", EN_MAP);
+        DE_MAP.forEach((key, de) -> {
+            String en = EN_MAP.get(key);
+            if (en != null) {
+                DE_TO_EN.put(de, en);
+                EN_TO_DE.put(en, de);
+            }
+        });
         initialized = true;
     }
 
@@ -30,55 +39,11 @@ public final class EzI18n {
         try (InputStream is = EzI18n.class.getResourceAsStream("/assets/ezclient/lang/" + langCode + ".json")) {
             if (is == null) return;
             String json = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-            // Regex to match "key" : "value" handling escaped characters
-            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\"((?:\\\\\"|[^\"])+)\"\\s*:\\s*\"((?:\\\\\"|[^\"])*)\"");
-            java.util.regex.Matcher matcher = pattern.matcher(json);
-            while (matcher.find()) {
-                String key = matcher.group(1).replace("\\\"", "\"");
-                String val = unescapeJsonString(matcher.group(2));
-                targetMap.put(key, val);
-            }
+            com.google.gson.JsonObject data = com.google.gson.JsonParser.parseString(json).getAsJsonObject();
+            for (var entry : data.entrySet()) targetMap.put(entry.getKey(), entry.getValue().getAsString());
         } catch (Throwable t) {
             System.err.println("[EzClient] Warning: Could not load lang/" + langCode + ".json: " + t.getMessage());
         }
-    }
-
-    private static String unescapeJsonString(String raw) {
-        if (raw == null || raw.isEmpty()) return "";
-        StringBuilder sb = new StringBuilder(raw.length());
-        for (int i = 0; i < raw.length(); i++) {
-            char c = raw.charAt(i);
-            if (c == '\\' && i + 1 < raw.length()) {
-                char next = raw.charAt(i + 1);
-                switch (next) {
-                    case '"' -> { sb.append('"'); i++; }
-                    case '\\' -> { sb.append('\\'); i++; }
-                    case '/' -> { sb.append('/'); i++; }
-                    case 'b' -> { sb.append('\b'); i++; }
-                    case 'f' -> { sb.append('\f'); i++; }
-                    case 'n' -> { sb.append('\n'); i++; }
-                    case 'r' -> { sb.append('\r'); i++; }
-                    case 't' -> { sb.append('\t'); i++; }
-                    case 'u' -> {
-                        if (i + 5 < raw.length()) {
-                            try {
-                                int unicode = Integer.parseInt(raw.substring(i + 2, i + 6), 16);
-                                sb.append((char) unicode);
-                                i += 5;
-                            } catch (NumberFormatException ignored) {
-                                sb.append(c);
-                            }
-                        } else {
-                            sb.append(c);
-                        }
-                    }
-                    default -> sb.append(c);
-                }
-            } else {
-                sb.append(c);
-            }
-        }
-        return sb.toString();
     }
 
     public static boolean isGerman() {
@@ -138,7 +103,13 @@ public final class EzI18n {
 
     public static String getOrDefault(String key, String fallback) {
         String raw = getRaw(key);
-        return raw != null ? raw : fallback;
+        return raw != null ? raw : text(fallback);
+    }
+
+    /** Translates reviewed display literals; callers keep configuration IDs unchanged. */
+    public static String text(String source) {
+        if (source == null) return "";
+        return (isGerman() ? EN_TO_DE : DE_TO_EN).getOrDefault(source, source);
     }
 
     public static Component comp(String key) {

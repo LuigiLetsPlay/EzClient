@@ -25,11 +25,11 @@ Rectangle {
         anchors.top: parent.top; anchors.topMargin: 85; anchors.horizontalCenter: parent.horizontalCenter; spacing: 9
         Repeater {
             model: [
-                { route: "home", label: "Spielen", icon: "nav-home.svg" },
+                { route: "home", label: EzI18n.text("Spielen"), icon: "nav-home.svg" },
                 { route: "profiles", label: "Profile", icon: "nav-profiles.svg" },
-                { route: "installed_mods", label: "Installiert", icon: "nav-mods.svg" },
-                { route: "mods", label: "Bibliothek", icon: "nav-discover.svg" },
-                { route: "versions", label: "Versionen", icon: "nav-versions.svg" },
+                { route: "installed_mods", label: EzI18n.text("Installiert"), icon: "nav-mods.svg" },
+                { route: "mods", label: EzI18n.text("Bibliothek"), icon: "nav-discover.svg" },
+                { route: "versions", label: EzI18n.text("Versionen"), icon: "nav-versions.svg" },
                 { route: "cape", label: "Capes", icon: "nav-cape.svg" }
             ]
             Rectangle {
@@ -67,7 +67,7 @@ Rectangle {
         MouseArea { id: createProfileMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.createProfileClicked() }
         ToolTip.visible: createProfileMouse.containsMouse
         ToolTip.delay: 350
-        ToolTip.text: "Neues Profil"
+        ToolTip.text: EzI18n.text("Neues Profil")
     }
 
     Rectangle {
@@ -83,6 +83,6 @@ Rectangle {
         MouseArea { id: settingsMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.navigate("settings") }
         ToolTip.visible: settingsMouse.containsMouse
         ToolTip.delay: 350
-        ToolTip.text: "Einstellungen"
+        ToolTip.text: EzI18n.text("Einstellungen")
     }
 }

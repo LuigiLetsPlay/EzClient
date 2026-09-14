@@ -1627,6 +1627,31 @@ class ProfileController(QObject):
             self._store.settings["last_profile"] = p.id
             self._store.save()
             self._sync_models()
+            self.inspectedProfileChanged.emit()
+
+    def _report_exception(self, context: str) -> None:
+        import traceback
+        log = traceback.format_exc()
+        summary = log.strip().splitlines()[-1]
+        self.analyzeCrash(log)
+        self.gameCrashed.emit(context, summary, log)
+
+    @Slot(str, str)
+    def deletePack(self, kind: str, filename: str) -> None:
+        profile = self._inspected_profile or self._active_profile
+        if not profile or kind not in ("resourcepacks", "shaderpacks"):
+            return
+        directory = (profile.path / kind).resolve()
+        target = (directory / filename).resolve()
+        if target.parent != directory or not target.is_file():
+            return
+        try:
+            target.unlink()
+            self._store.save()
+            self._sync_models()
+            self.inspectedProfileChanged.emit()
+        except OSError:
+            self._report_exception("Delete pack")
 
     @Slot(str, str, str, str, str, result=str)
     @Slot(str, str, str, str, result=str)
@@ -1888,6 +1913,7 @@ class ProfileController(QObject):
     def installIris(self) -> None:
         self.installMod("YL57xq9U", "Iris Shaders", "Latest", "iris.jar", "Iris Team", "Shader-Unterstützung mit hoher Performance", "https://cdn.modrinth.com/data/YL57xq9U/icon.png")
 
+    @Slot(str, str, str, str, str, str, str)
     @Slot(str, str, str, str, str, str, str, str)
     def installMod(self, mod_id: str, name: str = "", version: str = "Latest", filename: str = "", author: str = "", description: str = "", icon_url: str = "", source: str = "modrinth") -> None:
         if not self._active_profile:

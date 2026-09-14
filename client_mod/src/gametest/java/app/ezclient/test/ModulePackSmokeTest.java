@@ -23,14 +23,23 @@ public class ModulePackSmokeTest implements FabricClientGameTest {
                 FeatureModule.get(BossBarModule.class).setPosition(180, 12);
                 var waypoints = FeatureModule.get(WaypointsModule.class);
                 waypoints.put(new WaypointsModule.Waypoint("smoke", "Render Test", mc.player.getX() + 4, mc.player.getY(), mc.player.getZ() + 5,
-                    0xff22ff88, "*", WaypointsModule.world(mc), mc.level.dimension().toString(), false));
-                set(waypoints, "marker", "Both");
+                    0xff22ff88, "*", WaypointsModule.world(mc), mc.level.dimension().toString(), true, "", java.util.List.of()));
+                set(waypoints, "outline", true); set(waypoints, "fill", true);
                 var time = FeatureModule.get(TimeWeatherModule.class); set(time, "time", "Sunset");
                 var box = FeatureModule.get(BlockOverlayModule.class); set(box, "style", "Both");
                 var particles = FeatureModule.get(ParticleCustomizerModule.class); set(particles, "tint", true); set(particles, "multiplier", 3.5);
-                if (particles.set(particles.options().getFirst(), Double.NaN)) throw new AssertionError("NaN accepted");
+                var multiplier = particles.options().stream().filter(o -> o.key().equals("multiplier")).findFirst().orElseThrow();
+                if (particles.set(multiplier, Double.NaN)) throw new AssertionError("NaN accepted");
+                var itemModels = FeatureModule.get(ItemModelModule.class);
+                for (var view : ItemModelModule.View.values()) {
+                    itemModels.setTransform("minecraft:diamond_sword", view,
+                        new ItemModelModule.Transform(.1f, .05f, 0, 10, 15, 0, .8f, .8f, .8f), false);
+                }
                 ConfigManager.save(); ConfigManager.load();
                 if (particles.number("multiplier") != 3.5) throw new AssertionError("Settings round trip failed");
+                for (var view : ItemModelModule.View.values()) {
+                    if (itemModels.getTransform("minecraft:diamond_sword", view).isIdentity()) throw new AssertionError("Item model round trip failed");
+                }
             });
             var server = world.getServer();
             server.runCommand("execute at @p run summon minecraft:cow ~2 ~ ~4");
@@ -50,6 +59,8 @@ public class ModulePackSmokeTest implements FabricClientGameTest {
             });
             server.runCommand("give @p minecraft:iron_ingot 32");
             server.runCommand("give @p minecraft:gold_ingot 8");
+            server.runCommand("item replace entity @p weapon.mainhand with minecraft:diamond_sword");
+            server.runCommand("execute at @p run summon minecraft:item ~1 ~1 ~2 {Item:{id:\"minecraft:diamond_sword\",count:1}}");
             world.getConnection().waitForClientboundPackets();
             context.getInput().lookAt(context.computeOnClient(mc -> BlockPos.containing(mc.player.position().add(0, 0, 3))));
             context.waitTicks(20);
@@ -89,13 +100,40 @@ public class ModulePackSmokeTest implements FabricClientGameTest {
             context.waitTicks(3); context.takeScreenshot("module-pack-style");
             context.setScreen(() -> new WaypointScreen(null, FeatureModule.get(WaypointsModule.class)));
             context.waitTicks(3); context.takeScreenshot("module-pack-waypoints");
+            for (String language : java.util.List.of("de_de", "en_us")) {
+                context.runOnClient(mc -> mc.options.languageCode = language);
+                for (var module : ModuleManager.getInstance().getModules()) {
+                    context.setScreen(() -> EzHubScreen.createModuleSettingsScreen(null, module));
+                    context.waitTicks(2);
+                    context.takeScreenshot("settings-" + language + "-" + module.getClass().getSimpleName());
+                    int originalKey = module.getKeyBind();
+                    context.runOnClient(mc -> {
+                        var buttons = EzScreenBridge.current(mc).children().stream().filter(EzHotkeyButton.class::isInstance)
+                                .map(EzHotkeyButton.class::cast).toList();
+                        if (buttons.size() != 1) throw new AssertionError("Missing or duplicate hotkey: " + module.getName());
+                        var button = buttons.getFirst();
+                        if (button.getX() < 0 || button.getY() < 0 || button.getX() + button.getWidth() > EzScreenBridge.current(mc).width
+                                || button.getY() + button.getHeight() > EzScreenBridge.current(mc).height)
+                            throw new AssertionError("Hotkey outside screen: " + module.getName());
+                        button.onPress(null);
+                    });
+                    context.getInput().pressKey(GLFW.GLFW_KEY_F8);
+                    context.runOnClient(mc -> {
+                        if (module.getKeyBind() != GLFW.GLFW_KEY_F8) throw new AssertionError("Cannot assign hotkey: " + module.getName());
+                        EzScreenBridge.current(mc).children().stream().filter(EzHotkeyButton.class::isInstance)
+                                .map(EzHotkeyButton.class::cast).findFirst().orElseThrow().onPress(null);
+                    });
+                    context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+                    context.runOnClient(mc -> {
+                        if (module.getKeyBind() != -1 || EzScreenBridge.current(mc) == null) throw new AssertionError("Cannot clear hotkey: " + module.getName());
+                        EzKeyBindings.applyModuleKeyBind(module, originalKey);
+                    });
+                }
+                context.setScreen(() -> new ItemModelScreen(null, FeatureModule.get(ItemModelModule.class)));
+                context.waitTicks(3);
+                context.takeScreenshot("item-model-" + language);
+            }
             context.setScreen(() -> null);
-            server.runCommand("kill @p");
-            context.waitFor(mc -> mc.player != null && mc.player.isDeadOrDying());
-            context.waitTicks(2);
-            context.runOnClient(mc -> {
-                if (FeatureModule.get(WaypointsModule.class).points().stream().noneMatch(WaypointsModule.Waypoint::death)) throw new AssertionError("Death waypoint missing");
-            });
         }
     }
 }

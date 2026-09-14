@@ -10,8 +10,7 @@ def build_exe():
     print("       Building EzClient Standalone Windows .exe  ")
     print("==================================================")
 
-    # 1. Rebuild only the actively maintained 26.x JARs. Frozen 2.0.0 assets
-    # are packaged as-is and require an explicit maintenance build.
+    # Rebuild and package only the actively maintained, exact 26.x artifacts.
     print("[Build] Compiling actively maintained EzClient 26.x JARs first...")
     build_mod_script = root / "client_mod" / "build_mod.py"
     subprocess.run([sys.executable, str(build_mod_script)], check=True)
@@ -19,7 +18,12 @@ def build_exe():
     # 2. Prepare PyInstaller command
     icon_path = root / "ui" / "assets" / "icon.ico"
     ui_data = f"{root / 'ui'};ui"
-    assets_data = f"{root / 'backend' / 'assets'};backend/assets"
+    from backend.models.types import APP_VERSION
+    release_assets = [root / "backend" / "assets" / f"EzClient-{APP_VERSION}+{version}.jar"
+                      for version in ("26.1", "26.1.1", "26.2")]
+    for asset in release_assets:
+        if not asset.is_file():
+            raise FileNotFoundError(f"Required exact release artifact missing: {asset}")
 
     hidden_imports = [
         "PySide6.QtCore",
@@ -68,10 +72,10 @@ def build_exe():
         f"--icon={icon_path}",
         f"--version-file={root / 'file_version_info.txt'}",
         f"--add-data={ui_data}",
-        f"--add-data={assets_data}",
         "--clean",
         "--noconfirm",
     ]
+    cmd.extend(f"--add-data={asset};backend/assets" for asset in release_assets)
 
     for h in hidden_imports:
         cmd.append(f"--hidden-import={h}")
@@ -119,4 +123,3 @@ def build_exe():
 
 if __name__ == "__main__":
     build_exe()
-

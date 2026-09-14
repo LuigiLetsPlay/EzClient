@@ -8,10 +8,11 @@ import webbrowser
 import shutil
 import struct
 import tempfile
+import base64
 from pathlib import Path
 from backend.services import cape_community, cape_media
 from PySide6.QtCore import QObject, Signal, Slot, Property, QUrl, Qt, QByteArray, QBuffer, QIODevice
-from PySide6.QtGui import QImage, QPainter, QTransform
+from PySide6.QtGui import QImage, QPainter, QTransform, QColor
 from PySide6.QtWidgets import QDialog, QVBoxLayout
 
 from backend.services.msa_auth import (
@@ -22,7 +23,9 @@ from backend.services.msa_auth import (
     activate_saved_account,
     remove_saved_account,
     MinecraftSession,
-    MICROSOFT_AUTH_URL
+    MICROSOFT_AUTH_URL,
+    ACCOUNTS_FILE,
+    CACHE_FILE
 )
 
 
@@ -97,6 +100,89 @@ def _bake_editor_cape(image: QImage, fit_mode: str = "Cover") -> QImage:
     painter.drawImage(24, 0, elytra_visible.scaled(20, 2))
     painter.end()
     return result
+
+
+def _face_atlas(faces: dict, size: int) -> QImage:
+    """Build the vanilla UV layout for all 6 cuboid faces at the requested resolution."""
+    scale = max(1, size // 64)
+    atlas = QImage(64 * scale, 32 * scale, QImage.Format_RGBA8888)
+    atlas.fill(Qt.transparent)
+    images = {}
+    for face in ("back", "front", "left", "right", "top", "bottom"):
+        spec = faces.get(face) or {}
+        source = str(spec.get("source") or "")
+        if not source:
+            continue
+        try:
+            if source.startswith("data:image/"):
+                _, base64_data = source.split(",", 1)
+                raw_bytes = base64.b64decode(base64_data)
+                image = QImage()
+                if not image.loadFromData(raw_bytes):
+                    continue
+            else:
+                path = QUrl(source).toLocalFile() if source.startswith("file:") else source
+                image = QImage(path)
+        except Exception:
+            continue
+        image = image.convertToFormat(QImage.Format_RGBA8888)
+        if image.isNull() or image.width() > 4096 or image.height() > 4096:
+            continue
+        crop = spec.get("crop") or [0, 0, 1, 1]
+        if not source.startswith("data:image/") and len(crop) == 4 and (crop[0] != 0 or crop[1] != 0 or crop[2] != 1 or crop[3] != 1):
+            cx, cy, cw, ch = (float(v) for v in crop)
+            if 0 <= cx < 1 and 0 <= cy < 1 and 0 < cw <= 1 and 0 < ch <= 1:
+                x = round(cx * image.width())
+                y = round(cy * image.height())
+                w = max(1, min(image.width() - x, round(cw * image.width())))
+                h = max(1, min(image.height() - y, round(ch * image.height())))
+                image = image.copy(x, y, w, h)
+        images[face] = image
+
+    if not images:
+        raise ValueError("Bitte mindestens eine Seite bemalen oder ein Bild auswählen.")
+
+    painter = QPainter(atlas)
+    has_back = "back" in images
+    back_scaled = None
+    if has_back:
+        back_scaled = images["back"].scaled(10 * scale, 16 * scale, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        painter.drawImage(1 * scale, 1 * scale, back_scaled)
+        # Elytra wings from back
+        wing = back_scaled.scaled(10 * scale, 20 * scale, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        painter.drawImage(24 * scale, 2 * scale, wing)
+        painter.drawImage(36 * scale, 2 * scale, wing.mirrored(True, False))
+        painter.drawImage(22 * scale, 2 * scale, wing.scaled(2 * scale, 20 * scale))
+        painter.drawImage(34 * scale, 2 * scale, wing.scaled(2 * scale, 20 * scale))
+        painter.drawImage(24 * scale, 0, wing.scaled(20 * scale, 2 * scale))
+
+    # Inside cape face (front): (12, 1, 10, 16) mirrored
+    if "front" in images:
+        front_scaled = images["front"].scaled(10 * scale, 16 * scale, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        painter.drawImage(12 * scale, 1 * scale, front_scaled.mirrored(True, False))
+
+    # Left side: (0, 1, 1, 16) - appears on left side in 3D preview
+    if "left" in images:
+        left_scaled = images["left"].scaled(1 * scale, 16 * scale, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        painter.drawImage(0, 1 * scale, left_scaled)
+
+    # Right side: (11, 1, 1, 16) - appears on right side in 3D preview
+    if "right" in images:
+        right_scaled = images["right"].scaled(1 * scale, 16 * scale, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        painter.drawImage(11 * scale, 1 * scale, right_scaled)
+
+    # Top edge: (1, 0, 10, 1)
+    if "top" in images:
+        top_scaled = images["top"].scaled(10 * scale, 1 * scale, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        painter.drawImage(1 * scale, 0, top_scaled)
+
+    # Bottom edge: (11, 0, 10, 1)
+    if "bottom" in images:
+        bottom_scaled = images["bottom"].scaled(10 * scale, 1 * scale, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        painter.drawImage(11 * scale, 0, bottom_scaled)
+
+    painter.end()
+    return atlas
 
 
 def _write_hd_cape_preview(image: QImage, editor: bool = False, fit_mode: str = "Cover") -> bool:
@@ -244,6 +330,7 @@ class AccountController(QObject):
     skinUploadStatusChanged = Signal(str, bool)
     capeCommunityChanged = Signal()
     capeCommunityStatusChanged = Signal(str, bool)
+    capeUploadSuccess = Signal()
     capeMediaPrepared = Signal(str, int, float)
     capePreviewPrepared = Signal(str, int)
     capeAnimationPrepared = Signal(str, int, int, int, int, int, bool)
@@ -295,8 +382,46 @@ class AccountController(QObject):
         except Exception:
             pass
 
+        self._last_accounts_stamp = (
+            ACCOUNTS_FILE.stat().st_mtime if ACCOUNTS_FILE.is_file() else 0.0,
+            CACHE_FILE.stat().st_mtime if CACHE_FILE.is_file() else 0.0,
+        )
+        self._last_fs_sync = 0.0
+        try:
+            from PySide6.QtCore import QFileSystemWatcher
+            self._account_fs_watcher = QFileSystemWatcher(self)
+            watch_dir = str(ACCOUNTS_FILE.parent)
+            if Path(watch_dir).is_dir():
+                self._account_fs_watcher.addPath(watch_dir)
+            if ACCOUNTS_FILE.is_file():
+                self._account_fs_watcher.addPath(str(ACCOUNTS_FILE))
+            if CACHE_FILE.is_file():
+                self._account_fs_watcher.addPath(str(CACHE_FILE))
+            self._account_fs_watcher.directoryChanged.connect(self._on_accounts_fs_changed)
+            self._account_fs_watcher.fileChanged.connect(self._on_accounts_fs_changed)
+        except Exception as e:
+            print(f"[AccountController] Watcher setup error: {e}")
+
         self._load_account()
         self.refreshCapeCommunity()
+
+    def _on_accounts_fs_changed(self, path: str = "") -> None:
+        accounts_mtime = ACCOUNTS_FILE.stat().st_mtime if ACCOUNTS_FILE.is_file() else 0.0
+        cache_mtime = CACHE_FILE.stat().st_mtime if CACHE_FILE.is_file() else 0.0
+        stamp = (accounts_mtime, cache_mtime)
+        if hasattr(self, "_last_accounts_stamp") and self._last_accounts_stamp == stamp:
+            return
+        now = time.time()
+        if now - self._last_fs_sync < 0.5:
+            return
+        self._last_fs_sync = now
+        self._last_accounts_stamp = stamp
+        if hasattr(self, "_account_fs_watcher") and self._account_fs_watcher:
+            for f in (ACCOUNTS_FILE, CACHE_FILE):
+                f_str = str(f)
+                if f.is_file() and f_str not in self._account_fs_watcher.files():
+                    self._account_fs_watcher.addPath(f_str)
+        self._load_account(force_refresh=False)
 
     def _load_account(self, force_refresh: bool = False) -> None:
         """Read active session from .minecraft or stored cache."""
@@ -549,10 +674,13 @@ class AccountController(QObject):
         def worker() -> None:
             try:
                 capes = cape_community.list_capes()
+                clean_user = self._uuid.replace("-", "").lower() if self._uuid else ""
                 for cape in capes:
                     cape["imageUrl"] = cape_community.cape_image_url(cape)
                     cape["isAnimated"] = bool(cape.get("is_animated") or cape.get("animation_url"))
                     cape["animationUrl"] = str(cape.get("animation_url") or "")
+                    owner_uuid = str(cape.get("owner_uuid", "")).replace("-", "").lower()
+                    cape["isOwnCape"] = bool(clean_user and owner_uuid and owner_uuid == clean_user)
                 self._community_capes = capes
                 self._cape_community_status = f"{len(capes)} Community-Capes"
                 self.capeCommunityStatusChanged.emit(self._cape_community_status, False)
@@ -710,6 +838,7 @@ class AccountController(QObject):
                     tokens_file.write_text(json.dumps(tokens, indent=2), encoding="utf-8")
 
                 self.capeCommunityStatusChanged.emit("Cape wurde in der Community veröffentlicht.", False)
+                self.capeUploadSuccess.emit()
                 self.refreshCapeCommunity()
             except Exception as exc:
                 self.capeCommunityStatusChanged.emit(f"Upload fehlgeschlagen: {exc}", True)
@@ -727,6 +856,62 @@ class AccountController(QObject):
                 self.capeCommunityStatusChanged.emit("Danke, die Meldung wurde an das Team gesendet.", False)
             except Exception as exc:
                 self.capeCommunityStatusChanged.emit(f"Meldung fehlgeschlagen: {exc}", True)
+        threading.Thread(target=worker, daemon=True).start()
+        return True
+
+    @Slot(str, result=bool)
+    def isMyCape(self, owner_uuid: str) -> bool:
+        if not self._uuid:
+            return False
+        try:
+            clean_user = self._uuid.replace("-", "").lower()
+            clean_target = str(owner_uuid or "").replace("-", "").lower()
+            return bool(clean_user and clean_user == clean_target)
+        except Exception:
+            return False
+
+    @Slot(str, result=bool)
+    def deleteCommunityCape(self, cape_id: str) -> bool:
+        if not self.isOnline or not self._uuid or self._uuid == "00000000000000000000000000000000":
+            self.capeCommunityStatusChanged.emit(
+                "Du musst mit einem verifizierten Microsoft-Account angemeldet sein, um Capes zu löschen.", True
+            )
+            return False
+
+        session = get_minecraft_session()
+        if not session or not session.is_online:
+            self.capeCommunityStatusChanged.emit("Die Minecraft-Sitzung ist abgelaufen. Bitte melde dich erneut an.", True)
+            return False
+
+        canonical_uuid = cape_community.normalize_player_uuid(session.uuid)
+        tokens_file = Path(DATA_DIR) / "cosmetics" / "cape_tokens.json"
+        tokens = {}
+        if tokens_file.is_file():
+            try:
+                tokens = json.loads(tokens_file.read_text(encoding="utf-8"))
+            except Exception:
+                tokens = {}
+        clean_uuid = canonical_uuid.replace("-", "")
+        current_token = tokens.get(clean_uuid, "")
+
+        def worker() -> None:
+            try:
+                self.capeCommunityStatusChanged.emit("Cape wird gelöscht …", False)
+                cape_community.delete_cape(
+                    cape_id=cape_id,
+                    owner=session.username,
+                    owner_uuid=canonical_uuid,
+                    token=current_token,
+                    access_token=session.access_token or "",
+                )
+                if cape_id in self._active_community_cape_url:
+                    (Path(DATA_DIR) / "cosmetics" / "active_community_cape.txt").unlink(missing_ok=True)
+                    self._active_community_cape_url = ""
+                self.capeCommunityStatusChanged.emit("Cape erfolgreich aus der Community gelöscht.", False)
+                self.refreshCapeCommunity()
+            except Exception as exc:
+                self.capeCommunityStatusChanged.emit(f"Löschen fehlgeschlagen: {exc}", True)
+
         threading.Thread(target=worker, daemon=True).start()
         return True
 
@@ -789,7 +974,8 @@ class AccountController(QObject):
 
     @Slot(str, float, float, int, bool, result=bool)
     @Slot(str, float, float, int, bool, str, result=bool)
-    def prepareAnimatedCape(self, source_url: str, start: float, end: float, fps: int, ping_pong: bool, crop_part: str = "") -> bool:
+    @Slot(str, float, float, int, bool, str, str, result=bool)
+    def prepareAnimatedCape(self, source_url: str, start: float, end: float, fps: int, ping_pong: bool, crop_part: str = "", faces_json: str = "") -> bool:
         """Convert media off the UI thread and expose its first frame as safe fallback."""
         source = QUrl(source_url).toLocalFile() if source_url.startswith("file:") else source_url
         if not source:
@@ -802,10 +988,15 @@ class AccountController(QObject):
             if len(parts) == 4 and all(0.0 <= p <= 1.0 for p in parts) and parts[2] > 0 and parts[3] > 0:
                 crop_box = (parts[0], parts[1], parts[2], parts[3])
 
+        face_sources = json.loads(faces_json) if faces_json else {}
+        for spec in face_sources.values():
+            if isinstance(spec, dict) and str(spec.get("source") or "").startswith("file:"):
+                spec["source"] = QUrl(spec["source"]).toLocalFile()
+
         with self._cape_anim_lock:
             self._cape_anim_revision += 1
             revision = self._cape_anim_revision
-            self._cape_anim_pending = (revision, source, start, end, fps, ping_pong, crop_box)
+            self._cape_anim_pending = (revision, source, start, end, fps, ping_pong, crop_box, face_sources)
             if self._cape_anim_worker_running:
                 return True
             self._cape_anim_worker_running = True
@@ -822,7 +1013,7 @@ class AccountController(QObject):
                         self._cape_anim_worker_running = False
                     return
 
-                rev, job_source, job_start, job_end, job_fps, job_ping_pong, job_crop_box = job
+                rev, job_source, job_start, job_end, job_fps, job_ping_pong, job_crop_box, job_faces = job
                 try:
                     cosmetics = (Path(DATA_DIR) / "cosmetics").resolve()
                     cosmetics.mkdir(parents=True, exist_ok=True)
@@ -833,7 +1024,7 @@ class AccountController(QObject):
                     manifest = cape_media.generate_frame_sheet(
                         job_source,
                         target,
-                        cape_media.AnimationOptions(job_start, job_end, job_fps, job_ping_pong, job_crop_box),
+                        cape_media.AnimationOptions(job_start, job_end, job_fps, job_ping_pong, job_crop_box, job_faces),
                     )
                     from PIL import Image
                     sheet_path = target / manifest.sheet
@@ -885,6 +1076,22 @@ class AccountController(QObject):
     def prepareCapeImage(self, source_url: str, fit_mode: str) -> str:
         """Format a selected image into pending game/preview files."""
         try:
+            if fit_mode == "Faces":
+                faces = json.loads(source_url)
+                if not isinstance(faces, dict):
+                    raise ValueError("Ungültige Cape-Seiten.")
+                cosmetics = Path(DATA_DIR) / "cosmetics"
+                cosmetics.mkdir(parents=True, exist_ok=True)
+                for size, name in ((1024, "pending_cape.png"), (1280, "pending_cape_preview.png"), (1024, "pending_cape_upload.png")):
+                    atlas = _face_atlas(faces, size)
+                    encoded = QByteArray()
+                    buffer = QBuffer(encoded)
+                    if not buffer.open(QIODevice.WriteOnly) or not atlas.save(buffer, "PNG"):
+                        raise ValueError("Cape-Atlas konnte nicht gespeichert werden.")
+                    (cosmetics / name).write_bytes(_strip_png_metadata(bytes(encoded)))
+                self.skinUploadStatusChanged.emit("Vorschau bereit. Du kannst jetzt hochladen.", False)
+                import base64
+                return "data:image/png;base64," + base64.b64encode((cosmetics / "pending_cape_preview.png").read_bytes()).decode("ascii")
             source = source_url
             if source.startswith("file:///"):
                 source = QUrl(source).toLocalFile()
@@ -977,6 +1184,10 @@ class AccountController(QObject):
 
         threading.Thread(target=worker, name="EzClient-CapePreview", daemon=True).start()
         return revision
+
+    @Slot(str, result=int)
+    def requestCapeFacesPreview(self, faces_json: str) -> int:
+        return self.requestCapePreview(faces_json, "Faces")
 
     @Slot()
     def cancelPendingCape(self) -> None:

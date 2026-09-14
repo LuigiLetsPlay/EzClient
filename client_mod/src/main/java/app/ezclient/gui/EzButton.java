@@ -28,6 +28,7 @@ public final class EzButton extends AbstractButton {
         this.action = action;
         this.accent = accent;
         this.icon = icon;
+        setTooltip(net.minecraft.client.gui.components.Tooltip.create(label));
     }
 
     public void setAsToggle(boolean state) {
@@ -109,6 +110,9 @@ public final class EzButton extends AbstractButton {
             var font = Minecraft.getInstance().font;
             Component displayMessage = compactToggleLabel(getMessage());
             int available = Math.max(1, getWidth() - 6);
+            if (font.width(displayMessage) > available / 0.85f) {
+                displayMessage = EzUi.fitText(displayMessage, (int) (available / 0.85f));
+            }
             float textScale = Math.min(1.0f, available / (float)Math.max(1, font.width(displayMessage)));
             graphics.pose().pushMatrix();
             graphics.pose().translate(getX() + getWidth() / 2.0f, getY() + getHeight() / 2.0f);

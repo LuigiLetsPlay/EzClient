@@ -86,8 +86,8 @@ public final class EntityTypeSettingsScreen extends ScrollingSettingsScreen {
         // Search Bar (height 16px) & compact Reset button
         int resetWidth = 46;
         int searchWidth = contentWidth - resetWidth - 4;
-        searchBox = new EditBox(font, left, panelY + 26, searchWidth, 16, Component.literal("Entity suchen …"));
-        searchBox.setHint(Component.literal("Entity suchen …"));
+        searchBox = new EditBox(font, left, panelY + 26, searchWidth, 16, Component.literal(app.ezclient.util.EzI18n.text("Entity suchen …")));
+        searchBox.setHint(Component.literal(app.ezclient.util.EzI18n.text("Entity suchen …")));
         searchBox.setValue(search);
         searchBox.setMaxLength(80);
         searchBox.setResponder(val -> {
@@ -97,7 +97,7 @@ public final class EntityTypeSettingsScreen extends ScrollingSettingsScreen {
         addFixedWidget(searchBox);
 
         addFixedWidget(new EzButton(left + searchWidth + 4, panelY + 26, resetWidth, 16,
-                Component.literal("Reset"), false, b -> resetAll()));
+                Component.literal(app.ezclient.util.EzI18n.text("Reset")), false, b -> resetAll()));
 
         populateRows();
     }

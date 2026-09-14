@@ -130,14 +130,14 @@ Item {
                     spacing: 3
 
                     Text {
-                        text: root.creationHubView === "norisk" ? "NoRiskClient-Profil übernehmen" : "Neues Profil"
+                        text: root.creationHubView === "norisk" ? EzI18n.text("NoRiskClient-Profil übernehmen") : EzI18n.text("Neues Profil")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 23
                         font.bold: true
                         color: EzTheme.text
                     }
                     Text {
-                        text: root.creationHubView === "norisk" ? "Wähle ein lokal installiertes Profil aus." : "Wie möchtest du starten?"
+                        text: root.creationHubView === "norisk" ? EzI18n.text("Wähle ein lokal installiertes Profil aus.") : EzI18n.text("Wie möchtest du starten?")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 12
                         color: EzTheme.textMuted
@@ -197,14 +197,14 @@ Item {
                         spacing: 1
 
                         Text {
-                            text: "EzClient-Performancepaket hinzufügen"
+                            text: EzI18n.text("EzClient-Performancepaket hinzufügen")
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 12
                             font.bold: true
                             color: EzTheme.text
                         }
                         Text {
-                            text: "Installiert nur kompatible Komponenten; EzClient Core nur auf geprüften Versionen."
+                            text: EzI18n.text("Installiert nur kompatible Komponenten; EzClient Core nur auf geprüften Versionen.")
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 9
                             color: EzTheme.textMuted
@@ -229,26 +229,26 @@ Item {
                 Repeater {
                     model: [
                         {
-                            title: "Profil-Assistent",
-                            description: "Ein sauberes Profil in wenigen Schritten erstellen.",
+                            title: EzI18n.text("Profil-Assistent"),
+                            description: EzI18n.text("Ein sauberes Profil in wenigen Schritten erstellen."),
                             icon: "sparkles.svg",
                             action: "wizard"
                         },
                         {
-                            title: "Modpack installieren",
-                            description: "Modpacks aus der Bibliothek entdecken und spielen.",
+                            title: EzI18n.text("Modpack installieren"),
+                            description: EzI18n.text("Modpacks aus der Bibliothek entdecken und spielen."),
                             icon: "modpack-stack.svg",
                             action: "modpack"
                         },
                         {
-                            title: "Eigenes Profil",
-                            description: "Version und Loader frei wählen – ohne EzClient-Vorgaben.",
+                            title: EzI18n.text("Eigenes Profil"),
+                            description: EzI18n.text("Version und Loader frei wählen – ohne EzClient-Vorgaben."),
                             icon: "folder.svg",
                             action: "custom"
                         },
                         {
-                            title: "Von NoRiskClient",
-                            description: "Vorhandene Profile samt Mods und Einstellungen übernehmen.",
+                            title: EzI18n.text("Von NoRiskClient"),
+                            description: EzI18n.text("Vorhandene Profile samt Mods und Einstellungen übernehmen."),
                             icon: "client-norisk.svg",
                             action: "norisk"
                         }
@@ -402,7 +402,7 @@ Item {
                             }
                             Text {
                                 visible: modelData.hasXaeroWaypoints
-                                text: modelData.xaeroWaypointCount + " Xaero-Waypoint" + (modelData.xaeroWaypointCount === 1 ? " erkannt" : "s erkannt")
+                                text: modelData.xaeroWaypointCount + " Xaero-Waypoint" + (modelData.xaeroWaypointCount === 1 ? EzI18n.text(" erkannt") : "s erkannt")
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 10
                                 color: EzTheme.accentLight
@@ -410,7 +410,7 @@ Item {
                         }
 
                         EzButton {
-                            text: root.noriskImporting ? "Importiert …" : "Importieren"
+                            text: root.noriskImporting ? EzI18n.text("Importiert …") : EzI18n.text("Importieren")
                             primary: true
                             enabled: !root.noriskImporting
                             Layout.preferredWidth: 125
@@ -453,7 +453,7 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
-                    text: "Keine lokal installierten NoRiskClient-Profile gefunden."
+                    text: EzI18n.text("Keine lokal installierten NoRiskClient-Profile gefunden.")
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 14
                     font.bold: true
@@ -463,7 +463,7 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
-                    text: "Stelle sicher, dass NoRiskClient auf diesem PC installiert ist und Profile angelegt wurden."
+                    text: EzI18n.text("Stelle sicher, dass NoRiskClient auf diesem PC installiert ist und Profile angelegt wurden.")
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 11
                     color: EzTheme.textSubtle
@@ -471,7 +471,7 @@ Item {
 
                 EzButton {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "Erneut suchen"
+                    text: EzI18n.text("Erneut suchen")
                     Layout.preferredWidth: 140
                     Layout.preferredHeight: 34
                     onClicked: {
@@ -521,7 +521,7 @@ Item {
 
                 Text {
                     Layout.fillWidth: true
-                    text: root.pendingXaeroWaypointCount + " Xaero-Waypoint" + (root.pendingXaeroWaypointCount === 1 ? " erkannt" : "s erkannt")
+                    text: root.pendingXaeroWaypointCount + " Xaero-Waypoint" + (root.pendingXaeroWaypointCount === 1 ? EzI18n.text(" erkannt") : "s erkannt")
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 18
                     font.bold: true
@@ -530,7 +530,7 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
-                    text: "Möchtest du die Waypoints aus „" + root.pendingNoriskProfileName + "“ in EzClient-Waypoints umwandeln? Bei der Konvertierung werden Xaero Minimap/World Map und deren Daten nicht in das neue Profil kopiert."
+                    text: EzI18n.text("Möchtest du die Waypoints aus „") + root.pendingNoriskProfileName + EzI18n.text("“ in EzClient-Waypoints umwandeln? Bei der Konvertierung werden Xaero Minimap/World Map und deren Daten nicht in das neue Profil kopiert.")
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 12
                     color: EzTheme.textSecondary
@@ -538,7 +538,7 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
-                    text: "Keine Sorge: Das originale NoRisk-Profil wird nicht verändert."
+                    text: EzI18n.text("Keine Sorge: Das originale NoRisk-Profil wird nicht verändert.")
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 11
                     font.bold: true
@@ -550,12 +550,12 @@ Item {
                     spacing: 10
                     Item { Layout.fillWidth: true }
                     EzButton {
-                        text: "Xaero behalten"
+                        text: EzI18n.text("Xaero behalten")
                         Layout.preferredWidth: 140
                         onClicked: root.runNoRiskImport(root.pendingNoriskProfileId, false)
                     }
                     EzButton {
-                        text: "In EzClient umwandeln"
+                        text: EzI18n.text("In EzClient umwandeln")
                         primary: true
                         Layout.preferredWidth: 180
                         onClicked: root.runNoRiskImport(root.pendingNoriskProfileId, true)

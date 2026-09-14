@@ -1,8 +1,11 @@
 """Bounded GIF/video conversion for animated EzClient capes."""
 from __future__ import annotations
 
+import io
+import base64
 import json
 import math
+from bisect import bisect_right
 import os
 import shutil
 import subprocess
@@ -39,6 +42,7 @@ class AnimationOptions:
     fps: int = 12
     ping_pong: bool = False
     crop_box: tuple[float, float, float, float] | None = None
+    face_sources: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -141,7 +145,7 @@ def _validated_options(info: MediaInfo, options: AnimationOptions) -> AnimationO
         frames = max(1, frames * 2 - 2)
     if frames > MAX_FRAMES:
         raise ValueError(f"Maximal {MAX_FRAMES} Animationsframes sind erlaubt.")
-    return AnimationOptions(start, end, fps, bool(options.ping_pong), options.crop_box)
+    return AnimationOptions(start, end, fps, bool(options.ping_pong), options.crop_box, options.face_sources)
 
 
 def _crop_frame(frame: Image.Image, crop_box: tuple[float, float, float, float] | None) -> Image.Image:
@@ -156,7 +160,8 @@ def _crop_frame(frame: Image.Image, crop_box: tuple[float, float, float, float] 
     return frame.crop((left, top, left + width, top + height))
 
 
-def _atlas_from_face(face: Image.Image, crop_box: tuple[float, float, float, float] | None = None) -> Image.Image:
+def _atlas_from_face(face: Image.Image, crop_box: tuple[float, float, float, float] | None = None,
+                     side_images: dict[str, Image.Image] | None = None) -> Image.Image:
     atlas = Image.new("RGBA", ATLAS_SIZE, (0, 0, 0, 0))
     fitted = _crop_frame(face.convert("RGBA"), crop_box)
     if crop_box is not None:
@@ -176,12 +181,6 @@ def _atlas_from_face(face: Image.Image, crop_box: tuple[float, float, float, flo
     # 1. Cape visible back face: 10x16 at 4x scale = (40, 64) at (4, 4)
     cape_face = cropped.resize((40, 64), Image.Resampling.LANCZOS)
     atlas.paste(cape_face, FACE_BOX[:2], cape_face)
-    # Inner cape face: (48, 4)
-    atlas.paste(cape_face, (48, 4), cape_face)
-    # Cape top/bottom/sides borders
-    atlas.paste(cape_face.resize((40, 4)), (4, 0), cape_face.resize((40, 4)))
-    atlas.paste(cape_face.resize((4, 64)), (0, 4), cape_face.resize((4, 64)))
-    atlas.paste(cape_face.resize((4, 64)), (44, 4), cape_face.resize((4, 64)))
 
     # 2. Elytra wings: texOffs(22, 0) at 4x scale -> (88, 0, 96, 88)
     # Wing face size: 10x20 at 4x scale = (40, 80)
@@ -194,6 +193,18 @@ def _atlas_from_face(face: Image.Image, crop_box: tuple[float, float, float, flo
     atlas.paste(elytra_wing.resize((8, 80)), (88, 8), elytra_wing.resize((8, 80)))
     atlas.paste(elytra_wing.resize((8, 80)), (136, 8), elytra_wing.resize((8, 80)))
     atlas.paste(elytra_wing.resize((80, 8)), (96, 0), elytra_wing.resize((80, 8)))
+
+    for name, box, mirror in (("front", (48, 4, 88, 68), True),
+                              ("left", (0, 4, 4, 68), False),
+                              ("right", (44, 4, 48, 68), False),
+                              ("top", (4, 0, 44, 4), False),
+                              ("bottom", (44, 0, 84, 4), False)):
+        if side_images and name in side_images:
+            image = side_images[name]
+            fitted = image.resize((box[2] - box[0], box[3] - box[1]), Image.Resampling.LANCZOS)
+            if mirror:
+                fitted = fitted.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+            atlas.paste(fitted, box[:2])
 
     return atlas
 
@@ -214,17 +225,50 @@ def generate_frame_sheet(
     temporary = Path(tempfile.mkdtemp(prefix="ezclient-cape-", dir=parent))
     try:
         frames: list[Image.Image] = []
+        side_images: dict[str, Image.Image] = {}
+        for name in ("front", "left", "right", "top", "bottom"):
+            spec = (selected.face_sources or {}).get(name) or {}
+            source_url = str(spec.get("source") or "")
+            if not source_url:
+                continue
+            if source_url.startswith("data:image/"):
+                try:
+                    _, b64 = source_url.split(",", 1)
+                    raw = base64.b64decode(b64)
+                    with Image.open(io.BytesIO(raw)) as img:
+                        if img.width > 4096 or img.height > 4096:
+                            raise ValueError("Bild für eine Cape-Seite ist zu groß.")
+                        crop = spec.get("crop") or [0, 0, 1, 1]
+                        side_images[name] = _crop_frame(img.convert("RGBA"), tuple(float(v) for v in crop))
+                except Exception as exc:
+                    print(f"[CapeMedia] Warning: could not decode data URL for {name}: {exc}")
+                continue
+            side_path = Path(source_url).resolve()
+            if not side_path.is_file() or side_path.stat().st_size > MAX_SOURCE_BYTES:
+                raise ValueError("Ungültiges Bild für eine Cape-Seite.")
+            with Image.open(side_path) as image:
+                if image.width > 4096 or image.height > 4096:
+                    raise ValueError("Bild für eine Cape-Seite ist zu groß.")
+                crop = spec.get("crop") or [0, 0, 1, 1]
+                side_images[name] = _crop_frame(image.convert("RGBA"), tuple(float(v) for v in crop))
         if source_path.suffix.lower() == ".gif":
             try:
                 with Image.open(source_path) as gif:
-                    gif_frames = [frame.copy() for frame in ImageSequence.Iterator(gif)]
+                    gif_frames = []
+                    frame_ends = []
+                    elapsed = 0.0
+                    for frame in ImageSequence.Iterator(gif):
+                        elapsed += max(0.02, frame.info.get("duration", 100) / 1000.0)
+                        frame_ends.append(elapsed)
+                        # Pillow exposes the composited canvas after seeking.
+                        gif_frames.append(frame.convert("RGBA").copy())
                     if gif_frames:
-                        # Sample gif frames evenly matching selected fps
                         duration = selected.end - selected.start
                         target_count = max(1, min(MAX_FRAMES, math.ceil(duration * selected.fps)))
-                        step = max(1, len(gif_frames) / target_count)
-                        sampled = [gif_frames[min(len(gif_frames) - 1, int(i * step))] for i in range(target_count)]
-                        frames = [_atlas_from_face(f, selected.crop_box) for f in sampled]
+                        sampled = [gif_frames[min(len(gif_frames) - 1,
+                            bisect_right(frame_ends, selected.start + i / selected.fps))]
+                            for i in range(target_count)]
+                        frames = [_atlas_from_face(f, selected.crop_box, side_images) for f in sampled]
             except Exception:
                 frames = []
 
@@ -238,7 +282,9 @@ def generate_frame_sheet(
                 "-vf", f"fps={selected.fps}", "-frames:v", str(MAX_FRAMES),
                 str(raw_dir / "frame-%04d.png"),
             ])
-            frames = [_atlas_from_face(Image.open(path), selected.crop_box) for path in sorted(raw_dir.glob("frame-*.png"))]
+            for path in sorted(raw_dir.glob("frame-*.png")):
+                with Image.open(path) as image:
+                    frames.append(_atlas_from_face(image, selected.crop_box, side_images))
             shutil.rmtree(raw_dir, ignore_errors=True)
 
         if not frames:

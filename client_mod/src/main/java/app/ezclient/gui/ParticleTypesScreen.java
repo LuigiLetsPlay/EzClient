@@ -63,8 +63,8 @@ public final class ParticleTypesScreen extends ScrollingSettingsScreen {
         // Search Bar & quick action buttons
         int btnWidth = 44;
         int searchWidth = contentWidth - (btnWidth * 2) - 8;
-        searchBox = new EditBox(font, left, panelY + 26, searchWidth, 16, Component.literal("Partikel suchen …"));
-        searchBox.setHint(Component.literal("Partikel suchen …"));
+        searchBox = new EditBox(font, left, panelY + 26, searchWidth, 16, Component.literal(app.ezclient.util.EzI18n.text("Partikel suchen …")));
+        searchBox.setHint(Component.literal(app.ezclient.util.EzI18n.text("Partikel suchen …")));
         searchBox.setValue(search);
         searchBox.setMaxLength(80);
         searchBox.setResponder(val -> {

@@ -50,7 +50,7 @@ final class EzSlider extends AbstractSliderButton {
         EzUi.roundedRect(graphics, getX() + 1, getY() + 1, getWidth() - 2, getHeight() - 2, Math.max(1, radius - 1), 0xFF101318);
 
         // Track
-        int trackY = getY() + (getHeight() - 2) / 2;
+        int trackY = drawTextOnSlider ? getY() + getHeight() - 4 : getY() + (getHeight() - 2) / 2;
         int trackX = getX() + 6;
         int trackW = getWidth() - 12;
 
@@ -64,19 +64,23 @@ final class EzSlider extends AbstractSliderButton {
 
         // Handle thumb
         int thumbX = trackX + filled - 3;
-        int thumbY = getY() + (getHeight() - 10) / 2;
+        int thumbHeight = drawTextOnSlider ? 4 : 10;
+        int thumbY = drawTextOnSlider ? trackY - 1 : getY() + (getHeight() - 10) / 2;
         boolean hovered = isHovered();
-        EzUi.roundedRect(graphics, thumbX, thumbY, 6, 10, 2, hovered ? 0xFFFFFFFF : 0xFFE2E8F0);
-        EzUi.roundedRect(graphics, thumbX + 1, thumbY + 1, 4, 8, 1, EzUi.ACCENT_EMERALD);
+        EzUi.roundedRect(graphics, thumbX, thumbY, 6, thumbHeight, 2, hovered ? 0xFFFFFFFF : 0xFFE2E8F0);
+        EzUi.roundedRect(graphics, thumbX + 1, thumbY + 1, 4, thumbHeight - 2, 1, EzUi.ACCENT_EMERALD);
 
         if (drawTextOnSlider && getMessage() != null) {
-            graphics.text(Minecraft.getInstance().font, getMessage(), getX() + 8, getY() + (getHeight() - 8) / 2, 0xFFE7EBEF);
+            graphics.text(Minecraft.getInstance().font, EzUi.fitText(getMessage(), getWidth() - 16), getX() + 8, getY() + 2, 0xFFE7EBEF);
         }
     }
 
     @Override
     protected void updateMessage() {
-        if (label != null) setMessage(label.apply(value));
+        if (label != null) {
+            setMessage(label.apply(value));
+            setTooltip(net.minecraft.client.gui.components.Tooltip.create(getMessage()));
+        }
     }
 
     @Override

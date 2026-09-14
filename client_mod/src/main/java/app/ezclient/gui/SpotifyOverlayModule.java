@@ -217,7 +217,9 @@ public final class SpotifyOverlayModule extends FeatureModule {
         Track track = current;
         boolean source = (track != null && value.equals(track.source()))
                 || value.equals("Medien") || value.equals("Spotify") || value.equals("YouTube");
-        return super.styledText(value).copy().withStyle(style ->
+        String display = value.equals("Medien") || value.equals("Suche nach Medien …") || value.equals("Keine Wiedergabe")
+                ? app.ezclient.util.EzI18n.text(value) : value;
+        return super.styledText(display).copy().withStyle(style ->
                 style.withColor((source ? tint("accent", false) : tint("titleColor", false)) & 0xffffff));
     }
 

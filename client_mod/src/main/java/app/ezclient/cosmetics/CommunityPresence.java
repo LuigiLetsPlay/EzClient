@@ -53,14 +53,14 @@ public final class CommunityPresence {
 
         String name = username != null && !username.isBlank() ? username : "Spieler";
         String body = "{\"player_uuid\":\"" + playerId + "\",\"username\":\"" + name
-                + "\",\"client\":\"ezclient\",\"version\":\"2.1.0\"}";
+                + "\",\"client\":\"ezclient\",\"version\":\"2.2.0\"}";
         String endpoint = getApiUrl() + "/presence";
 
         try {
             HttpRequest req = HttpRequest.newBuilder(URI.create(endpoint))
                     .timeout(Duration.ofSeconds(5))
                     .header("Content-Type", "application/json")
-                    .header("User-Agent", "EzClient/2.1.0")
+                    .header("User-Agent", "EzClient/2.2.0")
                     .POST(HttpRequest.BodyPublishers.ofString(body)).build();
             HTTP.sendAsync(req, CosmeticHttp.text()).exceptionally(error -> null);
         } catch (RuntimeException ignored) {}

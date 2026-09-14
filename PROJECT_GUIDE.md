@@ -12,7 +12,7 @@ EzClient besteht aus:
 - versionsabhängigen Fabric-/Legacy-Fabric-Mod-JARs;
 - einem PyInstaller-Build für `EzClient.exe` und einem nativen Inno-Setup-Build für `EzClient-Setup.exe`.
 
-Aktuelle Produktversion: `2.0.0`.
+Aktuelle Produktversion: `2.2.0`.
 
 Es gibt keine Lite-Version mehr. Neue Builds, UI-Texte und Releases dürfen keine `EzClient-Lite`-Artefakte erzeugen oder voraussetzen.
 
@@ -66,38 +66,20 @@ Fabric wird ab Minecraft 1.3 angeboten. Für 1.3 bis 1.13.2 verwendet der Erstst
 
 ## 4. EzClient-Mod-Kompatibilität
 
-Eine Minecraft-Version gilt im Launcher nur dann als „EzClient Compatible“, wenn die exakt benannte JAR als Asset vorhanden ist:
+Nur die Minecraft-Reihe 26.x wird aktiv als EzClient-Mod gepflegt.
+26.1, 26.1.1 und 26.2 erhalten jeweils eine exakt passende JAR mit Java 25:
 
 ```text
-EzClient-<EzClient-Version>+<Minecraft-Version>.jar
+EzClient-2.2.0+26.1.jar
+EzClient-2.2.0+26.1.1.jar
+EzClient-2.2.0+26.2.jar
 ```
 
-Beispiele:
-
-```text
-EzClient-2.0.0+1.8.9.jar
-EzClient-2.0.0+1.21.11.jar
-EzClient-2.0.0+26.1.jar
-EzClient-2.0.0+26.1.1.jar
-EzClient-2.0.0+26.2.jar
-```
-
-Aktuelle echte Build-Ziele in `client_mod/build_mod.py`:
-
-- 1.8.9
-- 1.12.2
-- 1.16.5
-- 1.20.1
-- 1.21.1
-- 26.1
-- 26.1.1
-- 26.2
-
-Der 1.21.1-Adapter deklariert die geprüfte Range 1.21 bis 1.21.11 und wird deshalb für diese Patchversionen als Alias ausgeliefert. 26.1, 26.1.1 und 26.2 werden dagegen immer separat mit Java 25 und den jeweils passenden Fabric-APIs gebaut. Eine 26.2-JAR darf niemals nur auf 26.1 oder 1.21 umbenannt werden.
-
-Die sichtbare Mod-Suite ist für Legacy und 1.16–1.21 über eigene Implementierungen nachgebaut: Dashboard, HUD-Editor, Moduleinstellungen, Capes sowie FPS, CPS, Keystrokes, Koordinaten, Rüstung, Ping, Potion Effects, Combo, Reach, Day Counter, Toggle Sprint, Fullbright, Zoom, Crosshair und Clear Glass. Render- und Performance-Hooks bleiben versionsspezifisch, weil ihre Minecraft-Zielklassen nicht binär kompatibel sind.
-
-Wichtig: Ein gemeinsames, Minecraft-unabhängiges Modul kann zentral in `shared` oder `compat` implementiert werden. Rendering, Mixins, GUI-Hooks und andere Minecraft-interne Funktionen müssen je nach Mapping/API häufig separat für Legacy, Compatibility und die aktuelle Vollversion umgesetzt und getestet werden. Eine erfolgreich kompilierte JAR garantiert allein noch keine vollständige Feature-Parität.
+Eine JAR darf niemals als Ersatz für eine andere Minecraft-Version umbenannt werden.
+Ältere EzClient-Mod-Reihen sind in `Old/` archiviert und werden nicht ausgeliefert.
+Der Launcher unterstützt weiterhin Vanilla, Fabric und Forge für die älteren
+Minecraft-Versionen; die tatsächliche Loader-Verfügbarkeit muss vor dem Start geprüft werden.
+Das goldene EzClient-Abzeichen erscheint nur für vorhandene exakte 26.x-Assets.
 
 ## 5. Produktversion ändern
 
@@ -140,33 +122,9 @@ Nach jeder Änderung an der Minecraft-Mod oder nach einer Produktversionsänderu
 python client_mod/build_mod.py
 ```
 
-Ohne Schalter baut das Skript ausschließlich die aktiv gepflegte `26.x`-Reihe.
-Die eingefrorenen Ziele von 1.8.9 bis 1.21.x bleiben unverändert auf EzClient
-2.0.0. Sie dürfen nur für eine ausdrücklich beschlossene kritische Wartung neu
-gebaut werden:
-
-```powershell
-python client_mod/build_mod.py --frozen
-python client_mod/build_mod.py --all
-```
-
-Das Skript:
-
-1. startet standardmäßig die Gradle-/Stonecutter-Builds der `26.x`-Zielversionen;
-2. verwirft Source- und Dev-JARs;
-3. benennt die fertigen Dateien nach dem verbindlichen Asset-Schema;
-4. kopiert sie nach `backend/assets/`;
-5. erzeugt die kompatiblen 1.21.x-Aliase aus dem 1.21.1-Build.
-
-Ein einzelnes Ziel kann zum Debuggen direkt gebaut werden:
-
-```powershell
-cd client_mod
-.\gradlew.bat :26.1:build
-.\gradlew.bat :1.8.9:build
-```
-
-Ein normaler Release-Build muss nur die aktiv gepflegten `26.x`-Ziele neu erzeugen. Eingefrorene JARs werden als unveränderte 2.0.0-Artefakte übernommen.
+Das Skript baut ausschließlich 26.1, 26.1.1 und 26.2, prüft die
+Minecraft-Abhängigkeit in jeder fertigen JAR und kopiert die exakten Artefakte
+nach `backend/assets/`. Legacy-Builds und Versions-Aliase gehören nicht zum Release.
 
 ### Gemeinsamer Mod-Kern
 
@@ -187,7 +145,7 @@ Bei einer neuen Minecraft-Version sind mindestens folgende Stellen zu prüfen:
 2. Richtige Java-Grenze in `required_java()` prüfen.
 3. Stonecutter-Version in `client_mod/settings.gradle` ergänzen.
 4. `client_mod/versions/<MC-Version>/gradle.properties` mit Minecraft-, Loader-, Mapping- und Abhängigkeitswerten erstellen.
-5. Ziel in `client_mod/build_mod.py` ergänzen oder bewusst als kompatiblen Alias definieren.
+5. Exaktes 26.x-Ziel in `client_mod/build_mod.py` ergänzen.
 6. Modrinth-/CurseForge-Versionsfilter aktualisieren.
 7. Versionsbanner und UI-Katalog prüfen.
 8. JAR bauen und `fabric.mod.json` innerhalb der JAR kontrollieren.
@@ -215,9 +173,9 @@ Nur den Windows-Launcher bauen:
 python build_exe.py
 ```
 
-`build_exe.py` baut zuerst automatisch alle Mod-JARs neu und bindet anschließend `ui/` sowie `backend/assets/` in `dist/EzClient.exe` ein.
+`build_exe.py` baut zuerst automatisch alle Mod-JARs neu und bindet anschließend `ui/` sowie `backend/assets/` in `dist/EzClient/EzClient.exe` ein.
 
-Installer bauen, nachdem `dist/EzClient.exe` existiert:
+Installer bauen, nachdem `dist/EzClient/EzClient.exe` existiert:
 
 ```powershell
 python build_installer.py
@@ -232,7 +190,7 @@ python build_release.py
 Erwartete Ergebnisse:
 
 ```text
-dist/EzClient.exe
+dist/EzClient/EzClient.exe
 dist/EzClient-Setup.exe
 ```
 
@@ -300,7 +258,7 @@ Profilnamen werden eindeutig gehalten. Bei Duplikaten werden sichtbare Namen wie
 
 Launcher-eigene Kern-Mods und vom Benutzer installierte JARs müssen getrennt verwaltet werden. Synchronisierung darf unbekannte Benutzer-JARs niemals löschen.
 
-Zum verwalteten EzClient-Stack gehören ausschließlich EzClient Core, Sodium und Lithium. Das Performance-Profil ohne EzClient Core verwaltet ausschließlich Sodium und Lithium. Entity Culling darf vom Launcher nie installiert werden; alle weiteren Mods sind nur benutzerverwaltete optionale Mods. Sodium und Lithium dürfen nicht blind für alte Minecraft-Versionen installiert werden. Die verwaltete moderne Performance-Mod-Auswahl beginnt erst bei Versionen, für die tatsächlich passende Veröffentlichungen vorhanden sind; es darf keinen Fallback auf eine JAR für eine andere Minecraft-Version geben.
+Die aktuelle verwaltete Mod-Auswahl wird in `backend/services/store.py` und `profile_migration.py` definiert. Sie umfasst EzClient Core, Sodium, Lithium, Iris und Entity Culling; das Performance-Profil lässt EzClient Core weg. Für ältere Minecraft-Versionen werden nur tatsächlich kompatible Veröffentlichungen installiert. Es darf keinen Fallback auf eine JAR für eine andere Minecraft-Version geben. Benutzerverwaltete Mods und festgelegte Modpack-Versionen bleiben davon getrennt.
 
 ## 11. Direct Launch, Assets und Legacy Fabric
 
@@ -364,7 +322,7 @@ Release Notes müssen professionell und lesbar sein:
 [ ] Zielversionen und Java-Matrix berücksichtigt
 [ ] Gemeinsamer oder versionsspezifischer Mod-Code korrekt gewählt
 [ ] update_version.py bei Releasewechsel ausgeführt
-[ ] build_mod.py für alle aktiven 26.x-Ziele erfolgreich; Frozen-JARs unverändert
+[ ] build_mod.py für alle aktiven 26.x-Ziele erfolgreich; exakte 26.x-Assets geprüft
 [ ] alle Python-Tests erfolgreich
 [ ] Launcher-UI manuell geprüft
 [ ] Legacy-, 1.21.x- und 26.x-Start repräsentativ geprüft
@@ -372,3 +330,21 @@ Release Notes müssen professionell und lesbar sein:
 [ ] Assets und JAR-Metadaten kontrolliert
 [ ] saubere Release Notes erstellt
 ```
+
+## Release-Prüfung und Übersetzungen
+
+`python tools/run_release_tests.py` führt die Python-/QML-Tests mit temporärem
+APPDATA aus. `python tools/qa_launcher_render.py` erzeugt tatsächliche QML-Ansichten
+in DE/EN bei 760×560 und 1280×820 unter `build/release-qa/launcher`.
+Der Software-Renderer prüft Layouts; WebGL-Skin-/Cape-Vorschauen benötigen zusätzlich
+eine Prüfung mit GPU. Ergebnisse und Grenzen stehen in `docs/release-qa-2.2.0.md`.
+
+Geprüfte Sprachpaare stehen in `localization/*.tsv`. Nach Änderungen
+`python tools/update_display_translations.py` ausführen. Die erzeugten Kataloge
+sind Teil von Launcher und Mod. Konfigurations-IDs und gespeicherte Auswahlwerte
+bleiben unabhängig von der Sprache stabil.
+
+Der optionale Minecraft-Integrationstest läuft über
+`:26.2:runClientGameTest -PezclientTests -Ploomx.unobfuscated=true`.
+Er öffnet eine isolierte Testwelt und Moduleinstellungen in beiden Sprachen.
+Ein erfolgreicher Build ersetzt keine vollständigen Spieltests aller Loader-Versionen.

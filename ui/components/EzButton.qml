@@ -9,9 +9,10 @@ Button {
     property bool cyan: false
     property bool mcFont: true
     property string iconSource: ""
+    property int minWidth: 88
 
     implicitHeight: 40
-    implicitWidth: Math.max(88, (btnIcon.visible ? (btnIcon.width + btnRow.spacing) : 0) + btnText.implicitWidth + 28)
+    implicitWidth: Math.max(control.minWidth, (btnIcon.visible ? (btnIcon.width + btnRow.spacing) : 0) + btnText.implicitWidth + 28)
 
     scale: control.down ? 0.96 : (control.hovered ? 1.02 : 1.0)
     Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }

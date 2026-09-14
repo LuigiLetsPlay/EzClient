@@ -109,14 +109,14 @@ Item {
                     spacing: 2
 
                     Text {
-                        text: "Profil wirklich löschen?"
+                        text: EzI18n.text("Profil wirklich löschen?")
                         font.family: EzTheme.mcFontFamily
                         font.pixelSize: 16
                         font.bold: true
                         color: "#FFAAA8"
                     }
                     Text {
-                        text: "Unwiderrufliche Aktion"
+                        text: EzI18n.text("Unwiderrufliche Aktion")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
                         color: EzTheme.textMuted
@@ -160,7 +160,7 @@ Item {
 
                 Text {
                     Layout.fillWidth: true
-                    text: "Möchtest du das folgende Profil wirklich dauerhaft entfernen?"
+                    text: EzI18n.text("Möchtest du das folgende Profil wirklich dauerhaft entfernen?")
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 13
                     color: EzTheme.text
@@ -226,7 +226,7 @@ Item {
 
                     Text {
                         Layout.fillWidth: true
-                        text: "Dies kann nicht mehr rückgängig gemacht werden! Alle installierten Mods, Konfigurationen und lokalen Daten dieses Profils werden vollständig und unwiederbringlich gelöscht."
+                        text: EzI18n.text("Dies kann nicht mehr rückgängig gemacht werden! Alle installierten Mods, Konfigurationen und lokalen Daten dieses Profils werden vollständig und unwiederbringlich gelöscht.")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 12
                         lineHeight: 1.2
@@ -250,7 +250,7 @@ Item {
                 Item { Layout.fillWidth: true }
 
                 EzButton {
-                    text: "Abbrechen"
+                    text: EzI18n.text("Abbrechen")
                     Layout.preferredHeight: 38
                     Layout.preferredWidth: 110
                     onClicked: root.close()
@@ -281,7 +281,7 @@ Item {
                         }
 
                         Text {
-                            text: "Endgültig löschen"
+                            text: EzI18n.text("Endgültig löschen")
                             font.family: EzTheme.mcFontFamily
                             font.pixelSize: 12
                             font.bold: true

@@ -293,7 +293,7 @@ ApplicationWindow {
             Image { source: "icons/check.svg"; width: 14; height: 14; fillMode: Image.PreserveAspectFit }
             Text {
                 id: toastText
-                text: "Einstellung gespeichert"
+                text: EzI18n.text("Einstellung gespeichert")
                 font.family: EzTheme.mcFontFamily
                 font.pixelSize: 11
                 font.bold: true
@@ -329,7 +329,7 @@ ApplicationWindow {
             }
         }
         function onSettingSaved(msg) {
-            toastText.text = msg || "Einstellung gespeichert"
+            toastText.text = EzI18n.text(msg || "Einstellung gespeichert")
             toastBanner.opacity = 1.0
             toastTimer.restart()
         }
@@ -459,14 +459,14 @@ ApplicationWindow {
                     ColumnLayout {
                         spacing: 2
                         Text {
-                            text: window.crashTitle || "Minecraft Start-Fehler"
+                            text: window.crashTitle || EzI18n.text("Minecraft Start-Fehler")
                             font.family: EzTheme.mcFontFamily
                             font.pixelSize: 16
                             font.bold: true
                             color: "#FF453A"
                         }
                         Text {
-                            text: "Das Spiel konnte nicht gestartet werden oder ist abgestürzt."
+                            text: EzI18n.text("Das Spiel konnte nicht gestartet werden oder ist abgestürzt.")
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 12
                             color: EzTheme.textSecondary
@@ -501,7 +501,7 @@ ApplicationWindow {
                         anchors.margins: 10
                         spacing: 8
                         Text {
-                            text: window.crashShortError || "Unbekannter Fehler"
+                            text: window.crashShortError || EzI18n.text("Unbekannter Fehler")
                             font.family: "Consolas, monospace"
                             font.pixelSize: 11
                             color: "#FFA099"
@@ -531,7 +531,7 @@ ApplicationWindow {
 
                         TextEdit {
                             id: logText
-                            text: window.crashFullLog || "Keine Log-Ausgabe vorhanden."
+                            text: window.crashFullLog || EzI18n.text("Keine Log-Ausgabe vorhanden.")
                             font.family: "Consolas, monospace"
                             font.pixelSize: 11
                             color: "#C5C8D0"
@@ -561,7 +561,7 @@ ApplicationWindow {
                             spacing: 8
                             Image { source: "icons/copy.svg"; width: 14; height: 14; opacity: 0.8; sourceSize: Qt.size(14,14) }
                             Text {
-                                text: "Fehler kopieren"
+                                text: EzI18n.text("Fehler kopieren")
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 12
                                 font.bold: true
@@ -595,7 +595,7 @@ ApplicationWindow {
                             spacing: 8
                             Image { source: "icons/folder.svg"; width: 14; height: 14; opacity: 0.8; sourceSize: Qt.size(14,14) }
                             Text {
-                                text: "Ordner öffnen"
+                                text: EzI18n.text("Ordner öffnen")
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 12
                                 font.bold: true
@@ -626,7 +626,7 @@ ApplicationWindow {
                         border.color: EzTheme.border
                         border.width: 1
                         Text {
-                            text: "Schließen"
+                            text: EzI18n.text("Schließen")
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 12
                             font.bold: true

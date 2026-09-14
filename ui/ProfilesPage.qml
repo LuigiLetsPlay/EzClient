@@ -13,16 +13,16 @@ Item {
     property string createIcon: "ezclient"
     property bool loginBeforeCreate: false
     readonly property var createIconPresets: [
-        { id: "grass-block", label: "Grass" },
+        { id: "grass-block", label: EzI18n.text("Grass") },
         { id: "sand-block", label: "Sand" },
         { id: "norisk", label: "NoRisk" },
         { id: "ezclient", label: "EzClient" },
         { id: "tnt", label: "TNT" },
-        { id: "potion", label: "Trank" },
-        { id: "clock", label: "Uhr" },
-        { id: "compass", label: "Kompass" },
-        { id: "star", label: "Stern" },
-        { id: "flint", label: "Feuer" }
+        { id: "potion", label: EzI18n.text("Trank") },
+        { id: "clock", label: EzI18n.text("Uhr") },
+        { id: "compass", label: EzI18n.text("Kompass") },
+        { id: "star", label: EzI18n.text("Stern") },
+        { id: "flint", label: EzI18n.text("Feuer") }
     ]
 
     Connections {
@@ -238,7 +238,7 @@ Item {
                             color: EzTheme.textSecondary
                         }
                         Text {
-                            text: "(Wähle ein Preset oder eigenes Bild)"
+                            text: EzI18n.text("(Wähle ein Preset oder eigenes Bild)")
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 10
                             color: EzTheme.textSubtle
@@ -322,7 +322,7 @@ Item {
                                 anchors.centerIn: parent
                                 spacing: 4
                                 Text {
-                                    text: "+ Bild"
+                                    text: EzI18n.text("+ Bild")
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 10
                                     font.bold: true

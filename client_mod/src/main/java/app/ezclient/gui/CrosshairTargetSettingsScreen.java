@@ -90,8 +90,8 @@ public final class CrosshairTargetSettingsScreen extends ScrollingSettingsScreen
         // Row 1: Search Box & Reset All Button
         int resetWidth = 46;
         int searchWidth = contentWidth - resetWidth - 4;
-        searchBox = new EditBox(font, left, panelY + 26, searchWidth, 16, Component.literal("Entity / Block suchen …"));
-        searchBox.setHint(Component.literal("Entity oder Block suchen …"));
+        searchBox = new EditBox(font, left, panelY + 26, searchWidth, 16, Component.literal(app.ezclient.util.EzI18n.text("Entity / Block suchen …")));
+        searchBox.setHint(Component.literal(app.ezclient.util.EzI18n.text("Entity oder Block suchen …")));
         searchBox.setValue(search);
         searchBox.setMaxLength(80);
         searchBox.setResponder(val -> {
@@ -101,7 +101,7 @@ public final class CrosshairTargetSettingsScreen extends ScrollingSettingsScreen
         addFixedWidget(searchBox);
 
         addFixedWidget(new EzButton(left + searchWidth + 4, panelY + 26, resetWidth, 16,
-                Component.literal("Reset"), false, b -> {
+                Component.literal(app.ezclient.util.EzI18n.text("Reset")), false, b -> {
             module.clearTargetRules();
             ConfigManager.save();
             populateRows();
@@ -114,7 +114,7 @@ public final class CrosshairTargetSettingsScreen extends ScrollingSettingsScreen
         int tabW = (contentWidth - tabSpacing * 2) / 3;
 
         addFixedWidget(new EzButton(left, tabY, tabW, tabH,
-                Component.literal("Alle"), currentCategory == TargetCategory.ALL,
+                Component.literal(app.ezclient.util.EzI18n.text("Alle")), currentCategory == TargetCategory.ALL,
                 b -> { currentCategory = TargetCategory.ALL; rebuildWidgets(); }));
 
         addFixedWidget(new EzButton(left + tabW + tabSpacing, tabY, tabW, tabH,

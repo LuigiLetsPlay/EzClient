@@ -210,7 +210,7 @@ Window {
                             verticalAlignment: TextInput.AlignVCenter
                             onTextChanged: liveLogsWindow.searchQuery = text.toLowerCase().trim()
                             Text {
-                                text: "Search logs…"
+                                text: EzI18n.text("Search logs…")
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 11
                                 color: EzTheme.textMuted
@@ -229,7 +229,7 @@ Window {
                     spacing: 6
                     Repeater {
                         model: [
-                            { id: "ALL",   color: "#38BDF8", label: "ALL" },
+                            { id: "ALL",   color: "#38BDF8", label: EzI18n.text("ALL") },
                             { id: "ERROR", color: "#FF453A", label: "ERROR" },
                             { id: "WARN",  color: "#FFD60A", label: "WARN" },
                             { id: "INFO",  color: "#30D158", label: "INFO" },
@@ -426,7 +426,7 @@ Window {
                         spacing: 8
                         Image { source: "icons/box.svg"; width: 16; height: 16; opacity: 0.8; sourceSize: Qt.size(16,16) }
                         Text {
-                            text: "Instances (" + (liveLogsWindow.liveLogService ? liveLogsWindow.liveLogService.runningCount : 0) + ")"
+                            text: EzI18n.text("Instances (") + (liveLogsWindow.liveLogService ? liveLogsWindow.liveLogService.runningCount : 0) + ")"
                             font.family: EzTheme.mcFontFamily
                             font.pixelSize: 13
                             font.bold: true
@@ -625,17 +625,24 @@ Window {
                         border.color: foldM.containsMouse ? "#3B4761" : "#263045"
                         border.width: 1
 
-                        RowLayout {
+                        Row {
                             anchors.centerIn: parent
                             spacing: 8
-                            Image { source: "icons/folder.svg"; width: 14; height: 14; opacity: 0.8; sourceSize: Qt.size(14,14) }
+                            Image {
+                                source: "icons/folder.svg"
+                                width: 14
+                                height: 14
+                                opacity: 0.8
+                                sourceSize: Qt.size(14,14)
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
                             Text {
-                                text: "Profil-Ordner öffnen"
+                                text: EzI18n.text("Profil-Ordner öffnen")
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 11
                                 color: EzTheme.textSecondary
                                 elide: Text.ElideRight
-                                Layout.maximumWidth: parent.width - 36
+                                anchors.verticalCenter: parent.verticalCenter
                             }
                         }
 
@@ -681,7 +688,7 @@ Window {
                 spacing: 14
 
                 Text {
-                    text: "" + logListModel.count + (logListModel.count === allLogs.length ? " LINES" : " / " + allLogs.length + " LINES")
+                    text: "" + logListModel.count + (logListModel.count === allLogs.length ? EzI18n.text(" LINES") : " / " + allLogs.length + EzI18n.text(" LINES"))
                     font.family: "Consolas, monospace"
                     font.pixelSize: 10
                     color: EzTheme.textMuted
@@ -702,7 +709,7 @@ Window {
                         spacing: 4
                         Text { text: "⬇️"; font.pixelSize: 9 }
                         Text {
-                            text: "Following"
+                            text: EzI18n.text("Following")
                             font.family: "Consolas, monospace"
                             font.pixelSize: 10
                             font.bold: liveLogsWindow.autoScroll
@@ -734,7 +741,7 @@ Window {
                         anchors.centerIn: parent
                         spacing: 4
                         Image { source: "icons/trash.svg"; width: 12; height: 12; fillMode: Image.PreserveAspectFit }
-                        Text { text: "Clear"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
+                        Text { text: EzI18n.text("Clear"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
                     }
 
                     MouseArea {
@@ -762,7 +769,7 @@ Window {
                         anchors.centerIn: parent
                         spacing: 4
                         Image { source: "icons/clipboard.svg"; width: 14; height: 14; fillMode: Image.PreserveAspectFit }
-                        Text { text: "Copy Logs"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textSecondary }
+                        Text { text: EzI18n.text("Copy Logs"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textSecondary }
                     }
 
                     MouseArea {

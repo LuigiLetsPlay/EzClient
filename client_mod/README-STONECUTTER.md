@@ -1,12 +1,10 @@
 # EzClient multi-version build
 
-The mod has eight real Stonecutter build targets:
+The release has three actively maintained Stonecutter build targets:
 
-- `1.8.9` and `1.12.2`: Legacy Fabric, Java 8, legacy dashboard/HUD/modules/capes.
-- `1.16.5`, `1.20.1`, and `1.21.1`: mapped Fabric adapters with the modern dashboard/HUD/modules/capes.
 - `26.1`, `26.1.1`, and `26.2`: Java 25 full builds using their respective Minecraft/Fabric APIs.
 
-The 1.21.1 adapter declares and supplies the complete supported 1.21–1.21.11 range.
+Legacy mod targets are retired and archived in `Old/`; they are not shipped.
 Never copy or rename the 26.2 JAR to another Minecraft line: its bytecode, mixins,
 Minecraft constraint, and bundled Fabric API are specific to 26.2.
 
@@ -41,8 +39,7 @@ Implement new feature work in the active `26.x` implementation. Do not change
 the frozen builds would inherit that change. Rendering, mixins, mappings, key
 APIs, and screen APIs remain version-specific adapter code. After a 26.x change,
 run `python build_mod.py`; it rebuilds and publishes only the
-actively maintained 26.x targets. Frozen 2.0.0 targets require the explicit
-`--frozen` or `--all` maintenance flag and must not be part of normal releases.
+actively maintained 26.x targets. Archived targets must not be part of normal releases.
 
 `tests/test_shared_mod_state.py` is the cross-version behavior gate for shared
 state. Add a regression there whenever shared behavior changes.

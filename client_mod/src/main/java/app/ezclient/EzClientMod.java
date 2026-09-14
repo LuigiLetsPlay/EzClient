@@ -35,8 +35,8 @@ import net.minecraft.network.chat.Component;
  * - First-Launch Performance & PvP Optimization (Fast Graphics, 8 Chunks, No Shadows/Clouds, Biome Blend 0, 120 FPS default)
  */
 public class EzClientMod implements ClientModInitializer {
-    public static final String CLIENT_VERSION = "2.1.0";
-    public static final String CLIENT_TITLE = "EzClient 2.1.0";
+    public static final String CLIENT_VERSION = "2.2.0";
+    public static final String CLIENT_TITLE = "EzClient 2.2.0";
     private static volatile boolean running = true;
     private static Path ezClientDataDir = null;
 

@@ -1,0 +1,416 @@
+# In-game settings: German and English display text. Configuration values remain unchanged.
+Alle Items (Standard)	All items (default)
+Alle Items	All items
+Ansicht zurücksetzen	Reset view
+Gedroppt	Dropped
+Erweitert	Advanced
+Item-Modelle konfigurieren …	Configure item models …
+Position, Drehung und Größe pro Item für First Person, Boden und GUI einstellen	Adjust position, rotation and size per item for first person, ground and GUI
+Position, Drehung und Größe jedes Items für First Person, Boden und GUI anpassen.	Customize each item's position, rotation and size for first person, ground and GUI.
+SKALIERUNG	SCALE
+DREHUNG	ROTATION
+Kamera	Camera
+Kampf	Combat
+Umgebung	Environment
+Darstellung	Display
+Sichtbarkeit	Visibility
+Bewegung	Movement
+Physik	Physics
+Partikel	Particles
+Erze	Ores
+Warnungen	Warnings
+Freunde	Friends
+Präzision	Precision
+Nachkommastellen	Decimals
+Deckkraft	Opacity
+Kontur	Outline
+Füllung	Fill
+Füllfarbe	Fill color
+Fülldeckkraft	Fill opacity
+Fülldeckkraft %	Fill opacity %
+Füllungsalpha	Fill Alpha
+Konturalpha	Outline Alpha
+Linienstärke	Line width
+Linienbreite	Line Width
+Hitbox-Farbe	Hitbox color
+Augenhöhe	Eye height
+Augenfarbe	Eye color
+Blickrichtung	Look vector
+Blickfarbe	Look color
+Nur mit F3+B	Only with F3+B
+Spieler	Players
+Feindliche Kreaturen	Hostile mobs
+Passive Tiere	Passive animals
+Projektile	Projectiles
+Fallengelassene Items	Dropped items
+Regenbogenkontur	Chroma outline
+Regenbogen-Hitboxen	Chroma hitboxes
+Abbauüberlagerung	Breaking overlay
+Abbaurisse	Breaking cracks
+Block-Markierung	Highlight Blocks
+Maximale Entfernung	Max Distance
+Name anzeigen	Show Name
+Symbol anzeigen	Show Icon
+Koordinaten anzeigen	Show Coordinates
+Entfernung anzeigen	Show Distance
+Strahl	Beam
+Strahlhöhe	Beam Height
+Strahldeckkraft	Beam Alpha
+Texthintergrund	Text Background
+Beschriftungen durch Wände	Labels Through Walls
+Markierungen durch Wände	Highlights Through Walls
+Minimale Skalierung	Min Scale
+Maximale Skalierung	Max Scale
+Sichtbare leuchtende Ränder	Glowing borders
+Selbstleuchtende Erze	Emissive glowing
+Dynamisches Licht	Dynamic Light
+Verbundene Adern	Connected veins
+Scanradius	Scan radius
+Maximale Markierungen	Maximum markers
+Blöcke pro Tick	Blocks per tick
+Diamant	Diamond
+Smaragd	Emerald
+Eisen	Iron
+Kohle	Coal
+Kupfer	Copper
+Netherquarz	Nether quartz
+Antiker Schrott	Ancient debris
+Drehgeschwindigkeit	Rotation speed
+Bodendrehung	Ground rotation
+Drehung im Flug	Trajectory rotation
+Vanilla ab dieser Itemanzahl	Vanilla fallback above items
+Flach	Flat
+Natürlich	Natural
+Rotierend	Rotating
+Beide	Both
+Versteckt	Hidden
+Entfernung allein	Distance only
+Regenbogenfarbe	Rainbow (Chroma)
+Zeitmodus	Time mode
+Eigene Zeit	Custom time
+Zyklusgeschwindigkeit	Cycle speed
+Wetter	Weather
+Tag	Day
+Nacht	Night
+Sonnenuntergang	Sunset
+Regen	Rain
+Gewitter	Thunder
+Alle Partikel	All particles
+Eigene Trankpartikel	Own potion swirls
+Explosionen	Explosions
+Rauch	Smoke
+Regen- / Schneepartikel	Rain / snow particles
+Immer kritische Partikel	Always crit particles
+Immer Verzauberungspartikel	Always sharpness particles
+Kritische Partikel vervielfachen	Crit multiplier
+Partikelgeschwindigkeit	Particle speed
+Eigene Partikelfarbe	Custom particle tint
+Partikelfarbe	Particle color
+Nur eigene Pfeile	Own arrows only
+Partikeltyp	Particle
+Dichte	Density
+Intervall in Ticks	Interval ticks
+Streuung	Spread
+Maximale Reichweite	Maximum range
+Flamme	Flame
+Empfindlichkeit	Sensitivity
+Y-Achse umkehren	Invert Y
+Vertikales Blicklimit	Pitch limit
+Für freie Sicht halten	Hold to freelook
+Zur dritten Person wechseln	Switch to third person
+Bewegungsstärke	Movement strength
+Windstärke	Wind amplitude
+Windgeschwindigkeit	Wind speed
+Dämpfung	Damping
+Umgebungswind	Ambient wind
+Mit Elytra deaktivieren	Disable with elytra
+Windig	Windy
+Dezent	Subtle
+Animationsgeschwindigkeit	Animation speed
+Schimmerfarbe	Glint color
+Rüstung	Armor
+Distanzmultiplikator	End distance multiplier
+Nebelbeginn in Prozent	Fog start percent
+Wassernebel entfernen	Remove water fog
+Lavanebel entfernen	Remove lava fog
+Pulverschneenebel entfernen	Remove powder snow fog
+Alle Bossleisten ausblenden	Hide all boss bars
+Namen ausblenden mit	Hide names containing
+Leistenfarbe überschreiben	Override bar color
+Leistenfarbe	Bar color
+Regenbogenleiste	Rainbow bar
+Leere Leistenfarbe	Empty bar color
+Namenshintergrund	Name background
+Namensschatten	Name shadow
+Eigener Name in dritter Person	Own name in third person
+Gesundheitsanzeige	Health display
+Bekannte maximale HP (0 = unbekannt)	Known max HP (0 = unknown)
+Lokaler Clan- / Levelpräfix	Local clan / level prefix
+Freunde (Namen durch Kommas getrennt)	Friends (comma-separated names)
+Freundesfarbe	Friend accent
+Herzen	Hearts
+Untertitel-Dauer	Subtitle seconds
+Richtungspfeile	Directional arrows
+Nur Sound-IDs mit (leer = alle)	Only sound IDs containing (empty=all)
+Sound-IDs hervorheben mit	Highlight sound IDs containing
+Hervorhebungsfarbe	Highlight color
+Schrittlautstärke	Footstep volume
+Regenlautstärke	Rain volume
+Eigene Sound-ID enthält	Custom sound ID contains
+Eigene Soundlautstärke	Custom sound volume
+Blitzeffekte entfernen	Remove lightning flash
+Karten-Vorschau	Map preview
+Kartengröße	Map size
+Kartenmarkierungen	Map decorations
+Shulker-Vorschau	Shulker preview
+Vorschauskala	Preview scale
+Itemanzahl	Item counts
+Leere Slots	Empty slots
+Automatisch beim Weltbeitritt starten	Auto start on world join
+Bei Weltwechsel zurücksetzen	Reset on world change
+In Menüs pausieren	Pause in menus
+Stunden immer anzeigen	Always show hours
+Timer-Beschriftung anzeigen	Show timer label
+Farbe beim Laufen	Running color
+Farbe bei Pause	Paused color
+Zehntelsekunden	Tenths
+Millisekunden	Milliseconds
+Sättigungsfarbe	Saturation color
+Warnfarbe	Warning color
+Warnschwelle	Low threshold
+Hunger anzeigen	Show hunger
+Wert und Balken	Value + bar
+Prozent	Percent
+Ausgabeauflösung	Output resolution
+Vergrößerungsfilter	Upscale filter
+In EzClient-Galerie kopieren	Copy to EzClient gallery
+Öffnen-Aktion	Open action
+Kopieren-Aktion	Copy action
+Löschen-Aktion	Delete action
+Nativ	Native
+Bikubisch	Bicubic
+Team-Betten	Team beds
+Generator-Upgrades	Generator upgrade timers
+Eisen / Gold im Inventar	Iron / gold inventory
+Warnung an Baugrenze	Build height warning
+Y-Baugrenze der Karte	Map build limit Y
+Warnabstand zur Baugrenze	Warn blocks below limit
+Bei Inaktivität ausblenden	Hide when idle
+Quelle anzeigen	Show source
+Aktualisierung in Sekunden	Refresh seconds
+Maximale Titellänge	Maximum title length
+Andere Quellen erlauben	Allow other
+Quellen	Sources
+Abstand zur Grenze für die Warnung.	Distance from the build limit at which to warn.
+Abstand zwischen zwei Partikelpaketen.	Interval between particle bursts.
+Aktiviert eine eigene Partikelfarbe.	Enables a custom particle color.
+Akzentfarbe für Freunde.	Accent color for friends.
+Animiert auf diesem Client jedes sichtbare Cape, auch von NoRisk- und Vanilla-Spielern.	Animates every visible cape on this client, including NoRisk and vanilla players.
+Animiert den Schimmer durch das Farbspektrum.	Cycles the enchantment glint through the color spectrum.
+Animiert den Text im flüssigen Regenbogen-Verlauf.	Animates text with a smooth rainbow gradient.
+Animiert die Konturfarbe.	Animates the outline color.
+Animiert die Leistenfarbe.	Animates the bar color.
+Animiert die Schadensfarbe im Regenbogen-Verlauf.	Cycles the damage color through a rainbow gradient.
+Anzeige mit Sekunden oder Millisekunden.	Displays seconds or milliseconds.
+Begrenzt die Scan-Arbeit pro Tick.	Limits the scan workload per tick.
+Begrenzt lange Songtitel.	Limits the length of song titles.
+Beschränkt Hinweise auf passende Sound-IDs.	Limits subtitles to matching sound IDs.
+Bewegt Capes auch im Stand sanft.	Gently moves capes while standing still.
+Bewegungsprofil des Capes.	Movement style of the cape.
+Blendet Explosionspartikel ein oder aus.	Shows or hides explosion particles.
+Blendet Rauchpartikel ein oder aus.	Shows or hides smoke particles.
+Blendet alle Bossleisten aus.	Hides all boss bars.
+Blendet das Overlay ohne aktive Wiedergabe aus.	Hides the overlay when nothing is playing.
+Blendet nur Bossleisten mit diesem Text aus.	Hides only boss bars containing this text.
+Darstellungsformat für den belegten Arbeitsspeicher.	Display format for memory usage.
+Deaktiviert Zusatzphysik beim Tragen einer Elytra.	Disables additional cape physics while wearing an elytra.
+Deckkraft der Füllung.	Opacity of the fill.
+Deckkraft des Schimmers.	Opacity of the enchantment glint.
+Dreht Gegenstände während der Flugbahn.	Rotates items while they are in flight.
+Dämpft abrupte Cape-Bewegungen.	Smooths abrupt cape movements.
+Entfernt Lavanebel im Modus All fog.	Removes lava fog in All fog mode.
+Entfernt Pulverschnee-Nebel im Modus All fog.	Removes powder snow fog in All fog mode.
+Entfernt Unterwassernebel im Modus All fog.	Removes underwater fog in All fog mode.
+Entfernt allen Nebel oder nur den Distanznebel.	Removes all fog or only distance fog.
+Erhellt die Umgebung um gefundene Erze.	Lights up the area around detected ores.
+Erzeugt Verzauberungs-Partikel bei Treffern.	Creates enchantment particles on hits.
+Erzeugt bei Treffern kritische Partikel.	Creates critical hit particles on hits.
+Farbe bei niedriger Sättigung.	Color used for low saturation.
+Farbe bei pausiertem Timer.	Color used while the timer is paused.
+Farbe der Abbauüberlagerung.	Color of the block breaking overlay.
+Farbe der Augenhöhen-Markierung.	Color of the eye height marker.
+Farbe der Blockkontur.	Color of the block outline.
+Farbe der transparenten Füllung.	Color of the translucent fill.
+Farbe der überschriebenen Bossleiste.	Custom boss bar color.
+Farbe des Anzeigetextes.	Color of the display text.
+Farbe des Blickvektors.	Color of the look direction indicator.
+Farbe des Player-Namens.	Color of the player name.
+Farbe des Songtitels.	Color of the song title.
+Farbe des Verzauberungsschimmers.	Color of the enchantment glint.
+Farbe des Vorschautitels.	Color of the preview title.
+Farbe für Antiken Schrott.	Color for ancient debris.
+Farbe für Diamanterz.	Color for diamond ore.
+Farbe für Eisenerz.	Color for iron ore.
+Farbe für Golderz.	Color for gold ore.
+Farbe für Kohleerz.	Color for coal ore.
+Farbe für Kupfererz.	Color for copper ore.
+Farbe für Lapislazuli-Erz.	Color for lapis lazuli ore.
+Farbe für Netherquarzerz.	Color for nether quartz ore.
+Farbe für Redstone-Erz.	Color for redstone ore.
+Farbe für Smaragderz.	Color for emerald ore.
+Farbe für getönte Partikel.	Color for tinted particles.
+Farbe und Transparenz der Füllung.	Color and opacity of the fill.
+Farbe und Transparenz des Schadensblitzes.	Color and opacity of the damage flash.
+Farbe wichtiger Soundhinweise.	Color of important sound subtitles.
+Farbe während der Timer läuft.	Color used while the timer is running.
+Filter für die hochauflösende Ausgabe.	Filter for high-resolution output.
+Freelook ist nur aktiv, solange die Taste gehalten wird.	Freelook is active only while the key is held.
+Färbt die Anzeige bei hoher Speicherauslastung orange bzw. rot ein.	Colors the display orange or red when memory usage is high.
+Füllt die Hitbox transparent aus.	Adds a translucent hitbox fill.
+Füllt markierte Blöcke transparent.	Adds a translucent fill to marked blocks.
+Füllt sichtbare Erz-Seiten transparent aus.	Adds a translucent fill to visible ore faces.
+Geschwindigkeit der Gegenstandsdrehung.	Speed of item rotation.
+Geschwindigkeit der Partikel.	Speed of the particles.
+Geschwindigkeit der Windwelle.	Speed of the wind wave.
+Geschwindigkeit der dynamischen Zeit.	Speed of the day and night cycle.
+Geschwindigkeit des Regenbogenverlaufs.	Speed of the rainbow cycle.
+Grundfarbe der Kontur.	Base outline color.
+Größe der Shulker-Vorschau.	Size of the shulker preview.
+Größte Labelgröße in der Nähe.	Largest label size at close range.
+Gut lesbare Basisgröße von Waypoint-Labels.	Readable base size of waypoint labels.
+Hintergrund für lesbare Beschriftungen.	Background for readable labels.
+Hintergrund hinter Namensschildern.	Background behind nameplates.
+Hintergrundfarbe der Vorschau.	Background color of the preview.
+Hintergrundfarbe des Balkens.	Background color of the bar.
+Hält Labels bei verdeckten Zielen sichtbar.	Keeps labels visible when their targets are obstructed.
+Höhe des Richtstrahls.	Height of the waypoint beam.
+Intervall für die Abfrage der Medienfenster.	Interval between media player updates.
+Kantenlänge der Karten-Vorschau.	Side length of the map preview.
+Kehrt die vertikale Kamerabewegung um.	Inverts vertical camera movement.
+Kleinste Labelgröße auf großer Distanz.	Smallest label size at long range.
+Kommagetrennte Liste lokaler Freundesnamen.	Comma-separated list of local friend names.
+Kommagetrennte Soundteile für hervorgehobene Hinweise.	Comma-separated sound ID fragments to highlight.
+Lautstärkefaktor für den benutzerdefinierten Sound.	Volume multiplier for the custom sound.
+Legt die Drehung liegender Gegenstände fest.	Sets the rotation of items lying on the ground.
+Legt die Gesundheitsanzeige fest.	Sets the health display style.
+Lokaler Lautstärkefaktor für Regen.	Local volume multiplier for rain.
+Lokaler Lautstärkefaktor für Schritte.	Local volume multiplier for footsteps.
+Lässt freiliegende Erze in dunklen Höhlen hell leuchten.	Makes exposed ores glow in dark caves.
+Markiert Antiken Schrott.	Highlights ancient debris.
+Markiert Diamanterz.	Highlights diamond ore.
+Markiert Eisenerz.	Highlights iron ore.
+Markiert Golderz und Nethergolderz.	Highlights gold ore and nether gold ore.
+Markiert Kohleerz.	Highlights coal ore.
+Markiert Kupfererz.	Highlights copper ore.
+Markiert Lapislazuli-Erz.	Highlights lapis lazuli ore.
+Markiert Netherquarzerz.	Highlights nether quartz ore.
+Markiert Redstone-Erz.	Highlights redstone ore.
+Markiert Smaragderz.	Highlights emerald ore.
+Markiert gespeicherte Blockpositionen.	Highlights saved block positions.
+Master-Schalter für sämtliche Minecraft-Partikel.	Main switch for all Minecraft particles.
+Maximale Entfernung für Spuren.	Maximum trail distance.
+Maximale Renderdistanz für Waypoints (maximal = Unendlich).	Maximum waypoint render distance (maximum = unlimited).
+Maximale Zahl gleichzeitig markierter Erze.	Maximum number of ores highlighted at once.
+Maximaler vertikaler Blickwinkel.	Maximum vertical viewing angle.
+Multiplikator für die Dauer des Schadensblitzes.	Multiplier for the duration of the damage flash.
+Multiplikator für die Kamerabewegung.	Camera movement multiplier.
+Multipliziert die normale Sichtweite.	Multiplies the normal view distance.
+Multipliziert kritische Trefferpartikel.	Multiplies critical hit particles.
+Nachkommastellen des Sättigungswerts.	Decimal places in the saturation value.
+Normale Farbe von Text und Balken.	Normal text and bar color.
+Partikel pro Pfeil und Tick.	Particles per arrow per tick.
+Partikeltyp der Spur.	Particle type used for the trail.
+Passt den Schimmer von Items an.	Customizes the enchantment glint on items.
+Passt den Schimmer von Rüstung an.	Customizes the enchantment glint on armor.
+Pausiert im Einzelspieler bei geöffnetem Menü.	Pauses in singleplayer while a menu is open.
+Rahmenfarbe der Vorschau.	Border color of the preview.
+Referenzwert für die HP-Anzeige.	Reference value for the health display.
+Schatten für bessere Lesbarkeit.	Text shadow for better readability.
+Schützt die Leistung bei vielen Gegenständen.	Protects performance when many items are present.
+Setzt den Timer beim Wechsel der Welt zurück.	Resets the timer when switching worlds.
+Sichtbarkeitsdauer eines Soundhinweises.	How long each sound subtitle stays visible.
+Sound-ID, für die ein eigener Faktor gelten soll.	Sound ID to which the custom multiplier applies.
+Speichert zusätzlich in der EzClient-Galerie.	Also saves a copy in the EzClient gallery.
+Startet automatisch beim Betreten einer Welt.	Starts automatically when entering a world.
+Startpunkt des verbleibenden Distanznebels.	Starting point of the remaining distance fog.
+Steuert die Abbauanzeige.	Controls the block breaking display.
+Stärke der Blockkontur.	Thickness of the block outline.
+Stärke der Erz-Kontur.	Thickness of the ore outline.
+Stärke der Hitbox-Kontur.	Thickness of the hitbox outline.
+Stärke der Lauf- und Flugbewegung.	Strength of walking and flying movement.
+Stärke der Windwelle.	Strength of the wind wave.
+Suchradius um den Spieler.	Search radius around the player.
+Text vor dem angezeigten Speicherwert.	Text before the displayed memory value.
+Text vor dem lokalen Spielernamen.	Text before the local player name.
+Transparenz der Blockfüllung.	Opacity of the block fill.
+Transparenz der Blockkontur.	Opacity of the block outline.
+Transparenz des Richtstrahls.	Opacity of the waypoint beam.
+Transparenz des Texthintergrunds.	Opacity of the text background.
+Unterdrückt helle Blitzeffekte.	Suppresses bright lightning flashes.
+Unterhalb dieses Werts wird die Warnfarbe verwendet.	Uses the warning color below this value.
+Verbindet benachbarte Erze einer Ader ohne Innenränder.	Connects adjacent ores in a vein without internal borders.
+Verwendet eine eigene Leistenfarbe.	Uses a custom bar color.
+Warnt nahe der Bauhöhenbegrenzung.	Warns near the build height limit.
+Wechselt beim Aktivieren automatisch in die Rückansicht.	Automatically switches to rear third-person view when enabled.
+Wählt Kontur, Füllung oder beides.	Selects outline, fill, or both.
+Wählt das Layout der Bossleiste.	Selects the boss bar layout.
+Wählt die Ziele für den Schadenstreffer-Effekt.	Selects targets for the damage flash effect.
+Wählt die lokale Tageszeit ohne Serveränderung.	Selects the local time of day without changing the server.
+Wählt die lokale Wetterdarstellung.	Selects the local weather appearance.
+Y-Höhe der Kartengrenze.	Y coordinate of the map's build limit.
+Zeichnet sichtbare leuchtende Ränder auf freiliegende Erz-Seiten.	Draws glowing borders on exposed ore faces.
+Zeigt Eisen und Gold im Inventar.	Shows iron and gold in the inventory.
+Zeigt Generator- und Upgradeinformationen.	Shows generator and upgrade information.
+Zeigt Hitboxen nur im Minecraft-Debugmodus.	Shows hitboxes only in Minecraft debug mode.
+Zeigt Hitboxen von Spielern.	Shows player hitboxes.
+Zeigt Karten beim Darüberfahren groß an.	Shows enlarged maps when hovering over them.
+Zeigt Markierungen durch Wände.	Shows markers through walls.
+Zeigt Markierungen und Spieler auf Karten.	Shows markers and players on maps.
+Zeigt Projektile.	Shows projectiles.
+Zeigt Regen- und Schneepartikel.	Shows rain and snow particles.
+Zeigt Stackgrößen im Raster.	Shows stack sizes in the grid.
+Zeigt Status der Team-Betten.	Shows the status of team beds.
+Zeigt Stunden auch vor 60 Minuten.	Shows hours even before 60 minutes have elapsed.
+Zeigt XYZ-Koordinaten.	Shows XYZ coordinates.
+Zeigt auch leere Slots.	Also shows empty slots.
+Zeigt das Label Timer vor der Zeit.	Shows the Timer label before the time.
+Zeigt das gewählte Symbol.	Shows the selected icon.
+Zeigt den Inhalt von Shulker-Kisten beim Darüberfahren.	Shows shulker box contents when hovering over them.
+Zeigt den Namen des Players.	Shows the player name.
+Zeigt den Namen des Waypoints.	Shows the waypoint name.
+Zeigt den Wert als Zahl, Balken oder beides.	Shows the value as a number, a bar, or both.
+Zeigt den eigenen Namen in der dritten Person.	Shows your own name in third-person view.
+Zeigt die Augenhöhe.	Shows eye height.
+Zeigt die Blickrichtung.	Shows the look direction.
+Zeigt die Entfernung zum Waypoint.	Shows the distance to the waypoint.
+Zeigt die Kontur markierter Blöcke.	Shows the outline of marked blocks.
+Zeigt die Richtung der Soundquelle.	Shows the direction of the sound source.
+Zeigt eigene Effektpartikel.	Shows your own status effect particles.
+Zeigt eine Kopieren-Aktion im Chat.	Shows a copy action in chat.
+Zeigt eine Löschen-Aktion im Chat.	Shows a delete action in chat.
+Zeigt eine Öffnen-Aktion im Chat.	Shows an open action in chat.
+Zeigt einen vertikalen Richtstrahl.	Shows a vertical waypoint beam.
+Zeigt fallengelassene Gegenstände.	Shows dropped items.
+Zeigt feindliche Kreaturen.	Shows hostile mobs.
+Zeigt nur vom lokalen Spieler geschossene Pfeile.	Shows only arrows fired by the local player.
+Zeigt passive Kreaturen.	Shows passive mobs.
+Zeigt zusätzlich die Hungerpunkte.	Also shows hunger points.
+Zeitwert für den statischen Modus.	Time value for static mode.
+Zielauflösung für F2-Aufnahmen.	Target resolution for F2 screenshots.
+Zufällige Streuung der Spur.	Random spread of the trail.
+Öffnet eine durchsuchbare Liste aller Minecraft-Partikeltypen	Opens a searchable list of all Minecraft particle types
+Partikel-Typen verwalten …	Manage particle types …
+Partikel suchen …	Search particles …
+Block-Regeln konfigurieren …	Configure block rules …
+Entity-Regeln konfigurieren …	Configure entity rules …
+Ziel-Regeln (Entity & Block) …	Target rules (entities & blocks) …
+Waypoint Manager öffnen …	Open waypoint manager …
+Waypoint suchen …	Search waypoints …
+Entity suchen …	Search entities …
+Block suchen …	Search blocks …
+Item / Block suchen (z. B. Bett, Eimer) …	Search items / blocks (e.g. bed, bucket) …
+Entity oder Block suchen …	Search entities or blocks …
+Entity / Block suchen …	Search entities / blocks …
+Taste drücken …	Press a key …
+Nicht belegt	Unbound
+Nicht gesetzt	Not set

@@ -113,7 +113,7 @@ Item {
                             color: EzTheme.text
                         }
                         Text {
-                            text: "Modrinth · Autor: " + ((root.selectedRemoteMod && root.selectedRemoteMod.author)
+                            text: EzI18n.text("Modrinth · Autor: ") + ((root.selectedRemoteMod && root.selectedRemoteMod.author)
                                   ? root.selectedRemoteMod.author
                                   : ((root.currentInspectedMod && root.currentInspectedMod.author) ? root.currentInspectedMod.author : "Community"))
                             font.family: EzTheme.fontFamily
@@ -152,7 +152,7 @@ Item {
                         border.width: 1
                         Text {
                             id: verPillText
-                            text: (root.currentInspectedMod && window.integratedMods && window.integratedMods.indexOf(root.currentInspectedMod.slug) !== -1 ? "Integriert: " : "Installiert: ") + ((root.currentInspectedMod && root.currentInspectedMod.version) ? root.currentInspectedMod.version : "Latest")
+                            text: (root.currentInspectedMod && window.integratedMods && window.integratedMods.indexOf(root.currentInspectedMod.slug) !== -1 ? EzI18n.text("Integriert: ") : EzI18n.text("Installiert: ")) + ((root.currentInspectedMod && root.currentInspectedMod.version) ? root.currentInspectedMod.version : EzI18n.text("Latest"))
                             font.family: EzTheme.mcFontFamily; font.pixelSize: 10; font.bold: true
                             color: EzTheme.cyan; anchors.centerIn: parent
                         }
@@ -197,7 +197,7 @@ Item {
                         width: parent.width
                         text: (root.selectedRemoteMod && root.selectedRemoteMod.description)
                               ? root.selectedRemoteMod.description
-                              : ((root.currentInspectedMod && root.currentInspectedMod.description) ? root.currentInspectedMod.description : "Lade Modrinth-Daten…")
+                              : ((root.currentInspectedMod && root.currentInspectedMod.description) ? root.currentInspectedMod.description : EzI18n.text("Lade Modrinth-Daten…"))
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 12
                         color: EzTheme.textSecondary
@@ -213,7 +213,7 @@ Item {
                     spacing: 10
 
                     EzButton {
-                        text: "Versionen"
+                        text: EzI18n.text("Versionen")
                         primary: true
                         mcFont: true
                         Layout.preferredHeight: 34
@@ -234,7 +234,7 @@ Item {
                     Item { Layout.fillWidth: true }
 
                     EzButton {
-                        text: "Schließen"
+                        text: EzI18n.text("Schließen")
                         Layout.preferredHeight: 34
                         Layout.preferredWidth: 90
                         onClicked: root.inspectModalOpen = false
@@ -282,14 +282,14 @@ Item {
                         Layout.fillWidth: true
                         spacing: 2
                         Text {
-                            text: "Version wechseln: " + root.versionSwitchModName
+                            text: EzI18n.text("Version wechseln: ") + root.versionSwitchModName
                             font.family: EzTheme.mcFontFamily
                             font.pixelSize: 15
                             font.bold: true
                             color: EzTheme.text
                         }
                         Text {
-                            text: "Wähle ein offizielles Release aus der Modrinth API:"
+                            text: EzI18n.text("Wähle ein offizielles Release aus der Modrinth API:")
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 11
                             color: EzTheme.textMuted
@@ -315,13 +315,13 @@ Item {
                     Layout.fillWidth: true
                     spacing: 6
 
-                    Text { text: "Filter:"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
+                    Text { text: EzI18n.text("Filter:"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
 
                     Repeater {
                         model: [
                             { id: "release", label: "Release" },
                             { id: "beta",    label: "Beta" },
-                            { id: "all",     label: "Alle" }
+                            { id: "all",     label: EzI18n.text("Alle") }
                         ]
 
                         Rectangle {
@@ -421,7 +421,7 @@ Item {
                                 border.width: 1
 
                                 Text {
-                                    text: modelData.version_number === root.versionSwitchCurrentVer ? "Aktiv" : "Wählen"
+                                    text: modelData.version_number === root.versionSwitchCurrentVer ? EzI18n.text("Aktiv") : EzI18n.text("Wählen")
                                     font.family: EzTheme.mcFontFamily
                                     font.pixelSize: 10
                                     font.bold: true
@@ -464,7 +464,7 @@ Item {
                     visible: !modrinthController || modrinthController.filteredVersions.length === 0
 
                     Text {
-                        text: "Keine Versionen im aktuellen Filter gefunden"
+                        text: EzI18n.text("Keine Versionen im aktuellen Filter gefunden")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
                         color: EzTheme.textMuted
@@ -505,15 +505,15 @@ Item {
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 2
-                    Text { text: "Abhängigkeits-Warnung"; font.family: EzTheme.mcFontFamily; font.pixelSize: 15; font.bold: true; color: EzTheme.danger }
-                    Text { text: "Wichtige Kern-Modifikation"; font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
+                    Text { text: EzI18n.text("Abhängigkeits-Warnung"); font.family: EzTheme.mcFontFamily; font.pixelSize: 15; font.bold: true; color: EzTheme.danger }
+                    Text { text: EzI18n.text("Wichtige Kern-Modifikation"); font.family: EzTheme.fontFamily; font.pixelSize: 10; color: EzTheme.textMuted }
                 }
             }
 
             Rectangle { Layout.fillWidth: true; height: 1; color: EzTheme.border }
 
             Text {
-                text: "Warnung: Die Mod '" + (root.pendingDeleteMod ? root.pendingDeleteMod.name : "") + "' wird von folgenden installierten Mods benötigt: " + root.pendingDeleteDeps.join(", ") + ".\n\nDas Löschen kann zu Spielabstürzen führen."
+                text: EzI18n.text("Warnung: Die Mod '") + (root.pendingDeleteMod ? root.pendingDeleteMod.name : "") + EzI18n.text("' wird von folgenden installierten Mods benötigt: ") + root.pendingDeleteDeps.join(", ") + EzI18n.text(".\n\nDas Löschen kann zu Spielabstürzen führen.")
                 font.family: EzTheme.fontFamily
                 font.pixelSize: 11
                 color: EzTheme.text
@@ -529,14 +529,14 @@ Item {
                 spacing: 10
 
                 EzButton {
-                    text: "Abbrechen"
+                    text: EzI18n.text("Abbrechen")
                     Layout.fillWidth: true
                     Layout.preferredHeight: 34
                     onClicked: depWarningModal.close()
                 }
 
                 EzButton {
-                    text: "Trotzdem löschen"
+                    text: EzI18n.text("Trotzdem löschen")
                     danger: true
                     mcFont: true
                     Layout.fillWidth: true
@@ -569,14 +569,16 @@ Item {
                 Layout.fillWidth: true
                 spacing: 2
                 Text {
-                    text: "ERWEITERUNGEN"
+                    text: EzI18n.text("ERWEITERUNGEN")
                     font.family: EzTheme.mcFontFamily
                     font.pixelSize: 16
                     font.bold: true
                     color: EzTheme.text
                 }
                 Text {
-                    text: (profileController ? profileController.activeModsCount : 0) + " Erweiterungen im aktiven Profil (" + (profileController ? profileController.activeName : "") + ")"
+                    text: (profileController ? profileController.activeModsCount : 0) + EzI18n.text(" Erweiterungen im aktiven Profil (") + (profileController ? profileController.activeName : "") + ")"
+                    Layout.fillWidth: true
+                    elide: Text.ElideRight
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 11
                     color: EzTheme.textMuted
@@ -585,7 +587,7 @@ Item {
 
             // Add mods button taking user to Modrinth Store
             EzButton {
-                text: "Hinzufügen"
+                text: EzI18n.text("Hinzufügen")
                 primary: true
                 Layout.preferredHeight: 34
                 Layout.preferredWidth: 120
@@ -598,13 +600,13 @@ Item {
         }
 
         // ─── Search Bar + Filter Pills ───
-        RowLayout {
+        ColumnLayout {
             Layout.fillWidth: true
             spacing: 10
 
             // Search Bar (Stable width)
             Rectangle {
-                Layout.preferredWidth: 260
+                Layout.fillWidth: true
                 Layout.preferredHeight: 36
                 color: EzTheme.surface
                 border.color: modSearch.activeFocus ? EzTheme.accent : EzTheme.border
@@ -664,7 +666,9 @@ Item {
             }
 
             // Quick Status Filter Pills: Alle | EzClient Mods | Aktiv | Inaktiv
-            Row {
+            Flow {
+                Layout.fillWidth: true
+                Layout.preferredHeight: childrenRect.height
                 spacing: 6
 
                 Repeater {
@@ -714,7 +718,7 @@ Item {
                 spacing: 8
                 
                 EzButton {
-                    text: "Alle updaten"
+                    text: EzI18n.text("Alle updaten")
                     primary: true
                     mcFont: true
                     visible: root.hasUpdates
@@ -723,7 +727,7 @@ Item {
                     onClicked: profileController.updateAllMods()
                 }
 
-                Text { text: "Integrierte ausblenden"; font.family: EzTheme.fontFamily; font.pixelSize: 11; color: EzTheme.textMuted }
+                Text { text: EzI18n.text("Integrierte ausblenden"); font.family: EzTheme.fontFamily; font.pixelSize: 11; color: EzTheme.textMuted }
                 
                 Rectangle {
                     width: 34; height: 18; radius: 9
@@ -1053,7 +1057,7 @@ Item {
                                             spacing: 3
                                             Image { source: "icons/zap.svg"; width: 8; height: 8; fillMode: Image.PreserveAspectFit }
                                             Text {
-                                                text: "INTEGRIERT"
+                                                text: EzI18n.text("INTEGRIERT")
                                                 font.family: EzTheme.mcFontFamily; font.pixelSize: 8; font.bold: true
                                                 color: "#4ADE80"
                                             }
@@ -1086,7 +1090,7 @@ Item {
                                 }
 
                                 Text {
-                                    text: model.description || "Klicken für Modrinth-Details und Beschreibung…"
+                                    text: model.description || EzI18n.text("Klicken für Modrinth-Details und Beschreibung…")
                                     font.family: EzTheme.fontFamily
                                     font.pixelSize: 10
                                     color: EzTheme.textMuted

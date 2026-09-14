@@ -9,6 +9,8 @@
   "mixins": [],
   "client": [
     "VertexBuilderAccessor",
+    "MinecraftAccessor",
+    "JoinMultiplayerScreenMixin",
     "RenderSectionRegionAccessor",
     "ClientBrandRetrieverMixin",
     "TitleScreenMixin",
@@ -55,6 +57,8 @@
     "HitboxVisualizerMixin",
     "ItemPhysicsStateMixin",
     "ItemPhysicsMixin",
+    "ItemModelResolverMixin",
+    "ItemModelRenderStateMixin",
     "BossBarCustomizerMixin",
     "WeatherLevelMixin",
     "WeatherParticlesMixin",

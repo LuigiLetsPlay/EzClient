@@ -56,10 +56,6 @@ Item {
             frameHeight: frameH,
             pingPong: pingPong
         }
-        if (!isLoaded || !webEngine) return
-        var cleanSheet = (sheetUrl || "").replace(/[\r\n]/g, "").replace(/'/g, "\\'")
-        var js = "setAnimatedCape('" + cleanSheet + "', " + Number(frameCount) + ", " + Number(fps) + ", " + Number(columns) + ", " + Number(frameW) + ", " + Number(frameH) + ", " + (pingPong ? "true" : "false") + ");"
-        webEngine.runJavaScript(js)
     }
 
     function setRotateY(deg) {

@@ -1,5 +1,4 @@
 import os
-import os
 import sys
 import shutil
 import threading
@@ -50,6 +49,34 @@ def download_file(url: str, dest_path: Path, use_cache: bool = True) -> bool:
         temporary.unlink(missing_ok=True)
         print(f"[ModDownloader] Failed to download {url}: {e}")
         return False
+
+
+def _install_pinned(mod: ModData, target: Path) -> None:
+    """Restore an imported version exactly; never replace a modpack pin with latest."""
+    from backend.services.norisk_importer import _matches_hashes, _resolve_exact_file
+    if target.is_file() and target.stat().st_size > 0 and _matches_hashes(target, mod.hashes):
+        return
+    url = mod.download_url
+    hashes = dict(mod.hashes)
+    if not url:
+        exact = _resolve_exact_file(mod.source or "modrinth", mod.project_id,
+                                    mod.version_id, mod.filename, hashes)
+        url = exact.get("url")
+        hashes = {**exact.get("hashes", {}), **hashes}
+    if not url:
+        raise ValueError("The pinned mod version has no download URL")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    staged = target.with_name(target.name + ".verified")
+    try:
+        if not download_file(url, staged, use_cache=False):
+            raise OSError("Pinned mod download failed")
+        if not staged.stat().st_size or not _matches_hashes(staged, hashes):
+            raise ValueError("Pinned mod checksum mismatch")
+        os.replace(staged, target)
+        mod.download_url = url
+        mod.hashes = hashes
+    finally:
+        staged.unlink(missing_ok=True)
 
 def _sync_profile_mods(
     profile: ProfileData,
@@ -140,6 +167,15 @@ def _sync_profile_mods(
                 pass
 
         target_filename = m.filename
+        if m.pinned:
+            try:
+                _install_pinned(m, target_jar)
+                active_set.add(target_jar.name)
+            except Exception as exc:
+                failures[slug_or_id] = str(exc)
+                if target_jar.exists():
+                    active_set.add(target_jar.name)
+            continue
         is_ezclient = (m.slug and m.slug.lower() in ("ezclient", "ezclient-core")) or (m.filename and m.filename.lower().startswith("ezclient-")) or ("ezclient" in m.name.lower())
         
         if is_ezclient:
@@ -381,6 +417,9 @@ def provision_profile_mods_parallel(
 
     def install(mod: ModData) -> str:
         target_filename = mod.filename or f"{mod.slug or 'mod'}.jar"
+        if mod.pinned:
+            _install_pinned(mod, profile.mods_path / target_filename)
+            return target_filename
         is_ezclient = (mod.slug or "").lower() in {"ezclient", "ezclient-core"}
         if is_ezclient:
             candidates = [

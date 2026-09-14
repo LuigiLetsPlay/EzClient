@@ -75,8 +75,8 @@ public final class BlockSettingsScreen extends ScrollingSettingsScreen {
 
         int resetWidth = 46;
         int searchWidth = contentWidth - resetWidth - 4;
-        searchBox = new EditBox(font, left, panelY + 26, searchWidth, 16, Component.literal("Block suchen …"));
-        searchBox.setHint(Component.literal("Block suchen …"));
+        searchBox = new EditBox(font, left, panelY + 26, searchWidth, 16, Component.literal(app.ezclient.util.EzI18n.text("Block suchen …")));
+        searchBox.setHint(Component.literal(app.ezclient.util.EzI18n.text("Block suchen …")));
         searchBox.setValue(search);
         searchBox.setMaxLength(80);
         searchBox.setResponder(val -> {
@@ -86,7 +86,7 @@ public final class BlockSettingsScreen extends ScrollingSettingsScreen {
         addFixedWidget(searchBox);
 
         addFixedWidget(new EzButton(left + searchWidth + 4, panelY + 26, resetWidth, 16,
-                Component.literal("Reset"), false, b -> {
+                Component.literal(app.ezclient.util.EzI18n.text("Reset")), false, b -> {
             module.clearBlockRules();
             populateRows();
         }));

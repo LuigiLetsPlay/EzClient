@@ -71,7 +71,7 @@ public final class EzHubScreen extends Screen {
 
         // ── Top Search Box (right-aligned in header, next to close button) ──
         int searchW = Math.min(SEARCH_WIDTH, panelWidth - SIDEBAR_WIDTH - 38);
-        searchBox = new EditBox(font, panelX + panelWidth - searchW - 28, panelY + 11, searchW, SEARCH_HEIGHT, Component.literal("Search"));
+        searchBox = new EditBox(font, panelX + panelWidth - searchW - 28, panelY + 11, searchW, SEARCH_HEIGHT, Component.literal(app.ezclient.util.EzI18n.text("Search")));
         searchBox.setHint(app.ezclient.util.EzI18n.comp("ezclient.hub.search_hint"));
         searchBox.setValue(searchQuery);
         searchBox.setResponder(text -> {
@@ -109,8 +109,8 @@ public final class EzHubScreen extends Screen {
                 continue;
             }
             if (!searchQuery.isEmpty()) {
-                String name = m.getName().toLowerCase();
-                String cat = m.getCategory().toLowerCase();
+                String name = (m.getName() + " " + m.getDisplayName() + " " + m.getLocalizedDescription()).toLowerCase(java.util.Locale.ROOT);
+                String cat = (m.getCategory() + " " + app.ezclient.util.EzI18n.text(m.getCategory())).toLowerCase(java.util.Locale.ROOT);
                 if (!name.contains(searchQuery) && !cat.contains(searchQuery)) {
                     continue;
                 }
@@ -536,20 +536,25 @@ public final class EzHubScreen extends Screen {
 
     private void openModuleSettings(Module module) {
         if (minecraft == null) return;
+        EzScreenBridge.set(minecraft, createModuleSettingsScreen(this, module));
+    }
+
+    /** One routing table shared by the hub and the in-game settings audit. */
+    public static Screen createModuleSettingsScreen(Screen parent, Module module) {
         if (module instanceof CrosshairModule crosshair) {
-            EzScreenBridge.set(minecraft, new CrosshairPaintScreen(this, crosshair));
+            return new CrosshairPaintScreen(parent, crosshair);
         } else if (module instanceof KeystrokesModule ks) {
-            EzScreenBridge.set(minecraft, new KeystrokesSettingsScreen(this, ks));
+            return new KeystrokesSettingsScreen(parent, ks);
         } else if (module instanceof WaypointsModule waypoints) {
-            EzScreenBridge.set(minecraft, new WaypointScreen(this, waypoints));
+            return new WaypointScreen(parent, waypoints);
         } else if (module instanceof FeatureModule feature) {
-            EzScreenBridge.set(minecraft, new FeatureSettingsScreen(this, feature));
+            return new FeatureSettingsScreen(parent, feature);
         } else if (module instanceof HudModule hud) {
-            EzScreenBridge.set(minecraft, new HudSettingsScreen(this, hud));
+            return new HudSettingsScreen(parent, hud);
         } else if (module instanceof ZoomModule) {
-            EzScreenBridge.set(minecraft, new ZoomSettingsScreen(this));
+            return new ZoomSettingsScreen(parent);
         } else {
-            EzScreenBridge.set(minecraft, new ModuleSettingsScreen(this, module));
+            return new ModuleSettingsScreen(parent, module);
         }
     }
 

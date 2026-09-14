@@ -7,6 +7,8 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TARGETS = {
+    "ItemModelResolverMixin": ("net.minecraft.client.renderer.item.ItemModelResolver", ["updateForTopItem"]),
+    "ItemModelRenderStateMixin": ("net.minecraft.client.renderer.item.ItemStackRenderState", ["clear", "submit"]),
     "HitboxVisualizerMixin": ("net.minecraft.client.renderer.debug.EntityHitboxDebugRenderer", ["emitGizmos"]),
     "ItemPhysicsMixin": ("net.minecraft.client.renderer.entity.ItemEntityRenderer", []),
     "BossBarCustomizerMixin": ("net.minecraft.client.gui.components.BossHealthOverlay", ["extractRenderState", "extractBar"]),

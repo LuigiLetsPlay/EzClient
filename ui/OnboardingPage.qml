@@ -179,25 +179,25 @@ Item {
                 spacing: 12
                 Text {
                     Layout.fillWidth: true
-                    text: root.pendingXaeroWaypointCount + " Xaero-Waypoint" + (root.pendingXaeroWaypointCount === 1 ? " erkannt" : "s erkannt")
+                    text: root.pendingXaeroWaypointCount + " Xaero-Waypoint" + (root.pendingXaeroWaypointCount === 1 ? EzI18n.text(" erkannt") : "s erkannt")
                     font.family: EzTheme.fontFamily; font.pixelSize: 18; font.bold: true; color: EzTheme.text
                 }
                 Text {
                     Layout.fillWidth: true; wrapMode: Text.WordWrap
-                    text: "In EzClient-Waypoints umwandeln? Dann werden Xaero Minimap/World Map und deren Daten nicht in das neue Profil kopiert."
+                    text: EzI18n.text("In EzClient-Waypoints umwandeln? Dann werden Xaero Minimap/World Map und deren Daten nicht in das neue Profil kopiert.")
                     font.family: EzTheme.fontFamily; font.pixelSize: 12; color: EzTheme.textSecondary
                 }
                 Text {
                     Layout.fillWidth: true; wrapMode: Text.WordWrap
-                    text: "Das originale NoRisk-Profil „" + root.pendingNoriskProfileName + "“ wird nicht verändert."
+                    text: EzI18n.text("Das originale NoRisk-Profil „") + root.pendingNoriskProfileName + EzI18n.text("“ wird nicht verändert.")
                     font.family: EzTheme.fontFamily; font.pixelSize: 11; font.bold: true; color: EzTheme.accentLight
                 }
                 Item { Layout.fillHeight: true }
                 RowLayout {
                     Layout.fillWidth: true; spacing: 10
                     Item { Layout.fillWidth: true }
-                    EzButton { text: "Xaero behalten"; Layout.preferredWidth: 140; onClicked: root.importNoRisk(root.pendingNoriskProfileId, false) }
-                    EzButton { text: "In EzClient umwandeln"; primary: true; Layout.preferredWidth: 180; onClicked: root.importNoRisk(root.pendingNoriskProfileId, true) }
+                    EzButton { text: EzI18n.text("Xaero behalten"); Layout.preferredWidth: 140; onClicked: root.importNoRisk(root.pendingNoriskProfileId, false) }
+                    EzButton { text: EzI18n.text("In EzClient umwandeln"); primary: true; Layout.preferredWidth: 180; onClicked: root.importNoRisk(root.pendingNoriskProfileId, true) }
                 }
             }
         }
@@ -536,7 +536,7 @@ Item {
                         }
 
                         EzButton {
-                            text: (typeof accountController !== "undefined" && accountController && accountController.isOnline) ? "Konto wechseln" : "Anmelden"
+                            text: (typeof accountController !== "undefined" && accountController && accountController.isOnline) ? EzI18n.text("Konto wechseln") : EzI18n.text("Anmelden")
                             primary: !(typeof accountController !== "undefined" && accountController && accountController.isOnline)
                             mcFont: true
                             Layout.preferredHeight: 34
@@ -635,14 +635,14 @@ Item {
                     Rectangle {
                         height: 22; radius: 11; color: "#FF553315"; border.color: "#FF5533"; border.width: 1
                         Layout.preferredWidth: nrBadgeText.implicitWidth + 16
-                        Text { id: nrBadgeText; text: "⚡ NoRiskClient erkannt"; font.family: EzTheme.fontFamily; font.pixelSize: 10; font.bold: true; color: "#FF7744"; anchors.centerIn: parent }
+                        Text { id: nrBadgeText; text: EzI18n.text("⚡ NoRiskClient erkannt"); font.family: EzTheme.fontFamily; font.pixelSize: 10; font.bold: true; color: "#FF7744"; anchors.centerIn: parent }
                     }
                 }
 
                 Item { Layout.preferredHeight: 14 }
 
                 Text {
-                    text: "NoRisk-Profile übernehmen?"
+                    text: EzI18n.text("NoRisk-Profile übernehmen?")
                     font.family: EzTheme.mcFontFamily
                     font.pixelSize: 24
                     font.bold: true
@@ -654,7 +654,7 @@ Item {
                 Item { Layout.preferredHeight: 6 }
 
                 Text {
-                    text: "Wähle ein vorhandenes Profil. Spielstände, Einstellungen und Mods werden in ein neues EzClient-Profil kopiert."
+                    text: EzI18n.text("Wähle ein vorhandenes Profil. Spielstände, Einstellungen und Mods werden in ein neues EzClient-Profil kopiert.")
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 12
                     color: EzTheme.textSecondary
@@ -689,7 +689,7 @@ Item {
                         }
 
                         Text {
-                            text: "✨ EzClient Performance & Core Mod hinzufügen (Empfohlen)"
+                            text: EzI18n.text("✨ EzClient Performance & Core Mod hinzufügen (Empfohlen)")
                             font.family: EzTheme.fontFamily
                             font.pixelSize: 11
                             font.bold: true
@@ -715,7 +715,7 @@ Item {
                     Layout.preferredHeight: 22
 
                     Text {
-                        text: "Gefundene Profile"
+                        text: EzI18n.text("Gefundene Profile")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
                         font.bold: true
@@ -794,7 +794,7 @@ Item {
                                     Layout.minimumWidth: 0
                                     spacing: 2
                                     Text {
-                                        text: modelData.name || "Unbenanntes NoRisk-Profil"
+                                        text: modelData.name || EzI18n.text("Unbenanntes NoRisk-Profil")
                                         font.family: EzTheme.mcFontFamily
                                         font.pixelSize: 13
                                         font.bold: true
@@ -804,7 +804,7 @@ Item {
                                         maximumLineCount: 1
                                     }
                                     Text {
-                                        text: "Minecraft " + (modelData.version || "Unbekannt") + "  ·  " + (modelData.loader || "Vanilla") + "  ·  " + (modelData.modCount || 0) + " Mods"
+                                        text: "Minecraft " + (modelData.version || EzI18n.text("Unbekannt")) + "  ·  " + (modelData.loader || "Vanilla") + "  ·  " + (modelData.modCount || 0) + " Mods"
                                         font.family: EzTheme.fontFamily
                                         font.pixelSize: 10
                                         color: EzTheme.textMuted
@@ -823,7 +823,7 @@ Item {
                                 }
 
                                 EzButton {
-                                    text: "Importieren"
+                                    text: EzI18n.text("Importieren")
                                     primary: true
                                     mcFont: true
                                     Layout.preferredHeight: 36
@@ -849,7 +849,7 @@ Item {
                     Layout.fillWidth: true
                     Item { Layout.fillWidth: true }
                     Text {
-                        text: "Neues Standard-Profil erstellen →"
+                        text: EzI18n.text("Neues Standard-Profil erstellen →")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 12
                         font.bold: true
@@ -1895,7 +1895,7 @@ Item {
                 Item { height: 26 }
 
                 Text {
-                    text: root.setupFailed ? "Profil konnte nicht eingerichtet werden" : (root.downloadProgress >= 1.0 ? "Profil fertiggestellt!" : "Richte " + root.newName + " ein…")
+                    text: root.setupFailed ? EzI18n.text("Profil konnte nicht eingerichtet werden") : (root.downloadProgress >= 1.0 ? EzI18n.text("Profil fertiggestellt!") : EzI18n.text("Richte ") + root.newName + EzI18n.text(" ein…"))
                     font.family: EzTheme.mcFontFamily
                     font.pixelSize: 22
                     font.bold: true
@@ -1971,7 +1971,7 @@ Item {
                     border.color: EzTheme.border
                     Text {
                         anchors.centerIn: parent
-                        text: "Zurück"
+                        text: EzI18n.text("Zurück")
                         color: EzTheme.text
                         font.family: EzTheme.mcFontFamily
                         font.pixelSize: 12
