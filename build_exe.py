@@ -92,6 +92,18 @@ def build_exe():
 
     dist_dir = root / "dist" / "EzClient"
     dist_exe = dist_dir / "EzClient.exe"
+    runtime_dir = dist_dir / "_internal"
+
+    # Ensure shiboken6 and C++ runtime DLLs are mirrored into _internal and PySide6
+    # so the Windows dynamic loader finds them without depending on system PATH
+    shiboken_src = runtime_dir / "shiboken6"
+    pyside_target = runtime_dir / "PySide6"
+    if shiboken_src.is_dir():
+        for dll in shiboken_src.glob("*.dll"):
+            shutil.copy2(dll, runtime_dir / dll.name)
+            if pyside_target.is_dir():
+                shutil.copy2(dll, pyside_target / dll.name)
+
     if dist_exe.exists():
         try:
             from tools.sign_tool import sign_binary

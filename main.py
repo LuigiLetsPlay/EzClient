@@ -9,8 +9,26 @@ try:
 except ImportError:
     pyi_splash = None
 
-# Ensure PySide6 and shiboken6 package directories are added to Windows DLL search path
+# Ensure PySide6, shiboken6, and internal runtime DLL directories are added to Windows DLL search path
 if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
+    # 1. PyInstaller frozen application
+    if getattr(sys, "frozen", False):
+        base_dirs = [
+            getattr(sys, "_MEIPASS", None),
+            Path(sys.executable).resolve().parent,
+            Path(sys.executable).resolve().parent / "_internal",
+        ]
+        for b in base_dirs:
+            if b:
+                bp = Path(b)
+                for sub in ("", "PySide6", "shiboken6"):
+                    target = bp / sub if sub else bp
+                    if target.is_dir():
+                        try:
+                            os.add_dll_directory(str(target))
+                        except Exception:
+                            pass
+    # 2. Direct Python script execution
     try:
         import importlib.util
         spec = importlib.util.find_spec("PySide6")
