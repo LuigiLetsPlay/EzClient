@@ -487,8 +487,12 @@ public final class KeystrokesModule extends HudModule {
 
     public void renderCustom(GuiGraphicsExtractor g, Minecraft client, boolean editor) {
         if (client == null || client.options == null) return;
+        int w = getWidth(client, editor);
+        int h = getHeight(client, editor);
+        int renderX = getRenderX(client, w, editor);
+        int renderY = getRenderY(client, h, editor);
         g.pose().pushMatrix();
-        g.pose().translate(getX(), getY());
+        g.pose().translate(renderX, renderY);
         g.pose().scale((float)getScale(), (float)getScale());
         g.pose().translate(getContentOffsetX(), getContentOffsetY());
         renderElements(g, client, editor);

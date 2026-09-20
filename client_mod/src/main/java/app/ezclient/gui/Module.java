@@ -66,13 +66,7 @@ public abstract class Module {
 
     // Methods for building settings UI
     public boolean hasSettings() { return false; }
-    public boolean hasPreview() {
-        return switch (getName()) {
-            case "Scoreboard Customizer", "Motion Blur", "Chat Customizer",
-                 "TNT Timer", "FOV Changer", "Clear Glass",
-                 "Zoom", "Custom Crosshair", "Armor Status", "Toggle Sprint & Sneak" -> true;
-            default -> false;
-        };
-    }
+    public boolean hasHud() { return "HUD".equalsIgnoreCase(category); }
+    public boolean hasPreview() { return hasHud(); }
     public boolean mouseClickedSettings(double mouseX, double mouseY, int button, int x, int y, int width, int height) { return false; }
 }

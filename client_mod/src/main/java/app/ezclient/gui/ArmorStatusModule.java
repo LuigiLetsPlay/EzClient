@@ -133,7 +133,13 @@ public final class ArmorStatusModule extends HudModule {
     }
 
     private int getActiveSlotCount(Minecraft client, boolean editor) {
-        if (editor) return getSlotCount();
+        if (editor) {
+            if (client != null && client.player != null && dynamicBox) {
+                int equipped = getEquippedCount(client);
+                if (equipped > 0) return equipped;
+            }
+            return getSlotCount();
+        }
         if (!dynamicBox) return getSlotCount();
         return getEquippedCount(client);
     }
@@ -205,23 +211,42 @@ public final class ArmorStatusModule extends HudModule {
             return;
         }
 
+        int totalW = getWidth(client, editor);
+        int totalH = getHeight(client, editor);
         float scale = (float) getScale();
+        int renderX = getRenderX(client, totalW, editor);
+        int renderY = getRenderY(client, totalH, editor);
+
         graphics.pose().pushMatrix();
-        graphics.pose().translate(getX(), getY());
+        graphics.pose().translate(renderX, renderY);
         graphics.pose().scale(scale, scale);
 
         int padX = (hasBackground() || hasBorder()) ? CONTENT_PADDING_X : 2;
         int padY = (hasBackground() || hasBorder()) ? CONTENT_PADDING_Y : 1;
 
         List<ItemStack> itemsToRender = new ArrayList<>();
-        if (editor) {
-            for (int index : slotIndices()) {
-                itemsToRender.add(getDummyItem(index));
-            }
-        } else if (client != null && client.player != null) {
+        if (client != null && client.player != null) {
+            boolean hasRealEquipped = false;
             for (int index : slotIndices()) {
                 ItemStack item = playerItem(client, index);
-                if (!dynamicBox || !item.isEmpty()) itemsToRender.add(item);
+                if (!item.isEmpty()) {
+                    hasRealEquipped = true;
+                    break;
+                }
+            }
+            if (hasRealEquipped || !editor) {
+                for (int index : slotIndices()) {
+                    ItemStack item = playerItem(client, index);
+                    if (!dynamicBox || !item.isEmpty()) itemsToRender.add(item);
+                }
+            } else {
+                for (int index : slotIndices()) {
+                    itemsToRender.add(getDummyItem(index));
+                }
+            }
+        } else {
+            for (int index : slotIndices()) {
+                itemsToRender.add(getDummyItem(index));
             }
         }
 

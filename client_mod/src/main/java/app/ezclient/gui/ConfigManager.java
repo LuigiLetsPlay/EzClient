@@ -220,6 +220,21 @@ public class ConfigManager {
                     if (json.has("crosshairHideF3")) crosshair.setHideInF3(json.get("crosshairHideF3").getAsBoolean());
                     if (json.has("crosshairHideThirdPerson")) crosshair.setHideInThirdPerson(json.get("crosshairHideThirdPerson").getAsBoolean());
                     if (json.has("crosshairCenterOnMonitor")) crosshair.setCenterOnMonitor(json.get("crosshairCenterOnMonitor").getAsBoolean());
+                    if (json.has("crosshairTextColor")) crosshair.setTextColor(json.get("crosshairTextColor").getAsInt());
+                    if (json.has("crosshairColorMode")) {
+                        try { crosshair.setColorMode(HudModule.ColorMode.valueOf(json.get("crosshairColorMode").getAsString())); } catch (Exception ignored) {}
+                    }
+                    if (json.has("crosshairWaveColor2")) crosshair.setWaveColor2(json.get("crosshairWaveColor2").getAsInt());
+                    if (json.has("crosshairPreset")) {
+                        try { crosshair.restorePreset(CrosshairModule.CrosshairPreset.valueOf(json.get("crosshairPreset").getAsString())); } catch (Exception ignored) {}
+                    }
+                    if (json.has("crosshairPaintPattern")) {
+                        crosshair.setPaintPattern(json.get("crosshairPaintPattern").getAsString());
+                    }
+                    if (json.has("crosshairElements") && json.get("crosshairElements").isJsonObject()) {
+                        crosshair.readElementSettings(json.getAsJsonObject("crosshairElements"));
+                    }
+                    if (json.has("crosshairKeyBind")) crosshair.setKeyBind(json.get("crosshairKeyBind").getAsInt());
                     if (json.has("crosshairTargetRules") && json.get("crosshairTargetRules").isJsonObject()) {
                         crosshair.clearTargetRules();
                         JsonObject obj = json.getAsJsonObject("crosshairTargetRules");
@@ -281,6 +296,7 @@ public class ConfigManager {
                     if (json.has("pingUpdateInterval")) ping.setUpdateIntervalSeconds(json.get("pingUpdateInterval").getAsInt());
                     if (json.has("pingAlert")) ping.setPingAlert(json.get("pingAlert").getAsBoolean());
                     if (json.has("pingShowPlayerCount")) ping.setShowPlayerCount(json.get("pingShowPlayerCount").getAsBoolean());
+                    if (json.has("pingShowServerIcon")) ping.setShowServerIcon(json.get("pingShowServerIcon").getAsBoolean());
 
                     // Reach Display
                     ReachModule reach = ModuleManager.getInstance().getReachModule();
@@ -420,6 +436,14 @@ public class ConfigManager {
                             try { hud.setBorderColorMode(HudModule.ColorMode.valueOf(h.get("borderColorMode").getAsString())); } catch (Exception ignored) {}
                         }
                         if (h.has("borderWaveColor2")) hud.setBorderWaveColor2(h.get("borderWaveColor2").getAsInt());
+                        if (h.has("anchorX")) {
+                            try { hud.setAnchorX(HudModule.AnchorX.valueOf(h.get("anchorX").getAsString())); } catch (Exception ignored) {}
+                        }
+                        if (h.has("anchorY")) {
+                            try { hud.setAnchorY(HudModule.AnchorY.valueOf(h.get("anchorY").getAsString())); } catch (Exception ignored) {}
+                        }
+                        if (h.has("editorWidth")) hud.setEditorWidth(h.get("editorWidth").getAsInt());
+                        if (h.has("editorHeight")) hud.setEditorHeight(h.get("editorHeight").getAsInt());
                     }
 
                     for (Module m : ModuleManager.getInstance().getModules()) {
@@ -538,6 +562,15 @@ public class ConfigManager {
             json.addProperty("crosshairHideF3", crosshair.isHideInF3());
             json.addProperty("crosshairHideThirdPerson", crosshair.isHideInThirdPerson());
             json.addProperty("crosshairCenterOnMonitor", crosshair.isCenterOnMonitor());
+            json.addProperty("crosshairTextColor", crosshair.getTextColor());
+            json.addProperty("crosshairColorMode", crosshair.getColorMode().name());
+            json.addProperty("crosshairWaveColor2", crosshair.getWaveColor2());
+            json.addProperty("crosshairPreset", crosshair.getPreset().name());
+            json.addProperty("crosshairPaintPattern", crosshair.getPaintPattern());
+            JsonObject crosshairElementsObj = new JsonObject();
+            crosshair.writeElementSettings(crosshairElementsObj);
+            json.add("crosshairElements", crosshairElementsObj);
+            json.addProperty("crosshairKeyBind", crosshair.getKeyBind());
             JsonObject targetRulesObj = new JsonObject();
             for (var entry : crosshair.getTargetRules().entrySet()) {
                 var r = entry.getValue();
@@ -586,6 +619,7 @@ public class ConfigManager {
             json.addProperty("pingUpdateInterval", ping.getUpdateIntervalSeconds());
             json.addProperty("pingAlert", ping.isPingAlert());
             json.addProperty("pingShowPlayerCount", ping.isShowPlayerCount());
+            json.addProperty("pingShowServerIcon", ping.isShowServerIcon());
 
             // Reach Display
             ReachModule reach = ModuleManager.getInstance().getReachModule();
@@ -706,6 +740,10 @@ public class ConfigManager {
                 h.addProperty("rainbowBorder", hud.isRainbowBorder());
                 h.addProperty("borderColorMode", hud.getBorderColorMode().name());
                 h.addProperty("borderWaveColor2", hud.getBorderWaveColor2());
+                h.addProperty("anchorX", hud.getAnchorX().name());
+                h.addProperty("anchorY", hud.getAnchorY().name());
+                h.addProperty("editorWidth", hud.getEditorWidth());
+                h.addProperty("editorHeight", hud.getEditorHeight());
                 json.add("hud" + hud.getName(), h);
             }
 

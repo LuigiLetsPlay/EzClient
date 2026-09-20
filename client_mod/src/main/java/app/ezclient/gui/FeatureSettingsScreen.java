@@ -13,6 +13,7 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -27,6 +28,7 @@ public final class FeatureSettingsScreen extends ScrollingSettingsScreen {
     private final Screen parent;
     private final FeatureModule module;
     private boolean isListeningForHotkey = false;
+    private boolean advancedExpanded = false;
 
     private int panelX, panelY, panelWidth, panelHeight;
 
@@ -114,21 +116,21 @@ public final class FeatureSettingsScreen extends ScrollingSettingsScreen {
         if (module instanceof HitboxModule hitbox) {
             addRenderableWidget(described(new EzButton(
                     col1X, curY, fullW, 18,
-                    Component.literal(app.ezclient.util.EzI18n.text("Entity-Regeln konfigurieren …")), false,
+                    Component.literal("Custom Entity Settings …"), false,
                     b -> EzScreenBridge.set(minecraft, new EntityTypeSettingsScreen(this, hitbox))
             ), "Öffnet detaillierte Hitbox-Regeln für alle Entity-Typen"));
             curY += 22;
         } else if (module instanceof BlockOverlayModule blockOverlay) {
             addRenderableWidget(described(new EzButton(
                     col1X, curY, fullW, 18,
-                    Component.literal(app.ezclient.util.EzI18n.text("Block-Regeln konfigurieren …")), false,
+                    Component.literal("Custom Block Settings …"), false,
                     b -> EzScreenBridge.set(minecraft, new BlockSettingsScreen(this, blockOverlay))
             ), "Öffnet individuelle Kontur- und Füllregeln pro Block"));
             curY += 22;
         } else if (module instanceof DamageTintModule damageTint) {
             addRenderableWidget(described(new EzButton(
                     col1X, curY, fullW, 18,
-                    Component.literal(app.ezclient.util.EzI18n.text("Entity-Regeln konfigurieren …")), false,
+                    Component.literal("Custom Entity Settings …"), false,
                     b -> EzScreenBridge.set(minecraft, new DamageTintEntityScreen(this, damageTint))
             ), "Öffnet individuelle Schadensfarben pro Entity-Typ"));
             curY += 22;
@@ -146,18 +148,49 @@ public final class FeatureSettingsScreen extends ScrollingSettingsScreen {
                     b -> EzScreenBridge.set(minecraft, new ParticleTypesScreen(this, particles))
             ), "Öffnet eine durchsuchbare Liste aller Minecraft-Partikeltypen"));
             curY += 22;
-        } else if (module instanceof ItemModelModule itemModel) {
-            addRenderableWidget(described(new EzButton(
-                    col1X, curY, fullW, 18,
-                    Component.literal(app.ezclient.util.EzI18n.text("Item-Modelle konfigurieren …")), false,
-                    b -> EzScreenBridge.set(minecraft, new ItemModelScreen(this, itemModel))
-            ), "Position, Drehung und Größe pro Item für First Person, Boden und GUI einstellen"));
-            curY += 22;
+
         }
 
-        // Group options by defined categories
+        // Complex modules start with at most two approachable categories. Every
+        // remaining setting stays available in one explicit Advanced section.
         List<String> categories = module.settingCategories();
-        for (String cat : categories) {
+        List<String> basicCategories = new ArrayList<>();
+        List<String> advancedCategories = new ArrayList<>();
+        boolean simplify = module.options().size() >= 6 && categories.size() > 1;
+        for (String category : categories) {
+            String normalized = category.toLowerCase(Locale.ROOT);
+            boolean clearlyAdvanced = normalized.contains("erweit")
+                    || normalized.contains("advanced")
+                    || normalized.contains("fein")
+                    || normalized.contains("performance")
+                    || normalized.contains("system");
+            if (simplify && !basicCategories.isEmpty() && (clearlyAdvanced || basicCategories.size() >= 2)) {
+                advancedCategories.add(category);
+            } else {
+                basicCategories.add(category);
+            }
+        }
+
+        List<String> orderedCategories = new ArrayList<>(basicCategories);
+        orderedCategories.addAll(advancedCategories);
+        for (int categoryIndex = 0; categoryIndex < orderedCategories.size(); categoryIndex++) {
+            if (!advancedCategories.isEmpty() && categoryIndex == basicCategories.size()) {
+                String advancedLabel = app.ezclient.util.EzI18n.text("Erweitert");
+                addRenderableWidget(described(new EzButton(
+                        col1X, curY, fullW, 18,
+                        Component.literal((advancedExpanded ? "\u25BE " : "\u25B8 ") + advancedLabel
+                                + " (" + advancedCategories.size() + ")"),
+                        advancedExpanded,
+                        b -> {
+                            advancedExpanded = !advancedExpanded;
+                            rebuildWidgets();
+                        }
+                ), "Zeigt alle zus\u00E4tzlichen Anpassungen dieses Moduls"));
+                curY += 24;
+                if (!advancedExpanded) break;
+            }
+
+            String cat = orderedCategories.get(categoryIndex);
             List<FeatureModule.Option> catOptions = module.options().stream()
                     .filter(o -> cat.equalsIgnoreCase(module.settingInfo(o.key()).category()))
                     .toList();

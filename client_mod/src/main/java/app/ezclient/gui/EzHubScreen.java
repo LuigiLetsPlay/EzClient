@@ -458,8 +458,6 @@ public final class EzHubScreen extends Screen {
             graphics.centeredText(font, Component.literal(moduleName), 0, 0, EzUi.TEXT_LIGHT);
             graphics.pose().popMatrix();
 
-            // Toggle dot indicator (bottom right)
-            drawCompactToggleDot(graphics, cx + cardWidth - 8, cy + cardHeight - 8, module.isEnabled());
 
             // Favorite star icon (top-right)
             if (module.isFavorite() || hovered) {
@@ -526,13 +524,6 @@ public final class EzHubScreen extends Screen {
         graphics.pose().popMatrix();
     }
 
-    private static void drawCompactToggleDot(GuiGraphicsExtractor graphics, int x, int y, boolean on) {
-        int color = on ? EzUi.ACCENT_EMERALD : 0xFF3A4050;
-        EzUi.roundedRect(graphics, x, y, 5, 5, 2, color);
-        if (on) {
-            EzUi.roundedRect(graphics, x - 1, y - 1, 7, 7, 3, 0x205B8F6A);
-        }
-    }
 
     private void openModuleSettings(Module module) {
         if (minecraft == null) return;
@@ -542,17 +533,15 @@ public final class EzHubScreen extends Screen {
     /** One routing table shared by the hub and the in-game settings audit. */
     public static Screen createModuleSettingsScreen(Screen parent, Module module) {
         if (module instanceof CrosshairModule crosshair) {
-            return new CrosshairPaintScreen(parent, crosshair);
+            return new CrosshairSettingsScreen(parent, crosshair);
         } else if (module instanceof KeystrokesModule ks) {
             return new KeystrokesSettingsScreen(parent, ks);
-        } else if (module instanceof WaypointsModule waypoints) {
-            return new WaypointScreen(parent, waypoints);
+        } else if (module instanceof ItemModelModule itemModel) {
+            return new ItemModelScreen(parent, itemModel);
         } else if (module instanceof FeatureModule feature) {
             return new FeatureSettingsScreen(parent, feature);
         } else if (module instanceof HudModule hud) {
             return new HudSettingsScreen(parent, hud);
-        } else if (module instanceof ZoomModule) {
-            return new ZoomSettingsScreen(parent);
         } else {
             return new ModuleSettingsScreen(parent, module);
         }

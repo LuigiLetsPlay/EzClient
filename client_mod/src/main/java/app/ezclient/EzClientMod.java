@@ -26,6 +26,7 @@ import app.ezclient.gui.ModuleManager;
 import app.ezclient.cosmetics.CommunityPresence;
 import app.ezclient.cosmetics.CommunityCapeManager;
 import app.ezclient.render.ConnectedGlassModel;
+import app.ezclient.render.GlowingOreModel;
 import net.minecraft.network.chat.Component;
 
 /**
@@ -35,8 +36,8 @@ import net.minecraft.network.chat.Component;
  * - First-Launch Performance & PvP Optimization (Fast Graphics, 8 Chunks, No Shadows/Clouds, Biome Blend 0, 120 FPS default)
  */
 public class EzClientMod implements ClientModInitializer {
-    public static final String CLIENT_VERSION = "2.2.0";
-    public static final String CLIENT_TITLE = "EzClient 2.2.0";
+    public static final String CLIENT_VERSION = "2.2.1";
+    public static final String CLIENT_TITLE = "EzClient 2.2.1";
     private static volatile boolean running = true;
     private static Path ezClientDataDir = null;
 
@@ -83,6 +84,7 @@ public class EzClientMod implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         ConnectedGlassModel.register();
+        GlowingOreModel.register();
         registerBuiltinResourcePacks();
         app.ezclient.gui.ItemIconHelper.ensureComponentsBound();
         Path dataDir = getEzClientDataDir();
@@ -475,8 +477,8 @@ public class EzClientMod implements ClientModInitializer {
                 net.fabricmc.fabric.api.resource.ResourceManagerHelper.registerBuiltinResourcePack(
                     Identifier.fromNamespaceAndPath("ezclient", "glowing_ores"),
                     container,
-                    net.minecraft.network.chat.Component.literal("EzClient Glowing Ores (Border)"),
-                    net.fabricmc.fabric.api.resource.ResourcePackActivationType.DEFAULT_ENABLED
+                    net.minecraft.network.chat.Component.literal("EzClient Glowing Ores (OptiFine/Continuity)"),
+                    net.fabricmc.fabric.api.resource.ResourcePackActivationType.NORMAL
                 );
             });
         } catch (Throwable t) {

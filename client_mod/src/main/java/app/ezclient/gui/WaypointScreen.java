@@ -20,8 +20,9 @@ public final class WaypointScreen extends ScrollingSettingsScreen {
     private static final int ROW_HEIGHT = 18;
 
     private static final int[] PRESET_COLORS = {
-        0xFFFF4757, 0xFFFFA502, 0xFFECCC68, 0xFF2ED573,
-        0xFF1E90FF, 0xFF70A1FF, 0xFF9B59B6, 0xFFFFFFFF
+        0xFF22C96E, 0xFF00D2FF, 0xFF3B82F6,
+        0xFFFF6B4A, 0xFFEF4444, 0xFFEAB308,
+        0xFFA855F7, 0xFFFFFFFF, 0xFF334155
     };
 
     private record WaypointRow(String id, int x, int y, int width, int height) {}
@@ -310,16 +311,17 @@ public final class WaypointScreen extends ScrollingSettingsScreen {
                 }));
         y += 24;
 
-        // Row 3: Preset Color Swatches + Custom Picker Button
+        // Row 3: Preset Color Swatches + Custom Picker Button with Hex readout
         int swatchSize = 16;
         for (int i = 0; i < PRESET_COLORS.length; i++) {
             final int c = PRESET_COLORS[i];
-            int sx = x0 + i * (swatchSize + 4);
+            int sx = x0 + i * (swatchSize + 3);
             addRenderableWidget(new ColorPresetButton(sx, y, swatchSize, swatchSize, c, () -> editColor = c));
         }
-        int customBtnX = x0 + PRESET_COLORS.length * (swatchSize + 4) + 4;
+        int customBtnX = x0 + PRESET_COLORS.length * (swatchSize + 3) + 4;
         int customBtnW = innerWidth - (customBtnX - x0);
-        addRenderableWidget(new EzButton(customBtnX, y, customBtnW, swatchSize, Component.literal("Farbe …"), false,
+        String hexStr = String.format("#%06X", editColor & 0x00FFFFFF);
+        addRenderableWidget(new EzButton(customBtnX, y, customBtnW, swatchSize, Component.literal(hexStr + " …"), true,
                 button -> EzScreenBridge.set(minecraft, new ModuleColorScreen(this, "Waypoint-Farbe", editColor, color -> editColor = color))));
         y += 24;
 

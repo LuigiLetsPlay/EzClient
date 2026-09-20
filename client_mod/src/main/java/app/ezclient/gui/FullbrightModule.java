@@ -10,16 +10,16 @@ import net.minecraft.world.level.Level;
  * Fullbright & Gamma Boost module with brightness percentage,
  * smooth fade transitions, and Nether / End dimension blacklists.
  */
-public class FullbrightModule extends Module {
-    private int brightnessLevel = 1000; // 100% - 1500%
-    private boolean smoothFade = true;
-    private boolean disableInNether = false;
-    private boolean disableInEnd = false;
-
+public class FullbrightModule extends FeatureModule {
     private float currentFade = 0.0f;
 
     public FullbrightModule() {
-        super("Fullbright", "RENDER", false);
+        super("Fullbright", false, 0);
+
+        option("Helligkeit", "brightnessLevel", "Helligkeitsstufe (%)", "Stärke der Gammamodifikation in Prozent.", 1000.0, 100.0, 1500.0);
+        flag("Übergang", "smoothFade", "Sanftes Einblenden", "Weicher Helligkeitsübergang beim Ein- und Ausschalten.", true);
+        flag("Dimensionen", "disableInNether", "Im Nether deaktivieren", "Schaltet Fullbright in der Nether-Dimension automatisch ab.", false);
+        flag("Dimensionen", "disableInEnd", "Im Ende deaktivieren", "Schaltet Fullbright in der Ende-Dimension automatisch ab.", false);
     }
 
     @Override
@@ -32,22 +32,34 @@ public class FullbrightModule extends Module {
         return "Erhöht die Sichtbarkeit in dunklen Bereichen und kann pro Dimension gezielt deaktiviert werden.";
     }
 
-    public int getBrightnessLevel() { return brightnessLevel; }
-    public void setBrightnessLevel(int brightnessLevel) { this.brightnessLevel = Math.max(100, Math.min(1500, brightnessLevel)); ConfigManager.save(); }
+    public int getBrightnessLevel() { return (int) Math.round(number("brightnessLevel")); }
+    public void setBrightnessLevel(int brightnessLevel) {
+        set("brightnessLevel", (double) Math.max(100, Math.min(1500, brightnessLevel)));
+        ConfigManager.save();
+    }
 
-    public boolean isSmoothFade() { return smoothFade; }
-    public void setSmoothFade(boolean smoothFade) { this.smoothFade = smoothFade; ConfigManager.save(); }
+    public boolean isSmoothFade() { return flag("smoothFade"); }
+    public void setSmoothFade(boolean smoothFade) {
+        set("smoothFade", smoothFade);
+        ConfigManager.save();
+    }
 
-    public boolean isDisableInNether() { return disableInNether; }
-    public void setDisableInNether(boolean disableInNether) { this.disableInNether = disableInNether; ConfigManager.save(); }
+    public boolean isDisableInNether() { return flag("disableInNether"); }
+    public void setDisableInNether(boolean disableInNether) {
+        set("disableInNether", disableInNether);
+        ConfigManager.save();
+    }
 
-    public boolean isDisableInEnd() { return disableInEnd; }
-    public void setDisableInEnd(boolean disableInEnd) { this.disableInEnd = disableInEnd; ConfigManager.save(); }
+    public boolean isDisableInEnd() { return flag("disableInEnd"); }
+    public void setDisableInEnd(boolean disableInEnd) {
+        set("disableInEnd", disableInEnd);
+        ConfigManager.save();
+    }
 
     public boolean isDimensionAllowed(Minecraft client) {
         if (client == null || client.level == null) return true;
-        if (disableInNether && client.level.dimension() == Level.NETHER) return false;
-        if (disableInEnd && client.level.dimension() == Level.END) return false;
+        if (isDisableInNether() && client.level.dimension() == Level.NETHER) return false;
+        if (isDisableInEnd() && client.level.dimension() == Level.END) return false;
         return true;
     }
 
@@ -80,6 +92,6 @@ public class FullbrightModule extends Module {
 
     @Override
     public boolean hasSettings() {
-        return false;
+        return true;
     }
 }

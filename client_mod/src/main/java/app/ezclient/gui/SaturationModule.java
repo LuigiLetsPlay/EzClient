@@ -40,8 +40,10 @@ public final class SaturationModule extends FeatureModule {
         int width = Math.max(textWidth + CONTENT_PADDING_X * 2, bar ? 112 : 0);
         int height = bar ? 26 : 9 + CONTENT_PADDING_Y * 2;
         int active = saturation <= number("warning") ? tint("warningColor", false) : tint("normalColor", false);
+        int renderX = getRenderX(mc, width, editor);
+        int renderY = getRenderY(mc, height, editor);
         g.pose().pushMatrix();
-        g.pose().translate(getX(), getY());
+        g.pose().translate(renderX, renderY);
         g.pose().scale((float)getScale(), (float)getScale());
         renderBackgroundAndBorder(g, 0, 0, width, height);
         g.text(mc.font, styledText(label), CONTENT_PADDING_X, CONTENT_PADDING_Y, active, isTextShadow());

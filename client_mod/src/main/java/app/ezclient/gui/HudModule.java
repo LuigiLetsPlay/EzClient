@@ -25,12 +25,28 @@ public abstract class HudModule extends Module {
         public String getLabel() { return app.ezclient.util.EzI18n.get(translationKey); }
     }
 
+    public enum AnchorX {
+        LEFT,
+        CENTER,
+        RIGHT
+    }
+
+    public enum AnchorY {
+        TOP,
+        CENTER,
+        BOTTOM
+    }
+
     public static final int CONTENT_PADDING_X = 6;
     public static final int CONTENT_PADDING_Y = 4;
 
     private int x;
     private int y;
     private double scale = 1.0;
+    private AnchorX anchorX = AnchorX.LEFT;
+    private AnchorY anchorY = AnchorY.TOP;
+    private int editorWidth = 0;
+    private int editorHeight = 0;
     private String prefix;
     private String suffix;
     private ColorMode colorMode = ColorMode.SOLID;
@@ -69,6 +85,10 @@ public abstract class HudModule extends Module {
     public void resetToDefaults() {
         setPosition(defaultX, defaultY);
         setScale(1.0);
+        this.anchorX = AnchorX.LEFT;
+        this.anchorY = AnchorY.TOP;
+        this.editorWidth = 0;
+        this.editorHeight = 0;
         resetSettings();
     }
 
@@ -178,6 +198,96 @@ public abstract class HudModule extends Module {
     public void setBorderColorMode(ColorMode mode) { this.borderColorMode = mode == null ? ColorMode.SOLID : mode; ConfigManager.save(); }
     public int getBorderWaveColor2() { return borderWaveColor2; }
     public void setBorderWaveColor2(int color) { this.borderWaveColor2 = color; ConfigManager.save(); }
+    public AnchorX getAnchorX() { return anchorX != null ? anchorX : AnchorX.LEFT; }
+    public void setAnchorX(AnchorX anchorX) { this.anchorX = anchorX != null ? anchorX : AnchorX.LEFT; ConfigManager.save(); }
+
+    public AnchorY getAnchorY() { return anchorY != null ? anchorY : AnchorY.TOP; }
+    public void setAnchorY(AnchorY anchorY) { this.anchorY = anchorY != null ? anchorY : AnchorY.TOP; ConfigManager.save(); }
+
+    public int getEditorWidth() { return editorWidth; }
+    public void setEditorWidth(int editorWidth) { this.editorWidth = editorWidth; }
+
+    public int getEditorHeight() { return editorHeight; }
+    public void setEditorHeight(int editorHeight) { this.editorHeight = editorHeight; }
+
+    public void updateAnchor(int screenWidth, int screenHeight, int editorW, int editorH) {
+        this.editorWidth = Math.max(1, editorW);
+        this.editorHeight = Math.max(1, editorH);
+
+        double s = Double.isFinite(this.scale) && this.scale > 0 ? this.scale : 1.0;
+        int scaledW = (int) Math.ceil(this.editorWidth * s);
+        int scaledH = (int) Math.ceil(this.editorHeight * s);
+
+        int distLeft = this.x;
+        int distRight = screenWidth - (this.x + scaledW);
+        int distTop = this.y;
+        int distBottom = screenHeight - (this.y + scaledH);
+
+        int thresholdX = Math.max(40, screenWidth / 5);
+        int thresholdY = Math.max(30, screenHeight / 5);
+
+        if (distLeft <= thresholdX && distLeft <= distRight) {
+            this.anchorX = AnchorX.LEFT;
+        } else if (distRight <= thresholdX) {
+            this.anchorX = AnchorX.RIGHT;
+        } else {
+            this.anchorX = AnchorX.CENTER;
+        }
+
+        if (distTop <= thresholdY && distTop <= distBottom) {
+            this.anchorY = AnchorY.TOP;
+        } else if (distBottom <= thresholdY) {
+            this.anchorY = AnchorY.BOTTOM;
+        } else {
+            this.anchorY = AnchorY.CENTER;
+        }
+    }
+
+    public int getRenderX(Minecraft client, int currentWidth, boolean editor) {
+        if (editor) return this.x;
+        if (this.editorWidth <= 0 && client != null && client.getWindow() != null) {
+            updateAnchor(client.getWindow().getGuiScaledWidth(), client.getWindow().getGuiScaledHeight(),
+                    getWidth(client, true), getHeight(client, true));
+        }
+        int refW = this.editorWidth > 0 ? this.editorWidth : getWidth(client, true);
+        double s = Double.isFinite(this.scale) && this.scale > 0 ? this.scale : 1.0;
+        double rx;
+        switch (getAnchorX()) {
+            case RIGHT -> rx = this.x + (refW - currentWidth) * s;
+            case CENTER -> rx = this.x + ((refW - currentWidth) * s) / 2.0;
+            case LEFT -> rx = this.x;
+            default -> rx = this.x;
+        }
+        if (client != null && client.getWindow() != null) {
+            int screenW = client.getWindow().getGuiScaledWidth();
+            int maxRx = Math.max(0, screenW - (int) Math.ceil(currentWidth * s));
+            return Math.max(0, Math.min(maxRx, (int) Math.round(rx)));
+        }
+        return (int) Math.round(rx);
+    }
+
+    public int getRenderY(Minecraft client, int currentHeight, boolean editor) {
+        if (editor) return this.y;
+        if (this.editorHeight <= 0 && client != null && client.getWindow() != null) {
+            updateAnchor(client.getWindow().getGuiScaledWidth(), client.getWindow().getGuiScaledHeight(),
+                    getWidth(client, true), getHeight(client, true));
+        }
+        int refH = this.editorHeight > 0 ? this.editorHeight : getHeight(client, true);
+        double s = Double.isFinite(this.scale) && this.scale > 0 ? this.scale : 1.0;
+        double ry;
+        switch (getAnchorY()) {
+            case BOTTOM -> ry = this.y + (refH - currentHeight) * s;
+            case CENTER -> ry = this.y + ((refH - currentHeight) * s) / 2.0;
+            case TOP -> ry = this.y;
+            default -> ry = this.y;
+        }
+        if (client != null && client.getWindow() != null) {
+            int screenH = client.getWindow().getGuiScaledHeight();
+            int maxRy = Math.max(0, screenH - (int) Math.ceil(currentHeight * s));
+            return Math.max(0, Math.min(maxRy, (int) Math.round(ry)));
+        }
+        return (int) Math.round(ry);
+    }
 
     public int color() {
         return color(0);
@@ -504,6 +614,16 @@ public abstract class HudModule extends Module {
 
     @Override
     public boolean hasSettings() {
+        return true;
+    }
+
+    @Override
+    public boolean hasHud() {
+        return true;
+    }
+
+    @Override
+    public boolean hasPreview() {
         return true;
     }
 

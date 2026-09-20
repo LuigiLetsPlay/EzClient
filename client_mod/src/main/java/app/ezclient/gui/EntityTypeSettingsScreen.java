@@ -24,21 +24,24 @@ import java.util.function.Consumer;
  * 3-state status pills, live color swatches, and inline thickness steppers.
  */
 public final class EntityTypeSettingsScreen extends ScrollingSettingsScreen {
-    private static final int ROW_HEIGHT = 18;
+    private static final int HEADER_HEIGHT = 22;
+    private static final int EXPANDED_PANEL_HEIGHT = 48;
 
-    private record DisplayRow(String key, String displayName, int y) {}
+    private record DisplayRow(String key, String displayName, int y, int height, boolean expanded) {}
 
     private final Screen parent;
     private final HitboxModule module;
     private final List<DisplayRow> displayedRows = new ArrayList<>();
     private final List<AbstractWidget> rowWidgets = new ArrayList<>();
+    private final java.util.Set<String> expandedKeys = new java.util.HashSet<>();
 
     private int panelX, panelY, panelWidth, panelHeight;
     private String search = "";
     private EditBox searchBox;
+    private int totalContentBottom = 0;
 
     public EntityTypeSettingsScreen(Screen parent, HitboxModule module) {
-        super(Component.literal("Hitbox: EntityType-Regeln"));
+        super(Component.literal("Hitbox: Custom Entity Settings"));
         this.parent = parent;
         this.module = module;
     }
@@ -47,6 +50,7 @@ public final class EntityTypeSettingsScreen extends ScrollingSettingsScreen {
     @Override protected int scrollTop() { return panelY + 46; }
     @Override protected int scrollRight() { return panelX + panelWidth - 8; }
     @Override protected int scrollBottom() { return panelY + panelHeight - 10; }
+    @Override protected int scrollContentBottom() { return totalContentBottom; }
 
     public static String formatEntityName(String key) {
         if (key == null || key.isBlank()) return "";
@@ -134,32 +138,77 @@ public final class EntityTypeSettingsScreen extends ScrollingSettingsScreen {
         for (var id : matching) {
             String key = id.toString();
             String displayName = formatEntityName(key);
-            displayedRows.add(new DisplayRow(key, displayName, y));
+            boolean isExpanded = expandedKeys.contains(key);
+            int rowHeight = isExpanded ? (HEADER_HEIGHT + EXPANDED_PANEL_HEIGHT + 4) : (HEADER_HEIGHT + 2);
+            displayedRows.add(new DisplayRow(key, displayName, y, rowHeight, isExpanded));
 
-            // Controls on the right side of the row:
-            // 1. Status Pill (width 38, height 14) -> [ Auto / An / Aus ]
-            StatusPillButton pill = new StatusPillButton(left + contentWidth - 108, y + 2, 38, 14, key, module, this::populateRows);
+            // Full-width clickable Header row button (toggles expand / collapse)
+            int headerBtnW = contentWidth - 46;
+            EzButton toggleHeaderBtn = new EzButton(left, y, headerBtnW, HEADER_HEIGHT,
+                    Component.literal((isExpanded ? "▼ " : "▶ ") + "   " + displayName), isExpanded,
+                    b -> {
+                        if (isExpanded) expandedKeys.remove(key);
+                        else expandedKeys.add(key);
+                        populateRows();
+                    });
+            addRenderableWidget(toggleHeaderBtn);
+            rowWidgets.add(toggleHeaderBtn);
+
+            // Header Status Pill on right
+            StatusPillButton pill = new StatusPillButton(left + contentWidth - 42, y + 3, 42, 16, key, module, this::populateRows);
             addRenderableWidget(pill);
             rowWidgets.add(pill);
 
-            // 2. Color Swatch (width 26, height 14) -> opens ModuleColorScreen
-            ColorSwatchButton swatch = new ColorSwatchButton(left + contentWidth - 66, y + 2, 26, 14, value(key).color(), b -> {
-                EzScreenBridge.set(minecraft, new ModuleColorScreen(this, displayName, value(key).color(), color -> {
-                    var current = value(key);
-                    module.setRule(key, new HitboxModule.EntityRule(current.enabled(), color, current.width()));
-                    b.setColor(color);
-                }));
-            });
-            addRenderableWidget(swatch);
-            rowWidgets.add(swatch);
+            // ── Expanded Accordion Controls ──
+            if (isExpanded) {
+                int panelY = y + HEADER_HEIGHT + 2;
+                var currentVal = value(key);
 
-            // 3. Compact Stepper (width 36, height 14) -> ‹ 1.0 ›
-            CompactStepperButton stepper = new CompactStepperButton(left + contentWidth - 36, y + 2, 36, 14, key, module, this::populateRows);
-            addRenderableWidget(stepper);
-            rowWidgets.add(stepper);
+                // Row 1: Color button + swatch + thickness stepper
+                EzButton colorBtn = new EzButton(left + 6, panelY + 4, 105, 16,
+                        Component.literal("Hitbox-Farbe …"), true,
+                        b -> EzScreenBridge.set(minecraft, new ModuleColorScreen(this, displayName + " (Hitbox)", currentVal.color(), color -> {
+                            module.setRule(key, new HitboxModule.EntityRule(currentVal.enabled(), color, currentVal.width()));
+                            populateRows();
+                        })));
+                addRenderableWidget(colorBtn);
+                rowWidgets.add(colorBtn);
 
-            y += ROW_HEIGHT;
+                ColorSwatchButton swatch = new ColorSwatchButton(left + 114, panelY + 4, 20, 16, currentVal.color(),
+                        b -> EzScreenBridge.set(minecraft, new ModuleColorScreen(this, displayName + " (Hitbox)", currentVal.color(), color -> {
+                            module.setRule(key, new HitboxModule.EntityRule(currentVal.enabled(), color, currentVal.width()));
+                            populateRows();
+                        })));
+                addRenderableWidget(swatch);
+                rowWidgets.add(swatch);
+
+                CompactStepperButton stepper = new CompactStepperButton(left + 138, panelY + 4, contentWidth - 144, 16, key, module, this::populateRows);
+                addRenderableWidget(stepper);
+                rowWidgets.add(stepper);
+
+                // Row 2: Reset & Collapse buttons
+                EzButton resetBtn = new EzButton(left + 6, panelY + 26, 130, 16,
+                        Component.literal("Auf Standard zurücksetzen"), module.rule(key) != null,
+                        b -> {
+                            module.setRule(key, null);
+                            populateRows();
+                        });
+                addRenderableWidget(resetBtn);
+                rowWidgets.add(resetBtn);
+
+                EzButton collapseBtn = new EzButton(left + contentWidth - 75, panelY + 26, 70, 16,
+                        Component.literal("Einklappen ▲"), false,
+                        b -> {
+                            expandedKeys.remove(key);
+                            populateRows();
+                        });
+                addRenderableWidget(collapseBtn);
+                rowWidgets.add(collapseBtn);
+            }
+
+            y += rowHeight;
         }
+        totalContentBottom = y + 10;
     }
 
     @Override
@@ -186,20 +235,13 @@ public final class EntityTypeSettingsScreen extends ScrollingSettingsScreen {
 
         for (DisplayRow row : displayedRows) {
             int rowY = row.y();
-            boolean hovered = mx >= left && mx < left + contentWidth
-                    && (my + scrollAmount()) >= rowY && (my + scrollAmount()) < rowY + ROW_HEIGHT;
-
-            if (hovered) {
-                EzUi.roundedRect(g, left, rowY, contentWidth, ROW_HEIGHT, 2, 0x14FFFFFF);
+            if (row.expanded()) {
+                EzUi.roundedRect(g, left, rowY + HEADER_HEIGHT, contentWidth, EXPANDED_PANEL_HEIGHT, 4, 0x22000000);
+                EzUi.outline(g, left, rowY + HEADER_HEIGHT, contentWidth, EXPANDED_PANEL_HEIGHT, EzUi.BORDER_SUBTLE);
             }
-            // 1px subtle divider
-            g.fill(left, rowY + ROW_HEIGHT - 1, left + contentWidth, rowY + ROW_HEIGHT, 0x10FFFFFF);
 
-            // Entity Icon
-            ItemIconHelper.renderEntryIcon(g, row.key(), true, left + 4, rowY + 2);
-
-            int textY = rowY + 6;
-            g.text(font, row.displayName(), left + 24, textY, hovered ? EzUi.TEXT_WHITE : EzUi.TEXT_LIGHT);
+            // Entity Icon inside header
+            ItemIconHelper.renderEntryIcon(g, row.key(), true, left + 18, rowY + 3);
         }
 
         g.pose().popMatrix();

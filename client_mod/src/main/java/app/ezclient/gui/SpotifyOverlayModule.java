@@ -1,19 +1,26 @@
 package app.ezclient.gui;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 
 /**
  * Windows Media Session (GSMTC) overlay with per-provider filters,
- * active playback detection (playing vs paused/idle), and browser media support.
+ * active playback detection (playing vs paused/idle), dynamic album art / icon display,
+ * and browser media support.
  */
 public final class SpotifyOverlayModule extends FeatureModule {
     private record Track(String source, String title) {}
@@ -55,15 +62,37 @@ public final class SpotifyOverlayModule extends FeatureModule {
                         "$app=$playing.SourceAppUserModelId;" +
                         "$artist=$props.Artist;" +
                         "$title=$props.Title;" +
-                        "Write-Output ($app+'|'+$artist+'|'+$title);" +
+                        "$hasArt=0;" +
+                        "try {" +
+                            "if($props.Thumbnail){" +
+                                "$st=Await ($props.Thumbnail.OpenReadAsync()) ([Windows.Storage.Streams.IRandomAccessStreamWithContentType]);" +
+                                "if($st -and $st.Size -gt 0 -and $st.Size -le 5242880){" +
+                                    "$sz=[System.Convert]::ToUInt32($st.Size);" +
+                                    "$rd=[Windows.Storage.Streams.DataReader]::new($st);" +
+                                    "$null=Await ($rd.LoadAsync($sz)) ([System.UInt32]);" +
+                                    "$b=New-Object byte[] $sz;" +
+                                    "$rd.ReadBytes($b);" +
+                                    "$tf=[System.IO.Path]::Combine([System.IO.Path]::GetTempPath(),'ezclient_art.png');" +
+                                    "[System.IO.File]::WriteAllBytes($tf,$b);" +
+                                    "$hasArt=1;" +
+                                "}" +
+                            "}" +
+                        "}catch{};" +
+                        "Write-Output ($app+'|'+$artist+'|'+$title+'|'+$hasArt);" +
                         "exit" +
                     "}" +
                 "}" +
             "};" +
             "$p=Get-Process -Name 'spotify' -ErrorAction SilentlyContinue|Where-Object{$_.MainWindowTitle -and $_.MainWindowTitle -notmatch '^(Spotify( (Premium|Free))?)$'}|Select-Object -First 1;" +
-            "if($p){Write-Output ('Spotify||'+$p.MainWindowTitle)}";
+            "if($p){Write-Output ('Spotify||'+$p.MainWindowTitle+'|0')}";
 
     private static final String ENCODED_SCRIPT = Base64.getEncoder().encodeToString(SCRIPT.getBytes(StandardCharsets.UTF_16LE));
+
+    private static final Identifier ALBUM_ART_ID = Identifier.fromNamespaceAndPath("ezclient", "textures/generated/spotify_art.png");
+    private static DynamicTexture dynamicAlbumArt = null;
+    private static boolean hasAlbumArt = false;
+    private static volatile byte[] pendingArtBytes = null;
+    private static volatile boolean pendingArtUpdate = false;
 
     private final AtomicBoolean polling = new AtomicBoolean();
     private volatile Track current;
@@ -80,6 +109,7 @@ public final class SpotifyOverlayModule extends FeatureModule {
         flag("Sources", "cider", "Cider", "Erlaubt Cider.", true);
         flag("Sources", "deezer", "Deezer", "Erlaubt Deezer.", true);
         flag("Sources", "allowOther", "Allow other", "Erlaubt nicht erkannte Medienquellen.", true);
+        flag("Darstellung", "showCover", "Cover / Icon", "Zeigt das Album-Cover oder das App-Logo links an.", true);
         flag("Darstellung", "showSource", "Show source", "Zeigt den Namen des Players.", true);
         flag("Darstellung", "hideWhenIdle", "Hide when idle", "Blendet das Overlay ohne aktive Wiedergabe aus.", false);
         option("Darstellung", "maxLength", "Maximum title length", "Begrenzt lange Songtitel.", 52.0, 16, 120);
@@ -90,6 +120,26 @@ public final class SpotifyOverlayModule extends FeatureModule {
 
     @Override
     public void onTick() {
+        if (pendingArtUpdate) {
+            pendingArtUpdate = false;
+            byte[] bytes = pendingArtBytes;
+            Minecraft client = Minecraft.getInstance();
+            if (bytes != null) {
+                try (ByteArrayInputStream bais = new ByteArrayInputStream(bytes)) {
+                    NativeImage img = NativeImage.read(bais);
+                    if (dynamicAlbumArt != null) {
+                        try { dynamicAlbumArt.close(); } catch (Throwable ignored) {}
+                    }
+                    dynamicAlbumArt = new DynamicTexture(() -> "ezclient-spotify-art", img);
+                    client.getTextureManager().register(ALBUM_ART_ID, dynamicAlbumArt);
+                    hasAlbumArt = true;
+                } catch (Throwable t) {
+                    hasAlbumArt = false;
+                }
+            } else {
+                hasAlbumArt = false;
+            }
+        }
         if (!isEnabled() || System.currentTimeMillis() < nextPoll || !polling.compareAndSet(false, true)) return;
         nextPoll = System.currentTimeMillis() + (long)(number("refresh") * 1000);
         Thread.ofVirtual().name("EzClient-MediaProbe").start(() -> {
@@ -114,24 +164,52 @@ public final class SpotifyOverlayModule extends FeatureModule {
                 }
             }
             if (!process.waitFor(3, TimeUnit.SECONDS)) process.destroyForcibly();
-            if (resultLine == null || resultLine.isBlank()) return null;
+            if (resultLine == null || resultLine.isBlank()) {
+                pendingArtBytes = null;
+                pendingArtUpdate = true;
+                return null;
+            }
 
-            String[] parts = resultLine.split("\\|", 3);
+            String[] parts = resultLine.split("\\|", 4);
             String app = parts[0].trim();
             String artist = parts.length > 1 ? parts[1].trim() : "";
             String title = parts.length > 2 ? parts[2].trim() : "";
+            boolean hasArt = parts.length > 3 && "1".equals(parts[3].trim());
             if (title.isEmpty() && !artist.isEmpty()) {
                 title = artist;
                 artist = "";
             }
-            if (title.isEmpty()) return null;
+            if (title.isEmpty()) {
+                pendingArtBytes = null;
+                pendingArtUpdate = true;
+                return null;
+            }
 
             Track track = classify(app, artist, title);
             if (track != null && allowed(track.source())) {
+                if (hasArt) {
+                    try {
+                        File artFile = new File(System.getProperty("java.io.tmpdir"), "ezclient_art.png");
+                        if (artFile.exists() && artFile.length() > 0) {
+                            pendingArtBytes = Files.readAllBytes(artFile.toPath());
+                            pendingArtUpdate = true;
+                        }
+                    } catch (Throwable ignored) {
+                        pendingArtBytes = null;
+                        pendingArtUpdate = true;
+                    }
+                } else {
+                    pendingArtBytes = null;
+                    pendingArtUpdate = true;
+                }
                 return track;
             }
+            pendingArtBytes = null;
+            pendingArtUpdate = true;
             return null;
         } catch (Exception ignored) {
+            pendingArtBytes = null;
+            pendingArtUpdate = true;
             return null;
         }
     }
@@ -201,15 +279,95 @@ public final class SpotifyOverlayModule extends FeatureModule {
 
     @Override
     public List<String> lines(Minecraft mc, boolean editor) {
-        Track track = editor ? new Track("YouTube", "Kanal — Beispiel Video") : current;
+        Track track = current;
         if (track == null) {
-            return flag("hideWhenIdle") && !editor ? List.of()
-                    : List.of("Medien", polling.get() ? "Suche nach Medien …" : "Keine Wiedergabe");
+            if (editor) {
+                return List.of(app.ezclient.util.EzI18n.text("Medien"), app.ezclient.util.EzI18n.text("Keine Wiedergabe"));
+            }
+            return flag("hideWhenIdle") ? List.of()
+                    : List.of(app.ezclient.util.EzI18n.text("Medien"), app.ezclient.util.EzI18n.text(polling.get() ? "Suche nach Medien …" : "Keine Wiedergabe"));
         }
         String title = track.title();
         int limit = (int)number("maxLength");
         if (title.length() > limit) title = title.substring(0, Math.max(1, limit - 1)) + "…";
         return flag("showSource") ? List.of(track.source(), title) : List.of(title);
+    }
+
+    @Override
+    public int getWidth(Minecraft client, boolean editor) {
+        if (client == null || client.font == null) return 60;
+        List<String> rows = lines(client, editor);
+        if (rows.isEmpty()) return 0;
+        int padX = (hasBackground() || hasBorder()) ? CONTENT_PADDING_X : 2;
+        int textMaxW = rows.stream().mapToInt(row -> client.font.width(styledText(row))).max().orElse(60);
+        boolean showArt = flag("showCover");
+        int iconOffset = showArt ? (22 + 5) : 0;
+        return textMaxW + iconOffset + padX * 2;
+    }
+
+    @Override
+    public int getHeight(Minecraft client, boolean editor) {
+        List<String> rows = lines(client, editor);
+        if (rows.isEmpty()) return 0;
+        int padY = (hasBackground() || hasBorder()) ? CONTENT_PADDING_Y : 1;
+        int textH = rows.size() * 12;
+        boolean showArt = flag("showCover");
+        int minH = showArt ? 24 : 0;
+        return Math.max(textH, minH) + padY * 2;
+    }
+
+    @Override
+    public void renderFeature(GuiGraphicsExtractor graphics, Minecraft client, boolean editor) {
+        if (!hasHud() || (!editor && (EzScreenBridge.hudHidden(client) || client.getDebugOverlay().showDebugScreen()))) return;
+        List<String> rows = lines(client, editor);
+        if (rows.isEmpty()) return;
+        int padX = (hasBackground() || hasBorder()) ? CONTENT_PADDING_X : 2;
+        int padY = (hasBackground() || hasBorder()) ? CONTENT_PADDING_Y : 1;
+        int width = getWidth(client, editor);
+        int height = getHeight(client, editor);
+        float scale = (float) getScale();
+
+        int renderX = getRenderX(client, width, editor);
+        int renderY = getRenderY(client, height, editor);
+
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(renderX, renderY);
+        graphics.pose().scale(scale, scale);
+        renderBackgroundAndBorder(graphics, 0, 0, width, height);
+
+        boolean showArt = flag("showCover");
+        int iconSize = 22;
+        int textStartX = padX;
+        if (showArt) {
+            Identifier icon = (hasAlbumArt && dynamicAlbumArt != null) ? ALBUM_ART_ID : resolveMediaIcon();
+            int iconY = padY + Math.max(0, (height - padY * 2 - iconSize) / 2);
+            ModuleIconRenderer.drawTexture(graphics, icon, padX, iconY, iconSize);
+            textStartX = padX + iconSize + 5;
+        }
+
+        int textHeightTotal = rows.size() * 12;
+        int textOffsetY = padY + Math.max(0, (height - padY * 2 - textHeightTotal) / 2);
+        int availableW = width - textStartX - padX;
+
+        for (int i = 0; i < rows.size(); i++) {
+            net.minecraft.network.chat.Component comp = styledText(rows.get(i));
+            int textW = client.font.width(comp);
+            int lineX = textStartX + Math.max(0, (availableW - textW) / 2);
+            graphics.text(client.font, comp, lineX, textOffsetY + i * 12, color(), isTextShadow());
+        }
+
+        graphics.pose().popMatrix();
+    }
+
+    private Identifier resolveMediaIcon() {
+        Track track = current;
+        if (track != null) {
+            String src = track.source().toLowerCase(Locale.ROOT);
+            if (src.contains("spotify")) {
+                return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/spotify.png");
+            }
+        }
+        return Identifier.fromNamespaceAndPath("ezclient", "textures/icons/spotify.png");
     }
 
     @Override

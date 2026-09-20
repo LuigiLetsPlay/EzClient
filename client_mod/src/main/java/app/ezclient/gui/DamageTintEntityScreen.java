@@ -21,21 +21,24 @@ import java.util.Locale;
  * Screen for configuring per-entity Damage Tint rules.
  */
 public final class DamageTintEntityScreen extends ScrollingSettingsScreen {
-    private static final int ROW_HEIGHT = 18;
+    private static final int HEADER_HEIGHT = 22;
+    private static final int EXPANDED_PANEL_HEIGHT = 48;
 
-    private record DisplayRow(String key, String displayName, int y) {}
+    private record DisplayRow(String key, String displayName, int y, int height, boolean expanded) {}
 
     private final Screen parent;
     private final DamageTintModule module;
     private final List<DisplayRow> displayedRows = new ArrayList<>();
     private final List<AbstractWidget> rowWidgets = new ArrayList<>();
+    private final java.util.Set<String> expandedKeys = new java.util.HashSet<>();
 
     private int panelX, panelY, panelWidth, panelHeight;
     private String search = "";
     private EditBox searchBox;
+    private int totalContentBottom = 0;
 
     public DamageTintEntityScreen(Screen parent, DamageTintModule module) {
-        super(Component.literal("Damage Tint: Entity-Regeln"));
+        super(Component.literal("Damage Tint: Custom Entity Settings"));
         this.parent = parent;
         this.module = module;
     }
@@ -44,6 +47,7 @@ public final class DamageTintEntityScreen extends ScrollingSettingsScreen {
     @Override protected int scrollTop() { return panelY + 46; }
     @Override protected int scrollRight() { return panelX + panelWidth - 8; }
     @Override protected int scrollBottom() { return panelY + panelHeight - 10; }
+    @Override protected int scrollContentBottom() { return totalContentBottom; }
 
     public static String formatEntityName(String key) {
         if (key == null || key.isBlank()) return "";
@@ -119,42 +123,83 @@ public final class DamageTintEntityScreen extends ScrollingSettingsScreen {
         for (var id : matching) {
             String key = id.toString();
             String displayName = formatEntityName(key);
-            displayedRows.add(new DisplayRow(key, displayName, y));
+            boolean isExpanded = expandedKeys.contains(key);
+            int rowHeight = isExpanded ? (HEADER_HEIGHT + EXPANDED_PANEL_HEIGHT + 4) : (HEADER_HEIGHT + 2);
+            displayedRows.add(new DisplayRow(key, displayName, y, rowHeight, isExpanded));
 
             Integer ruleColor = module.getEntityRule(key);
             boolean isCustom = ruleColor != null;
 
-            // Mode Toggle Button: [ Default ] or [ Custom ]
-            EzButton modeBtn = new EzButton(left + contentWidth - 84, y + 2, 48, 14,
-                    Component.literal(isCustom ? "Custom" : app.ezclient.util.EzI18n.text("Default")), isCustom, b -> {
-                if (isCustom) {
-                    module.removeEntityRule(key);
-                } else {
-                    int col = (module.getCustomAlpha() << 24) | (module.getCustomColor() & 0x00FFFFFF);
-                    module.setEntityRule(key, col);
-                }
-                populateRows();
-            });
-            addRenderableWidget(modeBtn);
-            rowWidgets.add(modeBtn);
+            // Full-width clickable Header row button (toggles expand / collapse)
+            int headerBtnW = contentWidth - 68;
+            EzButton toggleHeaderBtn = new EzButton(left, y, headerBtnW, HEADER_HEIGHT,
+                    Component.literal((isExpanded ? "▼ " : "▶ ") + "   " + displayName), isExpanded,
+                    b -> {
+                        if (isExpanded) expandedKeys.remove(key);
+                        else expandedKeys.add(key);
+                        populateRows();
+                    });
+            addRenderableWidget(toggleHeaderBtn);
+            rowWidgets.add(toggleHeaderBtn);
 
-            // Color Swatch Button (only clickable when Custom)
-            int effectiveColor = isCustom ? ruleColor : (module.getCustomAlpha() << 24) | (module.getCustomColor() & 0x00FFFFFF);
-            ColorSwatchButton swatch = new ColorSwatchButton(left + contentWidth - 32, y + 2, 28, 14, effectiveColor, b -> {
-                if (!isCustom) {
-                    module.setEntityRule(key, effectiveColor);
-                    populateRows();
-                }
-                EzScreenBridge.set(minecraft, new ModuleColorScreen(this, displayName, module.getEntityRule(key) != null ? module.getEntityRule(key) : effectiveColor, color -> {
-                    module.setEntityRule(key, color);
-                    b.setColor(color);
-                }));
-            });
-            addRenderableWidget(swatch);
-            rowWidgets.add(swatch);
+            // Quick Status Pill on the right side of header
+            String statusText = isCustom ? "Angepasst" : "Standard";
+            EzButton statusBtn = new EzButton(left + contentWidth - 64, y + 2, 64, 16,
+                    Component.literal(statusText), isCustom,
+                    b -> {
+                        if (isExpanded) expandedKeys.remove(key);
+                        else expandedKeys.add(key);
+                        populateRows();
+                    });
+            addRenderableWidget(statusBtn);
+            rowWidgets.add(statusBtn);
 
-            y += ROW_HEIGHT;
+            // ── Expanded Accordion Controls ──
+            if (isExpanded) {
+                int panelY = y + HEADER_HEIGHT + 2;
+                int effectiveColor = isCustom ? ruleColor : ((module.getCustomAlpha() << 24) | (module.getCustomColor() & 0x00FFFFFF));
+
+                // Row 1: Color button + Swatch
+                EzButton colorBtn = new EzButton(left + 6, panelY + 4, 130, 16,
+                        Component.literal("Schadensfarbe …"), true,
+                        b -> EzScreenBridge.set(minecraft, new ModuleColorScreen(this, displayName + " (Damage)", effectiveColor, color -> {
+                            module.setEntityRule(key, color);
+                            populateRows();
+                        })));
+                addRenderableWidget(colorBtn);
+                rowWidgets.add(colorBtn);
+
+                ColorSwatchButton swatch = new ColorSwatchButton(left + 140, panelY + 4, 22, 16, effectiveColor,
+                        b -> EzScreenBridge.set(minecraft, new ModuleColorScreen(this, displayName + " (Damage)", effectiveColor, color -> {
+                            module.setEntityRule(key, color);
+                            populateRows();
+                        })));
+                addRenderableWidget(swatch);
+                rowWidgets.add(swatch);
+
+                // Row 2: Reset & Collapse buttons
+                EzButton resetBtn = new EzButton(left + 6, panelY + 26, 130, 16,
+                        Component.literal("Auf Standard zurücksetzen"), isCustom,
+                        b -> {
+                            module.removeEntityRule(key);
+                            populateRows();
+                        });
+                addRenderableWidget(resetBtn);
+                rowWidgets.add(resetBtn);
+
+                EzButton collapseBtn = new EzButton(left + contentWidth - 75, panelY + 26, 70, 16,
+                        Component.literal("Einklappen ▲"), false,
+                        b -> {
+                            expandedKeys.remove(key);
+                            populateRows();
+                        });
+                addRenderableWidget(collapseBtn);
+                rowWidgets.add(collapseBtn);
+            }
+
+            y += rowHeight;
         }
+        totalContentBottom = y + 10;
     }
 
     @Override
@@ -178,19 +223,13 @@ public final class DamageTintEntityScreen extends ScrollingSettingsScreen {
 
         for (DisplayRow row : displayedRows) {
             int rowY = row.y();
-            boolean hovered = mx >= left && mx < left + contentWidth
-                    && (my + scrollAmount()) >= rowY && (my + scrollAmount()) < rowY + ROW_HEIGHT;
-
-            if (hovered) {
-                EzUi.roundedRect(g, left, rowY, contentWidth, ROW_HEIGHT, 2, 0x14FFFFFF);
+            if (row.expanded()) {
+                EzUi.roundedRect(g, left, rowY + HEADER_HEIGHT, contentWidth, EXPANDED_PANEL_HEIGHT, 4, 0x22000000);
+                EzUi.outline(g, left, rowY + HEADER_HEIGHT, contentWidth, EXPANDED_PANEL_HEIGHT, EzUi.BORDER_SUBTLE);
             }
-            g.fill(left, rowY + ROW_HEIGHT - 1, left + contentWidth, rowY + ROW_HEIGHT, 0x10FFFFFF);
 
-            // Entity Icon
-            ItemIconHelper.renderEntryIcon(g, row.key(), true, left + 4, rowY + 2);
-
-            int textY = rowY + 6;
-            g.text(font, row.displayName(), left + 24, textY, hovered ? EzUi.TEXT_WHITE : EzUi.TEXT_LIGHT);
+            // Entity Icon inside header
+            ItemIconHelper.renderEntryIcon(g, row.key(), true, left + 18, rowY + 3);
         }
 
         g.pose().popMatrix();

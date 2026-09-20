@@ -28,5 +28,5 @@ def test_all_declarative_module_help_and_labels_have_translations():
     # Brand names and terms identical in both languages are deliberately not translated.
     unchanged = {"Amazon Music", "Animation", "Apple Music", "Chat", "Cider", "Deezer", "Filter", "Format",
                  "Gold", "Items", "Lapis", "Overlay", "Performance", "Redstone", "Shulker", "SoundCloud",
-                 "Spotify", "Tidal", "Timer", "Wind", "YouTube"}
+                 "Spotify", "System", "Tidal", "Timer", "Wind", "YouTube"}
     assert set(missing()) - unchanged == set()

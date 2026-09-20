@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
  * Automatically sends a friendly post-match "gg" after minigames conclude,
  * equipped with delay protection and fast trigger detection for popular servers.
  */
-public final class AutoGgModule extends Module {
+public final class AutoGgModule extends FeatureModule {
     private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "EzClient-AutoGG");
         t.setDaemon(true);
@@ -33,12 +33,13 @@ public final class AutoGgModule extends Module {
             "GAME OVER"
     );
 
-    private String customMessage = "gg";
-    private int delayMs = 1000; // 100 to 3000ms
     private long lastTriggeredTime = 0L;
 
     public AutoGgModule() {
-        super("AutoGG", "Utility", false);
+        super("AutoGG", false, 0);
+
+        option("Nachricht", "customMessage", "Nachricht", "Die nach Spielende automatisch in den Chat gesendete Nachricht.", "gg", 0, 0, "gg", "Good Game! <3", "gg wp", "Good Game!");
+        option("Verzögerung", "delayMs", "Verzögerung (ms)", "Wartezeit in Millisekunden vor dem Senden der Chat-Nachricht.", 1000.0, 500.0, 3000.0);
     }
 
     @Override
@@ -51,16 +52,23 @@ public final class AutoGgModule extends Module {
         return "Sendet nach einem erkannten Spielende mit einstellbarer Verzögerung automatisch eine freundliche Nachricht.";
     }
 
-    @Override
-    public boolean hasSettings() {
-        return true;
+    public String getCustomMessage() {
+        return text("customMessage");
     }
 
-    public String getCustomMessage() { return customMessage; }
-    public void setCustomMessage(String customMessage) { this.customMessage = customMessage == null ? "gg" : customMessage; ConfigManager.save(); }
+    public void setCustomMessage(String customMessage) {
+        set("customMessage", customMessage == null ? "gg" : customMessage);
+        ConfigManager.save();
+    }
 
-    public int getDelayMs() { return delayMs; }
-    public void setDelayMs(int delayMs) { this.delayMs = Math.max(100, Math.min(3000, delayMs)); ConfigManager.save(); }
+    public int getDelayMs() {
+        return (int) Math.round(number("delayMs"));
+    }
+
+    public void setDelayMs(int delayMs) {
+        set("delayMs", (double) Math.max(100, Math.min(3000, delayMs)));
+        ConfigManager.save();
+    }
 
     public void onChatMessage(String text) {
         if (!isEnabled()) return;
@@ -77,7 +85,7 @@ public final class AutoGgModule extends Module {
 
         if (matched) {
             lastTriggeredTime = now;
-            String msgToSend = customMessage;
+            String msgToSend = getCustomMessage();
             SCHEDULER.schedule(() -> {
                 Minecraft mc = Minecraft.getInstance();
                 mc.execute(() -> {
@@ -85,7 +93,7 @@ public final class AutoGgModule extends Module {
                         mc.getConnection().sendChat(msgToSend);
                     }
                 });
-            }, delayMs, TimeUnit.MILLISECONDS);
+            }, getDelayMs(), TimeUnit.MILLISECONDS);
         }
     }
 }

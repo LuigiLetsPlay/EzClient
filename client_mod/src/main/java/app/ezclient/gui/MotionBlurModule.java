@@ -10,17 +10,18 @@ import net.minecraft.world.phys.Vec3;
  * Motion Blur Module:
  * Adds smooth visual camera motion blur with intensity controls and automatic FPS protection.
  */
-public final class MotionBlurModule extends Module {
-    private int blurStrength = 40;
-    private boolean fpsProtection = true;
-    private int fpsThreshold = 60;
+public final class MotionBlurModule extends FeatureModule {
     private boolean hasPreviousCameraSample = false;
     private float previousYaw;
     private float previousPitch;
     private Vec3 previousPosition = Vec3.ZERO;
 
     public MotionBlurModule() {
-        super("Motion Blur", "Render", false);
+        super("Motion Blur", false, 0);
+
+        option("Einstellungen", "blurStrength", "Unschärfe-Stärke (%)", "Bestimmt die Intensität der Bewegungsunschärfe bei Kameradrehungen.", 40.0, 20.0, 100.0);
+        flag("Leistungsschutz", "fpsProtection", "FPS-Schutz", "Reduziert oder pausiert den Unschärfe-Effekt bei niedrigen Bildraten.", true);
+        option("Leistungsschutz", "fpsThreshold", "FPS-Schwelle", "Minimale Bildrate, ab welcher der Unschärfe-Effekt aktiv bleibt.", "60 FPS", 0, 0, "30 FPS", "60 FPS", "75 FPS", "120 FPS", "144 FPS");
     }
 
     @Override
@@ -33,23 +34,35 @@ public final class MotionBlurModule extends Module {
         return "Erzeugt bei Kamerabewegung einen einstellbaren Bewegungsunschärfe-Effekt mit FPS-Schutz.";
     }
 
-    @Override
-    public boolean hasSettings() {
-        return true;
+    public int getBlurStrength() {
+        return (int) Math.round(number("blurStrength"));
     }
 
-    public int getBlurStrength() { return blurStrength; }
     public void setBlurStrength(int blurStrength) {
         int clamped = Math.max(20, Math.min(100, blurStrength));
-        this.blurStrength = Math.round(clamped / 20.0f) * 20;
+        set("blurStrength", (double) (Math.round(clamped / 20.0f) * 20));
         ConfigManager.save();
     }
 
-    public boolean isFpsProtection() { return fpsProtection; }
-    public void setFpsProtection(boolean fpsProtection) { this.fpsProtection = fpsProtection; ConfigManager.save(); }
+    public boolean isFpsProtection() { return flag("fpsProtection"); }
+    public void setFpsProtection(boolean fpsProtection) {
+        set("fpsProtection", fpsProtection);
+        ConfigManager.save();
+    }
 
-    public int getFpsThreshold() { return fpsThreshold; }
-    public void setFpsThreshold(int fpsThreshold) { this.fpsThreshold = Math.max(30, Math.min(144, fpsThreshold)); ConfigManager.save(); }
+    public int getFpsThreshold() {
+        String s = text("fpsThreshold").replace(" FPS", "").trim();
+        try {
+            return Integer.parseInt(s);
+        } catch (Exception e) {
+            return 60;
+        }
+    }
+
+    public void setFpsThreshold(int fpsThreshold) {
+        set("fpsThreshold", fpsThreshold + " FPS");
+        ConfigManager.save();
+    }
 
     /** Returns true only on frames where the camera actually moved. */
     public boolean shouldRenderMotionBlur(Camera camera) {
@@ -58,7 +71,7 @@ public final class MotionBlurModule extends Module {
             return false;
         }
         Minecraft client = Minecraft.getInstance();
-        if (EzScreenBridge.current(client) != null || (fpsProtection && client.getFps() < fpsThreshold)) {
+        if (EzScreenBridge.current(client) != null || (isFpsProtection() && client.getFps() < getFpsThreshold())) {
             resetCameraTracking();
             return false;
         }
@@ -80,7 +93,7 @@ public final class MotionBlurModule extends Module {
     }
 
     public Identifier getPostChainId() {
-        int preset = Math.min(5, Math.max(1, blurStrength / 20));
+        int preset = Math.min(5, Math.max(1, getBlurStrength() / 20));
         return Identifier.fromNamespaceAndPath("ezclient", "motion_blur_" + preset);
     }
 

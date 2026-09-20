@@ -49,12 +49,24 @@ public final class HitboxModule extends FeatureModule {
     }
     public HitboxModule() {
         super("Hitbox Visualizer", false, 10);
-        flag("Entity-Typen", "players", "Players", "Zeigt Hitboxen von Spielern.", true); flag("Entity-Typen", "hostile", "Hostile mobs", "Zeigt feindliche Kreaturen.", true);
-        flag("Entity-Typen", "animals", "Passive animals", "Zeigt passive Kreaturen.", true); flag("Entity-Typen", "projectiles", "Projectiles", "Zeigt Projektile.", true); flag("Entity-Typen", "items", "Dropped items", "Zeigt fallengelassene Gegenstände.", false);
-        colorOption("Farbe", "box", "Hitbox color", "Grundfarbe der Kontur.", "FFFFFFFF"); option("Darstellung", "width", "Line width", "Stärke der Hitbox-Kontur.", 1.0, 1, 3);
-        flag("Farbe", "chroma", "Chroma hitboxes", "Animiert die Konturfarbe.", false); flag("Darstellung", "eyes", "Eye height", "Zeigt die Augenhöhe.", true); flag("Darstellung", "look", "Look vector", "Zeigt die Blickrichtung.", true);
-        colorOption("Farbe", "eyeColor", "Eye color", "Farbe der Augenhöhen-Markierung.", "FFFF3333"); colorOption("Farbe", "lookColor", "Look color", "Farbe des Blickvektors.", "FF3377FF");
-        flag("Darstellung", "fill", "Fill", "Füllt die Hitbox transparent aus.", false); colorOption("Farbe", "fillColor", "Fill color", "Farbe und Transparenz der Füllung.", "26FFFFFF");
+        colorOption("Hitbox Kontur", "box", "Hitbox color", "Grundfarbe der Kontur.", "FFFFFFFF");
+        option("Hitbox Kontur", "width", "Line width", "Stärke der Hitbox-Kontur.", 1.0, 1, 3);
+        flag("Hitbox Kontur", "chroma", "Chroma hitboxes", "Animiert die Konturfarbe.", false);
+
+        flag("Füllung", "fill", "Fill", "Füllt die Hitbox transparent aus.", false);
+        colorOption("Füllung", "fillColor", "Fill color", "Farbe und Transparenz der Füllung.", "26FFFFFF");
+
+        flag("Blickrichtung & Augenhöhe", "eyes", "Eye height", "Zeigt die Augenhöhe.", true);
+        colorOption("Blickrichtung & Augenhöhe", "eyeColor", "Eye color", "Farbe der Augenhöhen-Markierung.", "FFFF3333");
+        flag("Blickrichtung & Augenhöhe", "look", "Look vector", "Zeigt die Blickrichtung.", true);
+        colorOption("Blickrichtung & Augenhöhe", "lookColor", "Look color", "Farbe des Blickvektors.", "FF3377FF");
+
+        flag("Entity-Filter", "players", "Players", "Zeigt Hitboxen von Spielern.", true);
+        flag("Entity-Filter", "hostile", "Hostile mobs", "Zeigt feindliche Kreaturen.", true);
+        flag("Entity-Filter", "animals", "Passive animals", "Zeigt passive Kreaturen.", true);
+        flag("Entity-Filter", "projectiles", "Projectiles", "Zeigt Projektile.", true);
+        flag("Entity-Filter", "items", "Dropped items", "Zeigt fallengelassene Gegenstände.", false);
+
         flag("Erweitert", "debugOnly", "Only with F3+B", "Zeigt Hitboxen nur im Minecraft-Debugmodus.", false);
     }
     public boolean accepts(Entity e) {

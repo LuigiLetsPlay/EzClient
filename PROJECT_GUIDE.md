@@ -12,7 +12,7 @@ EzClient besteht aus:
 - versionsabhängigen Fabric-/Legacy-Fabric-Mod-JARs;
 - einem PyInstaller-Build für `EzClient.exe` und einem nativen Inno-Setup-Build für `EzClient-Setup.exe`.
 
-Aktuelle Produktversion: `2.2.0`.
+Aktuelle Produktversion: `2.2.1`.
 
 Es gibt keine Lite-Version mehr. Neue Builds, UI-Texte und Releases dürfen keine `EzClient-Lite`-Artefakte erzeugen oder voraussetzen.
 
@@ -70,9 +70,9 @@ Nur die Minecraft-Reihe 26.x wird aktiv als EzClient-Mod gepflegt.
 26.1, 26.1.1 und 26.2 erhalten jeweils eine exakt passende JAR mit Java 25:
 
 ```text
-EzClient-2.2.0+26.1.jar
-EzClient-2.2.0+26.1.1.jar
-EzClient-2.2.0+26.2.jar
+EzClient-2.2.1+26.1.jar
+EzClient-2.2.1+26.1.1.jar
+EzClient-2.2.1+26.2.jar
 ```
 
 Eine JAR darf niemals als Ersatz für eine andere Minecraft-Version umbenannt werden.
@@ -337,7 +337,7 @@ Release Notes müssen professionell und lesbar sein:
 APPDATA aus. `python tools/qa_launcher_render.py` erzeugt tatsächliche QML-Ansichten
 in DE/EN bei 760×560 und 1280×820 unter `build/release-qa/launcher`.
 Der Software-Renderer prüft Layouts; WebGL-Skin-/Cape-Vorschauen benötigen zusätzlich
-eine Prüfung mit GPU. Ergebnisse und Grenzen stehen in `docs/release-qa-2.2.0.md`.
+eine Prüfung mit GPU. Ergebnisse und Grenzen stehen in `docs/release-qa-2.2.1.md`.
 
 Geprüfte Sprachpaare stehen in `localization/*.tsv`. Nach Änderungen
 `python tools/update_display_translations.py` ausführen. Die erzeugten Kataloge

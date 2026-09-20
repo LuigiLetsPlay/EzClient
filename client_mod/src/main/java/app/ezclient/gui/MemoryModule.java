@@ -31,10 +31,7 @@ public final class MemoryModule extends FeatureModule {
         flag("Farben", "chroma", "Chroma-Effekt", "Animiert den Text im flüssigen Regenbogen-Verlauf.", false);
     }
 
-    @Override
-    public boolean hasPreview() {
-        return false;
-    }
+
 
     @Override
     public String getDescription() {

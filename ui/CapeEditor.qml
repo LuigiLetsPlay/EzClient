@@ -315,6 +315,13 @@ Item {
         var duration = Math.min(10.0, root.mediaDuration > 0 ? root.mediaDuration : 5.0)
         accountController.prepareAnimatedCape(
             root.selectedSource, 0, duration, 12, false, crop, root.facesJson())
+        animationPreviewRefreshTimer.restart()
+    }
+
+    function refreshAnimationPreview() {
+        if (!root.animatedSource) return
+        editorSkin3D.updateCape()
+        editorSkin3D.setAnim(root.previewAnimation)
     }
 
     Timer {
@@ -322,6 +329,15 @@ Item {
         interval: 200
         repeat: false
         onTriggered: root.prepare()
+    }
+
+    // Animated sheets can become available a fraction after the WebEngine's
+    // first request. Repeat the same action as the visible refresh control once.
+    Timer {
+        id: animationPreviewRefreshTimer
+        interval: 2000
+        repeat: false
+        onTriggered: root.refreshAnimationPreview()
     }
 
     function discard() {
@@ -385,6 +401,7 @@ Item {
             root.mediaProcessing = false
             root.pendingPreview = sheetUrl
             editorSkin3D.setAnimatedCape(sheetUrl, frameCount, fps, columns, frameW, frameH, pingPong)
+            animationPreviewRefreshTimer.restart()
         }
         function onCapePreviewPrepared(previewUrl, revision) {
             if (revision !== root.previewRequestId) return
@@ -1580,15 +1597,36 @@ Item {
 
                 Rectangle {
                     anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 14
-                    width: 28; height: 28; radius: 14
-                    color: "#B319132A"; border.color: EzTheme.accent
-                    visible: root.mediaProcessing && root.cropImageSource !== ""
+                    width: 32; height: 32; radius: 8
+                    color: refreshAnimationMouse.containsMouse ? "#E02A213D" : "#B319132A"
+                    border.color: refreshAnimationMouse.containsMouse ? EzTheme.accent : EzTheme.border
+                    visible: root.animatedSource
                     z: 51
-                    BusyIndicator {
-                        anchors.fill: parent
-                        anchors.margins: 4
-                        running: parent.visible
+
+                    Image {
+                        id: refreshAnimationIcon
+                        anchors.centerIn: parent
+                        width: 17; height: 17
+                        source: "icons/refresh-cw.svg"
+                        fillMode: Image.PreserveAspectFit
+                        opacity: root.mediaProcessing ? 0.65 : 1.0
+                        RotationAnimation on rotation {
+                            running: root.mediaProcessing
+                            from: 0; to: 360; duration: 900
+                            loops: Animation.Infinite
+                        }
                     }
+
+                    MouseArea {
+                        id: refreshAnimationMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.refreshAnimationPreview()
+                    }
+
+                    ToolTip.visible: refreshAnimationMouse.containsMouse
+                    ToolTip.text: EzI18n.text("Animation neu laden")
                 }
 
                 Rectangle {

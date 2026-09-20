@@ -1,6 +1,5 @@
 package app.ezclient.gui;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -11,30 +10,30 @@ import net.minecraft.client.input.InputWithModifiers;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 /**
- * Screen for configuring per-block Block Overlay rules.
+ * Screen for configuring per-block Block Overlay rules with expandable accordion rows.
  */
 public final class BlockSettingsScreen extends ScrollingSettingsScreen {
-    private static final int ROW_HEIGHT = 18;
+    private static final int HEADER_HEIGHT = 22;
+    private static final int EXPANDED_PANEL_HEIGHT = 70;
 
-    private record DisplayRow(String key, String displayName, int y) {}
+    private record DisplayRow(String key, String displayName, int y, int height, boolean expanded) {}
 
     private final Screen parent;
     private final BlockOverlayModule module;
     private final List<DisplayRow> displayedRows = new ArrayList<>();
     private final List<AbstractWidget> rowWidgets = new ArrayList<>();
+    private final Set<String> expandedKeys = new HashSet<>();
 
     private int panelX, panelY, panelWidth, panelHeight;
     private String search = "";
     private EditBox searchBox;
+    private int totalContentBottom = 0;
 
     public BlockSettingsScreen(Screen parent, BlockOverlayModule module) {
-        super(Component.literal("Block Overlay: Block-Regeln"));
+        super(Component.literal("Block Overlay: Custom Block Settings"));
         this.parent = parent;
         this.module = module;
     }
@@ -43,6 +42,7 @@ public final class BlockSettingsScreen extends ScrollingSettingsScreen {
     @Override protected int scrollTop() { return panelY + 46; }
     @Override protected int scrollRight() { return panelX + panelWidth - 8; }
     @Override protected int scrollBottom() { return panelY + panelHeight - 10; }
+    @Override protected int scrollContentBottom() { return totalContentBottom; }
 
     public static String formatBlockName(String key) {
         if (key == null || key.isBlank()) return "";
@@ -70,6 +70,7 @@ public final class BlockSettingsScreen extends ScrollingSettingsScreen {
         int left = settingsContentLeft(panelX);
         int contentWidth = settingsContentWidth(panelWidth);
 
+        // Header Close Button ✕
         addFixedWidget(new EzButton(panelX + panelWidth - 22, panelY + 6, 16, 16,
                 Component.literal("✕"), false, b -> onClose()));
 
@@ -115,71 +116,159 @@ public final class BlockSettingsScreen extends ScrollingSettingsScreen {
                 .sorted(Comparator.comparing(id -> formatBlockName(id.toString())))
                 .toList();
 
-        String[] styles = { "Default", "Outline", "Fill", "Both", "None" };
-
         for (var id : matching) {
             String key = id.toString();
             String displayName = formatBlockName(key);
-            displayedRows.add(new DisplayRow(key, displayName, y));
+            boolean isExpanded = expandedKeys.contains(key);
+            int rowHeight = isExpanded ? (HEADER_HEIGHT + EXPANDED_PANEL_HEIGHT + 4) : (HEADER_HEIGHT + 2);
+            displayedRows.add(new DisplayRow(key, displayName, y, rowHeight, isExpanded));
 
             BlockOverlayModule.BlockRule rule = module.getBlockRule(key);
             boolean isCustom = rule != null;
-            String curStyle = isCustom ? rule.style() : "Default";
 
-            // Style Cycler Button [ Default / Outline / Fill / Both / None ]
-            EzButton styleBtn = new EzButton(left + contentWidth - 116, y + 2, 54, 14,
-                    Component.literal(curStyle), isCustom, b -> {
-                int nextIdx = 0;
-                for (int i = 0; i < styles.length; i++) {
-                    if (styles[i].equalsIgnoreCase(curStyle)) {
-                        nextIdx = (i + 1) % styles.length;
-                        break;
-                    }
-                }
-                String next = styles[nextIdx];
-                if (next.equals("Default")) {
-                    module.removeBlockRule(key);
-                } else {
-                    int outline = rule != null ? rule.outlineColor() : module.tint("outline", false);
-                    int fill = rule != null ? rule.fillColor() : module.tint("fill", false);
-                    double op = rule != null ? rule.fillOpacity() : module.number("fillOpacity");
-                    module.setBlockRule(key, new BlockOverlayModule.BlockRule(next, outline, fill, op));
-                }
-                populateRows();
-            });
-            addRenderableWidget(styleBtn);
-            rowWidgets.add(styleBtn);
+            // Full-width clickable Header row button (toggles expand / collapse)
+            int headerBtnW = contentWidth - 68;
+            EzButton toggleHeaderBtn = new EzButton(left, y, headerBtnW, HEADER_HEIGHT,
+                    Component.literal((isExpanded ? "▼ " : "▶ ") + "   " + displayName), isExpanded,
+                    b -> {
+                        if (isExpanded) expandedKeys.remove(key);
+                        else expandedKeys.add(key);
+                        populateRows();
+                    });
+            addRenderableWidget(toggleHeaderBtn);
+            rowWidgets.add(toggleHeaderBtn);
 
-            // Outline Color Swatch
-            int outlineCol = rule != null ? rule.outlineColor() : module.tint("outline", false);
-            ColorSwatchButton outlineSwatch = new ColorSwatchButton(left + contentWidth - 58, y + 2, 26, 14, outlineCol, b -> {
-                String effStyle = rule != null ? rule.style() : "Outline";
-                int fill = rule != null ? rule.fillColor() : module.tint("fill", false);
+            // Quick Status Pill on the right side of header
+            String statusText = isCustom ? "Angepasst" : "Standard";
+            EzButton statusBtn = new EzButton(left + contentWidth - 64, y + 2, 64, 16,
+                    Component.literal(statusText), isCustom,
+                    b -> {
+                        if (isExpanded) expandedKeys.remove(key);
+                        else expandedKeys.add(key);
+                        populateRows();
+                    });
+            addRenderableWidget(statusBtn);
+            rowWidgets.add(statusBtn);
+
+            // ── Expanded Accordion Controls ──
+            if (isExpanded) {
+                int panelY = y + HEADER_HEIGHT + 2;
+
+                boolean outActive = rule != null
+                        ? (!"Fill".equalsIgnoreCase(rule.style()) && !"None".equalsIgnoreCase(rule.style()))
+                        : module.isOutlineActive();
+                boolean fillActive = rule != null
+                        ? (!"Outline".equalsIgnoreCase(rule.style()) && !"None".equalsIgnoreCase(rule.style()))
+                        : module.isFillActive();
+
+                int outlineCol = rule != null ? rule.outlineColor() : module.tint("outline", false);
+                int fillCol = rule != null ? rule.fillColor() : module.tint("fill", false);
                 double op = rule != null ? rule.fillOpacity() : module.number("fillOpacity");
-                EzScreenBridge.set(minecraft, new ModuleColorScreen(this, displayName + " (Outline)", outlineCol, color -> {
-                    module.setBlockRule(key, new BlockOverlayModule.BlockRule(effStyle, color, fill, op));
-                    b.setColor(color);
-                }));
-            });
-            addRenderableWidget(outlineSwatch);
-            rowWidgets.add(outlineSwatch);
 
-            // Fill Color Swatch
-            int fillCol = rule != null ? rule.fillColor() : module.tint("fill", false);
-            ColorSwatchButton fillSwatch = new ColorSwatchButton(left + contentWidth - 28, y + 2, 26, 14, fillCol, b -> {
-                String effStyle = rule != null ? rule.style() : "Fill";
-                int outline = rule != null ? rule.outlineColor() : module.tint("outline", false);
-                double op = rule != null ? rule.fillOpacity() : module.number("fillOpacity");
-                EzScreenBridge.set(minecraft, new ModuleColorScreen(this, displayName + " (Fill)", fillCol, color -> {
-                    module.setBlockRule(key, new BlockOverlayModule.BlockRule(effStyle, outline, color, op));
-                    b.setColor(color);
-                }));
-            });
-            addRenderableWidget(fillSwatch);
-            rowWidgets.add(fillSwatch);
+                // Row 1: Outline Controls
+                EzButton outToggle = new EzButton(left + 6, panelY + 4, 82, 16,
+                        Component.literal("Outline: " + (outActive ? "An" : "Aus")), outActive,
+                        b -> {
+                            boolean newOut = !outActive;
+                            updateBlockRule(key, newOut, fillActive, outlineCol, fillCol, op);
+                            populateRows();
+                        });
+                addRenderableWidget(outToggle);
+                rowWidgets.add(outToggle);
 
-            y += ROW_HEIGHT;
+                EzButton outColorBtn = new EzButton(left + 92, panelY + 4, 96, 16,
+                        Component.literal("Outline-Farbe …"), true,
+                        b -> EzScreenBridge.set(minecraft, new ModuleColorScreen(this, displayName + " (Outline)", outlineCol, color -> {
+                            updateBlockRule(key, outActive, fillActive, color, fillCol, op);
+                            populateRows();
+                        })));
+                addRenderableWidget(outColorBtn);
+                rowWidgets.add(outColorBtn);
+
+                ColorSwatchButton outSwatch = new ColorSwatchButton(left + 191, panelY + 4, 20, 16, outlineCol,
+                        b -> EzScreenBridge.set(minecraft, new ModuleColorScreen(this, displayName + " (Outline)", outlineCol, color -> {
+                            updateBlockRule(key, outActive, fillActive, color, fillCol, op);
+                            populateRows();
+                        })));
+                addRenderableWidget(outSwatch);
+                rowWidgets.add(outSwatch);
+
+                // Row 2: Filling Controls
+                EzButton fillToggle = new EzButton(left + 6, panelY + 24, 82, 16,
+                        Component.literal("Filling: " + (fillActive ? "An" : "Aus")), fillActive,
+                        b -> {
+                            boolean newFill = !fillActive;
+                            updateBlockRule(key, outActive, newFill, outlineCol, fillCol, op);
+                            populateRows();
+                        });
+                addRenderableWidget(fillToggle);
+                rowWidgets.add(fillToggle);
+
+                EzButton fillColorBtn = new EzButton(left + 92, panelY + 24, 96, 16,
+                        Component.literal("Füll-Farbe …"), true,
+                        b -> EzScreenBridge.set(minecraft, new ModuleColorScreen(this, displayName + " (Fill)", fillCol, color -> {
+                            updateBlockRule(key, outActive, fillActive, outlineCol, color, op);
+                            populateRows();
+                        })));
+                addRenderableWidget(fillColorBtn);
+                rowWidgets.add(fillColorBtn);
+
+                ColorSwatchButton fillSwatch = new ColorSwatchButton(left + 191, panelY + 24, 20, 16, fillCol,
+                        b -> EzScreenBridge.set(minecraft, new ModuleColorScreen(this, displayName + " (Fill)", fillCol, color -> {
+                            updateBlockRule(key, outActive, fillActive, outlineCol, color, op);
+                            populateRows();
+                        })));
+                addRenderableWidget(fillSwatch);
+                rowWidgets.add(fillSwatch);
+
+                int stepperW = contentWidth - 219;
+                EzButton opStepper = new EzButton(left + 215, panelY + 24, stepperW, 16,
+                        Component.literal("‹ Deckk: " + Math.round(op) + "% ›"), true,
+                        b -> {
+                            double nextOp = (op + 10 > 100) ? 0 : op + 10;
+                            updateBlockRule(key, outActive, fillActive, outlineCol, fillCol, nextOp);
+                            populateRows();
+                        }).withRightClick(b -> {
+                            double prevOp = (op - 10 < 0) ? 100 : op - 10;
+                            updateBlockRule(key, outActive, fillActive, outlineCol, fillCol, prevOp);
+                            populateRows();
+                        });
+                addRenderableWidget(opStepper);
+                rowWidgets.add(opStepper);
+
+                // Row 3: Action Buttons
+                EzButton resetRuleBtn = new EzButton(left + 6, panelY + 46, 120, 16,
+                        Component.literal("Auf Standard zurücksetzen"), isCustom,
+                        b -> {
+                            module.removeBlockRule(key);
+                            populateRows();
+                        });
+                addRenderableWidget(resetRuleBtn);
+                rowWidgets.add(resetRuleBtn);
+
+                EzButton collapseBtn = new EzButton(left + contentWidth - 75, panelY + 46, 70, 16,
+                        Component.literal("Einklappen ▲"), false,
+                        b -> {
+                            expandedKeys.remove(key);
+                            populateRows();
+                        });
+                addRenderableWidget(collapseBtn);
+                rowWidgets.add(collapseBtn);
+            }
+
+            y += rowHeight;
         }
+        totalContentBottom = y + 10;
+    }
+
+    private void updateBlockRule(String key, boolean outline, boolean fill, int outlineColor, int fillColor, double fillOpacity) {
+        String style;
+        if (outline && fill) style = "Both";
+        else if (outline) style = "Outline";
+        else if (fill) style = "Fill";
+        else style = "None";
+
+        module.setBlockRule(key, new BlockOverlayModule.BlockRule(style, outlineColor, fillColor, fillOpacity));
     }
 
     @Override
@@ -191,6 +280,7 @@ public final class BlockSettingsScreen extends ScrollingSettingsScreen {
         int left = settingsContentLeft(panelX);
         int contentWidth = settingsContentWidth(panelWidth);
 
+        // Header Title & Counter Badge
         g.text(font, title, left, panelY + 9, EzUi.TEXT_WHITE);
         int activeCount = module.getBlockRules().size();
         String counterText = activeCount > 0 ? "• " + activeCount + " angepasst" : "• Standard";
@@ -203,19 +293,14 @@ public final class BlockSettingsScreen extends ScrollingSettingsScreen {
 
         for (DisplayRow row : displayedRows) {
             int rowY = row.y();
-            boolean hovered = mx >= left && mx < left + contentWidth
-                    && (my + scrollAmount()) >= rowY && (my + scrollAmount()) < rowY + ROW_HEIGHT;
-
-            if (hovered) {
-                EzUi.roundedRect(g, left, rowY, contentWidth, ROW_HEIGHT, 2, 0x14FFFFFF);
+            if (row.expanded()) {
+                // Background card for expanded block panel
+                EzUi.roundedRect(g, left, rowY + HEADER_HEIGHT, contentWidth, EXPANDED_PANEL_HEIGHT, 4, 0x22000000);
+                EzUi.outline(g, left, rowY + HEADER_HEIGHT, contentWidth, EXPANDED_PANEL_HEIGHT, EzUi.BORDER_SUBTLE);
             }
-            g.fill(left, rowY + ROW_HEIGHT - 1, left + contentWidth, rowY + ROW_HEIGHT, 0x10FFFFFF);
 
-            // 3D Block Icon
-            ItemIconHelper.renderEntryIcon(g, row.key(), false, left + 4, rowY + 2);
-
-            int textY = rowY + 6;
-            g.text(font, row.displayName(), left + 24, textY, hovered ? EzUi.TEXT_WHITE : EzUi.TEXT_LIGHT);
+            // Render 3D Item/Block Icon directly inside header
+            ItemIconHelper.renderEntryIcon(g, row.key(), false, left + 18, rowY + 3);
         }
 
         g.pose().popMatrix();

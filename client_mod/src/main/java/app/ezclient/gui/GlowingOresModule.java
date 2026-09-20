@@ -1,217 +1,287 @@
 package app.ezclient.gui;
 
 import com.google.gson.JsonObject;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Shader-style Glowing Ores module.
- * Emissive vertex lighting during chunk meshing + depth-tested in-world borders on exposed faces.
- * Completely occluded by stone and walls (strictly no X-Ray).
+ * Pixel-texture based glowing ores.
+ *
+ * <p>The glow layer is emitted by {@code GlowingOreModel}. This module owns only the
+ * configuration snapshot used while chunk meshes are built. It never scans for or renders ores
+ * through walls.</p>
  */
 public final class GlowingOresModule extends FeatureModule {
+    /** Kept temporarily for binary/source compatibility with the retired gizmo renderer. */
     public record Ore(BlockPos pos, int color) {}
 
-    private static volatile boolean emissiveActive = false;
-    private static volatile boolean dynamicLightActive = false;
-    private static volatile Set<Block> activeOreBlocks = Collections.emptySet();
+    private enum OreKind {
+        DIAMOND("diamondColor"), EMERALD("emeraldColor"), ANCIENT("ancientColor"),
+        GOLD("goldColor"), IRON("ironColor"), COPPER("copperColor"),
+        REDSTONE("redstoneColor"), LAPIS("lapisColor"), COAL("coalColor"),
+        QUARTZ("quartzColor");
 
-    private volatile List<Ore> visible = List.of();
-    private final List<Ore> working = new ArrayList<>();
-    private int cursor;
-    private BlockPos scanCenter = BlockPos.ZERO;
+        private final String colorKey;
+
+        OreKind(String colorKey) {
+            this.colorKey = colorKey;
+        }
+    }
+
+    private static final Map<Block, OreKind> ALL_ORES = createOreMap();
+    private static volatile Map<Block, OreKind> activeOres = Collections.emptyMap();
+    private static volatile boolean pixelOutlineActive;
+    private static volatile boolean connectedVeinsActive;
+    private static volatile boolean orePixelsActive;
+    private static volatile boolean emissiveActive;
+    private static volatile boolean dynamicLightActive;
+    private static volatile boolean customColorsActive;
+    private static volatile int dynamicLightLevel = 15;
+    private static volatile int dynamicLightRadius = 6;
+    private static volatile int glowStrength = 100;
+    private static volatile Map<OreKind, Integer> colors = Collections.emptyMap();
 
     public GlowingOresModule() {
         super("Glowing Ores", false, 0);
-        option("Performance", "radius", "Scan radius", "Suchradius um den Spieler.", 24.0, 8, 64);
-        option("Performance", "blocksPerTick", "Blocks per tick", "Begrenzt die Scan-Arbeit pro Tick.", 4096.0, 256, 16384);
-        option("Performance", "maxOres", "Maximum markers", "Maximale Zahl gleichzeitig markierter Erze.", 512.0, 32, 2048);
 
-        flag("Darstellung", "emissive", "Emissive glowing", "Lässt freiliegende Erze in dunklen Höhlen hell leuchten.", true);
-        flag("Darstellung", "faceBorder", "Glowing borders", "Zeichnet sichtbare leuchtende Ränder auf freiliegende Erz-Seiten.", true);
-        flag("Darstellung", "connectedBorder", "Connected veins", "Verbindet benachbarte Erze einer Ader ohne Innenränder.", true);
-        flag("Darstellung", "fill", "Fill", "Füllt sichtbare Erz-Seiten transparent aus.", true);
-        flag("Darstellung", "dynamicLight", "Dynamic Light", "Erhellt die Umgebung um gefundene Erze.", true);
-        option("Darstellung", "lineWidth", "Line width", "Stärke der Erz-Kontur.", 3.0, 0.5, 6.0);
-        option("Darstellung", "fillAlpha", "Fill opacity", "Deckkraft der Füllung.", 0.28, 0, 0.8);
+        flag("Aussehen", "pixelOutline", "1 px Pixel outline",
+            "Zeichnet einen echten ein Pixel breiten Farbrand direkt auf die Erztextur.", true);
+        flag("Aussehen", "connectedBorder", "Connected veins",
+            "Entfernt Innenränder zwischen zusammenhängenden Blöcken derselben Erzader.", true);
+        flag("Aussehen", "orePixels", "Glowing ore pixels",
+            "Lässt zusätzlich die farbigen Erzadern innerhalb der Textur leuchten.", true);
 
-        flag("Erze", "diamond", "Diamond", "Markiert Diamanterz.", true);
-        flag("Erze", "emerald", "Emerald", "Markiert Smaragderz.", true);
-        flag("Erze", "ancient", "Ancient debris", "Markiert Antiken Schrott.", true);
-        flag("Erze", "gold", "Gold", "Markiert Golderz und Nethergolderz.", true);
-        flag("Erze", "iron", "Iron", "Markiert Eisenerz.", true);
-        flag("Erze", "copper", "Copper", "Markiert Kupfererz.", true);
-        flag("Erze", "redstone", "Redstone", "Markiert Redstone-Erz.", true);
-        flag("Erze", "lapis", "Lapis", "Markiert Lapislazuli-Erz.", true);
-        flag("Erze", "coal", "Coal", "Markiert Kohleerz.", true);
-        flag("Erze", "quartz", "Nether quartz", "Markiert Netherquarzerz.", true);
+        flag("Leuchten", "emissive", "Shader-like glow",
+            "Rendert Farbrand und Erzpixel selbstleuchtend; Shader können daraus Bloom erzeugen.", true);
+        option("Leuchten", "glowStrength", "Glow strength",
+            "Helligkeit der leuchtenden Texturpixel.", 100.0, 25, 100);
+        flag("Leuchten", "dynamicLight", "Light surroundings",
+            "Erzeugt einen hellen Lichtschein um tatsächlich freiliegende Erze.", true);
+        option("Leuchten", "lightLevel", "Surrounding light",
+            "Maximale Lichtstärke direkt am Erz.", 15.0, 1, 15);
+        option("Leuchten", "lightRadius", "Light radius",
+            "Reichweite des Lichtscheins um freiliegende Erze.", 6.0, 1, 10);
 
-        colorOption("Farben", "diamondColor", "Diamond", "Farbe für Diamanterz.", "FF35E8FF");
-        colorOption("Farben", "emeraldColor", "Emerald", "Farbe für Smaragderz.", "FF22E36B");
-        colorOption("Farben", "ancientColor", "Ancient debris", "Farbe für Antiken Schrott.", "FF8B5A45");
-        colorOption("Farben", "goldColor", "Gold", "Farbe für Golderz.", "FFFFC928");
-        colorOption("Farben", "ironColor", "Iron", "Farbe für Eisenerz.", "FFD8B08C");
-        colorOption("Farben", "copperColor", "Copper", "Farbe für Kupfererz.", "FFFF7A45");
-        colorOption("Farben", "redstoneColor", "Redstone", "Farbe für Redstone-Erz.", "FFFF3030");
-        colorOption("Farben", "lapisColor", "Lapis", "Farbe für Lapislazuli-Erz.", "FF3468FF");
-        colorOption("Farben", "coalColor", "Coal", "Farbe für Kohleerz.", "FF6E7480");
-        colorOption("Farben", "quartzColor", "Nether quartz", "Farbe für Netherquarzerz.", "FFEBE7E0");
+        flag("Erze", "diamond", "Diamond", "Diamanterz einschließen.", true);
+        flag("Erze", "emerald", "Emerald", "Smaragderz einschließen.", true);
+        flag("Erze", "ancient", "Ancient debris", "Antiken Schrott einschließen.", true);
+        flag("Erze", "gold", "Gold", "Gold- und Nethergolderz einschließen.", true);
+        flag("Erze", "iron", "Iron", "Eisenerz einschließen.", true);
+        flag("Erze", "copper", "Copper", "Kupfererz einschließen.", true);
+        flag("Erze", "redstone", "Redstone", "Redstone-Erz einschließen.", true);
+        flag("Erze", "lapis", "Lapis", "Lapislazuli-Erz einschließen.", true);
+        flag("Erze", "coal", "Coal", "Kohleerz einschließen.", true);
+        flag("Erze", "quartz", "Nether quartz", "Netherquarzerz einschließen.", true);
 
-        updateActiveOres();
+        flag("Erweitert – Farben", "customColors", "Tint original colors",
+            "Mischt eigene Farben in die mehrfarbigen Originaltexturen. Aus behält die authentische Palette.", false);
+        colorOption("Erweitert – Farben", "diamondColor", "Diamond", "Farbton für Diamanterz.", "FF35E8FF");
+        colorOption("Erweitert – Farben", "emeraldColor", "Emerald", "Farbton für Smaragderz.", "FF22E36B");
+        colorOption("Erweitert – Farben", "ancientColor", "Ancient debris", "Farbton für Antiken Schrott.", "FFB8795C");
+        colorOption("Erweitert – Farben", "goldColor", "Gold", "Farbton für Golderz.", "FFFFC928");
+        colorOption("Erweitert – Farben", "ironColor", "Iron", "Farbton für Eisenerz.", "FFFFE2BF");
+        colorOption("Erweitert – Farben", "copperColor", "Copper", "Farbton für Kupfererz.", "FFFF8A55");
+        colorOption("Erweitert – Farben", "redstoneColor", "Redstone", "Farbton für Redstone-Erz.", "FFFF3030");
+        colorOption("Erweitert – Farben", "lapisColor", "Lapis", "Farbton für Lapislazuli-Erz.", "FF4A7DFF");
+        colorOption("Erweitert – Farben", "coalColor", "Coal", "Farbton für Kohleerz.", "FFB9C0CB");
+        colorOption("Erweitert – Farben", "quartzColor", "Nether quartz", "Farbton für Netherquarzerz.", "FFFFF4E6");
+
+        updateRenderState();
     }
 
-    public static boolean isEmissive(Block b) {
-        return emissiveActive && activeOreBlocks.contains(b);
+    private static Map<Block, OreKind> createOreMap() {
+        Map<Block, OreKind> result = new HashMap<>();
+        put(result, OreKind.DIAMOND, Blocks.DIAMOND_ORE, Blocks.DEEPSLATE_DIAMOND_ORE);
+        put(result, OreKind.EMERALD, Blocks.EMERALD_ORE, Blocks.DEEPSLATE_EMERALD_ORE);
+        put(result, OreKind.ANCIENT, Blocks.ANCIENT_DEBRIS);
+        put(result, OreKind.GOLD, Blocks.GOLD_ORE, Blocks.DEEPSLATE_GOLD_ORE, Blocks.NETHER_GOLD_ORE);
+        put(result, OreKind.IRON, Blocks.IRON_ORE, Blocks.DEEPSLATE_IRON_ORE);
+        put(result, OreKind.COPPER, Blocks.COPPER_ORE, Blocks.DEEPSLATE_COPPER_ORE);
+        put(result, OreKind.REDSTONE, Blocks.REDSTONE_ORE, Blocks.DEEPSLATE_REDSTONE_ORE);
+        put(result, OreKind.LAPIS, Blocks.LAPIS_ORE, Blocks.DEEPSLATE_LAPIS_ORE);
+        put(result, OreKind.COAL, Blocks.COAL_ORE, Blocks.DEEPSLATE_COAL_ORE);
+        put(result, OreKind.QUARTZ, Blocks.NETHER_QUARTZ_ORE);
+        return Collections.unmodifiableMap(result);
+    }
+
+    private static void put(Map<Block, OreKind> map, OreKind kind, Block... blocks) {
+        for (Block block : blocks) map.put(block, kind);
+    }
+
+    public static boolean isKnownOre(Block block) {
+        return ALL_ORES.containsKey(block);
+    }
+
+    public static boolean isActive(Block block) {
+        return activeOres.containsKey(block);
+    }
+
+    public static boolean connects(Block first, Block second) {
+        OreKind kind = activeOres.get(first);
+        return kind != null && kind == activeOres.get(second);
+    }
+
+    public static boolean pixelOutline() {
+        return pixelOutlineActive;
+    }
+
+    public static boolean connectedVeins() {
+        return connectedVeinsActive;
+    }
+
+    public static boolean glowingOrePixels() {
+        return orePixelsActive;
+    }
+
+    public static boolean emissive() {
+        return emissiveActive;
     }
 
     public static boolean isDynamicLightActive() {
         return dynamicLightActive;
     }
 
+    /** The pixel model no longer needs a CPU-side ore scan. */
+    public java.util.List<Ore> ores() {
+        return java.util.List.of();
+    }
+
+    public static int overlayColor(Block block) {
+        OreKind kind = activeOres.get(block);
+        int strength = Math.max(0, Math.min(255, Math.round(glowStrength * 2.55f)));
+        int brightness = 0xFF000000 | strength << 16 | strength << 8 | strength;
+        if (!customColorsActive || kind == null) return brightness;
+
+        int tint = colors.getOrDefault(kind, 0xFFFFFFFF) | 0xFF000000;
+        int red = ((tint >> 16) & 0xFF) * strength / 255;
+        int green = ((tint >> 8) & 0xFF) * strength / 255;
+        int blue = (tint & 0xFF) * strength / 255;
+        return 0xFF000000 | red << 16 | green << 8 | blue;
+    }
+
     public static int getNeighborEmissiveLight(net.minecraft.client.renderer.block.BlockAndTintGetter level, BlockPos pos) {
-        if (!emissiveActive || !dynamicLightActive || level == null || pos == null) return 0;
-        for (net.minecraft.core.Direction dir : net.minecraft.core.Direction.values()) {
-            var state = level.getBlockState(pos.relative(dir));
-            if (state != null && isEmissive(state.getBlock())) {
-                return 11;
+        if (!dynamicLightActive || level == null || pos == null) return 0;
+        BlockPos.MutableBlockPos orePos = new BlockPos.MutableBlockPos();
+        // Search nearest-first on Manhattan shells. This follows Minecraft-style light falloff and
+        // avoids scanning every point in a large cube while chunk meshes are built.
+        for (int distance = 1; distance <= dynamicLightRadius; distance++) {
+            for (int dx = -distance; dx <= distance; dx++) {
+                int yAndZ = distance - Math.abs(dx);
+                for (int dy = -yAndZ; dy <= yAndZ; dy++) {
+                    int absZ = yAndZ - Math.abs(dy);
+                    if (isExposedActiveOre(level, orePos,
+                        pos.getX() + dx, pos.getY() + dy, pos.getZ() + absZ)
+                        || absZ != 0 && isExposedActiveOre(level, orePos,
+                            pos.getX() + dx, pos.getY() + dy, pos.getZ() - absZ)) {
+                        return Math.max(1, dynamicLightLevel - (distance - 1) * 2);
+                    }
+                }
             }
         }
         return 0;
     }
 
-    private void updateActiveOres() {
-        emissiveActive = isEnabled() && flag("emissive");
-        dynamicLightActive = isEnabled() && flag("dynamicLight");
-        if (!isEnabled()) {
-            activeOreBlocks = Collections.emptySet();
+    private static boolean isExposedActiveOre(net.minecraft.client.renderer.block.BlockAndTintGetter level,
+                                               BlockPos.MutableBlockPos pos, int x, int y, int z) {
+        pos.set(x, y, z);
+        var state = level.getBlockState(pos);
+        if (state == null || !isActive(state.getBlock())) return false;
+        for (net.minecraft.core.Direction direction : net.minecraft.core.Direction.values()) {
+            if (!level.getBlockState(pos.relative(direction)).canOcclude()) return true;
+        }
+        return false;
+    }
+
+    private void updateRenderState() {
+        boolean enabled = isEnabled();
+        pixelOutlineActive = enabled && flag("pixelOutline");
+        connectedVeinsActive = enabled && flag("connectedBorder");
+        orePixelsActive = enabled && flag("orePixels");
+        emissiveActive = enabled && flag("emissive");
+        dynamicLightActive = enabled && flag("dynamicLight");
+        customColorsActive = enabled && flag("customColors");
+        glowStrength = (int) Math.round(number("glowStrength"));
+        dynamicLightLevel = (int) Math.round(number("lightLevel"));
+        dynamicLightRadius = (int) Math.round(number("lightRadius"));
+
+        if (!enabled) {
+            activeOres = Collections.emptyMap();
+            colors = Collections.emptyMap();
             return;
         }
-        Set<Block> set = new HashSet<>();
-        if (flag("diamond")) { set.add(Blocks.DIAMOND_ORE); set.add(Blocks.DEEPSLATE_DIAMOND_ORE); }
-        if (flag("emerald")) { set.add(Blocks.EMERALD_ORE); set.add(Blocks.DEEPSLATE_EMERALD_ORE); }
-        if (flag("ancient")) { set.add(Blocks.ANCIENT_DEBRIS); }
-        if (flag("gold")) { set.add(Blocks.GOLD_ORE); set.add(Blocks.DEEPSLATE_GOLD_ORE); set.add(Blocks.NETHER_GOLD_ORE); }
-        if (flag("iron")) { set.add(Blocks.IRON_ORE); set.add(Blocks.DEEPSLATE_IRON_ORE); }
-        if (flag("copper")) { set.add(Blocks.COPPER_ORE); set.add(Blocks.DEEPSLATE_COPPER_ORE); }
-        if (flag("redstone")) { set.add(Blocks.REDSTONE_ORE); set.add(Blocks.DEEPSLATE_REDSTONE_ORE); }
-        if (flag("lapis")) { set.add(Blocks.LAPIS_ORE); set.add(Blocks.DEEPSLATE_LAPIS_ORE); }
-        if (flag("coal")) { set.add(Blocks.COAL_ORE); set.add(Blocks.DEEPSLATE_COAL_ORE); }
-        if (flag("quartz")) { set.add(Blocks.NETHER_QUARTZ_ORE); }
-        activeOreBlocks = Collections.unmodifiableSet(set);
+
+        Map<Block, OreKind> selected = new HashMap<>();
+        addIfEnabled(selected, "diamond", OreKind.DIAMOND);
+        addIfEnabled(selected, "emerald", OreKind.EMERALD);
+        addIfEnabled(selected, "ancient", OreKind.ANCIENT);
+        addIfEnabled(selected, "gold", OreKind.GOLD);
+        addIfEnabled(selected, "iron", OreKind.IRON);
+        addIfEnabled(selected, "copper", OreKind.COPPER);
+        addIfEnabled(selected, "redstone", OreKind.REDSTONE);
+        addIfEnabled(selected, "lapis", OreKind.LAPIS);
+        addIfEnabled(selected, "coal", OreKind.COAL);
+        addIfEnabled(selected, "quartz", OreKind.QUARTZ);
+        activeOres = Collections.unmodifiableMap(selected);
+
+        Map<OreKind, Integer> selectedColors = new HashMap<>();
+        for (OreKind kind : OreKind.values()) selectedColors.put(kind, tint(kind.colorKey, false));
+        colors = Collections.unmodifiableMap(selectedColors);
+    }
+
+    private void addIfEnabled(Map<Block, OreKind> selected, String setting, OreKind kind) {
+        if (!flag(setting)) return;
+        ALL_ORES.forEach((block, candidate) -> {
+            if (candidate == kind) selected.put(block, kind);
+        });
     }
 
     public static void reloadLevelRenderer() {
         Minecraft client = Minecraft.getInstance();
         if (client == null) return;
         client.execute(() -> {
-            if (client.level != null) {
-                //? if >=26.2 {
-                if (client.levelExtractor != null) {
-                    client.levelExtractor.allChanged();
-                }
-                //?} else {
-                /*if (client.levelRenderer != null) {
-                    client.levelRenderer.allChanged();
-                }
-                *///?}
-            }
+            if (client.level == null) return;
+            //? if >=26.2 {
+            if (client.levelExtractor != null) client.levelExtractor.allChanged();
+            //?} else {
+            /*if (client.levelRenderer != null) client.levelRenderer.allChanged();
+            *///?}
         });
     }
 
     @Override
     protected void onToggle() {
         super.onToggle();
-        updateActiveOres();
-        visible = List.of();
-        working.clear();
-        cursor = 0;
+        updateRenderState();
         reloadLevelRenderer();
     }
 
     @Override
     public boolean set(Option option, Object value) {
-        boolean ok = super.set(option, value);
-        if (ok) {
-            updateActiveOres();
-            visible = List.of();
-            working.clear();
-            cursor = 0;
+        boolean changed = super.set(option, value);
+        if (changed) {
+            updateRenderState();
             reloadLevelRenderer();
         }
-        return ok;
+        return changed;
     }
 
     @Override
     public void loadFeature(JsonObject json) {
+        boolean migrateDirectNeighborLight = !json.has("lightRadius");
         super.loadFeature(json);
-        updateActiveOres();
-    }
-
-    public List<Ore> ores() { return visible; }
-
-    @Override
-    public void onTick() {
-        Minecraft mc = Minecraft.getInstance();
-        if (!isEnabled() || mc.level == null || mc.player == null) {
-            visible = List.of();
-            working.clear();
-            cursor = 0;
-            return;
+        if (migrateDirectNeighborLight) {
+            options().stream()
+                .filter(option -> option.key().equals("lightLevel"))
+                .findFirst()
+                .ifPresent(option -> super.set(option, 15.0));
         }
-        int r = (int) number("radius"), side = r * 2 + 1, total = side * side * side;
-        BlockPos center = mc.player.blockPosition();
-        if (cursor == 0 || center.distManhattan(scanCenter) > Math.max(4, r / 4)) {
-            scanCenter = center.immutable();
-            working.clear();
-            cursor = 0;
-        }
-        int budget = (int) number("blocksPerTick"), max = (int) number("maxOres");
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        for (int n = 0; n < budget && cursor < total; n++, cursor++) {
-            int i = cursor;
-            int dx = i % side - r; i /= side;
-            int dy = i % side - r; int dz = i / side - r;
-            pos.set(scanCenter.getX() + dx, scanCenter.getY() + dy, scanCenter.getZ() + dz);
-            if (working.size() >= max || !mc.level.isLoaded(pos)) continue;
-            int color = oreColor(mc.level.getBlockState(pos));
-            if (color != 0 && isExposed(mc, pos)) {
-                working.add(new Ore(pos.immutable(), color));
-            }
-        }
-        if (cursor >= total) {
-            visible = Collections.unmodifiableList(new ArrayList<>(working));
-            working.clear();
-            cursor = 0;
-        }
-    }
-
-    private boolean isExposed(Minecraft mc, BlockPos pos) {
-        return !mc.level.getBlockState(pos.above()).canOcclude()
-            || !mc.level.getBlockState(pos.below()).canOcclude()
-            || !mc.level.getBlockState(pos.north()).canOcclude()
-            || !mc.level.getBlockState(pos.south()).canOcclude()
-            || !mc.level.getBlockState(pos.west()).canOcclude()
-            || !mc.level.getBlockState(pos.east()).canOcclude();
-    }
-
-    private int oreColor(BlockState state) {
-        Block b = state.getBlock();
-        if (flag("diamond") && (b == Blocks.DIAMOND_ORE || b == Blocks.DEEPSLATE_DIAMOND_ORE)) return tint("diamondColor", false);
-        if (flag("emerald") && (b == Blocks.EMERALD_ORE || b == Blocks.DEEPSLATE_EMERALD_ORE)) return tint("emeraldColor", false);
-        if (flag("ancient") && b == Blocks.ANCIENT_DEBRIS) return tint("ancientColor", false);
-        if (flag("gold") && (b == Blocks.GOLD_ORE || b == Blocks.DEEPSLATE_GOLD_ORE || b == Blocks.NETHER_GOLD_ORE)) return tint("goldColor", false);
-        if (flag("iron") && (b == Blocks.IRON_ORE || b == Blocks.DEEPSLATE_IRON_ORE)) return tint("ironColor", false);
-        if (flag("copper") && (b == Blocks.COPPER_ORE || b == Blocks.DEEPSLATE_COPPER_ORE)) return tint("copperColor", false);
-        if (flag("redstone") && (b == Blocks.REDSTONE_ORE || b == Blocks.DEEPSLATE_REDSTONE_ORE)) return tint("redstoneColor", false);
-        if (flag("lapis") && (b == Blocks.LAPIS_ORE || b == Blocks.DEEPSLATE_LAPIS_ORE)) return tint("lapisColor", false);
-        if (flag("coal") && (b == Blocks.COAL_ORE || b == Blocks.DEEPSLATE_COAL_ORE)) return tint("coalColor", false);
-        if (flag("quartz") && b == Blocks.NETHER_QUARTZ_ORE) return tint("quartzColor", false);
-        return 0;
+        updateRenderState();
     }
 
     @Override

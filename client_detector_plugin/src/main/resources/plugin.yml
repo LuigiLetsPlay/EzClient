@@ -1,5 +1,5 @@
 name: EzClientClientDetector
-version: 2.2.0
+version: 2.2.1
 main: app.ezclient.detector.EzClientDetectorPlugin
 api-version: '1.21'
 description: Reports verified Minecraft client handshakes for EzClient ingame badges.

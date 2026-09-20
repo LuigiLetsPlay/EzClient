@@ -1,5 +1,6 @@
 package app.ezclient.gui;
 
+import app.ezclient.mixin.ActiveScreenAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 
@@ -22,6 +23,31 @@ public final class EzScreenBridge {
         return minecraft.gui.screen();
         //?} else {
         /*return minecraft.screen;
+        *///?}
+    }
+
+    /**
+     * Makes HUD render hooks see normal gameplay while the HUD editor remains the
+     * real interactive screen. This keeps third-party HUDs such as minimaps alive
+     * without closing/reinitializing the editor or changing input ownership.
+     */
+    public static Screen suspendEditorForHudPass(Minecraft minecraft) {
+        Screen screen = current(minecraft);
+        if (!(screen instanceof HudEditorScreen)) return null;
+        //? if >=26.2 {
+        ((ActiveScreenAccessor) (Object) minecraft.gui).ezclient$setActiveScreen(null);
+        //?} else {
+        /*((ActiveScreenAccessor) (Object) minecraft).ezclient$setActiveScreen(null);
+        *///?}
+        return screen;
+    }
+
+    public static void restoreEditorAfterHudPass(Minecraft minecraft, Screen screen) {
+        if (!(screen instanceof HudEditorScreen) || current(minecraft) != null) return;
+        //? if >=26.2 {
+        ((ActiveScreenAccessor) (Object) minecraft.gui).ezclient$setActiveScreen(screen);
+        //?} else {
+        /*((ActiveScreenAccessor) (Object) minecraft).ezclient$setActiveScreen(screen);
         *///?}
     }
 

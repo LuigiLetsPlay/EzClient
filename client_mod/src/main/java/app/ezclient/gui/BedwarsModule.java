@@ -72,7 +72,7 @@ public final class BedwarsModule extends FeatureModule {
         rows = List.copyOf(output);
     }
     @Override public List<String> lines(Minecraft mc, boolean editor) {
-        if (!editor) return rows;
+        if (!editor || !rows.isEmpty()) return rows;
         List<String> preview = new ArrayList<>();
         if (flag("generators")) {
             preview.add("Diamond II: 0:45");

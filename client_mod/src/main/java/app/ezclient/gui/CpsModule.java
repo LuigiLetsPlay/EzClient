@@ -102,7 +102,7 @@ public final class CpsModule extends HudModule {
     }
 
     private String textForRender(Minecraft client, boolean editor) {
-        if (!editor) return displayText(client);
+        if (!editor || (client != null && client.player != null)) return displayText(client);
         return switch (displayMode) {
             case LMB_ONLY -> getPrefix() + "14 CPS" + getSuffix();
             case RMB_ONLY -> getPrefix() + "10 CPS" + getSuffix();
@@ -122,22 +122,26 @@ public final class CpsModule extends HudModule {
 
     public void renderCustom(GuiGraphicsExtractor graphics, Minecraft client, boolean editor) {
         recordSample();
-        float scale = (float) getScale();
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(getX(), getY());
-        graphics.pose().scale(scale, scale);
-
         String text = textForRender(client, editor);
 
         int textW = (client != null && client.font != null) ? client.font.width(text) + CONTENT_PADDING_X * 2 : 48;
         int totalW = showHistoryGraph ? Math.max(textW, 60) : textW;
         int totalH = getHeight(client);
+        float scale = (float) getScale();
+        int renderX = getRenderX(client, totalW, editor);
+        int renderY = getRenderY(client, totalH, editor);
+
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(renderX, renderY);
+        graphics.pose().scale(scale, scale);
 
         renderBackgroundAndBorder(graphics, 0, 0, totalW, totalH);
 
         int textColor = color();
         int textY = CONTENT_PADDING_Y;
-        graphics.text(client.font, text, CONTENT_PADDING_X, textY, textColor);
+        int tw = client.font.width(text);
+        int lineX = Math.max(CONTENT_PADDING_X, (totalW - tw) / 2);
+        graphics.text(client.font, text, lineX, textY, textColor);
 
         if (showHistoryGraph) {
             int graphX = CONTENT_PADDING_X;
@@ -148,7 +152,7 @@ public final class CpsModule extends HudModule {
             for (int i = 0; i < HISTORY_SIZE; i++) {
                 int idx = (historyIndex + 1 + i) % HISTORY_SIZE;
                 int val = displayMode == DisplayMode.RMB_ONLY ? rightHistory[idx] : leftHistory[idx];
-                if (editor) val = (i % 5) * 4;
+                if (editor && (client == null || client.player == null)) val = (i % 5) * 4;
                 int barH = Math.min(6, Math.max(1, val * 6 / 20));
                 int bx = graphX + i * barW;
                 int by = graphY + (6 - barH);

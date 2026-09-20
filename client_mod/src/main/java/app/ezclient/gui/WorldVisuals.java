@@ -21,8 +21,7 @@ public final class WorldVisuals {
         var hitboxes = FeatureModule.get(HitboxModule.class);
         var blocks = FeatureModule.get(BlockOverlayModule.class);
         var waypoints = FeatureModule.get(WaypointsModule.class);
-        var ores = FeatureModule.get(GlowingOresModule.class);
-        if (!hitboxes.isEnabled() && !blocks.isEnabled() && !waypoints.isEnabled() && !ores.isEnabled() && !BlockSelectionOverlay.isActive()) return;
+        if (!hitboxes.isEnabled() && !blocks.isEnabled() && !waypoints.isEnabled() && !BlockSelectionOverlay.isActive()) return;
         //? if >=26.2 {
         try (var ignored = mc.levelExtractor.collectPerFrameMainThreadGizmos()) {
         //?} else {
@@ -53,7 +52,6 @@ public final class WorldVisuals {
             }
             if (waypoints.isEnabled()) waypointVisuals(mc, waypoints);
             if (BlockSelectionOverlay.isActive()) BlockSelectionOverlay.renderWorldGizmos(mc);
-            if (ores.isEnabled()) glowingOres(ores);
         }
     }
 

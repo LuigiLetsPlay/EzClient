@@ -81,6 +81,10 @@ public final class HudRenderer {
             toggleSprint.renderCustom(graphics, client, editor);
             return;
         }
+        if (module instanceof PingModule ping) {
+            ping.renderCustom(graphics, client, editor);
+            return;
+        }
         if (module instanceof CrosshairModule crosshair) {
             if (editor) crosshair.renderCustom(graphics, client, true);
             return;
@@ -89,17 +93,21 @@ public final class HudRenderer {
         // Generic HudModule rendering with systemwide Badlion styling
         String text = module.displayText(client, editor);
         float scale = (float) module.getScale();
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(module.getX(), module.getY());
-        graphics.pose().scale(scale, scale);
-
         int w = module.getWidth(client, editor);
         int h = module.getHeight(client, editor);
+        int renderX = module.getRenderX(client, w, editor);
+        int renderY = module.getRenderY(client, h, editor);
+
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(renderX, renderY);
+        graphics.pose().scale(scale, scale);
 
         int padX = (module.hasBackground() || module.hasBorder()) ? HudModule.CONTENT_PADDING_X : 2;
         int padY = (module.hasBackground() || module.hasBorder()) ? HudModule.CONTENT_PADDING_Y : 1;
         module.renderBackgroundAndBorder(graphics, 0, 0, w, h);
-        graphics.text(client.font, module.styledText(text), padX,
+        int textW = client.font.width(module.styledText(text));
+        int textX = Math.max(padX, (w - textW) / 2);
+        graphics.text(client.font, module.styledText(text), textX,
                 padY, module.color(), module.isTextShadow());
 
         graphics.pose().popMatrix();

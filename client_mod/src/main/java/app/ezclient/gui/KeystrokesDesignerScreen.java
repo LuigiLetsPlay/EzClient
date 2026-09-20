@@ -187,7 +187,7 @@ public final class KeystrokesDesignerScreen extends Screen {
         }));
 
         addRenderableWidget(new EzButton(canvasX + (btnW + btnGap) * 2, toolY2, remW, toolRowH, Component.literal("HUD-Stil"), false,
-                b -> EzScreenBridge.set(minecraft, new FeatureStyleScreen(this, module))));
+                b -> EzScreenBridge.set(minecraft, new KeystrokesSettingsScreen(this, module))));
 
         // --- Inspector Tab Bar (Right column top) ---
         int tabX = inspectorX + 8;

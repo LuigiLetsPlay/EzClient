@@ -136,7 +136,7 @@ public final class FpsModule extends HudModule {
     }
 
     private String textForRender(boolean editor) {
-        if (!editor) return currentDisplayText();
+        if (!editor || (Minecraft.getInstance() != null && Minecraft.getInstance().player != null)) return currentDisplayText();
         return switch (formatOption) {
             case LABEL_VALUE -> getPrefix() + "240" + getSuffix();
             case VALUE_LABEL -> "240 FPS" + getSuffix();
@@ -145,16 +145,14 @@ public final class FpsModule extends HudModule {
     }
 
     private String minMaxText(boolean editor) {
-        return "Min: " + (editor ? 180 : minFps) + "  Max: " + (editor ? 290 : maxFps);
+        if (!editor || (Minecraft.getInstance() != null && Minecraft.getInstance().player != null)) {
+            return "Min: " + minFps + "  Max: " + maxFps;
+        }
+        return "Min: 180  Max: 290";
     }
 
     public void renderCustom(GuiGraphicsExtractor graphics, Minecraft client, boolean editor) {
         sampleFps(client);
-        float scale = (float) getScale();
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(getX(), getY());
-        graphics.pose().scale(scale, scale);
-
         String text = textForRender(editor);
 
         int textW = (client != null && client.font != null) ? client.font.width(text) + CONTENT_PADDING_X * 2 : 40;
@@ -165,17 +163,28 @@ public final class FpsModule extends HudModule {
             totalW = Math.max(textW, mmW);
         }
         int totalH = getHeight(client);
+        float scale = (float) getScale();
+        int renderX = getRenderX(client, totalW, editor);
+        int renderY = getRenderY(client, totalH, editor);
+
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(renderX, renderY);
+        graphics.pose().scale(scale, scale);
 
         renderBackgroundAndBorder(graphics, 0, 0, totalW, totalH);
 
         int textColor = color();
-        graphics.text(client.font, text, CONTENT_PADDING_X, CONTENT_PADDING_Y, textColor);
+        int tw = client.font.width(text);
+        int lineX = Math.max(CONTENT_PADDING_X, (totalW - tw) / 2);
+        graphics.text(client.font, text, lineX, CONTENT_PADDING_Y, textColor);
 
         if (showMinMax) {
-            graphics.pose().pushMatrix();
-            graphics.pose().translate(CONTENT_PADDING_X, 15);
-            graphics.pose().scale(0.7f, 0.7f);
             String mm = minMaxText(editor);
+            int mmScaledW = (int) (client.font.width(mm) * 0.7f);
+            int mmX = Math.max(CONTENT_PADDING_X, (totalW - mmScaledW) / 2);
+            graphics.pose().pushMatrix();
+            graphics.pose().translate(mmX, 15);
+            graphics.pose().scale(0.7f, 0.7f);
             graphics.text(client.font, mm, 0, 0, 0xFFAAAAAA);
             graphics.pose().popMatrix();
         }

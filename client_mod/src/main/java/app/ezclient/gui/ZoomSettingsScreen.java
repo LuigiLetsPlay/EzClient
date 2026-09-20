@@ -31,8 +31,6 @@ public final class ZoomSettingsScreen extends ScrollingSettingsScreen {
 
         addFixedWidget(new EzButton(panelX + panelWidth - 26, panelY + 6, 18, 16,
                 Component.literal("✕"), false, ignored -> onClose()));
-        addFixedWidget(new EzButton(panelX + 6, panelY + 102, ScrollingSettingsScreen.SETTINGS_SIDEBAR_WIDTH - 12, 18,
-                Component.literal(app.ezclient.util.EzI18n.text("Vorschau")), false, ignored -> EzScreenBridge.set(minecraft, new ModulePreviewScreen(this, zoom))));
 
         addFixedWidget(new EzHotkeyButton(panelX + 6, panelY + 66,
                 SETTINGS_SIDEBAR_WIDTH - 12, zoom.getKeyBind(), isListeningForHotkey,

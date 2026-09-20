@@ -1,1273 +1,718 @@
 package app.ezclient.gui;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractButton;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.InputWithModifiers;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
-import java.awt.Color;
+import java.util.Locale;
+import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 /**
- * Dynamic, ultra-clean Split-View HUD customization screen for EzClient.
- * Left: Live Preview card with scissor-clipping protection + independent Box and Border controls.
- * Right: Badlion-style Module Controls, Color Modes, Paint.NET Color Picker with 3x3 preset palette,
- * and a Reset Button with confirmation dialog.
+ * Modern, unified ScrollingSettingsScreen for all EzClient HudModule instances
+ * (FPS, CPS, Coordinates, Ping, Armor Status, Toggle Sprint/Sneak, Day Counter,
+ * Clock, Reach, Combo Counter, Potion Effects, Chat Customizer, etc.).
+ * Extends ScrollingSettingsScreen for full design unity across EzClient.
  */
-public final class HudSettingsScreen extends Screen {
+public final class HudSettingsScreen extends ScrollingSettingsScreen {
     private final Screen parent;
     private final HudModule module;
-
-    private int panelX, panelY;
-    private int panelWidth = 430;
-    private int panelHeight = 260;
-
-    // Color picker state
-    private int activeColorSlot = 1; // 1 = Farbe 1 (textColor), 2 = Farbe 2 (waveColor2)
-    private float currentHue = 0.40f;
-    private float currentSat = 0.83f;
-    private float currentVal = 0.79f;
-
-    private boolean isDraggingSV = false;
-    private boolean isDraggingHue = false;
-
-    private EditBox hexInput;
-    private static int crosshairTab = 0;
-    private boolean updatingHexInternally = false;
-
-    // Reset confirmation modal state
-    private boolean showResetConfirmation = false;
-
-    // Coordinates for Color Picker elements (Right side)
-    private int svX, svY, svW = 90, svH = 56;
-    private int hueX, hueY, hueW = 14, hueH = 56;
-
-    // 3x3 Color Palette Presets
-    private static final int[] PRESETS = {
-            0xFF22C96E, 0xFF00D2FF, 0xFF3B82F6,
-            0xFFFF6B4A, 0xFFEF4444, 0xFFEAB308,
-            0xFFA855F7, 0xFFFFFFFF, 0xFF334155
-    };
-    private int selectedPresetIndex = -1;
     private boolean isListeningForHotkey = false;
 
+    private int panelX, panelY, panelWidth, panelHeight;
+
+    @Override protected int scrollLeft() { return settingsContentLeft(panelX); }
+    @Override protected int scrollTop() { return panelY + 34; }
+    @Override protected int scrollRight() { return panelX + panelWidth - 8; }
+    @Override protected int scrollBottom() { return panelY + panelHeight - 32; }
+
     public HudSettingsScreen(Screen parent, HudModule module) {
-        super(Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.title", module.getDisplayName())));
+        super(Component.literal(module.getDisplayName() + " " + app.ezclient.util.EzI18n.get("ezclient.module_settings.title").replace("%s ", "").trim()));
         this.parent = parent;
         this.module = module;
     }
 
+    private <T extends AbstractWidget> T described(T widget, String description) {
+        if (description != null && !description.isBlank()) {
+            widget.setTooltip(Tooltip.create(Component.literal(app.ezclient.util.EzI18n.text(description))));
+        }
+        return widget;
+    }
+
+    private void resetOpenModule() {
+        module.resetToDefaults();
+        ConfigManager.save();
+        rebuildWidgets();
+    }
+
     @Override
     protected void init() {
-        panelWidth = 416;
-        panelHeight = 236;
+        panelWidth = settingsPanelWidth();
+        panelHeight = settingsPanelHeight();
         panelX = (width - panelWidth) / 2;
         panelY = (height - panelHeight) / 2;
 
-        int rightX = panelX + 148;
-        int rightWidth = panelWidth - 160;
-
-        if (!module.hasBorder() && activeColorSlot >= 3) {
-            activeColorSlot = 1;
-        }
-
-        // Top Right Close Button (Vertically centered in header)
-        addRenderableWidget(new EzButton(
+        // Top-right close button ✕
+        addFixedWidget(new EzButton(
                 panelX + panelWidth - 26, panelY + 6, 18, 16,
                 Component.literal("✕"), false, ignored -> onClose()
         ));
 
-        addRenderableWidget(new EzHotkeyButton(panelX + 12, panelY + 38, 124,
-                module.getKeyBind(), isListeningForHotkey,
+        // Header module enable toggle switch
+        addFixedWidget(described(new EzToggleSwitch(
+                panelX + panelWidth - 56, panelY + 7, 24, 14,
+                module.isEnabled(),
+                state -> {
+                    module.setEnabled(state);
+                    ConfigManager.save();
+                }
+        ), "Modul aktivieren / deaktivieren"));
+
+        // Sidebar preview button (if applicable)
+        if (module.hasPreview()) {
+            int sidebarY = panelY + 102;
+            addFixedWidget(new EzButton(
+                    panelX + 6, sidebarY, SETTINGS_SIDEBAR_WIDTH - 12, 18,
+                    Component.literal(app.ezclient.util.EzI18n.text("Vorschau")), false,
+                    ignored -> EzScreenBridge.set(minecraft, new ModulePreviewScreen(this, module))
+            ));
+        }
+
+        // Sidebar Hotkey button
+        addFixedWidget(new EzHotkeyButton(panelX + 6, panelY + 66,
+                SETTINGS_SIDEBAR_WIDTH - 12, module.getKeyBind(), isListeningForHotkey,
                 () -> { isListeningForHotkey = !isListeningForHotkey; rebuildWidgets(); }));
 
-        // ── LEFT SIDE: Box & Border toggles under preview ──
-        int prevX = panelX + 12;
-        int prevRow1Y = panelY + panelHeight - 44;
-        int prevRow2Y = panelY + panelHeight - 24;
-        int compactControlWidth = 60;
-
-        addRenderableWidget(new EzButton(
-                prevX, prevRow1Y, compactControlWidth, 16,
-                Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.box", app.ezclient.util.EzI18n.onOrOff(module.hasBackground()))), module.hasBackground(),
-                b -> {
-                    module.setBackground(!module.hasBackground());
-                    ConfigManager.save();
-                    rebuildWidgets();
-                }
+        // Footer buttons
+        addFixedWidget(new EzButton(
+                settingsContentLeft(panelX), panelY + panelHeight - 24, 100, 16,
+                Component.literal(app.ezclient.util.EzI18n.text("Zurücksetzen")), false,
+                b -> resetOpenModule()
+        ));
+        addFixedWidget(new EzButton(
+                settingsContentLeft(panelX) + 108, panelY + panelHeight - 24, 100, 16,
+                app.ezclient.util.EzI18n.comp("ezclient.module_settings.done"), true,
+                b -> onClose()
         ));
 
-        addRenderableWidget(new EzButton(
-                prevX + compactControlWidth + 4, prevRow1Y, compactControlWidth, 16,
-                Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.border", app.ezclient.util.EzI18n.onOrOff(module.hasBorder()))), module.hasBorder(),
-                b -> {
-                    module.setBorder(!module.hasBorder());
-                    if (!module.hasBorder() && activeColorSlot >= 3) {
-                        activeColorSlot = 1;
-                        selectedPresetIndex = -1;
-                        syncPickerFromCurrentSlot();
-                    }
-                    ConfigManager.save();
-                    rebuildWidgets();
-                }
-        ));
+        int curY = panelY + 38;
+        int fullW = settingsContentWidth(panelWidth);
+        int btnW = (fullW - 6) / 2;
+        int col1X = settingsContentLeft(panelX);
+        int col2X = col1X + btnW + 6;
 
-        addRenderableWidget(new EzButton(
-                prevX, prevRow2Y, 124, 16,
-                Component.literal("‹ " + app.ezclient.util.EzI18n.get("ezclient.hud_settings.border_style", module.getBorderStyle().getLabel()) + " ›"),
-                module.hasBorder(),
-                b -> {
-                    HudModule.BorderStyle[] styles = HudModule.BorderStyle.values();
-                    int next = (module.getBorderStyle().ordinal() + 1) % styles.length;
-                    module.setBorderStyle(styles[next]);
-                    syncPickerFromCurrentSlot();
-                    rebuildWidgets();
-                }
-        ).withRightClick(b -> {
-            HudModule.BorderStyle[] styles = HudModule.BorderStyle.values();
-            int prev = (module.getBorderStyle().ordinal() - 1 + styles.length) % styles.length;
-            module.setBorderStyle(styles[prev]);
-            syncPickerFromCurrentSlot();
-            rebuildWidgets();
-        }));
+        // ══════════════════════════════════════════════════════════════
+        // CATEGORY 1: MODUL-OPTIONEN (Module-specific settings)
+        // ══════════════════════════════════════════════════════════════
+        addRenderableWidget(new CategoryHeader(col1X, curY, fullW, 14,
+                Component.literal(app.ezclient.util.EzI18n.text("Modul-Optionen").toUpperCase(Locale.ROOT))));
+        curY += 16;
 
-        // ── RIGHT SIDE: 2 Clean Rows of Settings Buttons ──
-        int row1Y = panelY + 38;
-        int row2Y = panelY + 58;
-        int btnW = 124;
-        int btnGap = 6;
-        int col2X = rightX + btnW + btnGap;
-
-        if (module instanceof CoordinatesModule coords) {
-            String layoutStr = switch (coords.getLayoutMode()) {
-                case SINGLE_LINE -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.coords_1line");
-                case MULTI_LINE -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.coords_3line");
-                case COMPASS_BAR -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.coords_compass");
+        if (module instanceof FpsModule fps) {
+            String formatStr = switch (fps.getFormatOption()) {
+                case LABEL_VALUE -> "Format: FPS: 240";
+                case VALUE_LABEL -> "Format: 240 FPS";
+                case MINIMAL -> "Format: 240";
             };
-            addRenderableWidget(new EzButton(
-                    rightX, row1Y, btnW, 16,
-                    Component.literal(layoutStr), true,
-                    b -> {
-                        CoordinatesModule.LayoutMode cur = coords.getLayoutMode();
-                        if (cur == CoordinatesModule.LayoutMode.SINGLE_LINE) coords.setLayoutMode(CoordinatesModule.LayoutMode.MULTI_LINE);
-                        else if (cur == CoordinatesModule.LayoutMode.MULTI_LINE) coords.setLayoutMode(CoordinatesModule.LayoutMode.COMPASS_BAR);
-                        else coords.setLayoutMode(CoordinatesModule.LayoutMode.SINGLE_LINE);
-                        rebuildWidgets();
-                    }
-            ));
-            addRenderableWidget(new EzButton(
-                    col2X, row1Y, btnW, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.coords_dec", coords.getDecimalPrecision())), true,
-                    b -> {
-                        coords.setDecimalPrecision((coords.getDecimalPrecision() + 1) % 3);
-                        rebuildWidgets();
-                    }
-            ));
-            addRenderableWidget(new EzButton(
-                    rightX, row2Y, btnW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.coords_nether", app.ezclient.util.EzI18n.onOrOff(coords.isShowNether())), coords.isShowNether(),
-                    b -> { coords.setShowNether(!coords.isShowNether()); rebuildWidgets(); }
-            ));
-            addRenderableWidget(new EzButton(
-                    col2X, row2Y, btnW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.coords_biome_btn", app.ezclient.util.EzI18n.onOrOff(coords.isShowBiome())), coords.isShowBiome(),
-                    b -> { coords.setShowBiome(!coords.isShowBiome()); rebuildWidgets(); }
-            ));
-        } else if (module instanceof KeystrokesModule ks) {
-            addRenderableWidget(new EzButton(
-                    rightX, row1Y, btnW, 16,
-                    Component.literal(ks.getLayoutPreset().name().replace('_', ' ')), true,
-                    b -> {
-                        KeystrokesModule.LayoutPreset[] presets = KeystrokesModule.LayoutPreset.values();
-                        int next = (ks.getLayoutPreset().ordinal() + 1) % presets.length;
-                        ks.setLayoutPreset(presets[next]);
-                        rebuildWidgets();
-                    }
-            ));
-            addRenderableWidget(new EzButton(
-                    col2X, row1Y, btnW, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.keystrokes_space", ks.getSpaceStyle().name())), true,
-                    b -> {
-                        KeystrokesModule.SpaceStyle[] styles = KeystrokesModule.SpaceStyle.values();
-                        int next = (ks.getSpaceStyle().ordinal() + 1) % styles.length;
-                        ks.setSpaceStyle(styles[next]);
-                        rebuildWidgets();
-                    }
-            ));
-            addRenderableWidget(new EzButton(
-                    rightX, row2Y, btnW, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.keystrokes_fade", app.ezclient.util.EzI18n.onOrOff(ks.getFadeTimeMs() > 0))), ks.getFadeTimeMs() > 0,
-                    b -> {
-                        ks.setFadeTimeMs(ks.getFadeTimeMs() > 0 ? 0 : 150);
-                        rebuildWidgets();
-                    }
-            ));
-            addRenderableWidget(new EzButton(
-                    col2X, row2Y, btnW, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.keystrokes_cps", app.ezclient.util.EzI18n.onOrOff(ks.isShowMouseCps()))), ks.isShowMouseCps(),
-                    b -> {
-                        ks.setShowMouseCps(!ks.isShowMouseCps());
-                        rebuildWidgets();
-                    }
-            ));
-            addRenderableWidget(new EzButton(
-                    rightX, panelY + 78, rightWidth, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.keystrokes_designer"), true,
-                    b -> EzScreenBridge.set(minecraft, new KeystrokesDesignerScreen(this, ks))
-            ));
+            EzButton fmtBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(formatStr), true, b -> {
+                FpsModule.FormatOption[] opts = FpsModule.FormatOption.values();
+                fps.setFormatOption(opts[(fps.getFormatOption().ordinal() + 1) % opts.length]);
+                rebuildWidgets();
+            }).withRightClick(b -> {
+                FpsModule.FormatOption[] opts = FpsModule.FormatOption.values();
+                fps.setFormatOption(opts[(fps.getFormatOption().ordinal() - 1 + opts.length) % opts.length]);
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(fmtBtn, "Wählt das Anzeigeformat der Bildrate (z. B. 'FPS: 240' oder '240 FPS')."));
+
+            String smoothStr = "Glättung: " + (fps.getUpdateIntervalMs() == 0 ? "Aus" : fps.getUpdateIntervalMs() + "ms");
+            EzButton smoothBtn = new EzButton(col2X, curY, btnW, 16, Component.literal(smoothStr), fps.getUpdateIntervalMs() > 0, b -> {
+                int cur = fps.getUpdateIntervalMs();
+                int next = cur == 0 ? 250 : (cur == 250 ? 500 : (cur == 500 ? 1000 : 0));
+                fps.setUpdateIntervalMs(next);
+                rebuildWidgets();
+            }).withRightClick(b -> {
+                int cur = fps.getUpdateIntervalMs();
+                int prev = cur == 0 ? 1000 : (cur == 1000 ? 500 : (cur == 500 ? 250 : 0));
+                fps.setUpdateIntervalMs(prev);
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(smoothBtn, "Glättet die FPS-Anzeige über ein rollendes Zeitfenster gegen Schwankungen."));
+            curY += 20;
+
+            EzToggleSwitch minMaxSwitch = new EzToggleSwitch(col1X, curY, btnW, 16,
+                    Component.literal("Min / Max"), fps.isShowMinMax(),
+                    state -> { fps.setShowMinMax(state); rebuildWidgets(); });
+            addRenderableWidget(described(minMaxSwitch, "Zeigt die minimale und maximale Bildrate (1% Lows & Peaks) an."));
+
+            EzToggleSwitch colorCodingSwitch = new EzToggleSwitch(col2X, curY, btnW, 16,
+                    Component.literal("Dynamische Farben"), fps.isColorCoding(),
+                    state -> { fps.setColorCoding(state); rebuildWidgets(); });
+            addRenderableWidget(described(colorCodingSwitch, "Färbt die FPS dynamisch ein (Grün bei >120, Gelb bei >60, Rot bei Drops)."));
+            curY += 20;
+
         } else if (module instanceof CpsModule cps) {
-            addRenderableWidget(new EzButton(
-                    rightX, row1Y, btnW, 16,
-                    Component.literal(cps.getDisplayMode().name().replace('_', ' ')), true,
-                    b -> {
-                        CpsModule.DisplayMode[] modes = CpsModule.DisplayMode.values();
-                        int next = (cps.getDisplayMode().ordinal() + 1) % modes.length;
-                        cps.setDisplayMode(modes[next]);
-                        rebuildWidgets();
-                    }
-            ));
-            addRenderableWidget(new EzButton(
-                    col2X, row1Y, btnW, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.cps_graph", app.ezclient.util.EzI18n.onOrOff(cps.isShowHistoryGraph()))), cps.isShowHistoryGraph(),
-                    b -> { cps.setShowHistoryGraph(!cps.isShowHistoryGraph()); rebuildWidgets(); }
-            ));
-        } else if (module instanceof FpsModule fps) {
-            addRenderableWidget(new EzButton(
-                    rightX, row1Y, btnW, 16,
-                    Component.literal(fps.getFormatOption().name().replace('_', ' ')), true,
-                    b -> {
-                        FpsModule.FormatOption[] opts = FpsModule.FormatOption.values();
-                        int next = (fps.getFormatOption().ordinal() + 1) % opts.length;
-                        fps.setFormatOption(opts[next]);
-                        rebuildWidgets();
-                    }
-            ));
-            addRenderableWidget(new EzButton(
-                    col2X, row1Y, btnW, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.fps_smooth", (fps.getUpdateIntervalMs() == 0 ? app.ezclient.util.EzI18n.get("ezclient.hud_settings.off") : fps.getUpdateIntervalMs() + "ms"))), fps.getUpdateIntervalMs() > 0,
-                    b -> {
-                        int cur = fps.getUpdateIntervalMs();
-                        int next = cur == 0 ? 250 : (cur == 250 ? 500 : (cur == 500 ? 1000 : 0));
-                        fps.setUpdateIntervalMs(next);
-                        rebuildWidgets();
-                    }
-            ));
-            addRenderableWidget(new EzButton(
-                    rightX, row2Y, btnW * 2 + btnGap, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.fps_minmax", app.ezclient.util.EzI18n.onOrOff(fps.isShowMinMax()))), fps.isShowMinMax(),
-                    b -> { fps.setShowMinMax(!fps.isShowMinMax()); rebuildWidgets(); }
-            ));
-        } else if (module instanceof ArmorStatusModule armor) {
-            addRenderableWidget(new EzButton(
-                    rightX, row1Y, btnW, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get(armor.isHorizontal() ? "ezclient.hud_settings.armor_horizontal" : "ezclient.hud_settings.armor_vertical")), true,
-                    b -> { armor.setHorizontal(!armor.isHorizontal()); rebuildWidgets(); }
-            ));
-            addRenderableWidget(new EzButton(
-                    col2X, row1Y, btnW, 16,
-                    Component.literal(armor.getDurabilityMode().name()), true,
-                    b -> {
-                        ArmorStatusModule.DurabilityMode[] modes = ArmorStatusModule.DurabilityMode.values();
-                        int next = (armor.getDurabilityMode().ordinal() + 1) % modes.length;
-                        armor.setDurabilityMode(modes[next]);
-                        rebuildWidgets();
-                    }
-            ));
-            addRenderableWidget(new EzButton(
-                    rightX, row2Y, btnW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.dynamic_box", app.ezclient.util.EzI18n.onOrOff(armor.isDynamicBox())), armor.isDynamicBox(),
-                    b -> { armor.setDynamicBox(!armor.isDynamicBox()); rebuildWidgets(); }
-            ));
-            addRenderableWidget(new EzButton(
-                    col2X, row2Y, btnW, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.armor_warning", app.ezclient.util.EzI18n.onOrOff(armor.isDamageWarning()))), armor.isDamageWarning(),
-                    b -> { armor.setDamageWarning(!armor.isDamageWarning()); rebuildWidgets(); }
-            ));
-            addRenderableWidget(new EzButton(
-                    rightX, panelY + 78, btnW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.armor_equipment", armor.getEquipmentMode().getLabel()), true,
-                    b -> {
-                        ArmorStatusModule.EquipmentMode[] modes = ArmorStatusModule.EquipmentMode.values();
-                        armor.setEquipmentMode(modes[(armor.getEquipmentMode().ordinal() + 1) % modes.length]);
-                        rebuildWidgets();
-                    }
-            ).withRightClick(b -> {
-                ArmorStatusModule.EquipmentMode[] modes = ArmorStatusModule.EquipmentMode.values();
-                armor.setEquipmentMode(modes[(armor.getEquipmentMode().ordinal() - 1 + modes.length) % modes.length]);
+            String modeStr = switch (cps.getDisplayMode()) {
+                case COMBINED -> "Modus: Beide Tasten";
+                case LMB_ONLY -> "Modus: Nur Links";
+                case RMB_ONLY -> "Modus: Nur Rechts";
+            };
+            EzButton modeBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(modeStr), true, b -> {
+                CpsModule.DisplayMode[] modes = CpsModule.DisplayMode.values();
+                cps.setDisplayMode(modes[(cps.getDisplayMode().ordinal() + 1) % modes.length]);
                 rebuildWidgets();
-            }));
-            addRenderableWidget(new EzButton(
-                    col2X, panelY + 78, btnW, 16,
-                    Component.literal("Farbe: " + (armor.isColorTiers() ? "Dynamisch" : "Farbfeld")), armor.isColorTiers(),
-                    b -> { armor.setColorTiers(!armor.isColorTiers()); rebuildWidgets(); }
-            ));
-        } else if (module instanceof ToggleSprintSneakModule ts) {
-            addRenderableWidget(new EzButton(
-                    rightX, row1Y, btnW, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.togglesprint_sprint", ts.getSprintMode().name())), true,
-                    b -> {
-                        ToggleSprintSneakModule.SprintMode[] modes = ToggleSprintSneakModule.SprintMode.values();
-                        int next = (ts.getSprintMode().ordinal() + 1) % modes.length;
-                        ts.setSprintMode(modes[next]);
-                        rebuildWidgets();
-                    }
-            ));
-            addRenderableWidget(new EzButton(
-                    col2X, row1Y, btnW, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.togglesprint_sneak", ts.getSneakMode().name())), true,
-                    b -> {
-                        ToggleSprintSneakModule.SneakMode[] modes = ToggleSprintSneakModule.SneakMode.values();
-                        int next = (ts.getSneakMode().ordinal() + 1) % modes.length;
-                        ts.setSneakMode(modes[next]);
-                        rebuildWidgets();
-                    }
-            ));
-            addRenderableWidget(new EzButton(
-                    rightX, row2Y, btnW * 2 + btnGap, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.hide_hud", app.ezclient.util.EzI18n.onOrOff(ts.isHideHud())), ts.isHideHud(),
-                    b -> { ts.setHideHud(!ts.isHideHud()); rebuildWidgets(); }
-            ));
-        } else if (module instanceof PotionEffectModule potion) {
-            addRenderableWidget(new EzButton(
-                    rightX, row1Y, btnW, 16,
-                    Component.literal(potion.getDisplayStyle().name()), true,
-                    b -> {
-                        PotionEffectModule.DisplayStyle[] styles = PotionEffectModule.DisplayStyle.values();
-                        int next = (potion.getDisplayStyle().ordinal() + 1) % styles.length;
-                        potion.setDisplayStyle(styles[next]);
-                        rebuildWidgets();
-                    }
-            ));
-            addRenderableWidget(new EzButton(
-                    col2X, row1Y, btnW, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get(potion.isVertical() ? "ezclient.hud_settings.potion_vertical" : "ezclient.hud_settings.potion_horizontal")), true,
-                    b -> { potion.setVertical(!potion.isVertical()); rebuildWidgets(); }
-            ));
-            addRenderableWidget(new EzButton(
-                    rightX, row2Y, btnW, 16,
-                    Component.literal(app.ezclient.util.EzI18n.get("ezclient.hud_settings.potion_time", app.ezclient.util.EzI18n.onOrOff(potion.isShowTime()))), potion.isShowTime(),
-                    b -> { potion.setShowTime(!potion.isShowTime()); rebuildWidgets(); }
-            ));
-            addRenderableWidget(new EzButton(
-                    col2X, row2Y, btnW, 16,
-                    Component.literal(potion.getBlinkWarningSeconds() == 0 ? "Blinken: Aus" : app.ezclient.util.EzI18n.get("ezclient.hud_settings.potion_blink", potion.getBlinkWarningSeconds())), potion.getBlinkWarningSeconds() > 0,
-                    b -> {
-                        int cur = potion.getBlinkWarningSeconds();
-                        potion.setBlinkWarningSeconds(cur == 0 ? 3 : (cur == 3 ? 5 : (cur == 5 ? 10 : 0)));
-                        rebuildWidgets();
-                    }
-            ));
-        } else if (module instanceof CrosshairModule crosshair) {
-            addRenderableWidget(new EzButton(
-                    rightX, row1Y, btnW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.appearance"), crosshairTab == 0,
-                    b -> { crosshairTab = 0; rebuildWidgets(); }
-            ));
-            addRenderableWidget(new EzButton(
-                    col2X, row1Y, btnW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.target_colors"), crosshairTab == 1,
-                    b -> { crosshairTab = 1; rebuildWidgets(); }
-            ));
-
-            if (crosshairTab == 0) {
-                // Style Tab
-                addRenderableWidget(new EzButton(
-                        rightX, row2Y, btnW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.crosshair_shape", crosshair.getCrosshairTypeLabel()), true,
-                        b -> {
-                            crosshair.cycleCrosshairType(1);
-                            rebuildWidgets();
-                        }
-                ).withRightClick(b -> {
-                    crosshair.cycleCrosshairType(-1);
-                    rebuildWidgets();
-                }));
-
-                addRenderableWidget(new EzButton(
-                        col2X, row2Y, btnW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.crosshair_gap_step", crosshair.getGap()), true,
-                        b -> {
-                            crosshair.setGap((crosshair.getGap() + 1) % 16);
-                            rebuildWidgets();
-                        }
-                ).withRightClick(b -> {
-                    crosshair.setGap((crosshair.getGap() - 1 + 16) % 16);
-                    rebuildWidgets();
-                }));
-
-                int row3Y = panelY + 76;
-                addRenderableWidget(new EzButton(
-                        rightX, row3Y, btnW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.crosshair_size", crosshair.getSize()), true,
-                        b -> {
-                            crosshair.setSize(crosshair.getSize() >= 20 ? 2 : crosshair.getSize() + 1);
-                            rebuildWidgets();
-                        }
-                ).withRightClick(b -> {
-                    crosshair.setSize(crosshair.getSize() <= 2 ? 20 : crosshair.getSize() - 1);
-                    rebuildWidgets();
-                }));
-
-                addRenderableWidget(new EzButton(
-                        col2X, row3Y, btnW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.crosshair_thickness", crosshair.getThickness()), true,
-                        b -> {
-                            crosshair.setThickness(crosshair.getThickness() % 4 + 1);
-                            rebuildWidgets();
-                        }
-                ).withRightClick(b -> {
-                    crosshair.setThickness(crosshair.getThickness() <= 1 ? 4 : crosshair.getThickness() - 1);
-                    rebuildWidgets();
-                }));
-
-                int row4Y = panelY + 96;
-                addRenderableWidget(new EzButton(
-                        rightX, row4Y, btnW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.crosshair_opacity", crosshair.getOpacity()), true,
-                        b -> {
-                            crosshair.setOpacity(crosshair.getOpacity() >= 100 ? 10 : crosshair.getOpacity() + 10);
-                            rebuildWidgets();
-                        }
-                ).withRightClick(b -> {
-                    crosshair.setOpacity(crosshair.getOpacity() <= 10 ? 100 : crosshair.getOpacity() - 10);
-                    rebuildWidgets();
-                }));
-
-                addRenderableWidget(new EzButton(
-                        col2X, row4Y, btnW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.crosshair_outline", app.ezclient.util.EzI18n.onOrOff(crosshair.isShowOutline())), crosshair.isShowOutline(),
-                        b -> { crosshair.setShowOutline(!crosshair.isShowOutline()); rebuildWidgets(); }
-                ));
-
-                int row5Y = panelY + 116;
-                if (crosshair.getCrosshairType() == CrosshairModule.CrosshairType.DOT) {
-                    addRenderableWidget(new EzButton(
-                            rightX, row5Y, btnW * 2 + btnGap, 16,
-                            app.ezclient.util.EzI18n.comp("ezclient.hud_settings.crosshair_dot_size", crosshair.getDotSize()), true,
-                            b -> { crosshair.setDotSize(crosshair.getDotSize() >= 6 ? 1 : crosshair.getDotSize() + 1); rebuildWidgets(); }
-                    ).withRightClick(b -> {
-                        crosshair.setDotSize(crosshair.getDotSize() <= 1 ? 6 : crosshair.getDotSize() - 1);
-                        rebuildWidgets();
-                    }));
-                } else {
-                    addRenderableWidget(new EzButton(
-                            rightX, row5Y, btnW, 16,
-                            app.ezclient.util.EzI18n.comp("ezclient.hud_settings.crosshair_center_dot", app.ezclient.util.EzI18n.onOrOff(crosshair.isShowDot())), crosshair.isShowDot(),
-                            b -> { crosshair.setShowDot(!crosshair.isShowDot()); rebuildWidgets(); }
-                    ));
-                    addRenderableWidget(new EzButton(
-                            col2X, row5Y, btnW, 16,
-                            app.ezclient.util.EzI18n.comp("ezclient.hud_settings.crosshair_dynamic_toggle", app.ezclient.util.EzI18n.onOrOff(crosshair.isDynamicSpread())), crosshair.isDynamicSpread(),
-                            b -> { crosshair.setDynamicSpread(!crosshair.isDynamicSpread()); rebuildWidgets(); }
-                    ));
-                }
-
-                int row6Y = panelY + 136;
-                addRenderableWidget(new EzButton(
-                        rightX, row6Y, btnW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.crosshair_hide_f3", app.ezclient.util.EzI18n.onOrOff(crosshair.isHideInF3())), crosshair.isHideInF3(),
-                        b -> { crosshair.setHideInF3(!crosshair.isHideInF3()); rebuildWidgets(); }
-                ));
-
-                addRenderableWidget(new EzButton(
-                        col2X, row6Y, btnW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.crosshair_hide_third", app.ezclient.util.EzI18n.onOrOff(crosshair.isHideInThirdPerson())), crosshair.isHideInThirdPerson(),
-                        b -> { crosshair.setHideInThirdPerson(!crosshair.isHideInThirdPerson()); rebuildWidgets(); }
-                ));
-
-                int row7Y = panelY + 156;
-                addRenderableWidget(new EzButton(
-                        rightX, row7Y, btnW * 2 + btnGap, 16,
-                        Component.literal("Monitor-Zentrum: " + (crosshair.isCenterOnMonitor() ? "An" : "Aus")), crosshair.isCenterOnMonitor(),
-                        b -> { crosshair.setCenterOnMonitor(!crosshair.isCenterOnMonitor()); rebuildWidgets(); }
-                ));
-            } else {
-                // Target & Colors Tab
-                String targetModeName = switch (crosshair.getTargetMode()) {
-                    case OFF -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_target_off");
-                    case ENTITIES -> "Entities";
-                    case PLAYERS -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_target_players");
-                    case HOSTILE -> "Hostile";
-                    case NEUTRAL -> "Neutral";
-                    case BLOCKS -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_target_blocks");
-                    case ALL -> app.ezclient.util.EzI18n.get("ezclient.hud_settings.crosshair_target_all");
-                };
-
-                addRenderableWidget(new EzButton(
-                        rightX, row2Y, btnW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.crosshair_target_step", targetModeName), crosshair.isTargetHighlight(),
-                        b -> {
-                            CrosshairModule.TargetMode[] modes = CrosshairModule.TargetMode.values();
-                            int next = (crosshair.getTargetMode().ordinal() + 1) % modes.length;
-                            crosshair.setTargetMode(modes[next]);
-                            rebuildWidgets();
-                        }
-                ).withRightClick(b -> {
-                    CrosshairModule.TargetMode[] modes = CrosshairModule.TargetMode.values();
-                    int prev = (crosshair.getTargetMode().ordinal() - 1 + modes.length) % modes.length;
-                    crosshair.setTargetMode(modes[prev]);
-                    rebuildWidgets();
-                }));
-
-                addRenderableWidget(new EzButton(
-                        col2X, row2Y, btnW, 16,
-                        Component.literal(String.format("‹ Scale: %.2fx ›", crosshair.getSelectedRuleScale())), true,
-                        b -> {
-                            float current = crosshair.getSelectedRuleScale();
-                            crosshair.setSelectedRuleScale(current >= 1.5f ? 0.75f : current + 0.25f);
-                            rebuildWidgets();
-                        }
-                ).withRightClick(b -> {
-                    float current = crosshair.getSelectedRuleScale();
-                    crosshair.setSelectedRuleScale(current <= 0.75f ? 1.5f : current - 0.25f);
-                    rebuildWidgets();
-                }));
-            }
-        } else if (module instanceof DayCounterModule dayCounter) {
-            addRenderableWidget(new EzButton(
-                    rightX, row1Y, btnW, 16,
-                    Component.literal("Tage: " + (dayCounter.isShowDay() ? "An" : "Aus")), dayCounter.isShowDay(),
-                    b -> {
-                        dayCounter.setShowDay(!dayCounter.isShowDay());
-                        rebuildWidgets();
-                    }
-            ));
-            addRenderableWidget(new EzButton(
-                    col2X, row1Y, btnW, 16,
-                    Component.literal("Spielzeit: " + (dayCounter.isShowPlaytime() ? "An" : "Aus")), dayCounter.isShowPlaytime(),
-                    b -> {
-                        dayCounter.setShowPlaytime(!dayCounter.isShowPlaytime());
-                        rebuildWidgets();
-                    }
-            ));
-            addRenderableWidget(new EzButton(
-                    rightX, row2Y, btnW * 2 + btnGap, 16,
-                    Component.literal("Startzählung: " + (dayCounter.isStartAtDayOne() ? "Tag 1" : "Tag 0")), true,
-                    b -> {
-                        dayCounter.setStartAtDayOne(!dayCounter.isStartAtDayOne());
-                        rebuildWidgets();
-                    }
-            ));
-        } else if (module instanceof ClockModule clock) {
-            addRenderableWidget(new EzButton(
-                    rightX, row1Y, btnW, 16,
-                    Component.literal("‹ " + clock.getClockFormat().getLabel() + " ›"), true,
-                    b -> {
-                        ClockModule.ClockFormat[] formats = ClockModule.ClockFormat.values();
-                        int next = (clock.getClockFormat().ordinal() + 1) % formats.length;
-                        clock.setClockFormat(formats[next]);
-                        rebuildWidgets();
-                    }
-            ).withRightClick(b -> {
-                ClockModule.ClockFormat[] formats = ClockModule.ClockFormat.values();
-                int prev = (clock.getClockFormat().ordinal() - 1 + formats.length) % formats.length;
-                clock.setClockFormat(formats[prev]);
+            }).withRightClick(b -> {
+                CpsModule.DisplayMode[] modes = CpsModule.DisplayMode.values();
+                cps.setDisplayMode(modes[(cps.getDisplayMode().ordinal() - 1 + modes.length) % modes.length]);
                 rebuildWidgets();
-            }));
+            });
+            addRenderableWidget(described(modeBtn, "Wählt, welche Maustasten im CPS-Zähler erfasst und angezeigt werden."));
 
-            addRenderableWidget(new EzButton(
-                    col2X, row1Y, btnW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.prefix_value", clock.isShowPrefix() ? app.ezclient.util.EzI18n.get("ezclient.hud.clock.prefix").trim() : app.ezclient.util.EzI18n.get("ezclient.module_settings.none")), clock.isShowPrefix(),
-                    b -> {
-                        clock.setShowPrefix(!clock.isShowPrefix());
-                        rebuildWidgets();
-                    }
-            ));
-        } else if (module instanceof MemoryModule memory) {
-            addRenderableWidget(new EzButton(
-                    rightX, row1Y, btnW, 16,
-                    Component.literal("‹ " + memory.getMemoryFormat().getLabel() + " ›"), true,
-                    b -> {
-                        MemoryModule.MemoryFormat[] formats = MemoryModule.MemoryFormat.values();
-                        int next = (memory.getMemoryFormat().ordinal() + 1) % formats.length;
-                        memory.setMemoryFormat(formats[next]);
-                        rebuildWidgets();
-                    }
-            ).withRightClick(b -> {
-                MemoryModule.MemoryFormat[] formats = MemoryModule.MemoryFormat.values();
-                int prev = (memory.getMemoryFormat().ordinal() - 1 + formats.length) % formats.length;
-                memory.setMemoryFormat(formats[prev]);
+            EzToggleSwitch graphSwitch = new EzToggleSwitch(col2X, curY, btnW, 16,
+                    Component.literal("Klick-Graph"), cps.isShowHistoryGraph(),
+                    state -> { cps.setShowHistoryGraph(state); rebuildWidgets(); });
+            addRenderableWidget(described(graphSwitch, "Zeigt eine dynamische Sparkline-Verlaufskurve der letzten Klicks unter dem Text an."));
+            curY += 20;
+
+            EzToggleSwitch dynColorSwitch = new EzToggleSwitch(col1X, curY, btnW, 16,
+                    Component.literal("Dynamische Farben"), cps.isDynamicColor(),
+                    state -> { cps.setDynamicColor(state); rebuildWidgets(); });
+            addRenderableWidget(described(dynColorSwitch, "Hebt die Farbe des CPS-Zählers bei hohen Klickraten optisch hervor."));
+            curY += 20;
+
+        } else if (module instanceof CoordinatesModule coords) {
+            String layoutStr = switch (coords.getLayoutMode()) {
+                case SINGLE_LINE -> "Layout: Einzeilig";
+                case MULTI_LINE -> "Layout: Dreizeilig";
+                case COMPASS_BAR -> "Layout: Kompass";
+            };
+            EzButton layoutBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(layoutStr), true, b -> {
+                CoordinatesModule.LayoutMode cur = coords.getLayoutMode();
+                if (cur == CoordinatesModule.LayoutMode.SINGLE_LINE) coords.setLayoutMode(CoordinatesModule.LayoutMode.MULTI_LINE);
+                else if (cur == CoordinatesModule.LayoutMode.MULTI_LINE) coords.setLayoutMode(CoordinatesModule.LayoutMode.COMPASS_BAR);
+                else coords.setLayoutMode(CoordinatesModule.LayoutMode.SINGLE_LINE);
                 rebuildWidgets();
-            }));
+            });
+            addRenderableWidget(described(layoutBtn, "Wechselt zwischen kompakter Einzeiler-, klassischer 3-Zeilen- oder Kompass-Ansicht."));
 
-            addRenderableWidget(new EzButton(
-                    col2X, row1Y, btnW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.prefix_value", memory.isShowPrefix() ? "RAM:" : app.ezclient.util.EzI18n.get("ezclient.module_settings.none")), memory.isShowPrefix(),
-                    b -> {
-                        memory.setShowPrefix(!memory.isShowPrefix());
-                        rebuildWidgets();
-                    }
-            ));
+            String decStr = "Nachkommastellen: " + coords.getDecimalPrecision();
+            EzButton decBtn = new EzButton(col2X, curY, btnW, 16, Component.literal(decStr), true, b -> {
+                coords.setDecimalPrecision((coords.getDecimalPrecision() + 1) % 3);
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(decBtn, "Anzahl der Dezimalstellen für die Koordinatenanzeige."));
+            curY += 20;
+
+            EzToggleSwitch netherSwitch = new EzToggleSwitch(col1X, curY, btnW, 16,
+                    Component.literal("Nether-Koordinaten"), coords.isShowNether(),
+                    state -> { coords.setShowNether(state); rebuildWidgets(); });
+            addRenderableWidget(described(netherSwitch, "Berechnet und zeigt automatisch die korrespondierenden Nether-Koordinaten an."));
+
+            EzToggleSwitch biomeSwitch = new EzToggleSwitch(col2X, curY, btnW, 16,
+                    Component.literal("Biom-Anzeige"), coords.isShowBiome(),
+                    state -> { coords.setShowBiome(state); rebuildWidgets(); });
+            addRenderableWidget(described(biomeSwitch, "Blendet das aktuelle Minecraft-Biom neben den Koordinaten ein."));
+            curY += 20;
+
         } else if (module instanceof PingModule ping) {
-            addRenderableWidget(new EzButton(
-                    rightX, row1Y, btnW, 16,
-                    Component.literal("‹ " + ping.getDisplayLayout().name().replace('_', ' ') + " ›"), true,
-                    b -> {
-                        PingModule.DisplayLayout[] layouts = PingModule.DisplayLayout.values();
-                        int next = (ping.getDisplayLayout().ordinal() + 1) % layouts.length;
-                        ping.setDisplayLayout(layouts[next]);
-                        rebuildWidgets();
-                    }
-            ).withRightClick(b -> {
+            String pingLayoutStr = switch (ping.getDisplayLayout()) {
+                case LABEL_MS -> "Layout: Ping: 20ms";
+                case VALUE_ONLY -> "Layout: 20ms";
+                case SERVER_AND_PING -> "Layout: Server & Ping";
+            };
+            EzButton pingLayoutBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(pingLayoutStr), true, b -> {
                 PingModule.DisplayLayout[] layouts = PingModule.DisplayLayout.values();
-                int prev = (ping.getDisplayLayout().ordinal() - 1 + layouts.length) % layouts.length;
-                ping.setDisplayLayout(layouts[prev]);
+                ping.setDisplayLayout(layouts[(ping.getDisplayLayout().ordinal() + 1) % layouts.length]);
                 rebuildWidgets();
-            }));
+            });
+            addRenderableWidget(described(pingLayoutBtn, "Schaltet zwischen einfacher Latenzanzeige und detailliertem Modus um."));
 
-            addRenderableWidget(new EzButton(
-                    col2X, row1Y, btnW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.interval", ping.getUpdateIntervalSeconds()), true,
-                    b -> {
-                        int cur = ping.getUpdateIntervalSeconds();
-                        ping.setUpdateIntervalSeconds(cur >= 10 ? 1 : cur + 1);
-                        rebuildWidgets();
-                    }
-            ).withRightClick(b -> {
+            String intStr = "Intervall: " + ping.getUpdateIntervalSeconds() + "s";
+            EzButton intBtn = new EzButton(col2X, curY, btnW, 16, Component.literal(intStr), true, b -> {
+                int cur = ping.getUpdateIntervalSeconds();
+                ping.setUpdateIntervalSeconds(cur >= 10 ? 1 : cur + 1);
+                rebuildWidgets();
+            }).withRightClick(b -> {
                 int cur = ping.getUpdateIntervalSeconds();
                 ping.setUpdateIntervalSeconds(cur <= 1 ? 10 : cur - 1);
                 rebuildWidgets();
-            }));
+            });
+            addRenderableWidget(described(intBtn, "Häufigkeit der Ping-Messung in Sekunden."));
+            curY += 20;
 
-            addRenderableWidget(new EzButton(
-                    rightX, row2Y, btnW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.alert_colors", app.ezclient.util.EzI18n.onOrOff(ping.isPingAlert())), ping.isPingAlert(),
-                    b -> { ping.setPingAlert(!ping.isPingAlert()); rebuildWidgets(); }
-            ));
+            EzToggleSwitch alertSwitch = new EzToggleSwitch(col1X, curY, btnW, 16,
+                    Component.literal("Warnfarben"), ping.isPingAlert(),
+                    state -> { ping.setPingAlert(state); rebuildWidgets(); });
+            addRenderableWidget(described(alertSwitch, "Färbt die Latenz bei hohem Ping automatisch gelb oder rot."));
 
-            addRenderableWidget(new EzButton(
-                    col2X, row2Y, btnW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.players", app.ezclient.util.EzI18n.onOrOff(ping.isShowPlayerCount())), ping.isShowPlayerCount(),
-                    b -> { ping.setShowPlayerCount(!ping.isShowPlayerCount()); rebuildWidgets(); }
-            ));
-        } else if (module instanceof ReachModule reach) {
-            addRenderableWidget(new EzButton(
-                    rightX, row1Y, btnW, 16,
-                    Component.literal("‹ " + reach.getDisplayFormat().name() + " ›"), true,
-                    b -> {
-                        ReachModule.DisplayFormat[] formats = ReachModule.DisplayFormat.values();
-                        int next = (reach.getDisplayFormat().ordinal() + 1) % formats.length;
-                        reach.setDisplayFormat(formats[next]);
-                        rebuildWidgets();
-                    }
-            ).withRightClick(b -> {
-                ReachModule.DisplayFormat[] formats = ReachModule.DisplayFormat.values();
-                int prev = (reach.getDisplayFormat().ordinal() - 1 + formats.length) % formats.length;
-                reach.setDisplayFormat(formats[prev]);
+            EzToggleSwitch playersSwitch = new EzToggleSwitch(col2X, curY, btnW, 16,
+                    Component.literal("Spieleranzahl"), ping.isShowPlayerCount(),
+                    state -> { ping.setShowPlayerCount(state); rebuildWidgets(); });
+            addRenderableWidget(described(playersSwitch, "Zeigt die aktuelle Spielerzahl des Servers im HUD an."));
+            curY += 20;
+
+            EzToggleSwitch iconSwitch = new EzToggleSwitch(col1X, curY, btnW, 16,
+                    Component.literal("Server-Icon"), ping.isShowServerIcon(),
+                    state -> { ping.setShowServerIcon(state); rebuildWidgets(); });
+            addRenderableWidget(described(iconSwitch, "Zeigt das Server-Favicon links neben dem Ping-Wert an."));
+            curY += 20;
+
+        } else if (module instanceof ArmorStatusModule armor) {
+            String orientStr = "Ausrichtung: " + (armor.isHorizontal() ? "Horizontal" : "Vertikal");
+            EzButton orientBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(orientStr), true, b -> {
+                armor.setHorizontal(!armor.isHorizontal());
                 rebuildWidgets();
-            }));
+            });
+            addRenderableWidget(described(orientBtn, "Richtet die Rüstungsteile waagerecht oder senkrecht aneinander aus."));
 
-            addRenderableWidget(new EzButton(
-                    col2X, row1Y, btnW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.decimals", reach.getPrecision()), true,
-                    b -> {
-                        int p = reach.getPrecision() >= 3 ? 1 : reach.getPrecision() + 1;
-                        reach.setPrecision(p);
-                        rebuildWidgets();
-                    }
-            ).withRightClick(b -> {
-                int p = reach.getPrecision() <= 1 ? 3 : reach.getPrecision() - 1;
+            String durStr = "Haltbarkeit: " + switch (armor.getDurabilityMode()) {
+                case PERCENT -> "Prozent";
+                case HITS -> "Treffer";
+                case DAMAGE_BAR -> "Balken";
+                case ICON_ONLY -> "Nur Icon";
+            };
+            EzButton durBtn = new EzButton(col2X, curY, btnW, 16, Component.literal(durStr), true, b -> {
+                ArmorStatusModule.DurabilityMode[] modes = ArmorStatusModule.DurabilityMode.values();
+                armor.setDurabilityMode(modes[(armor.getDurabilityMode().ordinal() + 1) % modes.length]);
+                rebuildWidgets();
+            }).withRightClick(b -> {
+                ArmorStatusModule.DurabilityMode[] modes = ArmorStatusModule.DurabilityMode.values();
+                armor.setDurabilityMode(modes[(armor.getDurabilityMode().ordinal() - 1 + modes.length) % modes.length]);
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(durBtn, "Legt fest, wie der Zustand der Rüstung beziffert oder dargestellt wird."));
+            curY += 20;
+
+            EzToggleSwitch dynBoxSwitch = new EzToggleSwitch(col1X, curY, btnW, 16,
+                    Component.literal("Dynamische Box"), armor.isDynamicBox(),
+                    state -> { armor.setDynamicBox(state); rebuildWidgets(); });
+            addRenderableWidget(described(dynBoxSwitch, "Passt die Hintergrundbox automatisch an die angelegte Ausrüstung an."));
+
+            EzToggleSwitch dmgWarnSwitch = new EzToggleSwitch(col2X, curY, btnW, 16,
+                    Component.literal("Schadenswarnung"), armor.isDamageWarning(),
+                    state -> { armor.setDamageWarning(state); rebuildWidgets(); });
+            addRenderableWidget(described(dmgWarnSwitch, "Warnt optisch bei kritisch niedriger Resthaltbarkeit eines Rüstungsteils."));
+            curY += 20;
+
+            String eqStr = "Ausrüstung: " + armor.getEquipmentMode().getLabel();
+            EzButton eqBtn = new EzButton(col1X, curY, fullW, 16, Component.literal(eqStr), true, b -> {
+                ArmorStatusModule.EquipmentMode[] modes = ArmorStatusModule.EquipmentMode.values();
+                armor.setEquipmentMode(modes[(armor.getEquipmentMode().ordinal() + 1) % modes.length]);
+                rebuildWidgets();
+            }).withRightClick(b -> {
+                ArmorStatusModule.EquipmentMode[] modes = ArmorStatusModule.EquipmentMode.values();
+                armor.setEquipmentMode(modes[(armor.getEquipmentMode().ordinal() - 1 + modes.length) % modes.length]);
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(eqBtn, "Wählt, ob getragene Rüstung, Haupthand/Zweithand oder beides dargestellt wird."));
+            curY += 20;
+
+        } else if (module instanceof ToggleSprintSneakModule tss) {
+            String sprintStr = "Sprint: " + (tss.getSprintMode() == ToggleSprintSneakModule.SprintMode.TOGGLE ? "Toggle" : "Halten");
+            EzButton sprintBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(sprintStr), tss.getSprintMode() == ToggleSprintSneakModule.SprintMode.TOGGLE, b -> {
+                tss.setSprintMode(tss.getSprintMode() == ToggleSprintSneakModule.SprintMode.TOGGLE ? ToggleSprintSneakModule.SprintMode.HOLD : ToggleSprintSneakModule.SprintMode.TOGGLE);
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(sprintBtn, "Schaltet zwischen dauerhaftem Umschalt-Sprinten (Toggle) und gedrückt Halten um."));
+
+            String sneakStr = "Sneak: " + (tss.getSneakMode() == ToggleSprintSneakModule.SneakMode.TOGGLE ? "Toggle" : "Halten");
+            EzButton sneakBtn = new EzButton(col2X, curY, btnW, 16, Component.literal(sneakStr), tss.getSneakMode() == ToggleSprintSneakModule.SneakMode.TOGGLE, b -> {
+                tss.setSneakMode(tss.getSneakMode() == ToggleSprintSneakModule.SneakMode.TOGGLE ? ToggleSprintSneakModule.SneakMode.HOLD : ToggleSprintSneakModule.SneakMode.TOGGLE);
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(sneakBtn, "Schaltet zwischen dauerhaftem Umschalt-Schleichen (Toggle) und gedrückt Halten um."));
+            curY += 20;
+
+            EzToggleSwitch hideHudSwitch = new EzToggleSwitch(col1X, curY, btnW, 16,
+                    Component.literal("HUD verbergen"), tss.isHideHud(),
+                    state -> { tss.setHideHud(state); rebuildWidgets(); });
+            addRenderableWidget(described(hideHudSwitch, "Blendet die Sprint/Sneak-Statusanzeige im HUD aus."));
+            curY += 20;
+
+        } else if (module instanceof DayCounterModule day) {
+            EzToggleSwitch daySwitch = new EzToggleSwitch(col1X, curY, btnW, 16,
+                    Component.literal("Tageszähler"), day.isShowDay(),
+                    state -> { day.setShowDay(state); rebuildWidgets(); });
+            addRenderableWidget(described(daySwitch, "Zeigt den aktuellen Ingame-Tag der Spielwelt an."));
+
+            EzToggleSwitch playtimeSwitch = new EzToggleSwitch(col2X, curY, btnW, 16,
+                    Component.literal("Spielzeit"), day.isShowPlaytime(),
+                    state -> { day.setShowPlaytime(state); rebuildWidgets(); });
+            addRenderableWidget(described(playtimeSwitch, "Blendet die gesamte Spielzeit auf dieser Welt / diesem Server ein."));
+            curY += 20;
+
+            String startStr = "Startzählung: " + (day.isStartAtDayOne() ? "Tag 1" : "Tag 0");
+            EzButton startBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(startStr), true, b -> {
+                day.setStartAtDayOne(!day.isStartAtDayOne());
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(startBtn, "Wählt, ob die Welt am ersten Tag als Tag 1 oder Tag 0 beginnt."));
+            curY += 20;
+
+        } else if (module instanceof ClockModule clock) {
+            String clkStr = "Format: " + clock.getClockFormat().getLabel();
+            EzButton clkBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(clkStr), true, b -> {
+                ClockModule.ClockFormat[] formats = ClockModule.ClockFormat.values();
+                clock.setClockFormat(formats[(clock.getClockFormat().ordinal() + 1) % formats.length]);
+                rebuildWidgets();
+            }).withRightClick(b -> {
+                ClockModule.ClockFormat[] formats = ClockModule.ClockFormat.values();
+                clock.setClockFormat(formats[(clock.getClockFormat().ordinal() - 1 + formats.length) % formats.length]);
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(clkBtn, "Wählt zwischen 24-Stunden- und 12-Stunden-Format."));
+
+            EzToggleSwitch pfxSwitch = new EzToggleSwitch(col2X, curY, btnW, 16,
+                    Component.literal("Prefix anzeigen"), clock.isShowPrefix(),
+                    state -> { clock.setShowPrefix(state); rebuildWidgets(); });
+            addRenderableWidget(described(pfxSwitch, "Blendet das 'Uhr:'-Prefix vor der Zeit ein."));
+            curY += 20;
+
+        } else if (module instanceof ReachModule reach) {
+            String rchFmt = "Format: " + reach.getDisplayFormat().name();
+            EzButton rchBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(rchFmt), true, b -> {
+                ReachModule.DisplayFormat[] formats = ReachModule.DisplayFormat.values();
+                reach.setDisplayFormat(formats[(reach.getDisplayFormat().ordinal() + 1) % formats.length]);
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(rchBtn, "Formatierung der angezeigten Schlagdistanz."));
+
+            String precStr = "Nachkommastellen: " + reach.getPrecision();
+            EzButton precBtn = new EzButton(col2X, curY, btnW, 16, Component.literal(precStr), true, b -> {
+                int p = reach.getPrecision() >= 3 ? 1 : reach.getPrecision() + 1;
                 reach.setPrecision(p);
                 rebuildWidgets();
-            }));
+            });
+            addRenderableWidget(described(precBtn, "Präzision der Distanzberechnung."));
+            curY += 20;
 
-            addRenderableWidget(new EzButton(
-                    rightX, row2Y, btnW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.fade_ms", reach.getFadeOutDurationMs()), true,
-                    b -> {
-                        int f = reach.getFadeOutDurationMs() >= 3000 ? 500 : reach.getFadeOutDurationMs() + 500;
-                        reach.setFadeOutDurationMs(f);
-                        rebuildWidgets();
-                    }
-            ).withRightClick(b -> {
-                int f = reach.getFadeOutDurationMs() <= 500 ? 3000 : reach.getFadeOutDurationMs() - 500;
+            String fadeStr = "Fade: " + reach.getFadeOutDurationMs() + "ms";
+            EzButton fadeBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(fadeStr), true, b -> {
+                int f = reach.getFadeOutDurationMs() >= 3000 ? 500 : reach.getFadeOutDurationMs() + 500;
                 reach.setFadeOutDurationMs(f);
                 rebuildWidgets();
-            }));
+            });
+            addRenderableWidget(described(fadeBtn, "Dauer bis zum Ausblenden des Treffer-Wertes."));
 
-            addRenderableWidget(new EzButton(
-                    col2X, row2Y, btnW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.colors_mode", reach.isColorCoding() ? app.ezclient.util.EzI18n.get("ezclient.hud_settings.distance") : app.ezclient.util.EzI18n.get("ezclient.hud_settings.custom")), reach.isColorCoding(),
-                    b -> { reach.setColorCoding(!reach.isColorCoding()); rebuildWidgets(); }
-            ));
+            EzToggleSwitch rchColSwitch = new EzToggleSwitch(col2X, curY, btnW, 16,
+                    Component.literal("Farbcodierung"), reach.isColorCoding(),
+                    state -> { reach.setColorCoding(state); rebuildWidgets(); });
+            addRenderableWidget(described(rchColSwitch, "Färbt die Schlagdistanz abhängig von der Reichweite ein."));
+            curY += 20;
+
         } else if (module instanceof ComboCounterModule combo) {
-            addRenderableWidget(new EzButton(
-                    rightX, row1Y, btnW, 16,
-                    Component.literal("‹ " + combo.getDisplayFormat().name() + " ›"), true,
-                    b -> {
-                        ComboCounterModule.DisplayFormat[] formats = ComboCounterModule.DisplayFormat.values();
-                        int next = (combo.getDisplayFormat().ordinal() + 1) % formats.length;
-                        combo.setDisplayFormat(formats[next]);
-                        rebuildWidgets();
-                    }
-            ).withRightClick(b -> {
+            String cmbFmt = "Format: " + combo.getDisplayFormat().name();
+            EzButton cmbBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(cmbFmt), true, b -> {
                 ComboCounterModule.DisplayFormat[] formats = ComboCounterModule.DisplayFormat.values();
-                int prev = (combo.getDisplayFormat().ordinal() - 1 + formats.length) % formats.length;
-                combo.setDisplayFormat(formats[prev]);
+                combo.setDisplayFormat(formats[(combo.getDisplayFormat().ordinal() + 1) % formats.length]);
                 rebuildWidgets();
-            }));
+            });
+            addRenderableWidget(described(cmbBtn, "Darstellungsstil des Trefferserien-Zählers."));
 
-            addRenderableWidget(new EzButton(
-                    col2X, row1Y, btnW, 16,
-                    Component.literal(String.format("‹ Reset: %.1fs ›", combo.getResetWindowSeconds())), true,
-                    b -> {
-                        float r = combo.getResetWindowSeconds() >= 3.0f ? 1.0f : combo.getResetWindowSeconds() + 0.5f;
-                        combo.setResetWindowSeconds(r);
-                        rebuildWidgets();
-                    }
-            ).withRightClick(b -> {
-                float r = combo.getResetWindowSeconds() <= 1.0f ? 3.0f : combo.getResetWindowSeconds() - 0.5f;
+            String rstStr = String.format(Locale.ROOT, "Reset-Zeit: %.1fs", combo.getResetWindowSeconds());
+            EzButton rstBtn = new EzButton(col2X, curY, btnW, 16, Component.literal(rstStr), true, b -> {
+                float r = combo.getResetWindowSeconds() >= 3.0f ? 1.0f : combo.getResetWindowSeconds() + 0.5f;
                 combo.setResetWindowSeconds(r);
                 rebuildWidgets();
-            }));
+            });
+            addRenderableWidget(described(rstBtn, "Zeitspanne ohne neuen Treffer, bis die Combo zurückgesetzt wird."));
+            curY += 20;
 
-            addRenderableWidget(new EzButton(
-                    rightX, row2Y, btnW, 16,
-                    Component.literal("Farbe: " + (combo.isMilestoneColors() ? "Dynamisch" : "Farbfeld")), combo.isMilestoneColors(),
-                    b -> { combo.setMilestoneColors(!combo.isMilestoneColors()); rebuildWidgets(); }
-            ));
+            EzToggleSwitch msColSwitch = new EzToggleSwitch(col1X, curY, btnW, 16,
+                    Component.literal("Meilenstein-Farben"), combo.isMilestoneColors(),
+                    state -> { combo.setMilestoneColors(state); rebuildWidgets(); });
+            addRenderableWidget(described(msColSwitch, "Ändert die Textfarbe bei Erreichen höherer Treffer-Meilensteine."));
 
-            addRenderableWidget(new EzButton(
-                    col2X, row2Y, btnW, 16,
-                    app.ezclient.util.EzI18n.comp("ezclient.hud_settings.scale_punch", app.ezclient.util.EzI18n.onOrOff(combo.isScalePunch())), combo.isScalePunch(),
-                    b -> { combo.setScalePunch(!combo.isScalePunch()); rebuildWidgets(); }
-            ));
-        } else if (module instanceof BastiTimerModule timer) {
-            String prec = timer.text("precision");
-            addRenderableWidget(new EzButton(
-                    rightX, row1Y, btnW, 16,
-                    Component.literal("‹ " + prec + " ›"), true,
-                    b -> {
-                        String[] precs = { "Seconds", "Tenths", "Milliseconds" };
-                        int next = 0;
-                        for (int i = 0; i < precs.length; i++) {
-                            if (precs[i].equalsIgnoreCase(prec)) { next = (i + 1) % precs.length; break; }
-                        }
-                        timer.set("precision", precs[next]);
-                        rebuildWidgets();
-                    }
-            ).withRightClick(b -> {
-                String[] precs = { "Seconds", "Tenths", "Milliseconds" };
-                int prev = 0;
-                for (int i = 0; i < precs.length; i++) {
-                    if (precs[i].equalsIgnoreCase(prec)) { prev = (i - 1 + precs.length) % precs.length; break; }
-                }
-                timer.set("precision", precs[prev]);
+            EzToggleSwitch spSwitch = new EzToggleSwitch(col2X, curY, btnW, 16,
+                    Component.literal("Scale-Punch"), combo.isScalePunch(),
+                    state -> { combo.setScalePunch(state); rebuildWidgets(); });
+            addRenderableWidget(described(spSwitch, "Lässt die Combo-Zahl bei jedem erfolgreichen Treffer kurz aufploppen."));
+            curY += 20;
+
+        } else if (module instanceof PotionEffectModule potion) {
+            String styleStr = "Stil: " + switch (potion.getDisplayStyle()) {
+                case COMPACT -> "Kompakt";
+                case ORIGINAL -> "Original";
+                case DETAILED -> "Detailliert";
+            };
+            EzButton styleBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(styleStr), true, b -> {
+                PotionEffectModule.DisplayStyle[] styles = PotionEffectModule.DisplayStyle.values();
+                potion.setDisplayStyle(styles[(potion.getDisplayStyle().ordinal() + 1) % styles.length]);
                 rebuildWidgets();
-            }));
+            }).withRightClick(b -> {
+                PotionEffectModule.DisplayStyle[] styles = PotionEffectModule.DisplayStyle.values();
+                potion.setDisplayStyle(styles[(potion.getDisplayStyle().ordinal() - 1 + styles.length) % styles.length]);
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(styleBtn, "Darstellungsstil der aktiven Trankeffekte."));
 
-            addRenderableWidget(new EzButton(
-                    col2X, row1Y, btnW, 16,
-                    Component.literal("Prefix: " + (timer.flag("prefix") ? "Timer" : "Aus")), timer.flag("prefix"),
-                    b -> { timer.set("prefix", !timer.flag("prefix")); rebuildWidgets(); }
-            ));
+            String orientStr = "Ausrichtung: " + (potion.isVertical() ? "Vertikal" : "Horizontal");
+            EzButton orientBtn = new EzButton(col2X, curY, btnW, 16, Component.literal(orientStr), true, b -> {
+                potion.setVertical(!potion.isVertical());
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(orientBtn, "Richtet die Effekte vertikal untereinander oder horizontal nebeneinander aus."));
+            curY += 20;
 
-            addRenderableWidget(new EzButton(
-                    rightX, row2Y, btnW, 16,
-                    Component.literal("Auto-Start: " + (timer.flag("autoStart") ? "An" : "Aus")), timer.flag("autoStart"),
-                    b -> { timer.set("autoStart", !timer.flag("autoStart")); rebuildWidgets(); }
-            ));
+            EzToggleSwitch timeSwitch = new EzToggleSwitch(col1X, curY, btnW, 16,
+                    Component.literal("Dauer anzeigen"), potion.isShowTime(),
+                    state -> { potion.setShowTime(state); rebuildWidgets(); });
+            addRenderableWidget(described(timeSwitch, "Zeigt die verbleibende Restzeit des Trankeffekts an."));
 
-            addRenderableWidget(new EzButton(
-                    col2X, row2Y, btnW, 16,
-                    Component.literal("Menü-Pause: " + (timer.flag("pauseMenus") ? "An" : "Aus")), timer.flag("pauseMenus"),
-                    b -> { timer.set("pauseMenus", !timer.flag("pauseMenus")); rebuildWidgets(); }
-            ));
+            EzToggleSwitch customColSwitch = new EzToggleSwitch(col2X, curY, btnW, 16,
+                    Component.literal("Eigene Farben"), potion.isUseCustomColors(),
+                    state -> { potion.setUseCustomColors(state); rebuildWidgets(); });
+            addRenderableWidget(described(customColSwitch, "Verwendet die individuellen Trankfarben statt der Modulfarbe."));
+            curY += 20;
+
+        } else if (module instanceof ChatCustomizerModule chat) {
+            String tsStr = "Zeitstempel: " + chat.getTimestampFormat().getLabel();
+            EzButton tsBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(tsStr), true, b -> {
+                ChatCustomizerModule.TimestampFormat[] formats = ChatCustomizerModule.TimestampFormat.values();
+                chat.setTimestampFormat(formats[(chat.getTimestampFormat().ordinal() + 1) % formats.length]);
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(tsBtn, "Fügt Chat-Nachrichten einen genauen Sende-Zeitstempel hinzu."));
+
+            EzToggleSwitch cpSwitch = new EzToggleSwitch(col2X, curY, btnW, 16,
+                    Component.literal("Klick zum Kopieren"), chat.isCopyOnClick(),
+                    state -> { chat.setCopyOnClick(state); rebuildWidgets(); });
+            addRenderableWidget(described(cpSwitch, "Kopiert eine Chat-Nachricht per Shift-Klick in die Zwischenablage."));
+            curY += 20;
+
+            String opStr = "Deckkraft: " + chat.getBackgroundOpacity() + "%";
+            EzButton opBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(opStr), true, b -> {
+                int op = chat.getBackgroundOpacity() >= 100 ? 0 : chat.getBackgroundOpacity() + 25;
+                chat.setBackgroundOpacity(op);
+                rebuildWidgets();
+            }).withRightClick(b -> {
+                int op = chat.getBackgroundOpacity() <= 0 ? 100 : chat.getBackgroundOpacity() - 25;
+                chat.setBackgroundOpacity(op);
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(opBtn, "Deckkraft des Chat-Hintergrundfensters in Prozent."));
+
+            String limStr = "Verlauf: " + chat.getLineLimit() + " Zeilen";
+            EzButton limBtn = new EzButton(col2X, curY, btnW, 16, Component.literal(limStr), true, b -> {
+                int[] limits = { 100, 1000, 5000, 10000 };
+                int next = 5000;
+                for (int i = 0; i < limits.length; i++) {
+                    if (limits[i] == chat.getLineLimit()) { next = limits[(i + 1) % limits.length]; break; }
+                }
+                chat.setLineLimit(next);
+                rebuildWidgets();
+            }).withRightClick(b -> {
+                int[] limits = { 100, 1000, 5000, 10000 };
+                int prev = 5000;
+                for (int i = 0; i < limits.length; i++) {
+                    if (limits[i] == chat.getLineLimit()) { prev = limits[(i - 1 + limits.length) % limits.length]; break; }
+                }
+                chat.setLineLimit(prev);
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(limBtn, "Maximale Anzahl der im Chatverlauf gespeicherten Zeilen."));
+            curY += 20;
+
         } else {
-            EditBox prefix = new EditBox(font, rightX + 36, row1Y, 80, 16, Component.literal(app.ezclient.util.EzI18n.text("Prefix")));
-            prefix.setValue(module.getPrefix());
-            prefix.setResponder(module::setPrefix);
-            addRenderableWidget(prefix);
+            EditBox prefixBox = new EditBox(font, col1X, curY, btnW, 16, Component.literal("Prefix"));
+            prefixBox.setHint(Component.literal("Prefix"));
+            prefixBox.setValue(module.getPrefix());
+            prefixBox.setResponder(val -> { module.setPrefix(val); ConfigManager.save(); });
+            addRenderableWidget(described(prefixBox, "Text vor dem Modul-Wert."));
 
-            EditBox suffix = new EditBox(font, col2X + 36, row1Y, 80, 16, Component.literal("Suffix"));
-            suffix.setValue(module.getSuffix());
-            suffix.setResponder(module::setSuffix);
-            addRenderableWidget(suffix);
+            EditBox suffixBox = new EditBox(font, col2X, curY, btnW, 16, Component.literal("Suffix"));
+            suffixBox.setHint(Component.literal("Suffix"));
+            suffixBox.setValue(module.getSuffix());
+            suffixBox.setResponder(val -> { module.setSuffix(val); ConfigManager.save(); });
+            addRenderableWidget(described(suffixBox, "Text nach dem Modul-Wert."));
+            curY += 20;
         }
 
-        // ── Color Modes (Vanilla / Einfarbig / Welle / Rainbow) ──
-        if (!(module instanceof CrosshairModule) || crosshairTab == 1) {
-            boolean hasThirdModuleRow = module instanceof KeystrokesModule || module instanceof ArmorStatusModule;
-            int modeY = panelY + (hasThirdModuleRow ? 96 : 76);
+        curY += 6;
 
-            // If module has border, show Text vs Border switch
-            if (module.hasBorder()) {
-                int tbW = btnW;
-                addRenderableWidget(new EzButton(
-                        rightX, modeY, tbW, 14,
-                        Component.literal("Text"), activeColorSlot <= 2,
-                        b -> {
-                            activeColorSlot = 1;
-                            selectedPresetIndex = -1;
-                            syncPickerFromCurrentSlot();
-                            rebuildWidgets();
-                        }
-                ));
-                addRenderableWidget(new EzButton(
-                        col2X, modeY, tbW, 14,
-                        Component.literal("Border"), activeColorSlot >= 3,
-                        b -> {
-                            activeColorSlot = 3;
-                            selectedPresetIndex = -1;
-                            syncPickerFromCurrentSlot();
-                            rebuildWidgets();
-                        }
-                ));
-                modeY += 18;
+        // ══════════════════════════════════════════════════════════════
+        // CATEGORY 2: TEXTFARBE & EFFEKTE
+        // ══════════════════════════════════════════════════════════════
+        addRenderableWidget(new CategoryHeader(col1X, curY, fullW, 14,
+                Component.literal(app.ezclient.util.EzI18n.text("Textfarbe & Effekte").toUpperCase(Locale.ROOT))));
+        curY += 16;
+
+        String modeLabel = "Farbmodus: " + switch (module.getColorMode()) {
+            case SOLID -> "Einfarbig";
+            case WAVE -> "Welle";
+            case RAINBOW -> "Regenbogen";
+        };
+        EzButton colorModeBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(modeLabel), true, b -> {
+            HudModule.ColorMode[] modes = HudModule.ColorMode.values();
+            module.setColorMode(modes[(module.getColorMode().ordinal() + 1) % modes.length]);
+            ConfigManager.save();
+            rebuildWidgets();
+        }).withRightClick(b -> {
+            HudModule.ColorMode[] modes = HudModule.ColorMode.values();
+            module.setColorMode(modes[(module.getColorMode().ordinal() - 1 + modes.length) % modes.length]);
+            ConfigManager.save();
+            rebuildWidgets();
+        });
+        addRenderableWidget(described(colorModeBtn, "Wählt zwischen statischer Einzelfarbe, zweifarbiger Welle oder dynamischem Regenbogen."));
+
+        EzToggleSwitch shadowSwitch = new EzToggleSwitch(col2X, curY, btnW, 16,
+                Component.literal("Textschatten"), module.isTextShadow(),
+                state -> { module.setTextShadow(state); ConfigManager.save(); rebuildWidgets(); });
+        addRenderableWidget(described(shadowSwitch, "Zeichnet einen dezenten Textschatten für bessere Lesbarkeit auf jedem Hintergrund."));
+        curY += 20;
+
+        if (module.getColorMode() != HudModule.ColorMode.RAINBOW) {
+            addColorOption(col1X, curY, (module.getColorMode() == HudModule.ColorMode.WAVE ? btnW : fullW),
+                    "Textfarbe", "Grundfarbe des Textes (öffnet den Hex-Farbwähler).",
+                    module.getTextColor(),
+                    newCol -> { module.setTextColor(newCol); ConfigManager.save(); rebuildWidgets(); }
+            );
+            if (module.getColorMode() == HudModule.ColorMode.WAVE) {
+                addColorOption(col2X, curY, btnW,
+                        "Wellenfarbe 2", "Zweite Farbe für den Wellenfarbverlauf (öffnet den Hex-Farbwähler).",
+                        module.getWaveColor2(),
+                        newCol -> { module.setWaveColor2(newCol); ConfigManager.save(); rebuildWidgets(); }
+                );
             }
+            curY += 20;
+        }
 
-            boolean isBorderMode = (activeColorSlot >= 3);
+        curY += 6;
 
-            if (isBorderMode) {
-                // Border color modes: Einfarbig / Welle / Rainbow
-                int cW = 82;
-                int cGap = 4;
-                addRenderableWidget(new EzButton(
-                        rightX, modeY, cW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_solid"), module.getBorderColorMode() == HudModule.ColorMode.SOLID,
-                        b -> {
-                            module.setBorderColorMode(HudModule.ColorMode.SOLID);
-                            syncPickerFromCurrentSlot();
-                            rebuildWidgets();
-                        }
-                ));
+        // ══════════════════════════════════════════════════════════════
+        // CATEGORY 3: BOX & RAHMEN
+        // ══════════════════════════════════════════════════════════════
+        addRenderableWidget(new CategoryHeader(col1X, curY, fullW, 14,
+                Component.literal(app.ezclient.util.EzI18n.text("Box & Rahmen").toUpperCase(Locale.ROOT))));
+        curY += 16;
 
-                addRenderableWidget(new EzButton(
-                        rightX + cW + cGap, modeY, cW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_wave"), module.getBorderColorMode() == HudModule.ColorMode.WAVE,
-                        b -> {
-                            module.setBorderColorMode(HudModule.ColorMode.WAVE);
-                            syncPickerFromCurrentSlot();
-                            rebuildWidgets();
-                        }
-                ));
+        EzToggleSwitch boxSwitch = new EzToggleSwitch(col1X, curY, btnW, 16,
+                Component.literal("Hintergrund-Box"), module.hasBackground(),
+                state -> { module.setBackground(state); ConfigManager.save(); rebuildWidgets(); });
+        addRenderableWidget(described(boxSwitch, "Aktiviert oder deaktiviert den halbtransparenten Hintergrundkasten."));
 
-                addRenderableWidget(new EzButton(
-                        rightX + (cW + cGap) * 2, modeY, cW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_rainbow"), module.getBorderColorMode() == HudModule.ColorMode.RAINBOW,
-                        b -> {
-                            module.setBorderColorMode(HudModule.ColorMode.RAINBOW);
-                            rebuildWidgets();
-                        }
-                ));
+        addColorOption(col2X, curY, btnW,
+                "Hintergrundfarbe", "Farbe und Transparenz der Hintergrund-Box (öffnet den Hex-Farbwähler).",
+                module.getBackgroundColor(),
+                newCol -> { module.setBackgroundColor(newCol); ConfigManager.save(); rebuildWidgets(); }
+        );
+        curY += 20;
 
-                int pickerStartY = modeY + 20;
+        EzToggleSwitch borderSwitch = new EzToggleSwitch(col1X, curY, btnW, 16,
+                Component.literal("Rahmen"), module.hasBorder(),
+                state -> { module.setBorder(state); ConfigManager.save(); rebuildWidgets(); });
+        addRenderableWidget(described(borderSwitch, "Zeichnet eine dekorative Kontur um das HUD-Modul."));
+
+        String styleLabel = "Stil: " + module.getBorderStyle().getLabel();
+        EzButton styleBtn = new EzButton(col2X, curY, btnW, 16, Component.literal(styleLabel), module.hasBorder(), b -> {
+            HudModule.BorderStyle[] styles = HudModule.BorderStyle.values();
+            module.setBorderStyle(styles[(module.getBorderStyle().ordinal() + 1) % styles.length]);
+            ConfigManager.save();
+            rebuildWidgets();
+        }).withRightClick(b -> {
+            HudModule.BorderStyle[] styles = HudModule.BorderStyle.values();
+            module.setBorderStyle(styles[(module.getBorderStyle().ordinal() - 1 + styles.length) % styles.length]);
+            ConfigManager.save();
+            rebuildWidgets();
+        });
+        addRenderableWidget(described(styleBtn, "Wählt das visuelle Design des Modulrahmens."));
+        curY += 20;
+
+        if (module.hasBorder()) {
+            String borderModeLabel = "Rahmen-Farbmodus: " + switch (module.getBorderColorMode()) {
+                case SOLID -> "Einfarbig";
+                case WAVE -> "Welle";
+                case RAINBOW -> "Regenbogen";
+            };
+            EzButton borderModeBtn = new EzButton(col1X, curY, btnW, 16, Component.literal(borderModeLabel), true, b -> {
+                HudModule.ColorMode[] modes = HudModule.ColorMode.values();
+                module.setBorderColorMode(modes[(module.getBorderColorMode().ordinal() + 1) % modes.length]);
+                ConfigManager.save();
+                rebuildWidgets();
+            }).withRightClick(b -> {
+                HudModule.ColorMode[] modes = HudModule.ColorMode.values();
+                module.setBorderColorMode(modes[(module.getBorderColorMode().ordinal() - 1 + modes.length) % modes.length]);
+                ConfigManager.save();
+                rebuildWidgets();
+            });
+            addRenderableWidget(described(borderModeBtn, "Farbmodus der Rahmenkontur."));
+
+            if (module.getBorderColorMode() != HudModule.ColorMode.RAINBOW) {
+                addColorOption(col2X, curY, btnW,
+                        "Rahmenfarbe", "Hauptfarbe des Rahmens (öffnet den Hex-Farbwähler).",
+                        module.getBorderColor(),
+                        newCol -> { module.setBorderColor(newCol); ConfigManager.save(); rebuildWidgets(); }
+                );
+                curY += 20;
+
                 if (module.getBorderColorMode() == HudModule.ColorMode.WAVE) {
-                    addRenderableWidget(new EzButton(
-                            rightX, pickerStartY, btnW, 14,
-                            app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color1"), activeColorSlot == 3,
-                            b -> {
-                                activeColorSlot = 3;
-                                selectedPresetIndex = -1;
-                                syncPickerFromCurrentSlot();
-                                rebuildWidgets();
-                            }
-                    ));
-
-                    addRenderableWidget(new EzButton(
-                            col2X, pickerStartY, btnW, 14,
-                            app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color2"), activeColorSlot == 4,
-                            b -> {
-                                activeColorSlot = 4;
-                                selectedPresetIndex = -1;
-                                syncPickerFromCurrentSlot();
-                                rebuildWidgets();
-                            }
-                    ));
-                    pickerStartY += 18;
-                }
-
-                svX = rightX;
-                svY = pickerStartY;
-                svW = 84;
-                svH = 56;
-                hueX = svX + svW + 6;
-                hueY = pickerStartY;
-                hueW = 12;
-                hueH = 56;
-
-                if (isColorPickerVisible()) {
-                    int hexX = hueX + hueW + 12;
-                    int hexY = svY;
-                    hexInput = new EditBox(font, hexX, hexY, 60, 13, Component.literal("Hex"));
-                    hexInput.setMaxLength(8);
-                    hexInput.setResponder(this::onHexInputChanged);
-                    addRenderableWidget(hexInput);
-
-                    syncPickerFromCurrentSlot();
-                } else {
-                    hexInput = null;
-                }
-            } else if (module instanceof PotionEffectModule potion) {
-                int pW = 60;
-                int pGap = 5;
-                // 1. Vanilla / Effektfarben
-                addRenderableWidget(new EzButton(
-                        rightX, modeY, pW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_vanilla"),
-                        potion.isUseCustomColors() && potion.getColorMode() == HudModule.ColorMode.SOLID,
-                        b -> {
-                            potion.setUseCustomColors(true);
-                            potion.setColorMode(HudModule.ColorMode.SOLID);
-                            rebuildWidgets();
-                        }
-                ));
-
-                // 2. Solid / Einfarbig
-                addRenderableWidget(new EzButton(
-                        rightX + pW + pGap, modeY, pW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_solid"),
-                        !potion.isUseCustomColors() && potion.getColorMode() == HudModule.ColorMode.SOLID,
-                        b -> {
-                            potion.setUseCustomColors(false);
-                            potion.setColorMode(HudModule.ColorMode.SOLID);
-                            syncPickerFromCurrentSlot();
-                            rebuildWidgets();
-                        }
-                ));
-
-                // 3. Wave / Welle
-                addRenderableWidget(new EzButton(
-                        rightX + (pW + pGap) * 2, modeY, pW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_wave"),
-                        potion.getColorMode() == HudModule.ColorMode.WAVE,
-                        b -> {
-                            potion.setUseCustomColors(false);
-                            potion.setColorMode(HudModule.ColorMode.WAVE);
-                            syncPickerFromCurrentSlot();
-                            rebuildWidgets();
-                        }
-                ));
-
-                // 4. Rainbow
-                addRenderableWidget(new EzButton(
-                        rightX + (pW + pGap) * 3, modeY, pW + 4, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_rainbow"),
-                        potion.getColorMode() == HudModule.ColorMode.RAINBOW,
-                        b -> {
-                            potion.setUseCustomColors(false);
-                            potion.setColorMode(HudModule.ColorMode.RAINBOW);
-                            rebuildWidgets();
-                        }
-                ));
-
-                int pickerStartY = modeY + 20;
-                if (potion.getColorMode() == HudModule.ColorMode.WAVE) {
-                    addRenderableWidget(new EzButton(
-                            rightX, pickerStartY, btnW, 14,
-                            app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color1"), activeColorSlot == 1,
-                            b -> {
-                                activeColorSlot = 1;
-                                selectedPresetIndex = -1;
-                                syncPickerFromCurrentSlot();
-                                rebuildWidgets();
-                            }
-                    ));
-
-                    addRenderableWidget(new EzButton(
-                            col2X, pickerStartY, btnW, 14,
-                            app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color2"), activeColorSlot == 2,
-                            b -> {
-                                activeColorSlot = 2;
-                                selectedPresetIndex = -1;
-                                syncPickerFromCurrentSlot();
-                                rebuildWidgets();
-                            }
-                    ));
-                    pickerStartY += 18;
-                }
-
-                svX = rightX;
-                svY = pickerStartY;
-                svW = 84;
-                svH = 56;
-                hueX = svX + svW + 6;
-                hueY = pickerStartY;
-                hueW = 12;
-                hueH = 56;
-
-                if (isColorPickerVisible()) {
-                    int hexX = hueX + hueW + 12;
-                    int hexY = svY;
-                    hexInput = new EditBox(font, hexX, hexY, 60, 13, Component.literal("Hex"));
-                    hexInput.setMaxLength(8);
-                    hexInput.setResponder(this::onHexInputChanged);
-                    addRenderableWidget(hexInput);
-
-                    syncPickerFromCurrentSlot();
-                } else {
-                    hexInput = null;
+                    addColorOption(col1X, curY, btnW,
+                            "Rahmen-Wellenfarbe 2", "Zweite Farbe für den Rahmen-Wellenverlauf (öffnet den Hex-Farbwähler).",
+                            module.getBorderWaveColor2(),
+                            newCol -> { module.setBorderWaveColor2(newCol); ConfigManager.save(); rebuildWidgets(); }
+                    );
+                    curY += 20;
                 }
             } else {
-                int cW = 82;
-                int cGap = 4;
-                addRenderableWidget(new EzButton(
-                        rightX, modeY, cW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_solid"), module.getColorMode() == HudModule.ColorMode.SOLID,
-                        b -> {
-                            module.setColorMode(HudModule.ColorMode.SOLID);
-                            syncPickerFromCurrentSlot();
-                            rebuildWidgets();
-                        }
-                ));
-
-                addRenderableWidget(new EzButton(
-                        rightX + cW + cGap, modeY, cW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_wave"), module.getColorMode() == HudModule.ColorMode.WAVE,
-                        b -> {
-                            module.setColorMode(HudModule.ColorMode.WAVE);
-                            syncPickerFromCurrentSlot();
-                            rebuildWidgets();
-                        }
-                ));
-
-                addRenderableWidget(new EzButton(
-                        rightX + (cW + cGap) * 2, modeY, cW, 16,
-                        app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color_rainbow"), module.getColorMode() == HudModule.ColorMode.RAINBOW,
-                        b -> {
-                            module.setColorMode(HudModule.ColorMode.RAINBOW);
-                            rebuildWidgets();
-                        }
-                ));
-
-                int pickerStartY = modeY + 20;
-                if (module.getColorMode() == HudModule.ColorMode.WAVE) {
-                    addRenderableWidget(new EzButton(
-                            rightX, pickerStartY, btnW, 14,
-                            app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color1"), activeColorSlot == 1,
-                            b -> {
-                                activeColorSlot = 1;
-                                selectedPresetIndex = -1;
-                                syncPickerFromCurrentSlot();
-                                rebuildWidgets();
-                            }
-                    ));
-
-                    addRenderableWidget(new EzButton(
-                            col2X, pickerStartY, btnW, 14,
-                            app.ezclient.util.EzI18n.comp("ezclient.hud_settings.color2"), activeColorSlot == 2,
-                            b -> {
-                                activeColorSlot = 2;
-                                selectedPresetIndex = -1;
-                                syncPickerFromCurrentSlot();
-                                rebuildWidgets();
-                            }
-                    ));
-                    pickerStartY += 18;
-                }
-
-                svX = rightX;
-                svY = pickerStartY;
-                svW = 84;
-                svH = 56;
-                hueX = svX + svW + 6;
-                hueY = pickerStartY;
-                hueW = 12;
-                hueH = 56;
-
-                if (isColorPickerVisible()) {
-                    int hexX = hueX + hueW + 12;
-                    int hexY = svY;
-                    hexInput = new EditBox(font, hexX, hexY, 60, 13, Component.literal("Hex"));
-                    hexInput.setMaxLength(8);
-                    hexInput.setResponder(this::onHexInputChanged);
-                    addRenderableWidget(hexInput);
-
-                    syncPickerFromCurrentSlot();
-                } else {
-                    hexInput = null;
-                }
+                curY += 20;
             }
         }
-
-        // ── Reset Button (Bottom Right) ──
-        addRenderableWidget(new EzButton(
-                panelX + panelWidth - 76, panelY + panelHeight - 26, 64, 16,
-                app.ezclient.util.EzI18n.comp("ezclient.hud_settings.reset_btn"), false,
-                b -> showResetConfirmation = true
-        ));
     }
 
-    private boolean isColorPickerVisible() {
-        if (module instanceof CrosshairModule) {
-            return crosshairTab == 1;
-        }
-        if (activeColorSlot >= 3) {
-            return module.getBorderColorMode() != HudModule.ColorMode.RAINBOW;
-        }
-        if (module.getColorMode() == HudModule.ColorMode.RAINBOW) return false;
-        if (module instanceof PotionEffectModule potion && potion.isUseCustomColors()) return false;
-        return true;
+    private void addColorOption(int x, int y, int width, String label, String desc, int currentColor, IntConsumer colorSetter) {
+        int swatchW = 20;
+        int btnW = width - swatchW - 3;
+        EzButton btn = new EzButton(
+                x, y, btnW, 16,
+                Component.literal(app.ezclient.util.EzI18n.text(label) + " …"), true,
+                b -> openColorPicker(label, currentColor, colorSetter)
+        );
+        ColorSwatchButton swatch = new ColorSwatchButton(
+                x + btnW + 3, y, swatchW, 16,
+                currentColor,
+                b -> openColorPicker(label, currentColor, colorSetter)
+        );
+        addRenderableWidget(described(btn, desc));
+        addRenderableWidget(described(swatch, desc));
     }
 
-    private void syncPickerFromCurrentSlot() {
-        int color;
-        if (activeColorSlot == 1) {
-            color = (module instanceof CrosshairModule crosshair) ? crosshair.getSelectedRuleColor() : module.getTextColor();
-        } else if (activeColorSlot == 2) {
-            color = module.getWaveColor2();
-        } else if (activeColorSlot == 3) {
-            color = module.getBorderColor();
-        } else {
-            color = module.getBorderWaveColor2();
-        }
-        int r = (color >> 16) & 0xFF;
-        int g = (color >> 8) & 0xFF;
-        int b = color & 0xFF;
-
-        float[] hsv = Color.RGBtoHSB(r, g, b, null);
-        currentHue = hsv[0];
-        currentSat = hsv[1];
-        currentVal = hsv[2];
-
-        updateHexInputText(color);
-    }
-
-    private void updateHexInputText(int color) {
-        if (hexInput == null) return;
-        updatingHexInternally = true;
-        String hex = String.format("%06X", (color & 0xFFFFFF));
-        hexInput.setValue(hex);
-        updatingHexInternally = false;
-    }
-
-    private void onHexInputChanged(String text) {
-        if (updatingHexInternally) return;
-        try {
-            String clean = text.replace("#", "").trim();
-            if (clean.length() == 6) {
-                int rgb = (int) Long.parseLong(clean, 16);
-                int fullColor = 0xFF000000 | rgb;
-                applyColorToActiveSlot(fullColor);
-
-                int r = (rgb >> 16) & 0xFF;
-                int g = (rgb >> 8) & 0xFF;
-                int b = rgb & 0xFF;
-                float[] hsv = Color.RGBtoHSB(r, g, b, null);
-                currentHue = hsv[0];
-                currentSat = hsv[1];
-                currentVal = hsv[2];
-                selectedPresetIndex = -1;
-            }
-        } catch (Exception ignored) {}
-    }
-
-    private void applyColorToActiveSlot(int color) {
-        if (activeColorSlot == 1) {
-            if (module instanceof CrosshairModule crosshair) crosshair.setSelectedRuleColor(color);
-            else module.setTextColor(color);
-        } else if (activeColorSlot == 2) {
-            module.setWaveColor2(color);
-        } else if (activeColorSlot == 3) {
-            module.setBorderColor(color);
-        } else if (activeColorSlot == 4) {
-            module.setBorderWaveColor2(color);
-        }
-        ConfigManager.save();
-    }
-
-    private void updateColorFromHSV() {
-        int rgb = Color.HSBtoRGB(currentHue, currentSat, currentVal);
-        int fullColor = 0xFF000000 | (rgb & 0xFFFFFF);
-        applyColorToActiveSlot(fullColor);
-        updateHexInputText(fullColor);
-        selectedPresetIndex = -1;
+    private void openColorPicker(String title, int currentColor, IntConsumer onColorChanged) {
+        if (minecraft == null) return;
+        EzScreenBridge.set(minecraft, new ModuleColorScreen(this, title, currentColor, onColorChanged));
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent e, boolean doubleClick) {
-        if (isListeningForHotkey && e.button() != 0) {
-            EzKeyBindings.applyModuleKeyBind(module, -100 - e.button());
-            isListeningForHotkey = false;
-            rebuildWidgets();
-            return true;
-        }
+    protected void extractSettings(GuiGraphicsExtractor g, int mx, int my, float d) {
+        EzUi.backdrop(g, width, height);
+        EzUi.panel(g, panelX, panelY, panelWidth, panelHeight);
 
-        if (showResetConfirmation) {
-            int diaW = 240, diaH = 84;
-            int diaX = (width - diaW) / 2, diaY = (height - diaH) / 2;
+        g.text(font, EzUi.fitText(getTitle(), panelWidth - SETTINGS_SIDEBAR_WIDTH - 70), settingsContentLeft(panelX), panelY + 10, EzUi.TEXT_WHITE);
 
-            // Yes button
-            if (e.x() >= diaX + 14 && e.x() <= diaX + 114 && e.y() >= diaY + 52 && e.y() <= diaY + 72) {
-                module.resetSettings();
-                showResetConfirmation = false;
-                syncPickerFromCurrentSlot();
-                rebuildWidgets();
-                return true;
-            }
+        g.fill(settingsContentLeft(panelX), panelY + 28, panelX + panelWidth - 8, panelY + 29, EzUi.BORDER_SUBTLE);
+        renderSettingsSidebar(g, panelX, panelY, panelHeight, module.getDisplayName());
 
-            // Cancel button
-            if (e.x() >= diaX + 126 && e.x() <= diaX + 226 && e.y() >= diaY + 52 && e.y() <= diaY + 72) {
-                showResetConfirmation = false;
-                return true;
-            }
-            return true;
-        }
-
-        if (isColorPickerVisible()) {
-            double mx = e.x();
-            double my = e.y();
-
-            // Check SV Box click
-            if (mx >= svX && mx <= svX + svW && my >= svY && my <= svY + svH) {
-                isDraggingSV = true;
-                currentSat = (float) Math.max(0.0, Math.min(1.0, (mx - svX) / svW));
-                currentVal = (float) Math.max(0.0, Math.min(1.0, 1.0 - (my - svY) / svH));
-                updateColorFromHSV();
-                return true;
-            }
-
-            // Check Hue Bar click
-            if (mx >= hueX && mx <= hueX + hueW && my >= hueY && my <= hueY + hueH) {
-                isDraggingHue = true;
-                currentHue = (float) Math.max(0.0, Math.min(1.0, (my - hueY) / hueH));
-                updateColorFromHSV();
-                return true;
-            }
-
-            // Check 3x3 Preset grid click
-            int presetGridX = hueX + hueW + 12;
-            int presetGridY = svY + 16;
-            for (int i = 0; i < 9; i++) {
-                int px = presetGridX + (i % 3) * 28;
-                int py = presetGridY + (i / 3) * 16;
-                if (mx >= px && mx <= px + 26 && my >= py && my <= py + 14) {
-                    selectedPresetIndex = i;
-                    int presetColor = PRESETS[i];
-                    applyColorToActiveSlot(presetColor);
-                    syncPickerFromCurrentSlot();
-                    return true;
-                }
-            }
-        }
-
-        return super.mouseClicked(e, doubleClick);
+        super.extractSettings(g, mx, my, d);
     }
 
     @Override
-    public boolean mouseReleased(MouseButtonEvent e) {
-        isDraggingSV = false;
-        isDraggingHue = false;
-        return super.mouseReleased(e);
+    public boolean isPauseScreen() {
+        return false;
     }
 
     @Override
-    public boolean mouseDragged(MouseButtonEvent e, double deltaX, double deltaY) {
-        if (isColorPickerVisible()) {
-            if (isDraggingSV) {
-                currentSat = (float) Math.max(0.0, Math.min(1.0, (e.x() - svX) / svW));
-                currentVal = (float) Math.max(0.0, Math.min(1.0, 1.0 - (e.y() - svY) / svH));
-                updateColorFromHSV();
-                return true;
-            }
-            if (isDraggingHue) {
-                currentHue = (float) Math.max(0.0, Math.min(1.0, (e.y() - hueY) / hueH));
-                updateColorFromHSV();
-                return true;
-            }
+    public void onClose() {
+        if (minecraft != null) {
+            EzScreenBridge.set(minecraft, parent);
         }
-        return super.mouseDragged(e, deltaX, deltaY);
     }
 
     @Override
@@ -1282,179 +727,67 @@ public final class HudSettingsScreen extends Screen {
             rebuildWidgets();
             return true;
         }
-        if (event.key() == 256) { // ESC
-            onClose();
-            return true;
-        }
         return super.keyPressed(event);
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float d) {
-        extractTransparentBackground(g);
-
-        EzUi.panel(g, panelX, panelY, panelWidth, panelHeight);
-
-        // Header Title (Scaled up, crisp, vertically aligned)
-        g.pose().pushMatrix();
-        g.pose().translate(panelX + 14, panelY + 9);
-        g.pose().scale(1.15f, 1.15f);
-        g.text(font, EzUi.fitText(getTitle(), (int) ((panelWidth - 48) / 1.15f)), 0, 0, EzUi.TEXT_WHITE);
-        g.pose().popMatrix();
-
-        g.fill(panelX + 14, panelY + 28, panelX + panelWidth - 14, panelY + 29, EzUi.BORDER_SUBTLE);
-
-        // ── LEFT SIDE: Preview Box ──
-        int prevX = panelX + 12;
-        int prevY = panelY + 74;
-        int prevW = 124;
-        int previewButtonY = panelY + panelHeight - 44;
-        int prevH = Math.max(80, previewButtonY - prevY - 4);
-
-        EzUi.roundedRect(g, prevX, prevY, prevW, prevH, 6, 0x95080A0E);
-        // Checkerboard
-        int gridSize = 10;
-        for (int gy = prevY + 18; gy < prevY + prevH - 2; gy += gridSize) {
-            for (int gx = prevX + 2; gx < prevX + prevW - 2; gx += gridSize) {
-                if (((gx - prevX) / gridSize + (gy - prevY) / gridSize) % 2 == 0) {
-                    g.fill(gx, gy, Math.min(gx + gridSize, prevX + prevW - 2), Math.min(gy + gridSize, prevY + prevH - 2), 0x18FFFFFF);
-                }
-            }
+    protected boolean settingsMouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        if (isListeningForHotkey && event.button() != 0) {
+            EzKeyBindings.applyModuleKeyBind(module, -100 - event.button());
+            isListeningForHotkey = false;
+            rebuildWidgets();
+            return true;
         }
-        g.outline(prevX, prevY, prevW, prevH, EzUi.BORDER_SUBTLE);
-        g.text(font, app.ezclient.util.EzI18n.get("ezclient.hud_settings.preview"), prevX + 8, prevY + 6, EzUi.TEXT_MUTED);
-
-        // Render the real module editor path, centered without mutating saved X/Y.
-        g.enableScissor(prevX + 2, prevY + 18, prevX + prevW - 2, prevY + prevH - 2);
-        HudRenderer.drawCenteredPreview(
-                g, module,
-                prevX + prevW / 2,
-                prevY + 18 + (prevH - 20) / 2,
-                prevW - 16,
-                prevH - 28
-        );
-        g.disableScissor();
-
-        // ── RIGHT SIDE: Color Picker or Info Banner ──
-        if (isColorPickerVisible()) {
-            int step = 2;
-            for (int py = 0; py < svH; py += step) {
-                float v = 1.0f - ((float) py / (float) svH);
-                for (int px = 0; px < svW; px += step) {
-                    float s = (float) px / (float) svW;
-                    int col = 0xFF000000 | (Color.HSBtoRGB(currentHue, s, v) & 0xFFFFFF);
-                    g.fill(svX + px, svY + py, svX + px + step, svY + py + step, col);
-                }
-            }
-            g.outline(svX - 1, svY - 1, svW + 2, svH + 2, EzUi.BORDER_SUBTLE);
-
-            int cursorX = svX + (int) (currentSat * svW);
-            int cursorY = svY + (int) ((1.0f - currentVal) * svH);
-            g.outline(cursorX - 2, cursorY - 2, 5, 5, 0xFFFFFFFF);
-            g.outline(cursorX - 3, cursorY - 3, 7, 7, 0xFF000000);
-
-            // Hue Bar
-            for (int py = 0; py < hueH; py += 2) {
-                float h = (float) py / (float) hueH;
-                int col = 0xFF000000 | (Color.HSBtoRGB(h, 1.0f, 1.0f) & 0xFFFFFF);
-                g.fill(hueX, hueY + py, hueX + hueW, hueY + py + 2, col);
-            }
-            g.outline(hueX - 1, hueY - 1, hueW + 2, hueH + 2, EzUi.BORDER_SUBTLE);
-            int thumbY = hueY + (int) (currentHue * hueH);
-            g.fill(hueX - 1, thumbY - 1, hueX + hueW + 1, thumbY + 2, 0xFFFFFFFF);
-            g.outline(hueX - 2, thumbY - 2, hueW + 3, 4, 0xFF000000);
-
-            // Swatch & Hex
-            int activeColor = (activeColorSlot == 3)
-                    ? module.getBorderColor()
-                    : (activeColorSlot == 4)
-                        ? module.getBorderWaveColor2()
-                        : (activeColorSlot == 1)
-                            ? (module instanceof CrosshairModule crosshair ? crosshair.getSelectedRuleColor() : module.getTextColor())
-                            : module.getWaveColor2();
-            int swatchX = hueX + hueW + 6;
-            int swatchY = svY;
-            EzUi.roundedRect(g, swatchX, swatchY, 14, 13, 2, 0xFF35414D);
-            EzUi.roundedRect(g, swatchX + 1, swatchY + 1, 12, 11, 2, activeColor);
-            g.text(font, "#", swatchX + 16, swatchY + 3, EzUi.TEXT_MUTED);
-
-            // 3x3 Preset Palette
-            int presetGridX = hueX + hueW + 6;
-            int presetGridY = svY + 16;
-            for (int i = 0; i < 9; i++) {
-                int px = presetGridX + (i % 3) * 26;
-                int py = presetGridY + (i / 3) * 15;
-                EzUi.roundedRect(g, px, py, 23, 12, 2, PRESETS[i]);
-                if (selectedPresetIndex == i) {
-                    g.outline(px - 1, py - 1, 25, 14, 0xFFFFFFFF);
-                }
-            }
-        } else if ((activeColorSlot >= 3 && module.getBorderColorMode() == HudModule.ColorMode.RAINBOW) || (activeColorSlot < 3 && module.getColorMode() == HudModule.ColorMode.RAINBOW)) {
-            // Sleek Rainbow Mode Card
-            int rbX = svX;
-            int rbY = svY + 6;
-            int rbW = panelWidth - 150;
-            int rbH = 58;
-
-            EzUi.roundedRect(g, rbX, rbY, rbW, rbH, 6, 0xF50D111A);
-            g.outline(rbX, rbY, rbW, rbH, EzUi.BORDER_SUBTLE);
-
-            // Dynamic rainbow gradient bar
-            long now = System.currentTimeMillis();
-            for (int bx = 0; bx < rbW - 24; bx++) {
-                float hue = ((now % 3000L) / 3000.0f + (float) bx / (float) (rbW - 24)) % 1.0f;
-                int rgb = 0xFF000000 | (Color.HSBtoRGB(hue, 0.9f, 1.0f) & 0xFFFFFF);
-                g.fill(rbX + 12 + bx, rbY + 12, rbX + 13 + bx, rbY + 17, rgb);
-            }
-
-            g.centeredText(font, Component.literal("§e" + app.ezclient.util.EzI18n.get("ezclient.hud_settings.rainbow_active")), rbX + rbW / 2, rbY + 26, EzUi.TEXT_WHITE);
-            g.centeredText(font, Component.literal("§7" + app.ezclient.util.EzI18n.get("ezclient.hud_settings.rainbow_desc")), rbX + rbW / 2, rbY + 40, EzUi.TEXT_MUTED);
-        } else if (module instanceof PotionEffectModule potion && potion.isUseCustomColors()) {
-            // Sleek Vanilla Effect Colors Info Card
-            int infoX = svX;
-            int infoY = svY + 6;
-            int infoW = panelWidth - 150;
-            int infoH = 58;
-
-            EzUi.roundedRect(g, infoX, infoY, infoW, infoH, 6, 0xF50D111A);
-            g.outline(infoX, infoY, infoW, infoH, EzUi.BORDER_SUBTLE);
-
-            g.centeredText(font, Component.literal("§a" + app.ezclient.util.EzI18n.get("ezclient.hud_settings.vanilla_colors_title")), infoX + infoW / 2, infoY + 20, EzUi.TEXT_WHITE);
-            g.centeredText(font, Component.literal("§7" + app.ezclient.util.EzI18n.get("ezclient.hud_settings.vanilla_colors_desc")), infoX + infoW / 2, infoY + 36, EzUi.TEXT_MUTED);
-        }
-
-        super.extractRenderState(g, mx, my, d);
-
-        // Reset Dialog Modal
-        if (showResetConfirmation) {
-            g.fill(0, 0, width, height, 0xAA000000);
-            int diaW = 240, diaH = 84;
-            int diaX = (width - diaW) / 2, diaY = (height - diaH) / 2;
-
-            EzUi.roundedRect(g, diaX, diaY, diaW, diaH, 8, 0xF5131A26);
-            g.outline(diaX, diaY, diaW, diaH, 0xFF2A3644);
-            g.centeredText(font, app.ezclient.util.EzI18n.comp("ezclient.hud_settings.reset_modal_title"), diaX + diaW / 2, diaY + 12, 0xFFFFFFFF);
-            g.centeredText(font, app.ezclient.util.EzI18n.comp("ezclient.hud_settings.reset_modal_desc"), diaX + diaW / 2, diaY + 28, 0xFF94A3B8);
-
-            boolean hovYes = mx >= diaX + 14 && mx <= diaX + 114 && my >= diaY + 52 && my <= diaY + 72;
-            EzUi.roundedRect(g, diaX + 14, diaY + 52, 100, 20, 4, hovYes ? 0xFFDC2626 : 0xFFEF4444);
-            g.centeredText(font, app.ezclient.util.EzI18n.comp("ezclient.hud_settings.yes_reset"), diaX + 14 + 50, diaY + 58, 0xFFFFFFFF);
-
-            boolean hovNo = mx >= diaX + 126 && mx <= diaX + 226 && my >= diaY + 52 && my <= diaY + 72;
-            EzUi.roundedRect(g, diaX + 126, diaY + 52, 100, 20, 4, hovNo ? 0xFF475569 : 0xFF334155);
-            g.centeredText(font, app.ezclient.util.EzI18n.comp("ezclient.hud_settings.cancel"), diaX + 126 + 50, diaY + 58, 0xFFFFFFFF);
-        }
+        return super.settingsMouseClicked(event, doubleClick);
     }
 
-    @Override
-    public boolean isPauseScreen() {
-        return false;
+    private static final class CategoryHeader extends AbstractWidget {
+        public CategoryHeader(int x, int y, int width, int height, Component title) {
+            super(x, y, width, height, title);
+            this.active = false;
+        }
+
+        @Override
+        public void extractWidgetRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
+            var font = Minecraft.getInstance().font;
+            Component message = EzUi.fitText(getMessage(), getWidth());
+            g.text(font, message, getX(), getY() + (getHeight() - 8) / 2, EzUi.TEXT_MUTED);
+            int textW = font.width(message);
+            int lineStartX = getX() + textW + 6;
+            int lineEndX = getX() + getWidth();
+            if (lineStartX < lineEndX) {
+                int lineY = getY() + getHeight() / 2;
+                g.fill(lineStartX, lineY, lineEndX, lineY + 1, EzUi.BORDER_SUBTLE);
+            }
+        }
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput narration) {}
     }
 
-    @Override
-    public void onClose() {
-        if (minecraft != null) {
-            EzScreenBridge.set(minecraft, parent);
+    private static final class ColorSwatchButton extends AbstractButton {
+        private final int color;
+        private final Consumer<ColorSwatchButton> onClick;
+
+        public ColorSwatchButton(int x, int y, int width, int height, int color, Consumer<ColorSwatchButton> onClick) {
+            super(x, y, width, height, Component.empty());
+            this.color = color;
+            this.onClick = onClick;
         }
+
+        @Override
+        public void onPress(InputWithModifiers input) {
+            onClick.accept(this);
+        }
+
+        @Override
+        protected void extractContents(GuiGraphicsExtractor g, int mx, int my, float delta) {
+            EzUi.roundedRect(g, getX(), getY(), getWidth(), getHeight(), 3, 0xFF0D121D);
+            EzUi.roundedRect(g, getX() + 1, getY() + 1, getWidth() - 2, getHeight() - 2, 2, color);
+            EzUi.outline(g, getX(), getY(), getWidth(), getHeight(), isHovered() ? 0xFFFFFFFF : 0x40FFFFFF);
+        }
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput narration) {}
     }
 }

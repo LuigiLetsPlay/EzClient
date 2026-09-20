@@ -259,16 +259,18 @@ public final class PotionEffectModule extends HudModule {
         List<MobEffectInstance> effects = getSortedEffects(client, editor);
         if (effects.isEmpty() && !editor) return;
 
-        float scale = (float) getScale();
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(getX(), getY());
-        graphics.pose().scale(scale, scale);
-
         // Reuse the already collected effects. The old code constructed three
         // dummy effect instances again every frame just to calculate this box.
         EffectLayout layout = layoutFor(client, effects);
         int totalW = layout.width();
         int totalH = layout.height();
+        float scale = (float) getScale();
+        int renderX = getRenderX(client, totalW, editor);
+        int renderY = getRenderY(client, totalH, editor);
+
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(renderX, renderY);
+        graphics.pose().scale(scale, scale);
 
         if (displayStyle != DisplayStyle.ORIGINAL) {
             renderBackgroundAndBorder(graphics, 0, 0, totalW, totalH);

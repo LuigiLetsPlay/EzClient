@@ -23,7 +23,14 @@ public final class HudEditorScreen extends Screen {
     private static class ModuleSnapshot {
         final int x, y;
         final double scale;
-        ModuleSnapshot(int x, int y, double scale) { this.x = x; this.y = y; this.scale = scale; }
+        final HudModule.AnchorX anchorX;
+        final HudModule.AnchorY anchorY;
+        final int editorWidth, editorHeight;
+        ModuleSnapshot(int x, int y, double scale, HudModule.AnchorX anchorX, HudModule.AnchorY anchorY, int editorWidth, int editorHeight) {
+            this.x = x; this.y = y; this.scale = scale;
+            this.anchorX = anchorX; this.anchorY = anchorY;
+            this.editorWidth = editorWidth; this.editorHeight = editorHeight;
+        }
     }
 
     private final Screen parent;
@@ -56,7 +63,7 @@ public final class HudEditorScreen extends Screen {
     private int contextMenuX, contextMenuY;
     private HudModule contextModule;
 
-    private EzButton btnSave, btnResetAll, btnCancel;
+    private long lastReleaseTime = -1;
 
     public HudEditorScreen(Screen parent) {
         super(Component.literal("HUD Editor"));
@@ -68,22 +75,34 @@ public final class HudEditorScreen extends Screen {
         // Capture initial snapshot once on open
         if (initialModules.isEmpty()) {
             for (HudModule m : ModuleManager.getInstance().getHudModules()) {
-                initialModules.put(m, new ModuleSnapshot(m.getX(), m.getY(), m.getScale()));
+                initialModules.put(m, new ModuleSnapshot(m.getX(), m.getY(), m.getScale(),
+                        m.getAnchorX(), m.getAnchorY(), m.getEditorWidth(), m.getEditorHeight()));
             }
         }
+    }
 
-        // Bottom Action Toolbar (3 cohesive buttons)
-        int btnY = height - 26;
-        btnSave = new EzButton(width / 2 - 155, btnY, 100, 20, app.ezclient.util.EzI18n.comp("ezclient.hud_editor.save"), true, b -> saveAndClose());
-        btnResetAll = new EzButton(width / 2 - 50, btnY, 110, 20, app.ezclient.util.EzI18n.comp("ezclient.hud_editor.reset_all"), false, b -> showResetAllModal = true);
-        btnCancel = new EzButton(width / 2 + 65, btnY, 100, 20, app.ezclient.util.EzI18n.comp("ezclient.hud_editor.cancel"), false, b -> handleCloseRequest());
+    private float getDockAlpha() {
+        if (dragging || resizing) return 0.0f;
+        if (lastReleaseTime <= 0) return 1.0f;
+        long elapsed = System.currentTimeMillis() - lastReleaseTime;
+        if (elapsed < 3000L) return 0.0f;
+        long fade = elapsed - 3000L;
+        return Math.min(1.0f, fade / 400.0f);
+    }
 
-        addRenderableWidget(btnSave);
-        addRenderableWidget(btnResetAll);
-        addRenderableWidget(btnCancel);
+    private static int applyAlpha(int argb, float alpha) {
+        int a = (argb >>> 24);
+        int r = (argb >> 16) & 0xFF;
+        int g = (argb >> 8) & 0xFF;
+        int b = argb & 0xFF;
+        int newA = Math.max(0, Math.min(255, (int) (a * alpha)));
+        return (newA << 24) | (r << 16) | (g << 8) | b;
     }
 
     private void saveAndClose() {
+        for (HudModule m : ModuleManager.getInstance().getHudModules()) {
+            m.updateAnchor(width, height, m.getWidth(minecraft, true), m.getHeight(minecraft, true));
+        }
         ConfigManager.save();
         hasUnsavedChanges = false;
         EzScreenBridge.set(minecraft, parent);
@@ -91,8 +110,14 @@ public final class HudEditorScreen extends Screen {
 
     private void discardAndClose() {
         for (Map.Entry<HudModule, ModuleSnapshot> entry : initialModules.entrySet()) {
-            entry.getKey().setPosition(entry.getValue().x, entry.getValue().y);
-            entry.getKey().setScale(entry.getValue().scale);
+            HudModule m = entry.getKey();
+            ModuleSnapshot snap = entry.getValue();
+            m.setPosition(snap.x, snap.y);
+            m.setScale(snap.scale);
+            m.setAnchorX(snap.anchorX);
+            m.setAnchorY(snap.anchorY);
+            m.setEditorWidth(snap.editorWidth);
+            m.setEditorHeight(snap.editorHeight);
         }
         ConfigManager.save();
         hasUnsavedChanges = false;
@@ -210,13 +235,7 @@ public final class HudEditorScreen extends Screen {
                         // Settings item
                         showContextMenu = false;
                         if (contextModule != null) {
-                            if (contextModule instanceof KeystrokesModule ks) {
-                                EzScreenBridge.set(minecraft, new KeystrokesSettingsScreen(this, ks));
-                            } else if (contextModule instanceof FeatureModule feat) {
-                                EzScreenBridge.set(minecraft, new FeatureSettingsScreen(this, feat));
-                            } else {
-                                EzScreenBridge.set(minecraft, new HudSettingsScreen(this, contextModule));
-                            }
+                            EzScreenBridge.set(minecraft, EzHubScreen.createModuleSettingsScreen(this, contextModule));
                         }
                     } else if (relY < 44) {
                         // Toggle enabled/disabled item
@@ -242,6 +261,28 @@ public final class HudEditorScreen extends Screen {
             }
         }
 
+        // Minimal right-edge icon rail. The generous hit boxes stay easy to use,
+        // while only the glyphs are visible so the editor does not cover the HUD.
+        if (getDockAlpha() >= 0.5f && e.button() == 0) {
+            int dockW = 22, dockH = 66;
+            int dockX = width - dockW - 3;
+            int dockY = (height - dockH) / 2;
+            if (e.y() >= dockY && e.y() <= dockY + dockH) {
+                if (e.x() >= dockX && e.x() <= dockX + dockW && e.y() < dockY + 22) {
+                    saveAndClose();
+                    return true;
+                }
+                if (e.x() >= dockX && e.x() <= dockX + dockW && e.y() < dockY + 44) {
+                    showResetAllModal = true;
+                    return true;
+                }
+                if (e.x() >= dockX && e.x() <= dockX + dockW) {
+                    handleCloseRequest();
+                    return true;
+                }
+            }
+        }
+
         // ── Right Click -> Context Menu ──
         if (e.button() == 1) {
             HudModule mHit = hit(e.x(), e.y());
@@ -264,6 +305,7 @@ public final class HudEditorScreen extends Screen {
                 int sh = getModuleHeight(selected);
                 if (isResizeHandleHit(e.x(), e.y(), selected.getX(), selected.getY(), sw, sh)) {
                     resizing = true;
+                    lastReleaseTime = -1;
                     resizeStartX = e.x();
                     resizeStartY = e.y();
                     resizeStartWidth = selected.getWidth(minecraft);
@@ -279,12 +321,16 @@ public final class HudEditorScreen extends Screen {
                 offsetX = e.x() - selected.getX();
                 offsetY = e.y() - selected.getY();
                 dragging = true;
+                lastReleaseTime = -1;
                 hasUnsavedChanges = true;
                 return true;
             }
 
-            // Clicked background -> deselect (ignore clicks on the center bottom toolbar)
-            if (e.y() < height - 32 || e.x() < width / 2 - 165 || e.x() > width / 2 + 175) {
+            // Clicked background -> deselect (ignore clicks on the minimal dock)
+            int dockW = 22, dockH = 66;
+            int dockX = width - dockW - 3;
+            int dockY = (height - dockH) / 2;
+            if (e.y() < dockY || e.y() > dockY + dockH || e.x() < dockX || e.x() > dockX + dockW) {
                 selected = null;
             }
         }
@@ -295,6 +341,12 @@ public final class HudEditorScreen extends Screen {
     @Override
     public boolean mouseReleased(MouseButtonEvent e) {
         if (e.button() == 0) {
+            if (dragging || resizing) {
+                lastReleaseTime = System.currentTimeMillis();
+                if (selected != null) {
+                    selected.updateAnchor(width, height, selected.getWidth(minecraft, true), selected.getHeight(minecraft, true));
+                }
+            }
             dragging = false;
             resizing = false;
             guideX = -1;
@@ -378,8 +430,6 @@ public final class HudEditorScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float d) {
-        extractTransparentBackground(g);
-
         boolean isInteracting = dragging || resizing;
 
         // ── 1. Render Snapping Guides ──
@@ -447,6 +497,37 @@ public final class HudEditorScreen extends Screen {
 
         super.extractRenderState(g, mx, my, d);
 
+        // Background-free right-edge icons (Save, Reset, Close).
+        float dockAlpha = getDockAlpha();
+        if (dockAlpha > 0.01f) {
+            int dockW = 22, dockH = 66;
+            int dockX = width - dockW - 3;
+            int dockY = (height - dockH) / 2;
+            int centerX = dockX + dockW / 2;
+
+            boolean hovSave = mx >= dockX && mx <= dockX + dockW && my >= dockY && my < dockY + 22;
+            boolean hovReset = mx >= dockX && mx <= dockX + dockW && my >= dockY + 22 && my < dockY + 44;
+            boolean hovCancel = mx >= dockX && mx <= dockX + dockW && my >= dockY + 44 && my <= dockY + dockH;
+
+            g.centeredText(font, Component.literal("\u2713"), centerX, dockY + 7,
+                    applyAlpha(hovSave ? 0xFFFFFFFF : 0xFF2DD47A, dockAlpha));
+            g.centeredText(font, Component.literal("\u21BA"), centerX, dockY + 29,
+                    applyAlpha(hovReset ? 0xFFFFD166 : 0xFFA8B3C2, dockAlpha));
+            g.centeredText(font, Component.literal("\u00D7"), centerX, dockY + 51,
+                    applyAlpha(hovCancel ? 0xFFFFFFFF : 0xFFFF6B6B, dockAlpha));
+
+            // Tooltips on hover
+            if (dockAlpha >= 0.8f) {
+                if (hovSave) {
+                    renderDockTooltip(g, app.ezclient.util.EzI18n.get("ezclient.hud_editor.save"), dockX - 4, dockY + 5);
+                } else if (hovReset) {
+                    renderDockTooltip(g, app.ezclient.util.EzI18n.get("ezclient.hud_editor.reset_all"), dockX - 4, dockY + 27);
+                } else if (hovCancel) {
+                    renderDockTooltip(g, app.ezclient.util.EzI18n.get("ezclient.hud_editor.cancel"), dockX - 4, dockY + 49);
+                }
+            }
+        }
+
         // ── 5. Render Modals ──
         if (showUnsavedModal) {
             g.fill(0, 0, width, height, 0xAA000000);
@@ -512,6 +593,15 @@ public final class HudEditorScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    private void renderDockTooltip(GuiGraphicsExtractor g, String text, int rightX, int y) {
+        int tw = font.width(text);
+        int pad = 5;
+        int bx = rightX - tw - pad * 2;
+        EzUi.roundedRect(g, bx, y - 2, tw + pad * 2, 13, 3, 0xF0121722);
+        g.outline(bx, y - 2, tw + pad * 2, 13, 0xFF2A3644);
+        g.centeredText(font, Component.literal(text), bx + (tw + pad * 2) / 2, y, 0xFFFFFFFF);
     }
 
     @Override

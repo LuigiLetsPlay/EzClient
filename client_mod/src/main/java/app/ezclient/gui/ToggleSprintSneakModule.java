@@ -210,7 +210,7 @@ public final class ToggleSprintSneakModule extends HudModule {
 
     @Override
     public String displayText(Minecraft client, boolean editor) {
-        if (editor) {
+        if (editor && (client == null || client.player == null)) {
             String text = getPrefix() + customSprintingText + getSuffix();
             return text.trim().isEmpty() ? "[Sprinting (Toggled)]" : text;
         }
@@ -222,19 +222,23 @@ public final class ToggleSprintSneakModule extends HudModule {
             return;
         }
 
-        float scale = (float) getScale();
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(getX(), getY());
-        graphics.pose().scale(scale, scale);
-
         String text = displayText(client, editor);
 
         int totalW = (client != null && client.font != null) ? client.font.width(text) + CONTENT_PADDING_X * 2 : 80;
         int totalH = getHeight(client);
+        float scale = (float) getScale();
+        int renderX = getRenderX(client, totalW, editor);
+        int renderY = getRenderY(client, totalH, editor);
+
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(renderX, renderY);
+        graphics.pose().scale(scale, scale);
 
         renderBackgroundAndBorder(graphics, 0, 0, totalW, totalH);
 
-        graphics.text(client.font, text, CONTENT_PADDING_X, CONTENT_PADDING_Y, color());
+        int tw = client.font.width(text);
+        int lineX = Math.max(CONTENT_PADDING_X, (totalW - tw) / 2);
+        graphics.text(client.font, text, lineX, CONTENT_PADDING_Y, color());
         graphics.pose().popMatrix();
     }
 }

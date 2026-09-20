@@ -109,18 +109,18 @@ public final class CoordinatesModule extends HudModule {
         }
 
         int maxW = client.font.width(displayText(client, editor));
-        double px = (client.player != null && !editor) ? client.player.getX() : 120;
-        double py = (client.player != null && !editor) ? client.player.getY() : 64;
-        double pz = (client.player != null && !editor) ? client.player.getZ() : -350;
+        double px = (client.player != null) ? client.player.getX() : 120;
+        double py = (client.player != null) ? client.player.getY() : 64;
+        double pz = (client.player != null) ? client.player.getZ() : -350;
 
         if (layoutMode == LayoutMode.MULTI_LINE) {
             maxW = Math.max(maxW, client.font.width("X: " + formatCoord(px)));
             maxW = Math.max(maxW, client.font.width("Y: " + formatCoord(py)));
             maxW = Math.max(maxW, client.font.width("Z: " + formatCoord(pz)));
         }
-        String direction = editor ? app.ezclient.util.EzI18n.get("ezclient.direction.north") + " (-Z)" : getDirectionString(client);
-        String biome = editor ? net.minecraft.network.chat.Component.translatable("biome.minecraft.plains").getString() : getBiomeString(client);
-        String nether = editor ? "15 / -43" : getNetherCoordsString(client);
+        String direction = (client.player != null) ? getDirectionString(client) : app.ezclient.util.EzI18n.get("ezclient.direction.north") + " (-Z)";
+        String biome = (client.player != null) ? getBiomeString(client) : net.minecraft.network.chat.Component.translatable("biome.minecraft.plains").getString();
+        String nether = (client.player != null) ? getNetherCoordsString(client) : "15 / -43";
         if (showDirection) maxW = Math.max(maxW, client.font.width(directionLabel() + direction));
         if (showBiome) maxW = Math.max(maxW, client.font.width(biomeLabel() + biome));
         if (showNether) maxW = Math.max(maxW, client.font.width(netherLabel() + nether));
@@ -130,7 +130,7 @@ public final class CoordinatesModule extends HudModule {
 
     @Override
     public String displayText(Minecraft client, boolean editor) {
-        if (!editor) return displayText(client);
+        if (!editor || (client != null && client.player != null)) return displayText(client);
         return getPrefix() + formatCoord(120) + " / " + formatCoord(64) + " / " + formatCoord(-350) + getSuffix();
     }
 
@@ -187,13 +187,15 @@ public final class CoordinatesModule extends HudModule {
     }
 
     public void renderCustom(GuiGraphicsExtractor graphics, Minecraft client, boolean editor) {
-        float scale = (float) getScale();
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(getX(), getY());
-        graphics.pose().scale(scale, scale);
-
         int totalW = getWidth(client, editor);
         int totalH = getHeight(client, editor);
+        float scale = (float) getScale();
+        int renderX = getRenderX(client, totalW, editor);
+        int renderY = getRenderY(client, totalH, editor);
+
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(renderX, renderY);
+        graphics.pose().scale(scale, scale);
 
         renderBackgroundAndBorder(graphics, 0, 0, totalW, totalH);
 
@@ -209,54 +211,69 @@ public final class CoordinatesModule extends HudModule {
         int y = CONTENT_PADDING_Y;
 
         if (layoutMode == LayoutMode.MULTI_LINE) {
-            double px = (client.player != null && !editor) ? client.player.getX() : 120;
-            double py = (client.player != null && !editor) ? client.player.getY() : 64;
-            double pz = (client.player != null && !editor) ? client.player.getZ() : -350;
+            double px = (client.player != null) ? client.player.getX() : 120;
+            double py = (client.player != null) ? client.player.getY() : 64;
+            double pz = (client.player != null) ? client.player.getZ() : -350;
 
-            graphics.text(client.font, "X: ", CONTENT_PADDING_X, y, lblCol);
-            graphics.text(client.font, formatCoord(px), CONTENT_PADDING_X + client.font.width("X: "), y, valCol);
+            int lwX = client.font.width("X: " + formatCoord(px));
+            int lineX1 = Math.max(CONTENT_PADDING_X, (totalW - lwX) / 2);
+            graphics.text(client.font, "X: ", lineX1, y, lblCol);
+            graphics.text(client.font, formatCoord(px), lineX1 + client.font.width("X: "), y, valCol);
             y += 11;
 
-            graphics.text(client.font, "Y: ", CONTENT_PADDING_X, y, lblCol);
-            graphics.text(client.font, formatCoord(py), CONTENT_PADDING_X + client.font.width("Y: "), y, valCol);
+            int lwY = client.font.width("Y: " + formatCoord(py));
+            int lineX2 = Math.max(CONTENT_PADDING_X, (totalW - lwY) / 2);
+            graphics.text(client.font, "Y: ", lineX2, y, lblCol);
+            graphics.text(client.font, formatCoord(py), lineX2 + client.font.width("Y: "), y, valCol);
             y += 11;
 
-            graphics.text(client.font, "Z: ", CONTENT_PADDING_X, y, lblCol);
-            graphics.text(client.font, formatCoord(pz), CONTENT_PADDING_X + client.font.width("Z: "), y, valCol);
+            int lwZ = client.font.width("Z: " + formatCoord(pz));
+            int lineX3 = Math.max(CONTENT_PADDING_X, (totalW - lwZ) / 2);
+            graphics.text(client.font, "Z: ", lineX3, y, lblCol);
+            graphics.text(client.font, formatCoord(pz), lineX3 + client.font.width("Z: "), y, valCol);
             y += 11;
         } else {
-            graphics.text(client.font, displayText(client, editor), CONTENT_PADDING_X, y, valCol);
+            String single = displayText(client, editor);
+            int lw = client.font.width(single);
+            int lineX = Math.max(CONTENT_PADDING_X, (totalW - lw) / 2);
+            graphics.text(client.font, single, lineX, y, valCol);
             y += 11;
         }
 
         if (showDirection) {
-            String dirStr = editor ? app.ezclient.util.EzI18n.get("ezclient.direction.north") + " (-Z)" : getDirectionString(client);
+            String dirStr = (client.player != null) ? getDirectionString(client) : app.ezclient.util.EzI18n.get("ezclient.direction.north") + " (-Z)";
             String label = directionLabel();
-            graphics.text(client.font, label, CONTENT_PADDING_X, y, lblCol);
-            graphics.text(client.font, dirStr, CONTENT_PADDING_X + client.font.width(label), y, 0xFFE0E0E0);
+            int lw = client.font.width(label + dirStr);
+            int lineX = Math.max(CONTENT_PADDING_X, (totalW - lw) / 2);
+            graphics.text(client.font, label, lineX, y, lblCol);
+            graphics.text(client.font, dirStr, lineX + client.font.width(label), y, 0xFFE0E0E0);
             y += 11;
         }
 
         if (showBiome) {
-            String biomeStr = editor ? net.minecraft.network.chat.Component.translatable("biome.minecraft.plains").getString() : getBiomeString(client);
+            String biomeStr = (client.player != null) ? getBiomeString(client) : net.minecraft.network.chat.Component.translatable("biome.minecraft.plains").getString();
             String label = biomeLabel();
-            graphics.text(client.font, label, CONTENT_PADDING_X, y, lblCol);
-            graphics.text(client.font, biomeStr, CONTENT_PADDING_X + client.font.width(label), y, 0xFF43DD8C);
+            int lw = client.font.width(label + biomeStr);
+            int lineX = Math.max(CONTENT_PADDING_X, (totalW - lw) / 2);
+            graphics.text(client.font, label, lineX, y, lblCol);
+            graphics.text(client.font, biomeStr, lineX + client.font.width(label), y, 0xFF43DD8C);
             y += 11;
         }
 
         if (showNether) {
-            String netherStr = editor ? "15 / -43" : getNetherCoordsString(client);
+            String netherStr = (client.player != null) ? getNetherCoordsString(client) : "15 / -43";
             String label = netherLabel();
-            graphics.text(client.font, label, CONTENT_PADDING_X, y, lblCol);
-            graphics.text(client.font, netherStr, CONTENT_PADDING_X + client.font.width(label), y, 0xFFFF7744);
+            int lw = client.font.width(label + netherStr);
+            int lineX = Math.max(CONTENT_PADDING_X, (totalW - lw) / 2);
+            graphics.text(client.font, label, lineX, y, lblCol);
+            graphics.text(client.font, netherStr, lineX + client.font.width(label), y, 0xFFFF7744);
         }
 
         graphics.pose().popMatrix();
     }
 
     private void renderCompassBar(GuiGraphicsExtractor g, Minecraft client, int w, int h, int color, boolean editor) {
-        float yaw = (client.player != null && !editor) ? client.player.getYRot() : 0.0f;
+        float yaw = (client != null && client.player != null) ? client.player.getYRot() : 0.0f;
         yaw = (yaw % 360.0f + 360.0f) % 360.0f;
 
         int centerX = w / 2;

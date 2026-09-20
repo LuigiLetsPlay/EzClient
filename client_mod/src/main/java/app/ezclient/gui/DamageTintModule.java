@@ -33,11 +33,11 @@ public final class DamageTintModule extends FeatureModule {
 
     public DamageTintModule() {
         super("Damage Tint", false, 0);
-        option("Allgemein", "scope", "Ziel", "Wählt die Ziele für den Schadenstreffer-Effekt.",
+        colorOption("Schadensfarbe / Flash", "color", "Schadensfarbe", "Farbe und Transparenz des Schadensblitzes.", "B4FF2255");
+        flag("Schadensfarbe / Flash", "chroma", "Chroma-Modus", "Animiert die Schadensfarbe im Regenbogen-Verlauf.", false);
+        option("Schadensfarbe / Flash", "flashDuration", "Flash-Dauer", "Multiplikator für die Dauer des Schadensblitzes.", 1.0, 0.5, 2.0);
+        option("Zielbereich", "scope", "Ziele", "Wählt die Ziele für den Schadenstreffer-Effekt.",
                 "All Entities", 0, 0, "All Entities", "Players Only", "Self Only", "None");
-        colorOption("Farbe", "color", "Schadensfarbe", "Farbe und Transparenz des Schadensblitzes.", "B4FF2255");
-        flag("Farbe", "chroma", "Chroma-Modus", "Animiert die Schadensfarbe im Regenbogen-Verlauf.", false);
-        option("Darstellung", "flashDuration", "Flash-Dauer", "Multiplikator für die Dauer des Schadensblitzes.", 1.0, 0.5, 2.0);
     }
 
     @Override

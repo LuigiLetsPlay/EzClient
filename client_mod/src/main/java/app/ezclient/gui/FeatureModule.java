@@ -135,17 +135,8 @@ public abstract class FeatureModule extends HudModule {
         for (Option option : options) values.put(option.key(), option.initial());
         if (!ConfigManager.isLoading()) ConfigManager.save();
     }
-    public boolean hasHud() { return hud; }
-    @Override public boolean hasPreview() {
-        return this instanceof HitboxModule
-                || this instanceof ItemPhysicsModule
-                || this instanceof TimeWeatherModule
-                || this instanceof ParticleCustomizerModule
-                || this instanceof BlockOverlayModule
-                || this instanceof BossBarModule
-                || this instanceof BedwarsModule
-                || this instanceof SoundEnhancerModule;
-    }
+    @Override public boolean hasHud() { return hud; }
+    @Override public boolean hasPreview() { return hasHud(); }
     @Override protected String value(Minecraft client) { return ""; }
     public List<String> lines(Minecraft client, boolean editor) { return List.of(getName()); }
     @Override public int getHeight(Minecraft client) { return getHeight(client, false); }
@@ -168,16 +159,19 @@ public abstract class FeatureModule extends HudModule {
         int height = rows.size() * 12 + padY * 2;
         float scale = (float) getScale();
 
-        int screenW = client.getWindow().getGuiScaledWidth();
-        int screenH = client.getWindow().getGuiScaledHeight();
-        int renderX = editor ? getX() : Math.max(0, Math.min(screenW - (int) Math.ceil(width * scale), getX()));
-        int renderY = editor ? getY() : Math.max(0, Math.min(screenH - (int) Math.ceil(height * scale), getY()));
+        int renderX = getRenderX(client, width, editor);
+        int renderY = getRenderY(client, height, editor);
 
         graphics.pose().pushMatrix();
         graphics.pose().translate(renderX, renderY);
         graphics.pose().scale(scale, scale);
         renderBackgroundAndBorder(graphics, 0, 0, width, height);
-        for (int i = 0; i < rows.size(); i++) graphics.text(client.font, styledText(rows.get(i)), padX, padY + i * 12, color(), isTextShadow());
+        for (int i = 0; i < rows.size(); i++) {
+            net.minecraft.network.chat.Component comp = styledText(rows.get(i));
+            int textW = client.font.width(comp);
+            int lineX = Math.max(padX, (width - textW) / 2);
+            graphics.text(client.font, comp, lineX, padY + i * 12, color(), isTextShadow());
+        }
         graphics.pose().popMatrix();
     }
     public static <T extends FeatureModule> T get(Class<T> type) {
