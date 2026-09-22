@@ -1,4 +1,4 @@
-"""Build the complete EzClient 2.2.1 Windows release."""
+"""Build the complete EzClient 2.2.2 Windows release."""
 import subprocess
 import sys
 from pathlib import Path

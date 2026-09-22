@@ -2309,10 +2309,10 @@ class ProfileController(QObject):
                 # Official launcher fallback
                 self._live_log_service.append_system_message("Patching Launcher-Profil…", instance_id=instance_id)
                 _safe_emit_status("Patching Launcher-Profil…", False)
-                patch_launcher_profile(profile, mc)
+                patch_launcher_profile(profile)
                 self._live_log_service.append_system_message("Starte offiziellen Launcher…", instance_id=instance_id)
                 _safe_emit_status("Starte offiziellen Launcher…", False)
-                exit_code = launch_minecraft_official(profile, mc)
+                exit_code = launch_minecraft_official(status_callback=lambda msg: _safe_emit_status(msg, False))
                 self._is_launching = False
                 _safe_emit_status("Launcher gestartet", False)
                 if self.minimizeToTray:

@@ -86,7 +86,7 @@ def patch_profile_file(path: Path, profile: ProfileData, version_id: str) -> Non
     data["settings"] = settings
     write_json(path, data)
 
-def patch_launcher_profile(profile: ProfileData) -> None:
+def patch_launcher_profile(profile: ProfileData, mc: Path | None = None) -> None:
     from backend.services.store import preseed_optimized_profile_settings
     preseed_optimized_profile_settings(profile.path)
     version_id = fabric_version(profile.minecraft_version)
@@ -133,7 +133,7 @@ def launcher_install_exit_code() -> int | None:
     return _launcher_install_process.poll() if _launcher_install_process else None
 
 
-def launch_minecraft_official(status_callback: Callable[[str], None] | None = None) -> bool:
+def launch_minecraft_official(*args, status_callback: Callable[[str], None] | None = None, **kwargs) -> bool:
     """Start the official launcher, or bootstrap it on a fresh Windows PC.
 
     Returns ``True`` when the launcher was started immediately and ``False``

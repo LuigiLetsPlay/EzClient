@@ -24,7 +24,7 @@ Item {
 
     // Filter status state: "all", "enabled", "disabled", "performance"
     property string filterStatus: "all"
-    property bool showCoreMods: false
+    property bool showCoreMods: true
     readonly property bool hasUpdates: profileController && profileController.hasModUpdates
 
     // Background click handler to deselect / defocus search input
@@ -836,7 +836,8 @@ Item {
                         if (isEzClient) return false
                         var s = (model.slug || "").toLowerCase()
                         var pid = (model.projectId || "").toLowerCase()
-                        return Boolean(window.integratedMods && (window.integratedMods.indexOf(s) !== -1 || window.integratedMods.indexOf(pid) !== -1))
+                        var list = (typeof window !== "undefined" && window && window.integratedMods) ? window.integratedMods : ((typeof profileController !== "undefined" && profileController && profileController.integratedMods) ? profileController.integratedMods : [])
+                        return Boolean(list && (list.indexOf(s) !== -1 || list.indexOf(pid) !== -1))
                     }
                     readonly property bool matchesSearch: modSearch.text === "" ||
                         (model.name && model.name.toLowerCase().indexOf(modSearch.text.toLowerCase()) !== -1) ||
