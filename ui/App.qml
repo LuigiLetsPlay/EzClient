@@ -333,6 +333,15 @@ ApplicationWindow {
             toastBanner.opacity = 1.0
             toastTimer.restart()
         }
+        function onRequireLoginRequested() {
+            window.show()
+            window.showNormal()
+            window.raise()
+            window.requestActivate()
+            if (typeof accountController !== "undefined" && accountController) {
+                accountController.openLoginDialog()
+            }
+        }
         function onLaunchStatusChanged(statusText, isError) {
             if (!isError) {
                 var isPrep = statusText.indexOf("Vorbereitung") >= 0 ||

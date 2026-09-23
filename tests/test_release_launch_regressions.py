@@ -82,6 +82,47 @@ class ReleaseLaunchTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 _download_assets_parallel(self.root, [{"hash": "a" * 40, "size": 4}], lambda _: None)
 
+    def test_direct_launch_ready_on_clean_disk_with_active_profile(self):
+        from backend.controllers.profile_controller import ProfileController
+        from backend.services.store import ProfileStore
+        from backend.models.profile_model import ProfileModel
+        from backend.models.mod_model import ModModel
+        store = ProfileStore()
+        ctl = ProfileController(store, ProfileModel(), ModModel())
+        pid = ctl.createProfile("Test Regression Profile", "26.2", "Fabric", "ezclient", "grass")
+        try:
+            ctl.selectProfile(pid)
+            self.assertTrue(ctl.isDirectLaunchReady)
+            self.assertEqual("Direktstart", ctl.launchModeName)
+        finally:
+            ctl.deleteProfile(pid)
+
+    def test_offline_launch_emits_require_login_requested_without_official_launcher(self):
+        from backend.controllers.profile_controller import ProfileController
+        from backend.services.store import ProfileStore
+        from backend.models.profile_model import ProfileModel
+        from backend.models.mod_model import ModModel
+        from backend.services.msa_auth import MinecraftSession
+        store = ProfileStore()
+        ctl = ProfileController(store, ProfileModel(), ModModel())
+        pid = ctl.createProfile("Test Offline Launch", "26.2", "Fabric", "ezclient", "grass")
+        try:
+            ctl.selectProfile(pid)
+            login_requested = []
+            ctl.requireLoginRequested.connect(lambda: login_requested.append(True))
+
+            with patch("backend.services.msa_auth.get_minecraft_session", return_value=MinecraftSession("Player", "", "", "", False)), \
+                 patch("backend.services.minecraft.launch_minecraft_official") as mock_official:
+                ctl.launchActiveProfile()
+                import time
+                time.sleep(0.2)
+
+            self.assertTrue(len(login_requested) > 0)
+            mock_official.assert_not_called()
+        finally:
+            ctl.deleteProfile(pid)
+
 
 if __name__ == "__main__":
     unittest.main()
+

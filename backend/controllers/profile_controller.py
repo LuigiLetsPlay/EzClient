@@ -41,6 +41,7 @@ class ProfileController(QObject):
     settingSaved = Signal(str)
     hideToTrayRequested = Signal()
     restoreFromTrayRequested = Signal()
+    requireLoginRequested = Signal()
     onboardingStepProgress = Signal(float, str, str)
     onboardingFinished = Signal(str)
     
@@ -1167,20 +1168,11 @@ class ProfileController(QObject):
 
     @Property(bool, notify=activeProfileChanged)
     def isDirectLaunchReady(self) -> bool:
-        if not self._active_profile:
-            return False
-        from backend.services.direct_launch import find_version_meta
-        mc = minecraft_dir()
-        if not mc.exists():
-            return False
-        fabric_path, fabric_data, vanilla_path, vanilla_data = find_version_meta(
-            mc, self._active_profile.minecraft_version, self._active_profile.loader
-        )
-        return bool(fabric_data or vanilla_data)
+        return bool(self._active_profile)
 
     @Property(str, notify=activeProfileChanged)
     def launchModeName(self) -> str:
-        return "Direktstart" if self.isDirectLaunchReady else "Launcher"
+        return "Direktstart"
 
     @Property(str, notify=activeProfileChanged)
     def activeLoader(self) -> str:
@@ -2221,6 +2213,16 @@ class ProfileController(QObject):
             self.launchStatusChanged.emit("Kein Profil ausgewählt!", True)
             return
 
+        from backend.services.msa_auth import get_minecraft_session
+        session = get_minecraft_session()
+        if not session or not session.is_online:
+            self.launchStatusChanged.emit("Microsoft-Anmeldung erforderlich", True)
+            try:
+                self.requireLoginRequested.emit()
+            except RuntimeError:
+                pass
+            return
+
         self._is_launching = True
         profile = self._active_profile
 
@@ -2262,6 +2264,24 @@ class ProfileController(QObject):
                     pass
 
             try:
+                # 1. Require Microsoft account in EzClient
+                from backend.services.msa_auth import get_minecraft_session
+                session = get_minecraft_session()
+                if not session or not session.is_online:
+                    self._is_launching = False
+                    self._live_log_service.append_system_message(
+                        "Microsoft-Anmeldung erforderlich. Bitte melde dich mit deinem Minecraft-Konto in EzClient an.",
+                        "WARN",
+                        instance_id=instance_id,
+                    )
+                    self._live_log_service.detach_process(instance_id)
+                    _safe_emit_status("Microsoft-Anmeldung erforderlich", True)
+                    try:
+                        self.requireLoginRequested.emit()
+                    except RuntimeError:
+                        pass
+                    return
+
                 from backend.services.minecraft import minecraft_dir
                 mc = minecraft_dir()
 
@@ -2273,53 +2293,35 @@ class ProfileController(QObject):
                 _safe_emit_status("Synchronisiere Mods & Assets…", False)
                 sync_profile_mods(profile, status_callback=_sync_status)
 
-                # Prefer direct launch
-                direct_launch = self.preferDirectLaunch and self.isDirectLaunchReady
-                if direct_launch:
-                    def _direct_status(message: str) -> None:
-                        self._live_log_service.append_system_message(message, instance_id=instance_id)
-                        _safe_emit_status(message, False)
+                def _direct_status(message: str) -> None:
+                    self._live_log_service.append_system_message(message, instance_id=instance_id)
+                    _safe_emit_status(message, False)
 
-                    _safe_emit_status("Starte Minecraft direkt…", False)
-                    if server_ip:
-                        proc = launch_minecraft_direct(profile, _direct_status, log_file, server_ip=server_ip)
-                    else:
-                        proc = launch_minecraft_direct(profile, _direct_status, log_file)
-                    if not proc:
-                        self._live_log_service.append_system_message(
-                            "Minecraft wurde nicht gestartet. Prüfe die obigen Meldungen.",
-                            "ERROR", instance_id,
-                        )
-                        self._live_log_service.detach_process(instance_id)
-                        raise RuntimeError("Minecraft konnte nicht gestartet werden. Details stehen in den Live-Logs.")
-                    self._live_log_service.attach_process(
-                        proc, log_file, profile.name,
-                        f"{profile.loader} {profile.minecraft_version}", "Player",
-                        str(profile.path), instance_id,
+                _safe_emit_status("Starte Minecraft direkt…", False)
+                if server_ip:
+                    proc = launch_minecraft_direct(profile, _direct_status, log_file, server_ip=server_ip)
+                else:
+                    proc = launch_minecraft_direct(profile, _direct_status, log_file)
+                if not proc:
+                    self._live_log_service.append_system_message(
+                        "Minecraft wurde nicht gestartet. Prüfe die obigen Meldungen.",
+                        "ERROR", instance_id,
                     )
-                    self._is_launching = False
-                    _safe_emit_status("Minecraft läuft!", False)
-                    if self.minimizeToTray:
-                        try:
-                            self.hideToTrayRequested.emit()
-                        except RuntimeError:
-                            pass
-                    return
-
-                # Official launcher fallback
-                self._live_log_service.append_system_message("Patching Launcher-Profil…", instance_id=instance_id)
-                _safe_emit_status("Patching Launcher-Profil…", False)
-                patch_launcher_profile(profile)
-                self._live_log_service.append_system_message("Starte offiziellen Launcher…", instance_id=instance_id)
-                _safe_emit_status("Starte offiziellen Launcher…", False)
-                exit_code = launch_minecraft_official(status_callback=lambda msg: _safe_emit_status(msg, False))
+                    self._live_log_service.detach_process(instance_id)
+                    raise RuntimeError("Minecraft konnte nicht gestartet werden. Details stehen in den Live-Logs.")
+                self._live_log_service.attach_process(
+                    proc, log_file, profile.name,
+                    f"{profile.loader} {profile.minecraft_version}", session.username or "Player",
+                    str(profile.path), instance_id,
+                )
                 self._is_launching = False
-                _safe_emit_status("Launcher gestartet", False)
+                _safe_emit_status("Minecraft läuft!", False)
                 if self.minimizeToTray:
                     try:
                         self.hideToTrayRequested.emit()
                     except RuntimeError:
                         pass
+                return
             except Exception as e:
                 self._is_launching = False
                 print(f"[ProfileController] Launch error: {e}")

@@ -103,6 +103,70 @@ class TestServerPinger(unittest.TestCase):
         self.assertEqual(res["motd"], "Welcome to EzServer")
         self.assertTrue(res["favicon"].startswith("data:image/png;base64,"))
 
+    def test_extract_chat_component_text(self):
+        from backend.services.server_pinger import extract_chat_component_text
+        # Simple string
+        self.assertEqual(extract_chat_component_text("Hello World"), "Hello World")
+        # Dict with extra
+        comp = {
+            "text": "Welcome to ",
+            "extra": [
+                {"text": "EzNetwork", "color": "gold"},
+                {"text": " [1.21.x]", "color": "gray"}
+            ]
+        }
+        self.assertEqual(extract_chat_component_text(comp), "Welcome to EzNetwork [1.21.x]")
+        # Nested list
+        nested = [
+            {"text": "Line 1\n"},
+            {"extra": [{"text": "Line 2"}]}
+        ]
+        self.assertEqual(extract_chat_component_text(nested), "Line 1\nLine 2")
+
+    @patch("socket.create_connection")
+    def test_ping_complex_motd_and_sample(self, mock_create):
+        fake_response = {
+            "players": {
+                "max": "100",
+                "online": "12",
+                "sample": [
+                    {"name": {"text": "§bVIP_", "extra": [{"text": "Steve"}]}, "id": "1"}
+                ]
+            },
+            "description": {
+                "text": "§aEzServer ",
+                "extra": [
+                    {"text": "§eSurvival ", "bold": True},
+                    {"text": "§7| §cPvP"}
+                ]
+            }
+        }
+        json_bytes = json.dumps(fake_response).encode("utf-8")
+        mock_socket = MagicMock()
+        encoded_json_len = encode_varint(len(json_bytes))
+        resp_data = b"\x00" + encoded_json_len + json_bytes
+        encoded_resp_len = encode_varint(len(resp_data))
+        varint_bytes = list(encoded_resp_len) + [0] + list(encoded_json_len)
+        varint_idx = [0]
+
+        def fake_recv(n):
+            if varint_idx[0] < len(varint_bytes):
+                b = bytes([varint_bytes[varint_idx[0]]])
+                varint_idx[0] += 1
+                return b
+            return json_bytes
+
+        mock_socket.recv.side_effect = fake_recv
+        mock_create.return_value = mock_socket
+
+        res = ping_minecraft_server("play.hypixel.net", timeout=1.0)
+        self.assertTrue(res["online"])
+        self.assertEqual(res["players_online"], 12)
+        self.assertEqual(res["players_max"], 100)
+        self.assertEqual(res["motd"], "EzServer Survival | PvP")
+        self.assertEqual(res["player_sample"], ["VIP_Steve"])
+
 
 if __name__ == "__main__":
     unittest.main()
+

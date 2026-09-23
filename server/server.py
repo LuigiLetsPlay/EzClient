@@ -841,7 +841,7 @@ class CapeHandler(BaseHTTPRequestHandler):
             with STATE_LOCK:
                 PRESENCE[player_id] = (time.monotonic(), username, client, clean_text(str(payload.get("version", "")), 32))
             broadcast({"type": "presence", "uuid": player_id, "client": client, "version": clean_text(str(payload.get("version", "")), 32)})
-            self.send_json(HTTPStatus.OK, {"ok": True, "expires_in": PRESENCE_TTL_SECONDS, "version": "2.2.2"})
+            self.send_json(HTTPStatus.OK, {"ok": True, "expires_in": PRESENCE_TTL_SECONDS, "version": "2.2.3"})
         except (ValueError, json.JSONDecodeError):
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Ungültige Präsenz"})
 

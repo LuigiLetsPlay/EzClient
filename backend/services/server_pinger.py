@@ -66,10 +66,25 @@ def resolve_minecraft_srv(address: str, default_port: int = 25565) -> Tuple[str,
     if re.match(r"^\d+\.\d+\.\d+\.\d+$", host) or host.lower() in ("localhost", "127.0.0.1"):
         return host, default_port
 
-    # Query SRV via Windows nslookup
+    # Query SRV via Windows nslookup without flashing console windows
     try:
         cmd = ["nslookup", "-type=SRV", f"_minecraft._tcp.{host}"]
-        out = subprocess.check_output(cmd, text=True, timeout=1.5, stderr=subprocess.DEVNULL)
+        creationflags = 0
+        startupinfo = None
+        if hasattr(subprocess, "CREATE_NO_WINDOW"):
+            creationflags |= subprocess.CREATE_NO_WINDOW
+        if hasattr(subprocess, "STARTF_USESHOWWINDOW"):
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0
+        out = subprocess.check_output(
+            cmd,
+            text=True,
+            timeout=1.5,
+            stderr=subprocess.DEVNULL,
+            creationflags=creationflags,
+            startupinfo=startupinfo,
+        )
         target = re.search(r"svr hostname\s*=\s*([^\s\r\n]+)", out, re.IGNORECASE)
         port_m = re.search(r"port\s*=\s*(\d+)", out, re.IGNORECASE)
         if target and port_m:
@@ -80,6 +95,33 @@ def resolve_minecraft_srv(address: str, default_port: int = 25565) -> Tuple[str,
         pass
 
     return host, default_port
+
+
+def extract_chat_component_text(component: Any) -> str:
+    """Recursively extracts plain text from a Minecraft chat component."""
+    if component is None:
+        return ""
+    if isinstance(component, str):
+        return component
+    if isinstance(component, (int, float, bool)):
+        return str(component)
+    if isinstance(component, list):
+        return "".join(extract_chat_component_text(x) for x in component)
+    if isinstance(component, dict):
+        parts = []
+        if "text" in component:
+            parts.append(str(component["text"]))
+        if "translate" in component:
+            with_parts = component.get("with", [])
+            if isinstance(with_parts, list):
+                parts.append(" ".join(extract_chat_component_text(x) for x in with_parts))
+            else:
+                parts.append(str(component["translate"]))
+        if "extra" in component and isinstance(component["extra"], list):
+            for extra in component["extra"]:
+                parts.append(extract_chat_component_text(extra))
+        return "".join(parts)
+    return ""
 
 
 def ping_minecraft_server(address: str, timeout: float = 2.5) -> Dict[str, Any]:
@@ -98,7 +140,14 @@ def ping_minecraft_server(address: str, timeout: float = 2.5) -> Dict[str, Any]:
             "error": "Empty address",
         }
 
-    host, port = resolve_minecraft_srv(address)
+    clean_addr = address.strip()
+    if ":" in clean_addr:
+        orig_host = clean_addr.split(":", 1)[0].strip()
+    else:
+        orig_host = clean_addr
+
+    host, port = resolve_minecraft_srv(clean_addr)
+    handshake_host = orig_host or host
     t0 = time.perf_counter()
 
     try:
@@ -107,7 +156,7 @@ def ping_minecraft_server(address: str, timeout: float = 2.5) -> Dict[str, Any]:
             s.settimeout(timeout)
 
             # 1. Handshake packet (ID 0x00, protocol 767 for modern 1.21.x, next state 1 = status)
-            host_bytes = host.encode("utf-8")
+            host_bytes = handshake_host.encode("utf-8")
             packet = bytearray()
             packet += b"\x00"  # Packet ID
             packet += encode_varint(767)  # Protocol version
@@ -143,17 +192,29 @@ def ping_minecraft_server(address: str, timeout: float = 2.5) -> Dict[str, Any]:
 
         # Parse player info
         players_dict = raw_json.get("players", {})
-        players_online = int(players_dict.get("online", 0))
-        players_max = int(players_dict.get("max", 0))
+        if not isinstance(players_dict, dict):
+            players_dict = {}
+
+        try:
+            players_online = int(players_dict.get("online", 0))
+        except (TypeError, ValueError):
+            players_online = 0
+
+        try:
+            players_max = int(players_dict.get("max", 0))
+        except (TypeError, ValueError):
+            players_max = 0
 
         raw_sample = players_dict.get("sample", [])
         clean_sample: List[str] = []
         if isinstance(raw_sample, list):
             for p in raw_sample:
-                if isinstance(p, dict) and "name" in p:
-                    cleaned_name = clean_minecraft_formatting(str(p["name"]))
-                    if cleaned_name:
-                        clean_sample.append(cleaned_name)
+                if isinstance(p, dict):
+                    name_raw = p.get("name")
+                    if name_raw:
+                        cleaned_name = clean_minecraft_formatting(extract_chat_component_text(name_raw))
+                        if cleaned_name:
+                            clean_sample.append(cleaned_name)
                 elif isinstance(p, str):
                     cleaned_name = clean_minecraft_formatting(p)
                     if cleaned_name:
@@ -166,11 +227,7 @@ def ping_minecraft_server(address: str, timeout: float = 2.5) -> Dict[str, Any]:
 
         # Parse description / motd
         desc = raw_json.get("description", "")
-        motd = ""
-        if isinstance(desc, dict):
-            motd = clean_minecraft_formatting(desc.get("text", ""))
-        elif isinstance(desc, str):
-            motd = clean_minecraft_formatting(desc)
+        motd = clean_minecraft_formatting(extract_chat_component_text(desc))
 
         return {
             "online": True,

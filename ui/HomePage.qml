@@ -28,6 +28,7 @@ Item {
     readonly property string bodyUrl: typeof accountController !== "undefined" && accountController ? accountController.bodyUrl : ""
     readonly property string skinTextureUrl: typeof accountController !== "undefined" && accountController ? accountController.skinTextureUrl : ""
     readonly property string capeTextureUrl: typeof accountController !== "undefined" && accountController ? accountController.capePreviewTextureUrl : ""
+    readonly property bool isAccountOnline: typeof accountController !== "undefined" && accountController ? accountController.isOnline : false
     readonly property bool hasBackgroundVideo: {
         var p = typeof profileController !== "undefined" && profileController ? profileController.customBackgroundImage : ""
         return /\.(mp4|webm|mov|mkv)$/i.test(p)
@@ -503,7 +504,7 @@ Item {
                 ColumnLayout {
                     spacing: -1
                     Text {
-                        text: homeRoot.isLaunching ? EzI18n.text("WEITERE INSTANZ") : EzI18n.t("home_play", "SPIELEN")
+                        text: homeRoot.isLaunching ? EzI18n.text("WEITERE INSTANZ") : (!homeRoot.isAccountOnline ? EzI18n.text("ANMELDEN & SPIELEN") : EzI18n.t("home_play", "SPIELEN"))
                         font.family: EzTheme.mcFontFamily
                         font.pixelSize: 19
                         font.bold: true
@@ -512,7 +513,7 @@ Item {
                         Layout.alignment: Qt.AlignHCenter
                     }
                     Text {
-                        text: homeRoot.activeName + "  ·  " + homeRoot.activeLoader + " " + homeRoot.activeVersion
+                        text: !homeRoot.isAccountOnline ? EzI18n.text("Microsoft-Konto in EzClient erforderlich") : (homeRoot.activeName + "  ·  " + homeRoot.activeLoader + " " + homeRoot.activeVersion)
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 10
                         font.bold: true
@@ -528,6 +529,10 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
+                    if (!homeRoot.isAccountOnline && typeof accountController !== "undefined" && accountController) {
+                        accountController.openLoginDialog()
+                        return
+                    }
                     if (profileController) {
                         profileController.launchActiveProfile()
                     }
@@ -1397,6 +1402,10 @@ Item {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
+                                                if (!homeRoot.isAccountOnline && typeof accountController !== "undefined" && accountController) {
+                                                    accountController.openLoginDialog()
+                                                    return
+                                                }
                                                 if (profileController) {
                                                     profileController.launchActiveProfileWithServer(modelData.ip)
                                                 }
@@ -1591,6 +1600,10 @@ Item {
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
+                                        if (!homeRoot.isAccountOnline && typeof accountController !== "undefined" && accountController) {
+                                            accountController.openLoginDialog()
+                                            return
+                                        }
                                         if (profileController) {
                                             profileController.launchActiveProfileWithServer(modelData.ip)
                                         }
@@ -1606,6 +1619,10 @@ Item {
                             cursorShape: Qt.PointingHandCursor
                             z: -1
                             onClicked: {
+                                if (!homeRoot.isAccountOnline && typeof accountController !== "undefined" && accountController) {
+                                    accountController.openLoginDialog()
+                                    return
+                                }
                                 if (profileController) {
                                     profileController.launchActiveProfileWithServer(modelData.ip)
                                 }
