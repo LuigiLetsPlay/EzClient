@@ -43,7 +43,7 @@ public final class FeatureStyleScreen extends Screen {
             slider(tr("ezclient.style.scale"), module.getScale(), .5, 2, module::setScale);
             toggle(tr("ezclient.style.smooth_font"), module.isCustomFont(), module::setCustomFont);
             toggle(tr("ezclient.style.text_shadow"), module.isTextShadow(), module::setTextShadow);
-            slider(tr("ezclient.style.corner_radius"), module.getCornerRadius(), 0, 6, v -> module.setCornerRadius((int)v));
+            slider(tr("ezclient.style.corner_radius"), module.getCornerRadius(), 0, 1, v -> module.setCornerRadius((int)v));
         } else if (page == 1) {
             toggle(tr("ezclient.style.box"), module.hasBackground(), module::setBackground);
             toggle(tr("ezclient.style.border"), module.hasBorder(), module::setBorder);

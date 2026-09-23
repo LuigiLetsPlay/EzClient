@@ -5,6 +5,7 @@ import "components"
 
 Window {
     id: liveLogsWindow
+    property var mainWindow: null
     width: 1060
     height: 640
     minimumWidth: 800
@@ -17,6 +18,10 @@ Window {
     onClosing: function(close) {
         close.accepted = false
         liveLogsWindow.hide()
+        if ((!liveLogsWindow.mainWindow || !liveLogsWindow.mainWindow.visible)
+                && (!profileController || !profileController.minimizeToTray)) {
+            Qt.quit()
+        }
     }
 
     property var liveLogService: (typeof profileController !== "undefined" && profileController) ? profileController.liveLogService : null

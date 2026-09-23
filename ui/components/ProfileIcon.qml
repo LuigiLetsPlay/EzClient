@@ -26,6 +26,10 @@ Item {
         if (s === "ezclient" || s === "logo" || s === "ezclient.png") {
             return Qt.resolvedUrl("../assets/logo.png")
         }
+        if (s === "curseforge") return Qt.resolvedUrl("../icons/curseforge.svg")
+        if (s === "modrinth") return Qt.resolvedUrl("../icons/modrinth.svg")
+        if (s === "lunar" || s === "client-lunar") return Qt.resolvedUrl("../icons/client-lunar.svg")
+        if (s === "labymod" || s === "client-labymod") return Qt.resolvedUrl("../icons/client-labymod.svg")
         if (s === "grass-block" || s === "box") return Qt.resolvedUrl("../icons/grass-block.png")
         if (s === "sand-block" || s === "sand") return Qt.resolvedUrl("../icons/sand-block.png")
         if (s === "tnt") return Qt.resolvedUrl("../icons/tnt.png")
@@ -66,7 +70,7 @@ Item {
         Image {
             id: img
             anchors.fill: parent
-            anchors.margins: root.isCustomImage ? 0 : ((root.iconNameOrPath === "norisk" || root.iconNameOrPath === "ezclient" || root.iconNameOrPath === "grass-block" || root.iconNameOrPath === "box") ? 4 : 7)
+            anchors.margins: root.isCustomImage ? 0 : ((["norisk", "ezclient", "curseforge", "modrinth", "lunar", "labymod", "grass-block", "box"].indexOf(root.iconNameOrPath) !== -1) ? 4 : 7)
             fillMode: root.isCustomImage ? Image.PreserveAspectCrop : Image.PreserveAspectFit
             source: root.effectiveSource
             visible: status === Image.Ready && root.effectiveSource !== ""

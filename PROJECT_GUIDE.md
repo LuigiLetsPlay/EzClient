@@ -12,7 +12,7 @@ EzClient besteht aus:
 - versionsabhängigen Fabric-/Legacy-Fabric-Mod-JARs;
 - einem PyInstaller-Build für `EzClient.exe` und einem nativen Inno-Setup-Build für `EzClient-Setup.exe`.
 
-Aktuelle Produktversion: `2.2.3`.
+Aktuelle Produktversion: `2.2.4`.
 
 Es gibt keine Lite-Version mehr. Neue Builds, UI-Texte und Releases dürfen keine `EzClient-Lite`-Artefakte erzeugen oder voraussetzen.
 
@@ -70,9 +70,9 @@ Nur die Minecraft-Reihe 26.x wird aktiv als EzClient-Mod gepflegt.
 26.1, 26.1.1 und 26.2 erhalten jeweils eine exakt passende JAR mit Java 25:
 
 ```text
-EzClient-2.2.3+26.1.jar
-EzClient-2.2.3+26.1.1.jar
-EzClient-2.2.3+26.2.jar
+EzClient-2.2.4+26.1.jar
+EzClient-2.2.4+26.1.1.jar
+EzClient-2.2.4+26.2.jar
 ```
 
 Eine JAR darf niemals als Ersatz für eine andere Minecraft-Version umbenannt werden.

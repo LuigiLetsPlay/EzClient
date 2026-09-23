@@ -63,7 +63,7 @@ public abstract class HudModule extends Module {
     // ── Badlion Systemwide Standard Styling ──
     private boolean textShadow = true;
     private boolean customFont = false;
-    private int cornerRadius = 3;
+    private int cornerRadius = 1;
     private int borderWidth = 3;
     private float rainbowSpeed = 1.0f;
     private float rainbowSaturation = 0.85f;
@@ -167,8 +167,8 @@ public abstract class HudModule extends Module {
     public boolean isCustomFont() { return customFont; }
     public void setCustomFont(boolean customFont) { this.customFont = customFont; ConfigManager.save(); }
 
-    public int getCornerRadius() { return cornerRadius; }
-    public void setCornerRadius(int cornerRadius) { this.cornerRadius = Math.max(0, Math.min(6, cornerRadius)); ConfigManager.save(); }
+    public int getCornerRadius() { return Math.min(1, cornerRadius); }
+    public void setCornerRadius(int cornerRadius) { this.cornerRadius = Math.max(0, Math.min(1, cornerRadius)); ConfigManager.save(); }
 
     public int getBorderWidth() { return borderWidth; }
     public void setBorderWidth(int borderWidth) { this.borderWidth = Math.max(2, Math.min(4, borderWidth)); ConfigManager.save(); }
@@ -540,7 +540,7 @@ public abstract class HudModule extends Module {
         this.borderColor = 0xFF22C96E;
         this.textShadow = true;
         this.customFont = false;
-        this.cornerRadius = 3;
+        this.cornerRadius = 1;
         this.borderWidth = 3;
         this.rainbowSpeed = 1.0f;
         this.rainbowSaturation = 0.85f;

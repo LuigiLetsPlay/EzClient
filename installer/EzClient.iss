@@ -1,5 +1,5 @@
 #define MyAppName "EzClient"
-#define MyAppVersion "2.2.3"
+#define MyAppVersion "2.2.4"
 #define MyAppPublisher "Luigi / EzClient"
 #define MyAppURL "https://github.com/LuigiLetsPlay/EzClient"
 #define MyAppExeName "EzClient.exe"
@@ -26,13 +26,13 @@ SolidCompression=yes
 WizardStyle=modern
 CloseApplications=force
 RestartApplications=no
-VersionInfoVersion=2.2.3.0
+VersionInfoVersion=2.2.4.0
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription=EzClient Setup
 VersionInfoTextVersion={#MyAppVersion}
 VersionInfoCopyright=Copyright (C) 2026 {#MyAppPublisher}
 VersionInfoProductName={#MyAppName}
-VersionInfoProductVersion=2.2.3.0
+VersionInfoProductVersion=2.2.4.0
 
 
 [Languages]
@@ -64,4 +64,21 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: s
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: IsUpdateMode
+
+[Code]
+function IsUpdateMode: Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+  begin
+    if CompareText(ParamStr(I), '--update') = 0 then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
+end;
 

@@ -6,6 +6,9 @@ import urllib.request
 import urllib.parse
 import json
 import time
+import shutil
+
+from backend.models.types import APP_VERSION
 
 MOJANG_SKIN_URL = "https://api.minecraftservices.com/minecraft/profile/skins"
 
@@ -50,7 +53,7 @@ def upload_skin_file(access_token: str, file_path: str | Path, variant: str = "c
             headers={
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": f"multipart/form-data; boundary={boundary}",
-                "User-Agent": "EzClient/1.1.9"
+                "User-Agent": f"EzClient/{APP_VERSION}"
             },
             method="POST"
         )
@@ -82,7 +85,7 @@ def reset_skin_to_default(access_token: str) -> tuple[bool, str]:
             MOJANG_SKIN_URL,
             headers={
                 "Authorization": f"Bearer {access_token}",
-                "User-Agent": "EzClient/1.1.9"
+                "User-Agent": f"EzClient/{APP_VERSION}"
             },
             method="DELETE"
         )
@@ -261,27 +264,49 @@ def get_saved_skins() -> list[dict]:
     return []
 
 
-def save_skin_to_library(name: str, path: str, preview_url: str = "") -> list[dict]:
+def save_skin_to_library(name: str, path: str, preview_url: str = "", model: str = "default") -> list[dict]:
     skins = get_saved_skins()
     clean_name = (name or "").strip()
     if not clean_name:
         clean_name = "Mein Skin"
 
-    # If preview_url is not set and path is a local file, generate rendered preview
-    if not preview_url and path and Path(path).exists():
+    skin_id = f"skin_{int(time.time())}_{len(skins)}"
+
+    # Store an immutable copy.  Pointing a library entry at the account cache
+    # made saved skins silently change whenever that cache was refreshed.
+    source_path = Path(path) if path else None
+    if source_path and source_path.is_file():
+        library_dir = get_skins_dir() / "library"
+        library_dir.mkdir(parents=True, exist_ok=True)
+        suffix = source_path.suffix.lower() if source_path.suffix else ".png"
+        saved_path = library_dir / f"{skin_id}{suffix}"
+        shutil.copy2(source_path, saved_path)
+        path = str(saved_path)
+
+    # Always derive the card preview from the same full texture that will be
+    # opened later.  A remote head preview must never stand in for skin data.
+    if path and Path(path).exists():
         body_p, av_p = generate_skin_renders(path)
         if av_p:
             preview_url = "file:///" + str(Path(av_p)).replace("\\", "/")
 
-    skin_id = f"skin_{int(time.time())}_{len(skins)}"
     # Deduplicate by name
+    replaced = [s for s in skins if s.get("name", "").lower() == clean_name.lower()]
     skins = [s for s in skins if s.get("name", "").lower() != clean_name.lower()]
+    for old in replaced:
+        old_path = Path(str(old.get("path") or ""))
+        try:
+            if old_path.parent == get_skins_dir() / "library" and old_path != Path(path):
+                old_path.unlink(missing_ok=True)
+        except OSError:
+            pass
     skins.insert(0, {
         "id": skin_id,
         "name": clean_name,
         "path": path or "",
         "previewUrl": preview_url or f"https://mc-heads.net/avatar/{clean_name}/64",
-        "savedAt": int(time.time())
+        "savedAt": int(time.time()),
+        "model": "slim" if model == "slim" else "default",
     })
     try:
         (get_skins_dir() / "saved_skins.json").write_text(json.dumps(skins, indent=2), "utf-8")
@@ -293,7 +318,15 @@ def save_skin_to_library(name: str, path: str, preview_url: str = "") -> list[di
 def delete_saved_skin_from_library(skin_id_or_name: str) -> list[dict]:
     skins = get_saved_skins()
     target = (skin_id_or_name or "").strip().lower()
+    removed = [s for s in skins if s.get("id", "").lower() == target or s.get("name", "").lower() == target]
     skins = [s for s in skins if s.get("id", "").lower() != target and s.get("name", "").lower() != target]
+    for item in removed:
+        saved_path = Path(str(item.get("path") or ""))
+        try:
+            if saved_path.parent == get_skins_dir() / "library":
+                saved_path.unlink(missing_ok=True)
+        except OSError:
+            pass
     try:
         (get_skins_dir() / "saved_skins.json").write_text(json.dumps(skins, indent=2), "utf-8")
     except Exception:

@@ -585,6 +585,14 @@ Item {
                 }
             }
 
+            EzButton {
+                visible: profileController && profileController.activeCanInstallEzClient
+                text: EzI18n.text("EzClient hinzufügen")
+                Layout.preferredHeight: 34
+                Layout.preferredWidth: visible ? 170 : 0
+                onClicked: profileController.installEzClientToActiveProfile()
+            }
+
             // Add mods button taking user to Modrinth Store
             EzButton {
                 text: EzI18n.text("Hinzufügen")

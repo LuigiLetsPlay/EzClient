@@ -3,6 +3,10 @@ import QtQuick 2.15
 // Displays the visible 10x16 vanilla cape face, or an animated GIF preview.
 Item {
     id: root
+    // The grid view is a strict front-face viewport.  The surrounding card
+    // also clips today, but keeping the crop local prevents future layouts
+    // from exposing the remaining cape atlas faces.
+    clip: true
     property string capeSource: ""
     property string animationSource: ""
 

@@ -45,6 +45,8 @@ ApplicationWindow {
     function handleClose() {
         if (typeof profileController !== "undefined" && profileController && profileController.minimizeToTray) {
             window.hide()
+        } else if (globalLiveLogsWindow.visible) {
+            window.hide()
         } else {
             Qt.quit()
         }
@@ -52,6 +54,9 @@ ApplicationWindow {
 
     onClosing: function(close) {
         if (typeof profileController !== "undefined" && profileController && profileController.minimizeToTray) {
+            close.accepted = false
+            window.hide()
+        } else if (globalLiveLogsWindow.visible) {
             close.accepted = false
             window.hide()
         } else {
@@ -694,6 +699,7 @@ ApplicationWindow {
     LiveLogsWindow {
         id: globalLiveLogsWindow
         objectName: "globalLiveLogsWindow"
+        mainWindow: window
     }
 
     // ─────────────────────────────────────────

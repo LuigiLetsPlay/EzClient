@@ -14,9 +14,8 @@ from backend.models.types import ProfileData, ModData, DATA_DIR, APP_VERSION
 from backend.services.store import ProfileStore, ezclient_asset_name, has_ezclient_asset
 from backend.models.profile_model import ProfileModel
 from backend.models.mod_model import ModModel
-from backend.services.minecraft import detect_launcher, launch_minecraft_official, launcher_install_exit_code, patch_launcher_profile, java_path, minecraft_dir
+from backend.services.minecraft import java_path, minecraft_dir
 from backend.services.mod_downloader import sync_profile_mods
-from backend.services.process_watcher import MinecraftWatcher
 from backend.services.direct_launch import launch_minecraft_direct
 from backend.services.live_log_service import LiveLogService
 from backend.services.minecraft_versions import FROZEN_EZCLIENT_VERSION, is_frozen_ezclient_version
@@ -901,7 +900,38 @@ class ProfileController(QObject):
                 return (2, n)
             return (3, n)
 
-        sorted_mods = sorted(profile.mods, key=_sort_key)
+        merged_mods = list(profile.mods)
+        known_filenames = {
+            (m.filename or "").lower().removesuffix(".disabled")
+            for m in merged_mods if m.filename
+        }
+        known_ids = {
+            (m.slug or m.project_id or "").lower()
+            for m in merged_mods if (m.slug or m.project_id)
+        }
+        for scanned in self._installed_registry.installed_mods:
+            filename = str(scanned.get("filename") or "")
+            clean_filename = filename.lower().removesuffix(".disabled")
+            mod_id = str(scanned.get("slug") or scanned.get("mod_id") or Path(filename).stem).lower()
+            if clean_filename in known_filenames or mod_id in known_ids:
+                continue
+            merged_mods.append(ModData(
+                project_id=str(scanned.get("project_id") or mod_id),
+                slug=mod_id,
+                name=str(scanned.get("name") or Path(filename).stem),
+                version_id="local",
+                version=str(scanned.get("version") or "Lokal"),
+                filename=filename,
+                enabled=not filename.lower().endswith(".disabled"),
+                author=str(scanned.get("authors") or "Lokal"),
+                description=str(scanned.get("description") or "Lokal installierte Erweiterung"),
+                icon_url=str(scanned.get("icon_url") or ""),
+                source="local",
+            ))
+            known_filenames.add(clean_filename)
+            known_ids.add(mod_id)
+
+        sorted_mods = sorted(merged_mods, key=_sort_key)
         rp_entries = self._local_pack_entries(profile.path / "resourcepacks", "resourcepacks", "Ressourcenpaket", self)
         sp_entries = self._local_pack_entries(profile.path / "shaderpacks", "shaderpacks", "Shader-Paket", self)
         return sorted_mods + rp_entries + sp_entries
@@ -1184,15 +1214,40 @@ class ProfileController(QObject):
 
     @Property(bool, notify=activeProfileChanged)
     def activeHasEzClient(self) -> bool:
-        return bool(self._active_profile and self._active_profile.profile_type == "ezclient")
+        if not self._active_profile:
+            return False
+        return any(
+            (m.slug or m.project_id or "").lower() in ("ezclient", "ezclient-core")
+            or "ezclient" in (m.filename or "").lower()
+            for m in self._active_profile.mods
+        )
+
+    @Property(bool, notify=activeProfileChanged)
+    def activeCanInstallEzClient(self) -> bool:
+        p = self._active_profile
+        if not p:
+            return False
+        from backend.services.minecraft_versions import is_active_ezclient_version
+        return bool(
+            p.loader.lower() == "fabric"
+            and is_active_ezclient_version(p.minecraft_version)
+            and not self.activeHasEzClient
+        )
+
+    @Slot()
+    def installEzClientToActiveProfile(self) -> None:
+        if not self._active_profile or not self.activeCanInstallEzClient:
+            return
+        self._inspected_profile = self._active_profile
+        self.installEzClientToInspectedProfile()
 
     @Property(int, notify=activeProfileChanged)
     def activeModsCount(self) -> int:
-        return len(self._active_profile.mods) if self._active_profile else 0
+        return self._mod_model.rowCount() if self._active_profile else 0
 
     @Property(str, notify=activeProfileChanged)
     def activeLastPlayed(self) -> str:
-        return self._active_profile.last_played if self._active_profile else "Never"
+        return self._format_last_played(self._active_profile)
 
     @Property(str, notify=activeProfileChanged)
     def activeGameDir(self) -> str:
@@ -1316,7 +1371,17 @@ class ProfileController(QObject):
         if not p:
             return False
         from backend.services.minecraft_versions import is_active_ezclient_version
-        return bool(p.loader.lower() == "fabric" and is_active_ezclient_version(p.minecraft_version) and p.profile_type != "ezclient")
+        has_core = any(
+            (m.slug or m.project_id or "").lower() in ("ezclient", "ezclient-core")
+            or "ezclient" in (m.filename or "").lower()
+            for m in p.mods
+        )
+        return bool(
+            p.loader.lower() == "fabric"
+            and is_active_ezclient_version(p.minecraft_version)
+            and p.profile_type != "ezclient"
+            and not has_core
+        )
 
     @Slot()
     def installEzClientToInspectedProfile(self) -> None:
@@ -1336,7 +1401,17 @@ class ProfileController(QObject):
 
     @Property(str, notify=inspectedProfileChanged)
     def inspectedLastPlayed(self) -> str:
-        return self._inspected_profile.last_played if self._inspected_profile else "Never"
+        return self._format_last_played(self._inspected_profile)
+
+    @staticmethod
+    def _format_last_played(profile: ProfileData | None) -> str:
+        if not profile or not profile.last_played or profile.last_played == "Never":
+            return "Never"
+        try:
+            from datetime import datetime
+            return datetime.fromisoformat(profile.last_played).strftime("%d.%m.%Y %H:%M")
+        except (TypeError, ValueError):
+            return profile.last_played
 
     @Property(str, notify=inspectedProfileChanged)
     def inspectedGameDir(self) -> str:
@@ -1764,10 +1839,10 @@ class ProfileController(QObject):
 
     @Slot()
     def scanNoRiskProfiles(self) -> None:
-        """Scan local NoRiskClient installations."""
+        """Scan supported local launchers without modifying their profiles."""
         def _scan():
-            from backend.services.norisk_importer import discover_norisk_profiles
-            self._norisk_profiles = discover_norisk_profiles()
+            from backend.services.client_importer import discover_client_profiles
+            self._norisk_profiles = discover_client_profiles()
             try:
                 self.noriskProfilesChanged.emit()
             except RuntimeError:
@@ -1775,8 +1850,9 @@ class ProfileController(QObject):
         threading.Thread(target=_scan, daemon=True).start()
 
     @Slot(str, bool)
-    def importNoRiskProfile(self, profile_id: str, add_performance: bool = True) -> None:
-        """Import a discovered NoRiskClient profile into EzClient."""
+    @Slot(str, bool, bool)
+    def importNoRiskProfile(self, profile_id: str, add_performance: bool = True, convert_waypoints: bool = False) -> None:
+        """Import a discovered third-party profile into EzClient."""
         def _worker():
             from backend.services.norisk_importer import import_norisk_files
             found = next((p for p in self._norisk_profiles if p.get("id") == profile_id), None)
@@ -1785,16 +1861,20 @@ class ProfileController(QObject):
                 return
             try:
                 self.noriskImportProgress.emit(0.05, "Profil wird erstellt …")
-                name = found.get("name") or "NoRisk Import"
+                source_client = str(found.get("sourceClient") or "NoRiskClient")
+                name = found.get("name") or f"{source_client} Import"
                 version = found.get("version") or "1.20.1"
                 loader = found.get("loader") or "Fabric"
                 preset = "ezclient" if add_performance else "raw"
                 profile = self._store.create_profile(
-                    name=name, version=version, loader=loader, preset=preset, icon="norisk"
+                    name=name, version=version, loader=loader, preset=preset,
+                    icon={"NoRiskClient": "norisk", "Modrinth": "modrinth", "CurseForge": "curseforge",
+                          "Prism Launcher": "grass-block", "MultiMC": "grass-block"}.get(source_client, "grass-block")
                 )
                 import_norisk_files(
                     found, profile,
-                    progress=lambda p, msg: self.noriskImportProgress.emit(p * 0.7, msg)
+                    progress=lambda p, msg: self.noriskImportProgress.emit(p * 0.7, msg),
+                    convert_xaero_waypoints=convert_waypoints,
                 )
                 if add_performance:
                     from backend.services.store import performance_mods_for_version, ezclient_asset_name
@@ -1877,7 +1957,21 @@ class ProfileController(QObject):
                 self._sync_models()
                 self.activeProfileChanged.emit()
                 self._sync_mods_after_change(self._active_profile)
-                break
+                return
+        # JARs copied in manually are intentionally not injected into the
+        # persistent Modrinth manifest.  They can still be enabled/disabled by
+        # renaming the physical file, exactly like managed mods.
+        target = next((item for item in self._installed_registry.installed_mods if
+                       str(item.get("mod_id") or "").lower() == mod_id.lower()
+                       or str(item.get("slug") or "").lower() == mod_id.lower()
+                       or str(item.get("name") or "").lower() == mod_id.lower()), None)
+        if target:
+            path = Path(str(target.get("path") or ""))
+            if path.is_file():
+                destination = (path.with_name(path.name[:-9]) if path.name.lower().endswith(".disabled")
+                               else path.with_name(path.name + ".disabled"))
+                path.rename(destination)
+                self._sync_models()
 
     def _sync_mods_after_change(self, profile: ProfileData) -> None:
         def _worker():
@@ -2044,10 +2138,23 @@ class ProfileController(QObject):
                 retained.append(m)
 
         self._active_profile.mods = retained
+        if not deleted_filenames:
+            local_match = next((item for item in self._installed_registry.installed_mods if
+                                str(item.get("mod_id") or "").lower() == mod_id_clean
+                                or str(item.get("slug") or "").lower() == mod_id_clean
+                                or (name_clean and str(item.get("name") or "").lower() == name_clean)), None)
+            if local_match:
+                local_name = Path(str(local_match.get("path") or "")).name
+                if local_name:
+                    deleted_filenames.append(local_name)
         self._active_profile.user_mods = [s for s in self._active_profile.user_mods if s.lower() not in (mod_id_clean, name_clean)]
         self._active_profile.managed_core_mods = [s for s in self._active_profile.managed_core_mods if s.lower() not in (mod_id_clean, name_clean)]
         self._active_profile.integrated_mods = [s for s in self._active_profile.integrated_mods if s.lower() not in (mod_id_clean, name_clean)]
         if is_ezclient:
+            # Uninstalling EzClient is an explicit opt-out.  Without changing
+            # the profile type, the managed-profile repair job would silently
+            # install the core again on the next launcher start.
+            self._active_profile.profile_type = "raw"
             self._active_profile.managed_core_mods = [s for s in self._active_profile.managed_core_mods if s.lower() not in ("ezclient", "ezclient-core")]
             self._active_profile.integrated_mods = [s for s in self._active_profile.integrated_mods if s.lower() not in ("ezclient", "ezclient-core")]
         self._store.save()
@@ -2061,7 +2168,7 @@ class ProfileController(QObject):
                     p = profile_path / fn
                     if p.exists():
                         p.unlink()
-                    p_dis = profile_path / (fn + ".disabled")
+                    p_dis = (profile_path / fn[:-9]) if fn.lower().endswith(".disabled") else (profile_path / (fn + ".disabled"))
                     if p_dis.exists():
                         p_dis.unlink()
                 except Exception as ex:
@@ -2314,6 +2421,13 @@ class ProfileController(QObject):
                     f"{profile.loader} {profile.minecraft_version}", session.username or "Player",
                     str(profile.path), instance_id,
                 )
+                # Record only a real, successfully spawned game.  Preparation
+                # failures must not make a profile look as if it was played.
+                from backend.models.types import now_iso
+                profile.last_played = now_iso()
+                self._store.settings["last_profile"] = profile.id
+                self._store.save()
+                self._syncNeeded.emit()
                 self._is_launching = False
                 _safe_emit_status("Minecraft läuft!", False)
                 if self.minimizeToTray:

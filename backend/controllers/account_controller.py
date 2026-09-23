@@ -1461,12 +1461,38 @@ class AccountController(QObject):
 
     @Slot(str, str)
     def saveCurrentSkin(self, name: str, path: str = "") -> None:
-        """Saves a custom skin with a custom name to the persistent library."""
+        """Save the full current texture, never just its head preview/name."""
         target_path = path or self._active_custom_path
         target_name = (name or "").strip() or self._active_custom_name or self._username or "Mein Skin"
-        avatar_to_save = self._active_custom_avatar or self.avatarUrl
-        from backend.services.skin_service import save_skin_to_library
-        save_skin_to_library(target_name, target_path, avatar_to_save)
+        from backend.services.skin_service import fetch_skin_by_username, get_skins_dir, save_skin_to_library
+
+        # An untouched account skin has no custom path.  Resolve the actual
+        # texture first; previously only the avatar was persisted, so a custom
+        # library label such as "Main" was later treated as a username.
+        if not target_path:
+            account_cache = get_skins_dir() / f"{self._username}.png"
+            if self._skin_url:
+                try:
+                    request = urllib.request.Request(
+                        self._skin_url,
+                        headers={"User-Agent": "EzClient-SkinLibrary"},
+                    )
+                    with urllib.request.urlopen(request, timeout=10) as response:
+                        raw = response.read(2 * 1024 * 1024 + 1)
+                    image = QImage()
+                    if len(raw) <= 2 * 1024 * 1024 and image.loadFromData(raw, "PNG"):
+                        account_cache.write_bytes(raw)
+                except Exception as exc:
+                    print(f"[AccountController] Could not refresh current account skin: {exc}")
+            if not account_cache.is_file():
+                success, fetched_path, error = fetch_skin_by_username(self._username)
+                if not success:
+                    self.skinUploadStatusChanged.emit(error, True)
+                    return
+                account_cache = Path(fetched_path)
+            target_path = str(account_cache)
+
+        save_skin_to_library(target_name, target_path, "", self.skinModel)
         self.savedSkinsChanged.emit()
         self.skinUploadStatusChanged.emit(f"Skin '{target_name}' in Bibliothek gespeichert!", False)
 

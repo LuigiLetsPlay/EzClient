@@ -42,7 +42,8 @@ public final class CommunityCapeManager {
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4)).build();
     private static volatile long nextRefresh;
     private static final java.util.concurrent.atomic.AtomicBoolean REFRESH_RUNNING = new java.util.concurrent.atomic.AtomicBoolean();
-    private static final Set<UUID> VISIBLE_CAPES = new HashSet<>();
+    private static final Set<UUID> VISIBLE_CAPES = ConcurrentHashMap.newKeySet();
+    private static final Set<UUID> PENDING_REFRESH = ConcurrentHashMap.newKeySet();
     private static volatile long nextVisualScan;
     private static volatile long nextLocalScan;
     private static volatile long localFingerprint = Long.MIN_VALUE;
@@ -277,8 +278,12 @@ public final class CommunityCapeManager {
     }
 
     private static void refreshNearby(List<UUID> ids) {
+        if (ids == null || ids.isEmpty()) return;
+        PENDING_REFRESH.addAll(ids);
         if (!REFRESH_RUNNING.compareAndSet(false, true)) return;
-        String query = String.join(",", ids.stream().map(UUID::toString).toList());
+        List<UUID> batch = new ArrayList<>(PENDING_REFRESH);
+        PENDING_REFRESH.removeAll(batch);
+        String query = String.join(",", batch.stream().map(UUID::toString).toList());
         WORKER.execute(() -> { try {
             String body = HTTP.send(HttpRequest.newBuilder(URI.create(API + "/capes/active?players=" + query)).timeout(Duration.ofSeconds(6)).GET().build(), CosmeticHttp.text()).body();
             Set<UUID> active = new HashSet<>();
@@ -295,11 +300,14 @@ public final class CommunityCapeManager {
                 if (!animationUrl.isBlank()) downloadAnimated(id, animationUrl);
                 else download(id, imageUrl);
             }
-            for (UUID id : ids) {
+            for (UUID id : batch) {
                 if (!active.contains(id) && REMOTE_KEYS.remove(id) != null) clearCape(id);
             }
         } catch (Exception ex) { EzClientMod.log("Cape: community sync unavailable (" + ex.getClass().getSimpleName() + ")."); }
-        finally { REFRESH_RUNNING.set(false); } });
+        finally {
+            REFRESH_RUNNING.set(false);
+            if (!PENDING_REFRESH.isEmpty()) refreshNearby(new ArrayList<>(PENDING_REFRESH));
+        } });
     }
 
     private static void download(UUID id, String url) { try {
@@ -429,6 +437,7 @@ public final class CommunityCapeManager {
     public static void clearSession() {
         for (UUID id : new ArrayList<>(CAPES.keySet())) clearCape(id);
         VISIBLE_CAPES.clear();
+        PENDING_REFRESH.clear();
         REMOTE_KEYS.clear();
         localFingerprint = Long.MIN_VALUE;
         nextLocalScan = nextVisualScan = nextRefresh = 0;

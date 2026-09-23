@@ -429,13 +429,7 @@ Item {
                 Layout.preferredHeight: 36
                 Layout.preferredWidth: 110
                 onClicked: {
-                    if (!accountController || !accountController.isOnline) {
-                        root.loginBeforeCreate = true
-                        accountController.openLoginDialog()
-                    } else {
-                        createDialog.opacity = 1.0
-                        nameField.forceActiveFocus()
-                    }
+                    root.navigate("versions")
                 }
             }
         }

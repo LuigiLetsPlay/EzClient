@@ -666,9 +666,8 @@ Item {
                                         if (accountController) {
                                             skinModal.previewFilePath = modelData.path
                                             skinModal.previewName = modelData.name
-                                            // Empty path means the skin was saved by username;
-                                            // resolve it as a real skin texture, never the head render.
                                             skinModal.previewTextureUrl = accountController.getSkinTextureUrl(modelData.path || modelData.name)
+                                            skinModal.skinVariant = modelData.model === "slim" ? "slim" : "classic"
                                             skinModal.isApplied = false
                                             if (modalSkin3D) modalSkin3D.updateSkin()
                                         }

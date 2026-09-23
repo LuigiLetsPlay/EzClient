@@ -87,11 +87,19 @@ def patch_profile_file(path: Path, profile: ProfileData, version_id: str) -> Non
     write_json(path, data)
 
 def patch_launcher_profile(profile: ProfileData, mc: Path | None = None) -> None:
+    """Keep the legacy official-launcher profile patcher callable for migrations.
+
+    EzClient's Play button does not use this function anymore; Minecraft is
+    launched directly by :func:`launch_minecraft_direct`.  ``mc`` remains an
+    optional argument because older callers and migration tools pass an
+    explicit Minecraft directory.
+    """
     from backend.services.store import preseed_optimized_profile_settings
     preseed_optimized_profile_settings(profile.path)
     version_id = fabric_version(profile.minecraft_version)
-    patch_profile_file(minecraft_dir() / "launcher_profiles.json", profile, version_id)
-    store_file = minecraft_dir() / "launcher_profiles_microsoft_store.json"
+    target_mc = Path(mc) if mc is not None else minecraft_dir()
+    patch_profile_file(target_mc / "launcher_profiles.json", profile, version_id)
+    store_file = target_mc / "launcher_profiles_microsoft_store.json"
     if store_file.exists():
         patch_profile_file(store_file, profile, version_id)
 

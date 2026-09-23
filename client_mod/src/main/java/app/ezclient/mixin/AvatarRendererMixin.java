@@ -49,7 +49,7 @@ abstract class AvatarRendererMixin {
             if (type == CommunityPresence.ClientType.NONE) return;
             Component badge = BADGE_CACHE.get(type);
             if (badge != null) {
-                state.nameTag = Component.empty().append(badge).append(state.nameTag);
+                state.nameTag = Component.empty().append(badge).append(Component.literal(" ")).append(state.nameTag);
             }
         } catch (Throwable ignored) {
         }

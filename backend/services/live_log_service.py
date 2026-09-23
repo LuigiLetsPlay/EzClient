@@ -170,6 +170,11 @@ class LiveLogService(QObject):
             }
             self._instance_order.append(instance_id)
             self._selected_id = instance_id
+        # The log window owns a small QML-side cache for filtering.  Selecting
+        # a fresh instance alone is not a strong enough reset when a launch is
+        # started while that window is already open, so explicitly delimit the
+        # new game session before its first bootstrap message arrives.
+        self.logsCleared.emit()
         self.instancesChanged.emit()
         self.selectedInstanceChanged.emit()
         self.isRunningChanged.emit()

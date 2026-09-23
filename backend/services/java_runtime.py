@@ -12,6 +12,8 @@ import zipfile
 from pathlib import Path
 from typing import Callable
 
+from backend.models.types import APP_VERSION
+
 SUPPORTED_JAVA_MAJORS = (8, 16, 17, 21, 25)
 
 
@@ -80,7 +82,7 @@ def install_required_java(
     archive_path = staging_parent / "jdk.zip" if system == "windows" else staging_parent / "jdk.tar.gz"
     notify(f"Lade Java {major_version} automatisch herunter…")
     try:
-        request = urllib.request.Request(url, headers={"User-Agent": "EzClient/1.6.5"})
+        request = urllib.request.Request(url, headers={"User-Agent": f"EzClient/{APP_VERSION}"})
         with urllib.request.urlopen(request, timeout=60) as response, archive_path.open("wb") as output:
             total = int(response.headers.get("Content-Length") or 0)
             downloaded = 0

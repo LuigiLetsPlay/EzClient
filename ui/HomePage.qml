@@ -15,6 +15,21 @@ Item {
         onTriggered: if (profileController) profileController.refreshEzClientUpdateState()
     }
 
+    Timer {
+        interval: 30000
+        repeat: true
+        triggeredOnStart: true
+        running: homeRoot.visible
+                 && recentServersWidget.visible
+                 && !recentServersWidget.isCollapsed
+        onTriggered: {
+            if (profileController) {
+                profileController.refreshHomeServers()
+                homeRoot.refreshRecentServers()
+            }
+        }
+    }
+
     readonly property bool hasProfile: typeof profileController !== "undefined" && profileController && profileController.activeName !== "No Profile" && profileController.activeName !== ""
     readonly property string activeName: typeof profileController !== "undefined" && profileController ? profileController.activeName : ""
     readonly property string activeVersion: typeof profileController !== "undefined" && profileController ? profileController.activeVersion : "26.2"

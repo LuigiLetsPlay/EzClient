@@ -53,6 +53,21 @@ class LiveLogServiceTests(unittest.TestCase):
             self.assertIn("only one", service.getAllLogsText())
             self.assertNotIn("only two", service.getAllLogsText())
 
+    def test_begin_instance_announces_clean_visible_session(self):
+        service = LiveLogService()
+        resets = []
+        service.logsCleared.connect(lambda: resets.append(True))
+        with tempfile.TemporaryDirectory() as tmp:
+            old_id = service.begin_instance(Path(tmp) / "old.log", "Old", "Fabric", "A", tmp)
+            service.append_system_message("old session", instance_id=old_id)
+            resets.clear()
+
+            new_id = service.begin_instance(Path(tmp) / "new.log", "New", "Fabric", "A", tmp)
+
+            self.assertEqual([True], resets)
+            self.assertEqual(new_id, service.selectedInstanceId)
+            self.assertNotIn("old session", service.getAllLogsText())
+
     def test_stopped_instance_keeps_logs_and_has_starttime(self):
         service = LiveLogService()
         with tempfile.TemporaryDirectory() as tmp:

@@ -4,9 +4,11 @@ import urllib.parse
 from typing import Any
 import ssl
 
+from backend.models.types import APP_VERSION
+
 CURSEFORGE_API_KEY = "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm"
 BASE_URL = "https://api.curseforge.com/v1"
-USER_AGENT = "EzClient/1.1.9 (github.com/LuigiLetsPlay/EzClient)"
+USER_AGENT = f"EzClient/{APP_VERSION} (github.com/LuigiLetsPlay/EzClient)"
 
 # Loader mapping for CurseForge API
 LOADER_MAP = {

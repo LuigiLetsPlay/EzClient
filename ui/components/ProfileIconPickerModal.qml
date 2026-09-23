@@ -24,6 +24,10 @@ Item {
         { id: "sand-block", label: EzI18n.text("Sandblock"), icon: "sand-block" },
         { id: "norisk", label: "NoRisk", icon: "norisk" },
         { id: "ezclient", label: "EzClient", icon: "ezclient" },
+        { id: "curseforge", label: "CurseForge", icon: "curseforge" },
+        { id: "modrinth", label: "Modrinth", icon: "modrinth" },
+        { id: "lunar", label: "Lunar Client", icon: "lunar" },
+        { id: "labymod", label: "LabyMod", icon: "labymod" },
         { id: "tnt", label: "TNT", icon: "tnt" },
         { id: "potion", label: EzI18n.text("Trank"), icon: "potion" },
         { id: "clock", label: EzI18n.text("Uhr"), icon: "clock" },
@@ -89,7 +93,7 @@ Item {
                         color: EzTheme.text
                     }
                     Text {
-                        text: EzI18n.text("Wähle ein Icon aus oder lade ein eigenes Bild (PNG) hoch.")
+                        text: EzI18n.text("Wähle ein offizielles Client-Logo oder ein hochauflösendes Vanilla-Icon.")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 11
                         color: EzTheme.textMuted

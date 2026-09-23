@@ -642,8 +642,9 @@ def import_norisk_files(
 
     mods_dest.mkdir(parents=True, exist_ok=True)
 
+    source_client = str(discovered.get("sourceClient") or "NoRiskClient")
     if progress:
-        progress(0.10, "Kopiere NoRisk-Dateien …")
+        progress(0.10, f"Kopiere {source_client}-Dateien …")
 
     raw = discovered.get("raw") if isinstance(discovered.get("raw"), dict) else {}
     raw_mods = raw.get("mods") if isinstance(raw.get("mods"), list) else []
@@ -797,7 +798,8 @@ def import_norisk_files(
     if convert_xaero_waypoints:
         _write_ezclient_waypoints(destination, xaero_waypoints)
 
-    (destination / ".norisk-import").write_text("Preserve imported configuration", encoding="utf-8")
+    marker = ".norisk-import" if source_client == "NoRiskClient" else ".client-import"
+    (destination / marker).write_text(f"Imported from {source_client}; preserve configuration", encoding="utf-8")
 
     # 5. Apply JVM and memory settings
     profile.mods = imported_mods

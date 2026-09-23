@@ -130,7 +130,7 @@ Item {
                     spacing: 3
 
                     Text {
-                        text: root.creationHubView === "norisk" ? EzI18n.text("NoRiskClient-Profil übernehmen") : EzI18n.text("Neues Profil")
+                        text: root.creationHubView === "norisk" ? EzI18n.text("Profil aus anderem Client übernehmen") : EzI18n.text("Neues Profil")
                         font.family: EzTheme.fontFamily
                         font.pixelSize: 23
                         font.bold: true
@@ -247,9 +247,9 @@ Item {
                             action: "custom"
                         },
                         {
-                            title: EzI18n.text("Von NoRiskClient"),
-                            description: EzI18n.text("Vorhandene Profile samt Mods und Einstellungen übernehmen."),
-                            icon: "client-norisk.svg",
+                            title: EzI18n.text("Aus anderem Client"),
+                            description: EzI18n.text("Profile aus NoRiskClient, Modrinth, CurseForge, Prism oder MultiMC übernehmen."),
+                            icon: "extension-grid.svg",
                             action: "norisk"
                         }
                     ]
@@ -379,7 +379,7 @@ Item {
                                 anchors.centerIn: parent
                                 width: 28
                                 height: 28
-                                source: "../icons/client-norisk.svg"
+                                source: "../icons/" + (modelData.sourceIcon || "extension-grid.svg")
                             }
                         }
 
@@ -395,7 +395,7 @@ Item {
                                 color: EzTheme.text
                             }
                             Text {
-                                text: "Minecraft " + modelData.version + "  •  " + modelData.loader + "  •  " + modelData.modCount + " Mods"
+                                text: (modelData.sourceClient || "Client") + "  •  Minecraft " + modelData.version + "  •  " + modelData.loader + "  •  " + modelData.modCount + " Mods"
                                 font.family: EzTheme.fontFamily
                                 font.pixelSize: 11
                                 color: EzTheme.textMuted
@@ -444,7 +444,7 @@ Item {
 
                 Image {
                     Layout.alignment: Qt.AlignHCenter
-                    source: "../icons/client-norisk.svg"
+                    source: "../icons/extension-grid.svg"
                     width: 48
                     height: 48
                     opacity: 0.4
@@ -453,7 +453,7 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
-                    text: EzI18n.text("Keine lokal installierten NoRiskClient-Profile gefunden.")
+                    text: EzI18n.text("Keine importierbaren Profile anderer Clients gefunden.")
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 14
                     font.bold: true
@@ -463,7 +463,7 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
-                    text: EzI18n.text("Stelle sicher, dass NoRiskClient auf diesem PC installiert ist und Profile angelegt wurden.")
+                    text: EzI18n.text("Unterstützt werden NoRiskClient, Modrinth, CurseForge, Prism Launcher und MultiMC.")
                     font.family: EzTheme.fontFamily
                     font.pixelSize: 11
                     color: EzTheme.textSubtle

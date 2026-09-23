@@ -43,7 +43,7 @@ abstract class PlayerTabOverlayMixin {
             if (current == null) return;
             Component badge = BADGE_CACHE.get(type);
             if (badge != null) {
-                cir.setReturnValue(Component.empty().append(badge).append(current));
+                cir.setReturnValue(Component.empty().append(badge).append(Component.literal(" ")).append(current));
             }
         } catch (Throwable ignored) {
         }
